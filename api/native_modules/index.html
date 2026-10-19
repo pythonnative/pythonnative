@@ -898,6 +898,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1016,6 +1020,62 @@
     
   
     Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/devtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PythonNative Go & DevTools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging
   
 
     
@@ -1976,6 +2036,8 @@
   
     
     
+      
+        
       
         
       
@@ -4322,6 +4384,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.native_modules.linking.set_interceptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;set_interceptor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.native_modules.linking.set_initial_url" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5056,6 +5129,34 @@
     
   
     Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevTools agent
   
 
     
@@ -6846,6 +6947,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.native_modules.linking.set_interceptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;set_interceptor
+      
+    </span>
+  </a>
   
 </li>
       
@@ -14737,6 +14849,14 @@ URL that cold-started the app is kept and returned by
       </thead>
       <tbody>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_interceptor&lt;/span&gt; (&lt;code&gt;pythonnative.native_modules.linking.set_interceptor&lt;/code&gt;)" href="#pythonnative.native_modules.linking.set_interceptor">set_interceptor</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Install a hook that sees each deep link first and may consume it.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_initial_url&lt;/span&gt; (&lt;code&gt;pythonnative.native_modules.linking.set_initial_url&lt;/code&gt;)" href="#pythonnative.native_modules.linking.set_initial_url">set_initial_url</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -15099,6 +15219,32 @@ dispatched right after startup).</p>
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.native_modules.linking.set_interceptor" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">set_interceptor</span>
+
+
+<a href="#pythonnative.native_modules.linking.set_interceptor" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_interceptor</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">interceptor</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">],</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#bool">bool</a></span><span class="p">]],</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Install a hook that sees each deep link first and may consume it.</p>
+<p>Debug builds install the dev client's connect-link handler here, so
+<code>pn-&lt;app id&gt;://connect</code> links pair the app with <code>pn start</code>
+without becoming the app's initial URL. <code>interceptor(url)</code> returns
+<code>True</code> to consume the link.</p>
+
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-function">
 

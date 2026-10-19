@@ -1014,6 +1014,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1132,6 +1136,62 @@
     
   
     Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/devtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PythonNative Go & DevTools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging
   
 
     
@@ -2090,6 +2150,8 @@
   
     
     
+      
+        
       
         
       
@@ -3205,6 +3267,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevTools agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3775,7 +3865,12 @@ keeps dirtying itself for more than fifty passes raises
 <tr>
 <td>Dev loop</td>
 <td>Metro dev server; Expo Go / dev client on device; Fast Refresh</td>
-<td><code>pn start</code> dev server; debug builds and the <code>--dev-client</code> shell connect over an authenticated WebSocket; Fast Refresh reloads <code>.py</code> modules in place</td>
+<td><code>pn start</code> dev server with a QR code; PythonNative Go or the project's debug build connect over an authenticated WebSocket; Fast Refresh reloads <code>.py</code> modules in place</td>
+</tr>
+<tr>
+<td>Dev tools</td>
+<td>React Native DevTools, LogBox, the dev menu</td>
+<td>DevTools served by <code>pn start</code> (components, console and REPL, problems, network, performance); the dev menu, element inspector, and performance monitor on device; <code>debugpy</code> breakpoints from VS Code</td>
 </tr>
 <tr>
 <td>Navigation</td>

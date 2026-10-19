@@ -18,7 +18,7 @@
         <link rel="prev" href="../ios/">
       
       
-        <link rel="next" href="../browser-preview/">
+        <link rel="next" href="../devtools/">
       
       
         
@@ -900,6 +900,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1071,10 +1075,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-two-terminal-setup" class="md-nav__link">
+  <a href="#one-terminal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The two-terminal setup
+        One terminal
       
     </span>
   </a>
@@ -1144,21 +1148,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#physical-iphones" class="md-nav__link">
+  <a href="#physical-phones" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Physical iPhones
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-dev-client-shell-app" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The dev-client shell app
+        Physical phones
       
     </span>
   </a>
@@ -1240,6 +1233,62 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../devtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PythonNative Go & DevTools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2190,6 +2239,8 @@
   
     
     
+      
+        
       
         
       
@@ -3305,6 +3356,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../api/devtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevTools agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../api/hot_reload/" class="md-nav__link">
         
   
@@ -3685,10 +3764,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-two-terminal-setup" class="md-nav__link">
+  <a href="#one-terminal" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The two-terminal setup
+        One terminal
       
     </span>
   </a>
@@ -3758,21 +3837,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#physical-iphones" class="md-nav__link">
+  <a href="#physical-phones" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Physical iPhones
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-dev-client-shell-app" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The dev-client shell app
+        Physical phones
       
     </span>
   </a>
@@ -3894,29 +3962,80 @@ place. Native builds happen only when something native changes.</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  │                    │◄──────►│  renders through the bridge  │
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>  │  watches app/      │        └──────────────────────────────┘
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>  │  syncs sources     │  ws    ┌──────────────────────────────┐
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  │  streams logs      │◄──────►│  iOS Simulator / Android     │
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  │                    │        │  emulator (pn run)           │
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  │                    │  ws    ┌──────────────────────────────┐
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  │                    │◄──────►│  phone on the same Wi-Fi     │
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  └────────────────────┘        └──────────────────────────────┘
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>  │  streams logs      │◄──────►│  PythonNative Go, or your    │
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>  │  serves DevTools   │        │  debug build (simulator,     │
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>  │  proxies debugging │        │  emulator, phone on Wi-Fi)   │
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>  │                    │  ws    ┌──────────────────────────────┐
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>  │                    │◄──────►│  DevTools (browser tab)      │
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>  └────────────────────┘        └──────────────────────────────┘
 </span></code></pre></div>
-<h2 id="the-two-terminal-setup">The two-terminal setup<a class="headerlink" href="#the-two-terminal-setup" title="Permanent link">&para;</a></h2>
-<p>Terminal one runs the dev server for the whole session:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>start<span class="w">          </span><span class="c1"># dev server only</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pn<span class="w"> </span>preview<span class="w">        </span><span class="c1"># dev server and open the browser preview</span>
+<h2 id="one-terminal">One terminal<a class="headerlink" href="#one-terminal" title="Permanent link">&para;</a></h2>
+<p>Run the dev server for the whole session:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pn<span class="w"> </span>start<span class="w">          </span><span class="c1"># dev server, QR code, and key commands</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pn<span class="w"> </span>preview<span class="w">        </span><span class="c1"># the same, and open the browser preview</span>
 </span></code></pre></div>
-<p>Terminal two builds and launches a debug app whenever you need one:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pn<span class="w"> </span>run<span class="w"> </span>ios
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>pn<span class="w"> </span>run<span class="w"> </span>android
-</span></code></pre></div>
-<p><code>pn run</code> finds the dev server on <code>localhost:8765</code> (<code>--port</code> to change
-it), hands the server's URL and your <a href="#the-dev-token">dev token</a> to the
-debug build, installs it, and launches. The app connects on startup, pulls any sources newer than
-what it shipped with, and from then on Fast Refreshes on every save.
-Its <code>print()</code> output, tracebacks, and reload notices stream back to the
-<code>pn start</code> terminal, so you can leave <code>pn run</code> and keep working from one
-window.</p>
-<p>Rerunning <code>pn run</code> is cheap: when nothing native changed since the last
+<p><code>pn start</code> prints a QR code, the preview and DevTools URLs, and the
+debugger address, then reads single keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="keys"><kbd class="key-i">I</kbd></span>, <span class="keys"><kbd class="key-a">A</kbd></span></td>
+<td>Open the app on the iOS Simulator or an Android emulator: in <a href="../devtools/#pythonnative-go">PythonNative Go</a> when the project can run there, otherwise as the project's own debug build (<code>pn run</code>)</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-shift">Shift</kbd><span>+</span><kbd class="key-i">I</kbd></span>, <span class="keys"><kbd class="key-shift">Shift</kbd><span>+</span><kbd class="key-a">A</kbd></span></td>
+<td>Always build and run the project's own debug build</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-w">W</kbd></span></td>
+<td>Open the browser preview</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-j">J</kbd></span></td>
+<td>Open <a href="../devtools/#devtools">DevTools</a></td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-r">R</kbd></span></td>
+<td>Reload every connected app</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-m">M</kbd></span></td>
+<td>Open the <a href="../devtools/#the-dev-menu">dev menu</a> on every connected device</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-d">D</kbd></span></td>
+<td>Show which app the <a href="../debugging/">debugger</a> attaches to, and the VS Code configuration</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-c">C</kbd></span></td>
+<td>Clear the terminal</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-question">?</kbd></span></td>
+<td>List the commands</td>
+</tr>
+<tr>
+<td><span class="keys"><kbd class="key-q">Q</kbd></span></td>
+<td>Quit</td>
+</tr>
+</tbody>
+</table>
+<p>On a phone that has PythonNative Go (or the project's development build)
+installed, scanning the QR code with the camera opens the project there. Every
+connected app pulls any sources newer than what it holds and from then on
+Fast Refreshes on every save. Its <code>print()</code> output, tracebacks, and
+reload notices stream back to the <code>pn start</code> terminal.</p>
+<p>The same actions are commands, for scripts and second terminals: <code>pn go
+ios</code>, <code>pn go android</code>, <code>pn run ios</code>, and <code>pn run android</code> find the dev
+server on <code>localhost:8765</code> (<code>--port</code> to change it), install the app, and
+open it with a connect link carrying your <a href="#the-dev-token">dev token</a>.
+Rerunning <code>pn run</code> is cheap: when nothing native changed since the last
 build (see <a href="#when-native-rebuilds-happen">When native rebuilds happen</a>)
 it reinstalls the previous artifact and relaunches in a few seconds.</p>
 <h2 id="what-pn-start-does">What <code>pn start</code> does<a class="headerlink" href="#what-pn-start-does" title="Permanent link">&para;</a></h2>
@@ -3937,6 +4056,10 @@ three jobs:</p>
    like the Swift and Kotlin runtimes; the reconciler for it runs
    inside <code>pn start</code> itself. See the
    <a href="../browser-preview/">Browser preview guide</a>.</li>
+<li><strong>Serves DevTools and the debugger.</strong> <code>GET /devtools</code> is the
+   <a href="../devtools/#devtools">DevTools</a> page, which talks to every connected
+   app through the server, and <code>127.0.0.1:5678</code> accepts
+   <a href="../debugging/">debugger</a> connections and forwards them to an app.</li>
 </ol>
 <p>Logs from every peer are interleaved in the terminal and prefixed with
 the source: <code>[ios iPhone 15]</code>, <code>[android Pixel 8]</code>, <code>[browser]</code>, and
@@ -3982,8 +4105,18 @@ the source: <code>[ios iPhone 15]</code>, <code>[android Pixel 8]</code>, <code>
 <td>Yes</td>
 </tr>
 <tr>
+<td><code>GET /devtools</code></td>
+<td>The DevTools page (<code>/devtools/&lt;name&gt;</code> for its assets)</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>GET /connect</code></td>
+<td>Connect links, server URLs, and the QR code as SVG (JSON)</td>
+<td>Yes</td>
+</tr>
+<tr>
 <td><code>WS /ws?role=client</code></td>
-<td>Dev-client protocol</td>
+<td>Dev session protocol (version 2)</td>
 <td>Yes</td>
 </tr>
 <tr>
@@ -3991,18 +4124,30 @@ the source: <code>[ios iPhone 15]</code>, <code>[android Pixel 8]</code>, <code>
 <td>Browser preview bridge channel</td>
 <td>Yes</td>
 </tr>
+<tr>
+<td><code>WS /ws?role=devtools</code></td>
+<td>DevTools pages</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>TCP 127.0.0.1:5678</code></td>
+<td>Debug Adapter Protocol proxy</td>
+<td>Via the app's session</td>
+</tr>
 </tbody>
 </table>
 <p>For example, <code>curl -H "X-PN-Token: $(cat ~/.pythonnative/dev-token)"
 localhost:8765/status</code> prints the server's status.</p>
 <h3 id="flags">Flags<a class="headerlink" href="#flags" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pn<span class="w"> </span>start<span class="w"> </span><span class="o">[</span>entry<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span><span class="m">8765</span><span class="o">]</span><span class="w"> </span><span class="o">[</span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="o">]</span><span class="w"> </span><span class="o">[</span>--open<span class="o">]</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pn<span class="w"> </span>preview<span class="w"> </span><span class="o">[</span>entry<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span><span class="m">8765</span><span class="o">]</span><span class="w"> </span><span class="o">[</span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-open<span class="o">]</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pn<span class="w"> </span>start<span class="w"> </span><span class="o">[</span>entry<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span><span class="m">8765</span><span class="o">]</span><span class="w"> </span><span class="o">[</span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="o">]</span><span class="w"> </span><span class="o">[</span>--debug-port<span class="w"> </span><span class="m">5678</span><span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-interactive<span class="o">]</span><span class="w"> </span><span class="o">[</span>--open<span class="o">]</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>pn<span class="w"> </span>preview<span class="w"> </span><span class="o">[</span>entry<span class="o">]</span><span class="w"> </span><span class="o">[</span>--port<span class="w"> </span><span class="m">8765</span><span class="o">]</span><span class="w"> </span><span class="o">[</span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="o">]</span><span class="w"> </span><span class="o">[</span>--debug-port<span class="w"> </span><span class="m">5678</span><span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-interactive<span class="o">]</span><span class="w"> </span><span class="o">[</span>--no-open<span class="o">]</span>
 </span></code></pre></div>
 <p><code>entry</code> overrides the entry module from <code>pythonnative.toml</code> (for
 example <code>app.screens.settings</code> to mount one screen's <code>App</code>). The server
 binds to all interfaces by default so phones on your network can reach
-it; pass <code>--host 127.0.0.1</code> to keep it local.</p>
+it; pass <code>--host 127.0.0.1</code> to keep it local. <code>--debug-port 0</code> turns the
+debugger proxy off, and <code>--no-interactive</code> stops <code>pn start</code> from reading
+keys (it never does when stdin isn't a terminal).</p>
 <h3 id="the-dev-token">The dev token<a class="headerlink" href="#the-dev-token" title="Permanent link">&para;</a></h3>
 <p>The dev server hands out your application's source code, so it only
 answers clients that present your <strong>dev token</strong>. <code>pn start</code> generates
@@ -4016,8 +4161,8 @@ keep connecting.</p>
   <code>SameSite=Strict</code> cookie and drops it from the address bar. Opening
   the bare <code>http://localhost:8765/</code> in a browser that has never seen the
   token leaves the preview waiting; open the printed URL once instead.</li>
-<li><code>pn run</code> reads the same file and passes the token to the app inside
-  its dev-server URL.</li>
+<li><code>pn run</code>, <code>pn go</code>, and the QR code pass the token to the app inside
+  the connect link, and the app remembers it for its next launch.</li>
 <li>Scripts can send it in an <code>X-PN-Token</code> header or a <code>token</code> query
   parameter.</li>
 </ul>
@@ -4027,71 +4172,68 @@ browser's upgrade request must come from the server's own origin
 clients send no <code>Origin</code>, so they only need the token.</p>
 <p>To issue a new token (for example, after sharing a URL you shouldn't
 have), stop <code>pn start</code>, delete <code>~/.pythonnative/dev-token</code>, and start it
-again. Installed debug builds then need a fresh <code>pn run</code>, and the
-browser preview needs the newly printed URL. Two environment variables
+again. Installed dev clients then need the new QR code (or a fresh <code>pn
+run</code> or <code>pn go</code>), and the browser preview needs the newly printed URL. Two environment variables
 override the file: <code>PN_DEV_TOKEN</code> supplies the token itself, and
 <code>PN_DEV_TOKEN_FILE</code> points at another file. Set them the same way for
 <code>pn start</code> and <code>pn run</code>.</p>
 <h2 id="dev-clients">Dev clients<a class="headerlink" href="#dev-clients" title="Permanent link">&para;</a></h2>
-<p>A <strong>dev client</strong> is a debug build of your app. On launch,
+<p>A <strong>dev client</strong> is an app that runs your project's Python from <code>pn
+start</code>: either <a href="../devtools/#pythonnative-go">PythonNative Go</a>, the
+prebuilt client that runs any project without native code, or your
+project's own debug build from <code>pn run</code>. On launch,
 <code>pythonnative.bootstrap.start(dev=True)</code> calls
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;start_if_configured&lt;/span&gt;" href="../../api/devserver/#pythonnative.devclient.start_if_configured"><code>devclient.start_if_configured</code></a>,
 which:</p>
 <ul>
-<li>reads the server URL, including the dev token, that <code>pn run</code> passed
-  in (<code>PN_DEV_SERVER</code>), or the one saved from the last session;</li>
-<li>connects over WebSocket on a daemon thread and says <code>hello</code> with a
-  hash of every source it holds in its writable <strong>overlay</strong>. On the
-  first launch the overlay is seeded from the sources bundled in the
-  build, so a build made from the current tree reports everything
-  up to date;</li>
-<li>receives a <code>sync</code> with only the files that differ, writes them into
-  the overlay (which sits ahead of the bundled sources on <code>sys.path</code>),
-  and applies a Fast Refresh for the modules that changed. Nothing
-  changed, nothing reloads;</li>
-<li>mirrors <code>print</code>, warnings, and tracebacks to the server;</li>
+<li>takes the server URL, including the dev token, from the connect link
+  that launched the app (<code>pn-&lt;app id&gt;://connect?url=...</code>, which <code>pn run</code>,
+  <code>pn go</code>, and the QR code open), or reconnects to the last server it
+  used;</li>
+<li>connects over WebSocket on a daemon thread and says <code>hello</code>, describing
+  its runtime (framework version, bridge protocol, plugins, and bundled
+  packages) and a hash of every source it holds in its writable
+  <strong>overlay</strong>. On the first launch the overlay is seeded from the sources
+  bundled in the build, so a build made from the current tree reports
+  everything up to date;</li>
+<li>receives a <code>sync</code> with only the files that differ, or an <code>incompatible</code>
+  answer naming the command that fixes a mismatch (an outdated Go, or a
+  build that predates a plugin). Synced files go into the overlay, which
+  sits ahead of the bundled sources on <code>sys.path</code>, and a Fast Refresh
+  applies the modules that changed. Nothing changed, nothing reloads;</li>
+<li>installs the pure-Python packages from <code>[requirements]</code> that its bundle
+  lacks, copied from the environment <code>pn start</code> runs in;</li>
+<li>mirrors <code>print</code>, warnings, and tracebacks to the server, and answers
+  <a href="../devtools/#devtools">DevTools</a> and the <a href="../debugging/">debugger</a>;</li>
 <li>reports every reload (<code>fast_refresh</code> or <code>remount</code>, and which modules).</li>
 </ul>
 <p>Release builds never include any of this: <code>pn build</code> produces a
 standalone app with your sources bundled and no dev client. Its copy of
 <code>pythonnative</code> leaves out the development modules entirely (the dev
-client, Fast Refresh, the dev server, the CLI, and the test helpers);
-see <a href="../building-for-release/#what-a-release-bundle-leaves-out">Building for release</a>.</p>
+client, the DevTools agent, Fast Refresh, the dev server, the CLI, and
+the test helpers); see
+<a href="../building-for-release/#what-a-release-bundle-leaves-out">Building for release</a>.</p>
 <h3 id="simulators-and-emulators">Simulators and emulators<a class="headerlink" href="#simulators-and-emulators" title="Permanent link">&para;</a></h3>
-<p><code>pn run ios</code> and <code>pn run android</code> handle the URL plumbing. The iOS
-Simulator shares the Mac's loopback interface, so <code>localhost</code> works.
-For Android the CLI runs <code>adb reverse</code> so <code>localhost:8765</code> inside the
-emulator (or a USB-attached phone) reaches the server.</p>
-<h3 id="physical-iphones">Physical iPhones<a class="headerlink" href="#physical-iphones" title="Permanent link">&para;</a></h3>
-<p>A physical iOS device is on your Wi-Fi rather than your loopback, so
-<code>pn run ios --device &lt;name&gt;</code> passes the Mac's first LAN address
-instead. Both machines must be on the same network and the port must
-not be firewalled. If auto-detection picks the wrong interface, pass
-the device URL that <code>pn start</code> printed, token included:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--device<span class="w"> </span><span class="s2">"Owen's iPhone"</span><span class="w"> </span>--dev-server<span class="w"> </span><span class="s2">"http://192.168.1.20:8765/?token=..."</span>
+<p>Press <span class="keys"><kbd class="key-i">I</kbd></span> or <span class="keys"><kbd class="key-a">A</kbd></span> in the <code>pn start</code> terminal, or run <code>pn go ios</code>, <code>pn
+go android</code>, <code>pn run ios</code>, or <code>pn run android</code>. The CLI handles the
+plumbing: the iOS Simulator shares the Mac's loopback interface, so the
+link uses <code>localhost</code>, and for Android the CLI runs <code>adb reverse</code> so
+<code>localhost:8765</code> inside the emulator (or a USB-attached phone) reaches
+the server. When no Android device is running, <code>pn</code> boots the first
+emulator from Android Studio's Device Manager.</p>
+<h3 id="physical-phones">Physical phones<a class="headerlink" href="#physical-phones" title="Permanent link">&para;</a></h3>
+<p>A phone is on your Wi-Fi rather than your loopback, so it uses your
+computer's LAN address. Once the phone has a dev client (see
+<a href="../devtools/#physical-devices">Physical devices</a>), scan the QR code <code>pn
+start</code> prints with the camera; it opens the dev client with that address
+and your token. <code>pn
+run ios --device &lt;name&gt;</code> and <code>pn go ios --device &lt;name&gt;</code> pass the LAN
+address too. Both machines must be on the same network and the port must
+not be firewalled. If auto-detection picks the wrong interface, pass the
+device URL that <code>pn start</code> printed, token included:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--device<span class="w"> </span><span class="s2">"Owen's iPhone"</span><span class="w"> </span>--dev-server<span class="w"> </span><span class="s2">"http://192.168.1.20:8765/?token=..."</span>
 </span></code></pre></div>
-<p>Fast Refresh works the same over Wi-Fi; there's no longer a USB-only
-path.</p>
-<h3 id="the-dev-client-shell-app">The dev-client shell app<a class="headerlink" href="#the-dev-client-shell-app" title="Permanent link">&para;</a></h3>
-<p>Sometimes you want one installed app that can load <em>any</em> project, the
-way Expo Go does. Build a shell with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pn<span class="w"> </span>run<span class="w"> </span>ios<span class="w"> </span>--dev-client
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pn<span class="w"> </span>run<span class="w"> </span>android<span class="w"> </span>--dev-client
-</span></code></pre></div>
-<p>The shell has no app of its own. It opens a
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;ConnectScreen&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/devserver/#pythonnative.devclient.ConnectScreen"><code>ConnectScreen</code></a> where you type
-the device URL that <code>pn start</code> printed, such as
-<code>192.168.1.20:8765/?token=...</code> (the last one used is prefilled). After the first sync the real
-<code>app.main</code> from the overlay shadows the placeholder and the screen
-remounts into your app. The URL is remembered for next launch, so a
-shell built once keeps working across projects as long as their native
-inputs (native plugins, <code>[requirements].packages</code>, permissions) are the
-same.</p>
+<p>Fast Refresh, DevTools, and the debugger work the same over Wi-Fi.</p>
 <h2 id="when-native-rebuilds-happen">When native rebuilds happen<a class="headerlink" href="#when-native-rebuilds-happen" title="Permanent link">&para;</a></h2>
 <p>A debug build has to go through Gradle or Xcode only when a <strong>native
 input</strong> changes:</p>
@@ -4157,9 +4299,12 @@ so a <code>Camera</code> call returns an "unavailable" result rather than a
 photo.</p>
 <h2 id="logs-and-errors">Logs and errors<a class="headerlink" href="#logs-and-errors" title="Permanent link">&para;</a></h2>
 <p>Every dev client mirrors its Python output to the server, so the
-<code>pn start</code> terminal is the one place to watch. Uncaught exceptions in
-renders, effects, and handlers show a RedBox on the affected screen
-(on device and in the preview) and print the traceback in the terminal.
+<code>pn start</code> terminal is the one place to watch, and DevTools' Console
+shows the same lines per app. Uncaught exceptions in renders, effects,
+and handlers show the <a href="../devtools/#the-development-error-screen">development error screen</a>
+on the affected screen (on device and in the preview), with the
+component stack and your source, and print the traceback in the
+terminal.
 Errors before any screen mounts (an <code>ImportError</code> in <code>app/main.py</code>,
 say) print in the terminal and pop up in the preview's console; fix
 the file and save to recover, nothing needs restarting.</p>
@@ -4174,7 +4319,7 @@ start</code>). <code>pn start</code> warns when one is missing. Device builds re
 their own wheels from the same list; see <a href="../pypi-packages/">PyPI packages</a>.</p>
 <h2 id="profiling">Profiling<a class="headerlink" href="#profiling" title="Permanent link">&para;</a></h2>
 <p>Set <code>PN_PROFILE</code> to a writable file path before starting the Python process:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nv">PN_PROFILE</span><span class="o">=</span>/tmp/pythonnative-trace.json<span class="w"> </span>pn<span class="w"> </span>preview
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">PN_PROFILE</span><span class="o">=</span>/tmp/pythonnative-trace.json<span class="w"> </span>pn<span class="w"> </span>preview
 </span></code></pre></div>
 <p>Collection retains the latest 10,000 timing events and exports the trace at
 normal process exit. The trace identifies rendered components and separates
@@ -4183,16 +4328,18 @@ mutation, and layout durations. Counters cover bridge bytes/operations, list
 snapshot rows and patches, and mounted views. <code>Profiler.summary()</code> reports
 retained-sample p50/p95/max durations, work counters, and gauges.</p>
 <p>Setting <code>PN_PROFILE</code> here captures the preview's Python process; it doesn't
-configure an environment variable inside a connected mobile app.</p>
+configure an environment variable inside a connected mobile app. To trace a
+device, use <strong>Record trace</strong> in DevTools' Performance panel, which captures
+the selected app and downloads the same trace format.</p>
 <p>Run the reproducible headless work benchmark from the repository root:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>python<span class="w"> </span>scripts/benchmark-rendering.py<span class="w"> </span>--rows<span class="w"> </span><span class="m">100000</span><span class="w"> </span>--edits<span class="w"> </span><span class="m">20</span><span class="w"> </span>&gt;<span class="w"> </span>benchmark.json
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python<span class="w"> </span>scripts/benchmark-rendering.py<span class="w"> </span>--rows<span class="w"> </span><span class="m">100000</span><span class="w"> </span>--edits<span class="w"> </span><span class="m">20</span><span class="w"> </span>&gt;<span class="w"> </span>benchmark.json
 </span></code></pre></div>
 <p>It compares ordinary sequence replacement with <code>ListData</code>, asserts bounded
 metadata and mounted-view work, and emits JSON. Timings include profiling and
 aren't device frame-rate measurements or CI thresholds.</p>
 <p>The runtime benchmark times <code>import pythonnative</code> in fresh interpreters,
 element construction, a 300-component re-render, and commit preparation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>python<span class="w"> </span>scripts/benchmark-runtime.py<span class="w"> </span>--output<span class="w"> </span>runtime.json
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python<span class="w"> </span>scripts/benchmark-runtime.py<span class="w"> </span>--output<span class="w"> </span>runtime.json
 </span></code></pre></div>
 <p>Compare its numbers between changes on one machine. CI doesn't gate on them;
 <code>tests/test_performance_budgets.py</code> instead checks the deterministic causes
@@ -4201,21 +4348,21 @@ subsystems, per-field render journaling, <code>inspect.Signature</code> binding,
 release-mode prop validation). On a device, a debug iOS build logs
 <code>[PN] First screen attached ... ms after process start</code> once per launch.</p>
 <p>For an explicit capture in a headless test:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.profiling</span><span class="w"> </span><span class="kn">import</span> <span class="n">Profiler</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Profiled render"</span><span class="p">)</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="k">with</span> <span class="n">Profiler</span><span class="p">()</span> <span class="k">as</span> <span class="n">profiler</span><span class="p">:</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>    <span class="n">result</span><span class="o">.</span><span class="n">unmount</span><span class="p">()</span>
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="n">profiler</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s2">"trace.json"</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.profiling</span><span class="w"> </span><span class="kn">import</span> <span class="n">Profiler</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">App</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Profiled render"</span><span class="p">)</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="k">with</span> <span class="n">Profiler</span><span class="p">()</span> <span class="k">as</span> <span class="n">profiler</span><span class="p">:</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="n">result</span><span class="o">.</span><span class="n">unmount</span><span class="p">()</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="n">profiler</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s2">"trace.json"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The same context manager can surround work on the application's Python
 thread in an embedded runtime. Choose an app-writable path when exporting

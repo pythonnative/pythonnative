@@ -898,6 +898,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -1016,6 +1020,62 @@
     
   
     Development Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/devtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PythonNative Go & DevTools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging
   
 
     
@@ -1974,6 +2034,8 @@
   
     
     
+      
+        
       
         
       
@@ -3069,6 +3131,34 @@
     
   
     Dev server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/devtools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevTools agent
   
 
     
@@ -4609,7 +4699,10 @@ see the failure and keep the rest of the page alive. See
 <ul>
 <li>Is <code>pn start</code> (or <code>pn preview</code>) running? Debug builds connect to it
   on launch; the terminal prints <code>[pn] ios &lt;device&gt; connected</code> when
-  one arrives. If you launched <code>pn run</code> with no server up, the app is
+  one arrives. If it prints "can't run this project" instead, the
+  device shows the reason and the command that fixes it (usually <code>pn go
+  &lt;platform&gt;</code> for an outdated PythonNative Go, or <code>pn run &lt;platform&gt;
+  --rebuild</code> for a build that predates a native plugin). If you launched <code>pn run</code> with no server up, the app is
   running its bundled sources: start the server and relaunch.</li>
 <li>Is the device on the same network? Simulators and emulators reach
   the server through <code>localhost</code> (Android via <code>adb reverse</code>), but a
@@ -4619,8 +4712,8 @@ see the failure and keep the rest of the page alive. See
   address is wrong.</li>
 <li>Did the server refuse the app's token? The app logs "refused the
   connection" when its URL has no dev token or an old one (after the
-  token file was deleted, say). Relaunch with <code>pn run</code>, or enter the
-  URL <code>pn start</code> prints on the dev-client connect screen. See
+  token file was deleted, say). Scan the QR code <code>pn start</code> prints, or
+  relaunch with <code>pn run</code> or <code>pn go</code>. See
   <a href="../../guides/dev-workflow/#the-dev-token">The dev token</a>.</li>
 <li>The watcher only sees files under <code>app/</code>. Code outside <code>app/</code> needs
   a rebuild.</li>
