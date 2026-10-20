@@ -3915,14 +3915,21 @@ the code and save to recover.</p>
 adds opening the tab. Simulators and devices launched with <code>pn run</code>
 connect to the same server, so one terminal drives every client.</p>
 <h2 id="the-toolbar">The toolbar<a class="headerlink" href="#the-toolbar" title="Permanent link">&para;</a></h2>
-<p>Along the top of the page:</p>
+<p>Along the top of the page (on a narrow window the buttons shrink to icons;
+hover one for its name and shortcut):</p>
 <ul>
-<li><strong>Device</strong>: iPhone 15, iPhone 15 Pro Max, iPhone SE, Pixel 8, Pixel
-  Fold (inner), iPad mini, or <em>Fill window</em>. The frame's size, safe
-  area insets, and notch follow the choice, so <code>use_safe_area_insets</code>
-  and <code>use_window_dimensions</code> return realistic values. Switching
-  devices re-lays out the running app without remounting it.</li>
-<li><strong>Rotate</strong> (<code>r</code>): swap width and height.</li>
+<li><strong>Device</strong>: iPhone 15, iPhone 15 Pro Max, iPhone SE, iPad mini, Pixel 8,
+  Pixel Fold (inner), or <em>Fill window</em>. Each device draws its own frame:
+  the Dynamic Island, the iPhone SE's bezels and home button, the Android
+  punch-hole camera and gesture handle. The status bar height and safe
+  area insets follow the choice, so <code>use_safe_area_insets</code> and
+  <code>use_window_dimensions</code> return realistic values. Switching devices
+  re-lays out the running app without remounting it. The readout beside
+  the menu shows the window size in points, and the zoom when the frame
+  is scaled down to fit.</li>
+<li><strong>Rotate</strong> (<code>r</code>): turn the device to landscape and back. A landscape
+  iPhone hides its status bar and insets both sides for the sensor
+  housing, as iOS does.</li>
 <li><strong>Dark / Light</strong> (<code>d</code>): toggle the color scheme. <code>use_color_scheme</code>,
   <code>use_theme</code>, and <code>{"light": ..., "dark": ...}</code> dynamic colors all
   follow it live.</li>
@@ -3933,11 +3940,16 @@ connect to the same server, so one terminal drives every client.</p>
 <li><strong>Reload app</strong> (<code>Shift+R</code>): tear the app down and mount it again from
   scratch, discarding all state (a full remount, not a Fast Refresh).</li>
 <li><strong>Console</strong> (<code>`</code>): show or hide a log panel with the same lines
-  the terminal prints, plus the page's own errors.</li>
+  the terminal prints, plus the page's own errors. A badge counts errors
+  logged while it's closed. Drag its title bar to resize it.</li>
+<li><strong>Dev menu</strong> (<code>Cmd+D</code> / <code>Ctrl+D</code>): reload, the element inspector, the
+  performance monitor, and debugging with VS Code.</li>
+<li><strong>DevTools</strong>: open <a href="../devtools/">PythonNative DevTools</a> in a new tab.</li>
 </ul>
-<p>The status dot shows the WebSocket connection. If you stop <code>pn preview</code>
-the page waits and reconnects when the server returns; the app is
-mounted fresh on reconnect.</p>
+<p>The dot beside the project name shows the WebSocket connection. If you
+stop <code>pn preview</code> the page waits and reconnects when the server returns;
+the app is mounted fresh on reconnect. The device, orientation, color
+scheme, and console state are remembered per browser.</p>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <p><code>pn preview</code> sets <code>PN_PLATFORM=web</code> and runs
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;serve&lt;/span&gt;" href="../../api/devserver/#pythonnative.preview.serve"><code>pythonnative.preview.serve</code></a>, which:</p>
@@ -4035,8 +4047,11 @@ and logic rather than pixel-perfect platform chrome.</p>
 <li>Gestures: the page streams raw pointer events to the Python
   <a href="../gestures/">gesture arbiter</a>. Mobile renderers recognize gestures
   in Swift and Kotlin.</li>
-<li>Scrolling, <code>FlatList</code> / <code>SectionList</code> windowing, pull to refresh,
-  and scroll-driven <code>Animated.event</code> bindings.</li>
+<li>Scrolling, <code>FlatList</code> / <code>SectionList</code> windowing, pull to refresh
+  (drag the content down at the top, or scroll up past it with a
+  trackpad or mouse wheel), and scroll-driven <code>Animated.event</code> bindings.</li>
+<li>Navigation transitions: card pushes slide over a parallaxing screen,
+  modals slide up, and <code>Modal</code> honors <code>animation_type</code>.</li>
 </ul>
 <p>Approximated or absent:</p>
 <ul>
