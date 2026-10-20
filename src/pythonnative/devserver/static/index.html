@@ -5,56 +5,102 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light dark" />
   <title>PythonNative preview</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233572e8'/%3E%3Cpath d='M10 22V10h7a4 4 0 0 1 0 8h-7' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/static/preview.css" />
 </head>
 <body>
   <header id="pn-toolbar">
     <div class="pn-brand">
-      <span class="pn-dot" id="pn-status-dot" title="Disconnected"></span>
-      <strong>PythonNative</strong>
-      <span id="pn-project-name" class="pn-muted"></span>
+      <span class="pn-logo" aria-hidden="true">Pn</span>
+      <strong class="pn-brand-name">PythonNative</strong>
+      <span id="pn-project-name" class="pn-project-name"></span>
+      <span class="pn-dot" id="pn-status-dot" role="status" aria-label="Disconnected" title="Disconnected"></span>
     </div>
     <div class="pn-controls">
-      <label>Device
-        <select id="pn-device"></select>
-      </label>
-      <button id="pn-rotate" title="Rotate (r)">Rotate</button>
-      <button id="pn-scheme" title="Toggle light/dark (d)">Dark</button>
-      <button id="pn-back" title="Back (Esc)">Back</button>
-      <button id="pn-reload" title="Remount the app (shift+r)">Reload app</button>
-      <button id="pn-console-toggle" title="Show/hide console (`)">Console</button>
-      <button id="pn-dev-menu" title="Open the dev menu (Cmd/Ctrl+D)">Dev menu</button>
-      <a id="pn-devtools-link" class="pn-tool-link" href="/devtools" target="_blank" rel="noopener" title="Open PythonNative DevTools in a new tab">DevTools</a>
+      <div class="pn-group">
+        <label for="pn-device" class="pn-visually-hidden">Device</label>
+        <select id="pn-device" title="Device"></select>
+        <span id="pn-dims" class="pn-dims" title="Window size in points, and the zoom the frame is drawn at"></span>
+        <button id="pn-rotate" class="pn-tb" type="button" title="Rotate (r)" aria-label="Rotate">
+          <svg class="pn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="12" height="12" rx="2"/><path d="M13 3a8 8 0 0 1 8 8"/><path d="M18 9l3 2 2-3"/></svg>
+          <span class="pn-tb-label">Rotate</span>
+        </button>
+        <button id="pn-scheme" class="pn-tb" type="button" title="Toggle light/dark (d)" aria-label="Switch to dark appearance">
+          <svg class="pn-icon pn-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+          <svg class="pn-icon pn-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <span class="pn-tb-label">Dark</span>
+        </button>
+      </div>
+      <span class="pn-sep" aria-hidden="true"></span>
+      <div class="pn-group">
+        <button id="pn-back" class="pn-tb" type="button" title="Back (Esc)" aria-label="Back">
+          <svg class="pn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          <span class="pn-tb-label">Back</span>
+        </button>
+        <button id="pn-reload" class="pn-tb" type="button" title="Remount the app (Shift+R)" aria-label="Reload app">
+          <svg class="pn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          <span class="pn-tb-label">Reload app</span>
+        </button>
+      </div>
+      <span class="pn-sep" aria-hidden="true"></span>
+      <div class="pn-group">
+        <button id="pn-console-toggle" class="pn-tb" type="button" title="Show/hide console (`)" aria-label="Console" aria-pressed="false" aria-controls="pn-console">
+          <svg class="pn-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg>
+          <span class="pn-tb-label">Console</span>
+          <span id="pn-console-badge" class="pn-badge-count" hidden></span>
+        </button>
+        <button id="pn-dev-menu" class="pn-tb" type="button" title="Open the dev menu (Cmd/Ctrl+D)" aria-label="Dev menu">
+          <svg class="pn-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>
+          <span class="pn-tb-label">Dev menu</span>
+        </button>
+        <a id="pn-devtools-link" class="pn-tb pn-tool-link" href="/devtools" target="_blank" rel="noopener" title="Open PythonNative DevTools in a new tab" aria-label="DevTools">
+          <svg class="pn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+          <span class="pn-tb-label">DevTools</span>
+        </a>
+      </div>
     </div>
   </header>
 
   <main id="pn-stage">
     <div id="pn-device-frame" class="pn-frame">
-      <div id="pn-statusbar" class="pn-statusbar">
-        <span class="pn-time" id="pn-clock">9:41</span>
-        <span class="pn-status-icons">●●● ⌒ ▮</span>
+      <div id="pn-statusbar" class="pn-statusbar" aria-hidden="true">
+        <span class="pn-sb-time" id="pn-clock">9:41</span>
+        <span class="pn-sb-right">
+          <span class="pn-sb-net">
+            <svg class="pn-sb-signal" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="0.8"/><rect x="4.6" y="5" width="3" height="6" rx="0.8"/><rect x="9.2" y="2.5" width="3" height="8.5" rx="0.8"/><rect x="13.8" y="0" width="3" height="11" rx="0.8"/></svg>
+            <svg class="pn-sb-wifi" viewBox="0 0 16 12"><path d="M8 2.3a9.2 9.2 0 0 1 6.4 2.6l1.2-1.2A10.9 10.9 0 0 0 8 .6 10.9 10.9 0 0 0 .4 3.7l1.2 1.2A9.2 9.2 0 0 1 8 2.3z"/><path d="M8 5.6c1.7 0 3.2.6 4.3 1.7l1.2-1.2A7.8 7.8 0 0 0 8 3.9a7.8 7.8 0 0 0-5.5 2.2l1.2 1.2A6.1 6.1 0 0 1 8 5.6z"/><path d="M8 8.9c.8 0 1.5.3 2.1.8L8 11.8 5.9 9.7A3 3 0 0 1 8 8.9z"/></svg>
+          </span>
+          <svg class="pn-sb-battery" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="22.5" height="12" rx="3.6" fill="none" stroke="currentColor" opacity="0.4"/><rect x="2" y="2" width="19.5" height="9" rx="2.2"/><path d="M24.6 4.4v4.2c.8-.3 1.4-1.1 1.4-2.1s-.6-1.8-1.4-2.1z" opacity="0.45"/></svg>
+        </span>
       </div>
       <div id="pn-screens" class="pn-screens"></div>
       <div id="pn-overlays" class="pn-overlays"></div>
-      <div id="pn-home" class="pn-home"></div>
+      <div id="pn-cutout" class="pn-cutout" aria-hidden="true"></div>
+      <div id="pn-home" class="pn-home" aria-hidden="true"></div>
     </div>
     <div id="pn-connect" class="pn-connect">
       <div class="pn-connect-card">
-        <h1>Waiting for <code>pn start</code></h1>
+        <div class="pn-connect-spinner" aria-hidden="true"></div>
+        <h1 id="pn-connect-title">Waiting for <code>pn start</code></h1>
         <p id="pn-connect-detail">Connecting to the dev server...</p>
       </div>
     </div>
   </main>
 
-  <section id="pn-console" class="pn-console pn-hidden">
+  <section id="pn-console" class="pn-console pn-hidden" aria-label="Console">
     <div class="pn-console-bar">
-      <span>Console</span>
-      <button id="pn-console-clear">Clear</button>
+      <span class="pn-console-title">Console</span>
+      <span class="pn-console-actions">
+        <button id="pn-console-clear" type="button">Clear</button>
+        <button id="pn-console-close" type="button" aria-label="Close console" title="Close (`)">
+          <svg class="pn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </span>
     </div>
-    <div id="pn-console-lines" class="pn-console-lines"></div>
+    <div id="pn-console-lines" class="pn-console-lines" role="log" aria-live="polite"></div>
   </section>
 
-  <div id="pn-toasts" class="pn-toasts"></div>
+  <div id="pn-toasts" class="pn-toasts" role="status" aria-live="polite"></div>
   <div id="pn-measure" class="pn-measure" aria-hidden="true"></div>
 
   <script type="module" src="/static/shell.js"></script>

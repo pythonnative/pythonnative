@@ -55,14 +55,21 @@ connect to the same server, so one terminal drives every client.
 
 ## The toolbar
 
-Along the top of the page:
+Along the top of the page (on a narrow window the buttons shrink to icons;
+hover one for its name and shortcut):
 
-- **Device**: iPhone 15, iPhone 15 Pro Max, iPhone SE, Pixel 8, Pixel
-  Fold (inner), iPad mini, or *Fill window*. The frame's size, safe
-  area insets, and notch follow the choice, so `use_safe_area_insets`
-  and `use_window_dimensions` return realistic values. Switching
-  devices re-lays out the running app without remounting it.
-- **Rotate** (`r`): swap width and height.
+- **Device**: iPhone 15, iPhone 15 Pro Max, iPhone SE, iPad mini, Pixel 8,
+  Pixel Fold (inner), or *Fill window*. Each device draws its own frame:
+  the Dynamic Island, the iPhone SE's bezels and home button, the Android
+  punch-hole camera and gesture handle. The status bar height and safe
+  area insets follow the choice, so `use_safe_area_insets` and
+  `use_window_dimensions` return realistic values. Switching devices
+  re-lays out the running app without remounting it. The readout beside
+  the menu shows the window size in points, and the zoom when the frame
+  is scaled down to fit.
+- **Rotate** (`r`): turn the device to landscape and back. A landscape
+  iPhone hides its status bar and insets both sides for the sensor
+  housing, as iOS does.
 - **Dark / Light** (`d`): toggle the color scheme. `use_color_scheme`,
   `use_theme`, and `{"light": ..., "dark": ...}` dynamic colors all
   follow it live.
@@ -73,11 +80,16 @@ Along the top of the page:
 - **Reload app** (`Shift+R`): tear the app down and mount it again from
   scratch, discarding all state (a full remount, not a Fast Refresh).
 - **Console** (`` ` ``): show or hide a log panel with the same lines
-  the terminal prints, plus the page's own errors.
+  the terminal prints, plus the page's own errors. A badge counts errors
+  logged while it's closed. Drag its title bar to resize it.
+- **Dev menu** (`Cmd+D` / `Ctrl+D`): reload, the element inspector, the
+  performance monitor, and debugging with VS Code.
+- **DevTools**: open [PythonNative DevTools](devtools.md) in a new tab.
 
-The status dot shows the WebSocket connection. If you stop `pn preview`
-the page waits and reconnects when the server returns; the app is
-mounted fresh on reconnect.
+The dot beside the project name shows the WebSocket connection. If you
+stop `pn preview` the page waits and reconnects when the server returns;
+the app is mounted fresh on reconnect. The device, orientation, color
+scheme, and console state are remembered per browser.
 
 ## How it works
 
@@ -192,8 +204,11 @@ Faithful:
 - Gestures: the page streams raw pointer events to the Python
   [gesture arbiter](gestures.md). Mobile renderers recognize gestures
   in Swift and Kotlin.
-- Scrolling, `FlatList` / `SectionList` windowing, pull to refresh,
-  and scroll-driven `Animated.event` bindings.
+- Scrolling, `FlatList` / `SectionList` windowing, pull to refresh
+  (drag the content down at the top, or scroll up past it with a
+  trackpad or mouse wheel), and scroll-driven `Animated.event` bindings.
+- Navigation transitions: card pushes slide over a parallaxing screen,
+  modals slide up, and `Modal` honors `animation_type`.
 
 Approximated or absent:
 

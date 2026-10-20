@@ -1,6 +1,13 @@
 import Yoga from "./yoga/src/index.js";
 
 const detached = new Set(["VirtualList", "Modal", "Portal", "ScreenStack"]);
+/**
+ * Containers whose children fill a layer of their own (the modal sheet, the
+ * portal's full-screen overlay). Their children share one Yoga host node the
+ * layer's size, so `position="absolute"` insets resolve against the layer as
+ * they do against the native root view.
+ */
+const layered = new Set(["Modal", "Portal"]);
 
 /** Height of a native-stack navigation bar, and of one with a large title. */
 export const STACK_HEADER = 44;
@@ -78,7 +85,11 @@ export function insertLayout(renderer, parent, child) {
   const old = child.yoga.getParent();
   if (old) old.removeChild(child.yoga);
   child.layoutParent = null;
-  if (detached.has(parent.type) || child.props._pn_header_slot) renderer.layoutDetached.add(child);
+  if (layered.has(parent.type)) {
+    parent.layerYoga ||= Yoga.Node.create();
+    parent.layerYoga.insertChild(child.yoga, Math.min(parent.children.indexOf(child), parent.layerYoga.getChildCount()));
+    renderer.layoutDetached.add(child);
+  } else if (detached.has(parent.type) || child.props._pn_header_slot) renderer.layoutDetached.add(child);
   else {
     if (parent.yogaMeasured) { parent.yoga.unsetMeasureFunc(); parent.yogaMeasured = false; }
     const index = parent.children.slice(0, parent.children.indexOf(child)).filter(item => !item.props._pn_header_slot).length;
@@ -92,6 +103,10 @@ export function disposeLayout(view) {
   const parent = view.yoga.getParent();
   if (parent) parent.removeChild(view.yoga);
   view.yoga.free(); view.yoga = null;
+  if (view.layerYoga) {
+    for (let i = view.layerYoga.getChildCount() - 1; i >= 0; i--) view.layerYoga.removeChild(view.layerYoga.getChild(i));
+    view.layerYoga.free(); view.layerYoga = null;
+  }
 }
 export function computeLayout(renderer, {roots = [], width, height, selective = false}) {
   const rootTags = new Set(roots), detachedRoots = renderer.layoutDetached || new Set();
@@ -114,10 +129,23 @@ export function computeLayout(renderer, {roots = [], width, height, selective = 
   }
   for (const tag of roots) renderer.views.get(tag)?.yoga.calculateLayout(width, height, 1);
   for (const tag of roots) collect(renderer.views.get(tag));
+  const layers = new Set();
   for (const view of detachedRoots) {
     if (!renderer.views.has(view.tag) || !view.parent) continue;
     const parent = view.parent;
     if (view.props._pn_header_slot) { view.yoga.calculateLayout(NaN, STACK_HEADER, 1); collect(view); continue; }
+    if (parent.layerYoga) {
+      if (!layers.has(parent)) {
+        layers.add(parent);
+        const size = parent.manager.layerSize?.(parent);
+        const layerWidth = size?.[0] || width, layerHeight = size?.[1] || height;
+        parent.layerYoga.setWidth(layerWidth);
+        parent.layerYoga.setHeight(layerHeight);
+        parent.layerYoga.calculateLayout(layerWidth, layerHeight, 1);
+      }
+      collect(view);
+      continue;
+    }
     const isList = parent.type === "VirtualList", horizontal = parent.props.horizontal;
     const inset = parent.type === "ScreenStack" ? stackHeaderHeight(view.props) : 0;
     view.yoga.calculateLayout(isList && horizontal ? NaN : parent.frame?.w || width,

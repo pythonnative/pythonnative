@@ -356,9 +356,11 @@ const [card, sheet] = renderer.views.get(21).children;
 assert(card.el.style.display === '' && sheet.el.style.display === '' && sheet.el.classList.contains('pn-screen-transparent'), 'a transparent modal keeps the screen beneath visible');
 commit([['u',22,{active:false},[]], ['c',24,'Screen',{presentation:'card', active:true, animation:'fade'}], ['i',21,24,2]]);
 const third = renderer.views.get(24);
-assert(card.el.style.display === 'none' && sheet.el.style.display === 'none' && third.el.style.display === '' && third.el.classList.contains('pn-screen-fade'), 'a pushed card covers the stack and enters with its animation');
+assert(card.el.style.display === 'none' && sheet.el.style.display === '' && third.el.style.display === '' && third.el.classList.contains('pn-screen-fade'), 'a pushed card enters with its animation over the screen it covers');
 await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-assert(!third.el.classList.contains('pn-screen-fade'), 'the enter class is released after a frame');
+assert(!third.el.classList.contains('pn-screen-fade') && !sheet.el.classList.contains('pn-under'), 'the enter class is released after a frame; a fade leaves the covered screen in place');
+await sleep(350);
+assert(sheet.el.style.display === 'none' && card.el.style.display === 'none', 'the covered screens leave the stage once the push lands');
 commit([['d',24]]);
 const ghost = renderer.views.get(21).el.querySelector('.pn-screen-ghost');
 assert(ghost && card.el.style.display === '' && sheet.el.style.display === '' && renderer.views.get(21).children.length === 2, 'a pop leaves a snapshot to animate out and reveals the stack beneath');
@@ -380,6 +382,14 @@ navStack.back.click();
 assert(JSON.stringify(emitted(60, 'on_native_back')) === '[[1]]', 'the back button asks Python to pop one screen');
 commit([['u',61,{title:'A much longer inbox title'},[]]]);
 assert(navStack.back.textContent === 'Back', 'a long previous title falls back to "Back", as in UIKit');
+commit([['u',61,{header_back_title:'Every message in the inbox'},[]], ['u',62,{title:'A detail title that fills the bar'},[]]]);
+assert(navStack.back.textContent === 'Back' && navStack.back.getAttribute('aria-label') === 'Every message in the inbox', 'a back title that would hit the title shortens to "Back" and keeps its accessible name');
+navStack.el.style.width = '200px';
+commit([['u',62,{title:'A detail title that fills the narrow bar'},[]]]);
+assert(navStack.back.textContent === '' && navStack.back.classList.contains('pn-stack-back-chevron'), 'with no room for "Back" the chevron stands alone');
+navStack.el.style.width = '390px';
+commit([['u',61,{},['header_back_title']]]);
+commit([['u',62,{title:'Detail'},[]]]);
 commit([['u',62,{header_shown:false},[]]]);
 assert(navStack.header.style.display === 'none' && navStack.body.style.top === '0px', 'header_shown false hides the bar');
 commit([['u',62,{header_shown:true, header_large_title:true},[]]]);
@@ -389,6 +399,86 @@ assert(renderer.views.get(62).frame.h === 600 - 96 && renderer.views.get(61).fra
 assert(renderer.views.get(63).frame.h === 44, 'header slots are laid out at the bar height');
 commit([['d',64], ['d',63], ['d',62], ['d',61], ['d',60]]);
 navStack.el.remove();
+
+// ScreenStack: a card push slides over the covered screen, which parallaxes aside; a pop reveals it the same way.
+commit([['c',710,'ScreenStack',{}], ['c',711,'Screen',{title:'List'}], ['i',710,711,0]]);
+const cardStack = renderer.views.get(710); stage.append(cardStack.el); place(710, 0, 0, 390, 600);
+const listScreen = renderer.views.get(711);
+commit([['c',712,'Screen',{title:'Item'}], ['i',710,712,1]]);
+const itemScreen = renderer.views.get(712);
+assert(itemScreen.el.classList.contains('pn-screen-right') && listScreen.el.style.display === '', 'a push starts the new card off stage and keeps the covered screen up');
+await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+assert(!itemScreen.el.classList.contains('pn-screen-right') && listScreen.el.classList.contains('pn-under'), 'the card slides in while the covered screen moves aside');
+await sleep(350);
+assert(listScreen.el.style.display === 'none' && !listScreen.el.classList.contains('pn-under'), 'the covered screen leaves the stage once the push lands');
+commit([['d',712]]);
+assert(listScreen.el.style.display === '' && listScreen.el.classList.contains('pn-under') && !listScreen.el.classList.contains('pn-screen-right'), 'a pop reveals the screen beneath from its parallax position, not as a push');
+await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+assert(!listScreen.el.classList.contains('pn-under'), 'the revealed screen slides back into place');
+commit([['d',711], ['d',710]]);
+cardStack.el.remove();
+
+// Leaf views paint background_color and honor display and z_index.
+commit([['c',700,'Image',{width:40, height:40, background_color:'#ff0000', placeholder_color:'#00ff00'}],
+  ['c',701,'ActivityIndicator',{background_color:'#0000ff', z_index:3}], ['c',702,'Button',{title:'Hidden', display:'none'}]]);
+assert(renderer.views.get(700).el.style.backgroundColor === 'rgb(255, 0, 0)', 'Image background_color wins over placeholder_color');
+commit([['u',700,{},['background_color']]]);
+assert(renderer.views.get(700).el.style.backgroundColor === 'rgb(0, 255, 0)', 'without background_color the placeholder fill shows');
+assert(renderer.views.get(701).el.style.backgroundColor === 'rgb(0, 0, 255)' && renderer.views.get(701).el.style.zIndex === '3', 'leaf views paint background_color and z_index');
+assert(renderer.views.get(702).el.style.display === 'none', 'display none hides a leaf view');
+commit([['d',700], ['d',701], ['d',702]]);
+
+// Switch keeps its intrinsic size; Slider paints its minimum track.
+commit([['c',703,'Switch',{value:true}], ['c',704,'Slider',{value:0.25, min_value:0, max_value:1, _pn_events:['on_change']}]]);
+const switchView = renderer.views.get(703); stage.append(switchView.el); place(703, 0, 0, 300, 40);
+assert(switchView.el.style.width === '51px' && switchView.el.style.height === '31px', 'a stretched Switch keeps the platform switch size');
+const sliderView = renderer.views.get(704);
+assert(sliderView.el.style.getPropertyValue('--pn-fill') === '25%', 'the minimum track fills up to the value');
+sliderView.el.value = '0.75'; sliderView.el.dispatchEvent(new Event('input'));
+assert(sliderView.el.style.getPropertyValue('--pn-fill') === '75%' && emitted(704, 'on_change').length === 1, 'dragging moves the fill and reports the value');
+switchView.el.remove();
+commit([['d',703], ['d',704]]);
+
+// RefreshControl: pulling down at the top fires on_refresh; the spinner holds while refreshing.
+commit([['c',705,'ScrollView',{width:200, height:100, refresh_control:{refreshing:false}, _pn_events:['on_refresh']}], ['c',706,'View',{height:300}], ['i',705,706,0]]);
+const refresher = renderer.views.get(705); stage.append(refresher.el); place(705, 0, 0, 200, 100);
+assert(refresher.refresh && refresher.refresh.style.opacity !== '1' && !refresher.el.querySelector('button'), 'the refresh indicator stays hidden at rest');
+const wheel = (deltaY) => refresher.el.dispatchEvent(new WheelEvent('wheel', {deltaY, bubbles:true, cancelable:true}));
+wheel(-20);
+assert(refresher.pull > 0 && refresher.content.style.transform.startsWith('translateY(') && emitted(705, 'on_refresh').length === 0, 'a short pull moves the content without refreshing');
+for (let i = 0; i < 8; i++) wheel(-30);
+assert(emitted(705, 'on_refresh').length === 1, 'pulling past the threshold fires on_refresh once');
+commit([['u',705,{refresh_control:{refreshing:true}},[]]]);
+await sleep(200);
+assert(refresher.content.style.transform === 'translateY(56px)' && refresher.refreshSpinner.classList.contains('pn-refresh-spinning'), 'the spinner holds in view while refreshing');
+commit([['u',705,{refresh_control:{refreshing:false}},[]]]);
+assert(refresher.content.style.transform === '' && !refresher.refreshSpinner.classList.contains('pn-refresh-spinning'), 'the content springs back when the refresh ends');
+refresher.el.scrollTop = 50; wheel(-30);
+assert(refresher.pull === 0, 'scrolling up through content is plain scrolling');
+commit([['d',706], ['d',705]]);
+refresher.el.remove();
+
+// Portal content lays out against the whole overlay, so absolute insets pin it to the screen edges.
+overlay.style.cssText = 'position:relative;flex:none;width:390px;height:800px';
+commit([['c',707,'Portal',{}], ['c',708,'View',{position:'absolute', left:24, right:24, bottom:40, height:50}], ['i',707,708,0]]);
+renderer.computeLayout({roots:[707], width:390, height:600});
+const banner = renderer.views.get(708).frame;
+assert(banner.x === 24 && banner.w === 342 && banner.y === 710 && banner.h === 50, `portal insets resolve against the overlay: ${JSON.stringify(banner)}`);
+commit([['d',708], ['d',707]]);
+overlay.style.cssText = '';
+
+// Modal: presenting and dismissing animate (animation_type), and "none" is instant.
+commit([['c',709,'Modal',{visible:true}]]);
+const sliding = renderer.views.get(709);
+assert(sliding.backdrop.dataset.animation === 'slide', 'a modal slides by default');
+commit([['u',709,{visible:false},[]]]);
+assert(sliding.backdrop.isConnected && sliding.backdrop.classList.contains('pn-modal-out'), 'a dismissed modal animates out before it leaves the stage');
+await sleep(400);
+assert(!sliding.backdrop.isConnected, 'the dismissed modal leaves the stage after its transition');
+commit([['u',709,{animation_type:'none', visible:true},[]]]);
+commit([['u',709,{visible:false},[]]]);
+assert(!sliding.backdrop.isConnected, 'animation_type none dismisses at once');
+commit([['d',709]]);
 
 // Animation: easing descriptors and the decay model.
 assert(easingFor({easing:'linear'})(0.3) === 0.3 && easingFor({easing:'quad'})(0.5) === 0.25 && easingFor({easing:'cubic'})(0.5) === 0.125, 'named easings');
@@ -426,7 +516,7 @@ assert(stream().length === 2 && stream()[1][1] === 'up', 'pointer up follows');
 const callbacks = [];
 const screensEl = document.createElement('div'), overlaysEl = document.createElement('div'); stage.append(screensEl, overlaysEl);
 const host = new PreviewHost({bridge:{request: async () => null, callback: (...args) => callbacks.push(args), send() {}}, renderer, screensEl, overlaysEl,
-  frameMetrics: () => ({width:744, height:1133, bottomInset:20}), deviceName: () => 'iPad mini', projectName: () => 'demo',
+  frameMetrics: () => ({width:744, height:1133, top:24, bottomInset:20, leftInset:0, rightInset:0}), deviceName: () => 'iPad mini', projectName: () => 'demo',
   scheme: () => 'light', color: (value) => value == null ? null : String(value), statusBar() {}, log() {}, toast() {}});
 const call = async (module, method, args = {}) => JSON.parse(await host.call(module, method, JSON.stringify({args})));
 const info = (await call('Device', 'info')).value;
@@ -468,7 +558,7 @@ assert(evaluated.ok !== false && evaluated.value === '42', `eval_js answers from
 commit([['d',68]]); webView.el.remove();
 const screen = new Screen(host, 99, null, null, {});
 const viewport = screen.viewport();
-assert(viewport.screen_width === 744 && viewport.screen_height === 1133 && viewport.font_scale === 1 && viewport.scale === (window.devicePixelRatio || 1) && viewport.width === 744 && viewport.height === 1133 - 47 - 44, 'viewport payload carries scale, font_scale, and the screen size');
+assert(viewport.screen_width === 744 && viewport.screen_height === 1133 && viewport.font_scale === 1 && viewport.scale === (window.devicePixelRatio || 1) && viewport.width === 744 && viewport.height === 1133 - 24 - 44 && JSON.stringify(viewport.insets) === '{"top":0,"left":0,"bottom":20,"right":0}', 'viewport payload carries scale, font_scale, the screen size, and the device status bar and insets');
 screen.applyOptions({title:'Inbox', header_style:{background_color:'rgb(255, 0, 0)'}, header_back_visible:false, header_tint_color:'rgb(0, 128, 0)', header_title_style:{color:'rgb(1, 2, 3)'}});
 assert(screen.header.style.background.includes('rgb(255, 0, 0)') && screen.back.style.visibility === 'hidden' && screen.back.style.color === 'rgb(0, 128, 0)' && screen.title.style.color === 'rgb(1, 2, 3)' && screen.title.textContent === 'Inbox', 'header reads header_style.background_color and header_back_visible');
 assert(screen.transition() === 'pn-screen-right' && new Screen(host, 98, null, null, {presentation:'modal'}).transition() === 'pn-screen-bottom', 'host screens use the same transitions');

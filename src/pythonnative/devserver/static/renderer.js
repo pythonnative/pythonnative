@@ -154,18 +154,22 @@ export function transformToCSS(value) {
 const LIVE_REGIONS = { polite: "polite", assertive: "assertive", none: "off" };
 const BORDER_STYLES = new Set(["solid", "dashed", "dotted"]);
 
-/** Style keys shared by containers and leaves. `leaf` skips the container-only ones. */
-export function applyStyle(view, props, changed, scheme, { leaf = false } = {}) {
+/**
+ * Style keys shared by containers and leaves. `leaf` skips the
+ * container-only ones; `background: false` leaves `background_color` to a
+ * manager that paints its own (a switch track, a progress track).
+ */
+export function applyStyle(view, props, changed, scheme, { leaf = false, background = true } = {}) {
   const el = view.el;
   const s = el.style;
   const c = (v) => parseColor(v, scheme);
   const has = (k) => k in changed;
 
+  if (background && has("background_color")) s.backgroundColor = c(props.background_color) ?? "";
+  if (has("display")) s.display = props.display === "none" ? "none" : "";
+  if (has("z_index")) s.zIndex = props.z_index == null ? "" : String(props.z_index);
   if (!leaf) {
-    if (has("background_color")) s.backgroundColor = c(props.background_color) ?? "";
     if (has("overflow")) s.overflow = props.overflow === "hidden" ? "hidden" : "";
-    if (has("display")) s.display = props.display === "none" ? "none" : "";
-    if (has("z_index")) s.zIndex = props.z_index == null ? "" : String(props.z_index);
     if (has("pointer_events")) {
       const mode = props.pointer_events;
       view.pointerMode = mode;
@@ -989,7 +993,10 @@ class ImageManager extends ViewManager {
       const mode = props.scale_type;
       view.img.style.objectFit = mode === "cover" || mode === "repeat" ? "cover" : mode === "stretch" ? "fill" : mode === "center" ? "none" : "contain";
     }
-    if (has("placeholder_color")) view.el.style.backgroundColor = parseColor(props.placeholder_color, scheme) ?? "";
+    // An explicit `background_color` wins over the placeholder fill, as on iOS and Android.
+    if (has("placeholder_color") || has("background_color")) {
+      view.el.style.backgroundColor = parseColor(props.background_color ?? props.placeholder_color, scheme) ?? "";
+    }
     if (has("tint_color")) {
       const tint = parseColor(props.tint_color, scheme);
       view.tint.style.display = tint ? "" : "none";
@@ -1001,7 +1008,7 @@ class ImageManager extends ViewManager {
       view.img.style.filter = radius > 0 ? `blur(${px(radius)})` : "";
       view.el.style.overflow = radius > 0 ? "hidden" : "";
     }
-    applyStyle(view, props, changed, scheme, { leaf: true });
+    applyStyle(view, props, changed, scheme, { leaf: true, background: false });
   }
   destroy(view) {
     if (view.unsubscribeAssets) view.unsubscribeAssets();
@@ -1068,7 +1075,11 @@ class SwitchManager extends ViewManager {
     }
     if ("thumb_color" in changed) el.firstChild.style.backgroundColor = parseColor(props.thumb_color, scheme) ?? "";
     if ("disabled" in changed) el.classList.toggle("pn-disabled", props.disabled === true);
-    applyStyle(view, props, changed, scheme, { leaf: true });
+    applyStyle(view, props, changed, scheme, { leaf: true, background: false });
+  }
+  /** UISwitch and the Material switch keep their intrinsic size at the frame's origin, however wide the frame. */
+  frame(view, x, y, w, h) {
+    super.frame(view, x, y, Math.min(w, 51), Math.min(h, 31));
   }
   measure() {
     return [51, 31];
@@ -1081,7 +1092,10 @@ class SliderManager extends ViewManager {
     el.type = "range";
     el.className = "pn-view pn-slider";
     el.step = "any";
-    el.addEventListener("input", () => view.ctx.emit(view.tag, "on_change", [Number(el.value)]));
+    el.addEventListener("input", () => {
+      this.fill(view);
+      view.ctx.emit(view.tag, "on_change", [Number(el.value)]);
+    });
     el.addEventListener("change", () => {
       if (view.hasEvent("on_sliding_complete")) view.ctx.emit(view.tag, "on_sliding_complete", [Number(el.value)]);
     });
@@ -1096,12 +1110,22 @@ class SliderManager extends ViewManager {
     if ("max_value" in changed) el.max = String(props.max_value ?? 1);
     if ("value" in changed && props.value != null) el.value = String(props.value);
     if ("minimum_track_color" in changed || "tint_color" in changed) {
-      el.style.accentColor = parseColor(props.minimum_track_color ?? props.tint_color, scheme) ?? "";
+      el.style.setProperty("--pn-fill-color", parseColor(props.minimum_track_color ?? props.tint_color, scheme) ?? "");
     }
     if ("maximum_track_color" in changed) el.style.setProperty("--pn-track", parseColor(props.maximum_track_color, scheme) ?? "");
     if ("thumb_color" in changed) el.style.setProperty("--pn-thumb", parseColor(props.thumb_color, scheme) ?? "");
     if ("disabled" in changed) el.disabled = props.disabled === true;
+    this.fill(view);
     applyStyle(view, props, changed, scheme, { leaf: true });
+  }
+  /** The minimum track: the share of the range left of the thumb, painted in the tint. */
+  fill(view) {
+    const el = view.el;
+    const min = Number(el.min) || 0;
+    const max = Number(el.max);
+    const span = max - min;
+    const share = span > 0 ? Math.max(0, Math.min(1, (Number(el.value) - min) / span)) : 0;
+    el.style.setProperty("--pn-fill", `${Math.round(share * 10000) / 100}%`);
   }
   measure(view, maxW) {
     return [isFiniteConstraint(maxW) ? Math.max(100, maxW) : 100, 34];
@@ -1169,7 +1193,7 @@ class ProgressBarManager extends ViewManager {
     } else if (view.spinner) {
       view.spinner.style.borderTopColor = color ?? "#8e8e93";
     }
-    applyStyle(view, props, changed, scheme, { leaf: true });
+    applyStyle(view, props, changed, scheme, { leaf: true, background: false });
   }
   measure(view, maxW) {
     if (view.indeterminate) return [20, 20];
@@ -1190,6 +1214,12 @@ export function scrollPayload(el) {
 }
 
 const SCROLL_IDLE_MS = 150;
+// Pull to refresh, in points: the pull that fires `on_refresh`, the
+// offset the spinner holds while refreshing, and the rubber band's limit.
+const REFRESH_THRESHOLD = 64;
+const REFRESH_HOLD = 56;
+const REFRESH_MAX = 140;
+const REFRESH_SETTLE_MS = 280;
 const TEXT_CONTROL = "input, textarea, select, [contenteditable]";
 
 /** The focused text control, if any (what `Keyboard.dismiss` and `keyboard_dismiss_mode` act on). */
@@ -1372,36 +1402,161 @@ class ScrollViewManager extends ViewManager {
     if (has("overflow") && props.overflow !== "hidden") el.style.overflow = "";
     if (has("horizontal") || has("overflow") || has("scroll_enabled")) this.applyOverflow(view);
   }
+  /**
+   * `refresh_control`: pulling the content down past the threshold at the top
+   * of the scroller (a trackpad or wheel scroll up, a mouse drag, or a touch
+   * drag) fires `on_refresh`, and the spinner stays in view while Python
+   * holds `refreshing` true, like UIRefreshControl and SwipeRefreshLayout.
+   */
   updateRefresh(view) {
     const rc = view.props.refresh_control;
     if (!rc || typeof rc !== "object") {
-      if (view.refresh) view.refresh.remove();
-      view.refresh = null;
+      if (view.refresh) {
+        view.refresh.remove();
+        view.refresh = null;
+        this.setPull(view, 0, false);
+      }
       return;
     }
     if (!view.refresh) {
       const bar = document.createElement("div");
       bar.className = "pn-refresh";
-      const button = document.createElement("button");
-      button.className = "pn-button";
-      button.textContent = "↻ Refresh";
-      button.style.fontSize = "13px";
-      button.addEventListener("click", () => view.ctx.emit(view.tag, "on_refresh", []));
+      bar.setAttribute("aria-hidden", "true");
       const spinner = document.createElement("div");
-      spinner.className = "pn-spinner";
-      spinner.style.width = spinner.style.height = "20px";
-      bar.appendChild(button);
+      spinner.className = "pn-spinner pn-refresh-spinner";
       bar.appendChild(spinner);
       view.el.insertBefore(bar, view.content);
       view.refresh = bar;
-      view.refreshButton = button;
       view.refreshSpinner = spinner;
+      view.pull = 0;
+      if (!view.pullInstalled) this.installPull(view);
     }
     const refreshing = !!rc.refreshing;
-    view.refreshButton.style.display = refreshing ? "none" : "";
-    view.refreshSpinner.style.display = refreshing ? "" : "none";
+    const wasRefreshing = !!view.refreshing;
+    view.refreshing = refreshing;
     const tint = parseColor(rc.tint_color ?? rc.color, view.ctx.scheme());
-    if (tint) view.refreshSpinner.style.borderTopColor = tint;
+    view.refreshSpinner.style.borderTopColor = tint ?? "";
+    if (refreshing) {
+      clearTimeout(view.refreshFallback);
+      view.refreshSpinner.classList.add("pn-refresh-spinning");
+      if (!view.pulling) this.setPull(view, REFRESH_HOLD, true);
+    } else if (wasRefreshing || (view.refreshTriggered && !view.pulling)) {
+      this.retract(view);
+    }
+  }
+  /** Offset the content by `distance` and reveal the spinner in proportion. */
+  setPull(view, distance, animated) {
+    view.pull = distance;
+    const content = view.content;
+    content.style.transition = animated ? `transform ${REFRESH_SETTLE_MS}ms cubic-bezier(0.2, 0.8, 0.2, 1)` : "";
+    content.style.transform = distance > 0 ? `translateY(${px(distance)})` : "";
+    const bar = view.refresh;
+    if (!bar) return;
+    const progress = Math.min(1, distance / REFRESH_THRESHOLD);
+    bar.style.transition = content.style.transition.replace("transform", "opacity");
+    bar.style.opacity = String(progress);
+    bar.style.height = px(Math.max(distance, 0));
+    if (!view.refreshing) view.refreshSpinner.style.transform = `rotate(${Math.round(progress * 270)}deg)`;
+  }
+  /** Spring the content back once the refresh is over (or never started). */
+  retract(view) {
+    clearTimeout(view.refreshFallback);
+    view.refreshTriggered = false;
+    view.refreshSpinner?.classList.remove("pn-refresh-spinning");
+    this.setPull(view, 0, true);
+  }
+  /** The finger (or wheel) let go: hold the spinner if the pull fired, otherwise spring back. */
+  releasePull(view) {
+    view.pulling = false;
+    if (view.refreshing) {
+      this.setPull(view, REFRESH_HOLD, true);
+    } else if (view.refreshTriggered) {
+      // Python usually answers `on_refresh` by setting `refreshing`; keep
+      // the spinner up briefly so a synchronous refresh still reads as one.
+      this.setPull(view, REFRESH_HOLD, true);
+      view.refreshSpinner.classList.add("pn-refresh-spinning");
+      clearTimeout(view.refreshFallback);
+      view.refreshFallback = setTimeout(() => { if (!view.refreshing) this.retract(view); }, 600);
+    } else {
+      this.setPull(view, 0, true);
+    }
+  }
+  /** Track a pull by `delta` points (positive pulls down); fires `on_refresh` once past the threshold. */
+  dragPull(view, delta) {
+    if (!view.refresh || view.refreshing) return false;
+    const next = Math.max(0, Math.min(REFRESH_MAX, view.pull + delta * (view.pull > REFRESH_THRESHOLD ? 0.3 : 0.55)));
+    if (next === view.pull && next === 0) return false;
+    view.pulling = true;
+    this.setPull(view, next, false);
+    if (next >= REFRESH_THRESHOLD && !view.refreshTriggered) {
+      view.refreshTriggered = true;
+      view.ctx.emit(view.tag, "on_refresh", []);
+    }
+    return true;
+  }
+  installPull(view) {
+    view.pullInstalled = true;
+    const el = view.el;
+    const atTop = () => el.scrollTop <= 0 && !view.props.horizontal;
+    // Frame points per client pixel: the device frame may be scaled down to fit.
+    const scale = () => (el.clientHeight ? el.getBoundingClientRect().height / el.clientHeight : 1) || 1;
+    let wheelTimer = null;
+    el.addEventListener("wheel", (event) => {
+      if (!view.refresh || view.refreshing || event.ctrlKey) return;
+      const delta = -event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+      if (!(atTop() && delta > 0) && !(view.pull > 0 && view.pulling)) return;
+      if (!this.dragPull(view, delta)) return;
+      event.preventDefault();
+      clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(() => this.releasePull(view), 140);
+    }, { passive: false });
+    // Mouse and pen: dragging the content down while it rests at the top.
+    let drag = null;
+    el.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "touch" || event.button !== 0 || !view.refresh || !atTop()) return;
+      drag = { y: event.clientY, last: 0, active: false, id: event.pointerId };
+    });
+    el.addEventListener("pointermove", (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      const travel = (event.clientY - drag.y) / scale();
+      if (!drag.active) {
+        if (travel < 6) return;
+        drag.active = true;
+        drag.last = travel;
+        el.setPointerCapture?.(event.pointerId);
+      }
+      this.dragPull(view, travel - drag.last);
+      drag.last = travel;
+    });
+    const endDrag = (event) => {
+      if (!drag || event.pointerId !== drag.id) return;
+      const active = drag.active;
+      drag = null;
+      if (!active) return;
+      // The drag shouldn't also count as a tap on whatever it started on.
+      el.addEventListener("click", (click) => { click.stopPropagation(); click.preventDefault(); }, { capture: true, once: true });
+      setTimeout(() => this.releasePull(view), 0);
+    };
+    el.addEventListener("pointerup", endDrag);
+    el.addEventListener("pointercancel", endDrag);
+    // Touch: a downward drag at the top pulls instead of scrolling.
+    let touch = null;
+    el.addEventListener("touchstart", (event) => {
+      touch = view.refresh && atTop() && event.touches.length === 1 ? { y: event.touches[0].clientY, last: 0 } : null;
+    }, { passive: true });
+    el.addEventListener("touchmove", (event) => {
+      if (!touch) return;
+      const travel = (event.touches[0].clientY - touch.y) / scale();
+      if (travel <= 0 && !view.pulling) return;
+      if (this.dragPull(view, travel - touch.last)) event.preventDefault();
+      touch.last = travel;
+    }, { passive: false });
+    const endTouch = () => {
+      if (touch && view.pulling) this.releasePull(view);
+      touch = null;
+    };
+    el.addEventListener("touchend", endTouch);
+    el.addEventListener("touchcancel", endTouch);
   }
   childrenChanged(view) {
     // Content size = union of the children's frames (as UIScrollView.contentSize).
@@ -1975,6 +2130,11 @@ class ModalManager extends ViewManager {
   container(view) {
     return view.sheet;
   }
+  /** The content lays out against the sheet (or the whole frame before the sheet is on stage). */
+  layerSize(view) {
+    const sheet = view.sheet.isConnected ? view.sheet : view.ctx.overlays();
+    return [sheet.clientWidth || view.ctx.frameWidth(), sheet.clientHeight || 0];
+  }
   frame() {}
   update(view, changed) {
     const props = view.props;
@@ -1992,21 +2152,56 @@ class ModalManager extends ViewManager {
     const visible = !!props.visible;
     if (visible && !view.shown) {
       view.shown = true;
+      clearTimeout(view.leaving);
+      view.backdrop.classList.remove("pn-modal-out");
+      view.backdrop.style.pointerEvents = "";
       view.ctx.overlays().appendChild(view.backdrop);
+      this.present(view);
       document.addEventListener("keydown", view.onKeyDown, true);
       view.ctx.emit(view.tag, "on_show", []);
     } else if (!visible && view.shown) {
       view.shown = false;
-      view.backdrop.remove();
+      this.dismiss(view, view.backdrop);
       document.removeEventListener("keydown", view.onKeyDown, true);
       view.ctx.emit(view.tag, "on_dismiss", []);
     }
   }
+  /** `animation_type`: the sheet slides up (or fades in) over a fading backdrop. */
+  present(view) {
+    const kind = view.props.animation_type || "slide";
+    if (kind === "none") return;
+    const backdrop = view.backdrop;
+    backdrop.dataset.animation = kind;
+    backdrop.classList.add("pn-modal-out");
+    void backdrop.offsetWidth; // commit the off-stage position before transitioning from it
+    requestAnimationFrame(() => backdrop.classList.remove("pn-modal-out"));
+  }
+  /** Play the dismissal on `backdrop`, then take it off the stage. */
+  dismiss(view, backdrop) {
+    const kind = view.props.animation_type || "slide";
+    if (kind === "none") {
+      backdrop.remove();
+      return;
+    }
+    backdrop.dataset.animation = kind;
+    backdrop.style.pointerEvents = "none";
+    backdrop.classList.add("pn-modal-out");
+    view.leaving = setTimeout(() => {
+      backdrop.remove();
+      backdrop.style.pointerEvents = "";
+    }, MODAL_TRANSITION_MS + 40);
+  }
   destroy(view) {
     document.removeEventListener("keydown", view.onKeyDown, true);
-    if (view.shown) view.backdrop.remove();
+    if (!view.shown) return;
+    // Python destroys the content with the modal; animate a snapshot out.
+    const ghost = view.backdrop.cloneNode(true);
+    view.backdrop.replaceWith(ghost);
+    this.dismiss(view, ghost);
   }
 }
+
+const MODAL_TRANSITION_MS = 300;
 
 class PortalManager extends ViewManager {
   create(view, props) {
@@ -2025,6 +2220,11 @@ class PortalManager extends ViewManager {
   }
   container(view) {
     return view.layer;
+  }
+  /** The portal's children lay out against the whole device frame, like a window-level overlay. */
+  layerSize(view) {
+    const layer = view.ctx.overlays();
+    return [layer.clientWidth || view.ctx.frameWidth(), layer.clientHeight || 0];
   }
   frame() {}
   update() {}
@@ -2217,6 +2417,17 @@ const MODAL_PRESENTATIONS = new Set(["modal", "full_screen_modal", "form_sheet",
  * `presentation` props: `default` slides from the right for cards and from
  * the bottom for the modal presentations; `none` skips the transition.
  */
+/**
+ * Jump `el` to a transition's start state (`cls`) without animating there,
+ * and commit that style so removing `cls` afterwards plays the transition.
+ */
+export function placeOffStage(el, cls) {
+  el.style.transition = "none";
+  el.classList.add(cls);
+  void getComputedStyle(el).transform;
+  el.style.transition = "";
+}
+
 export function screenTransition(props) {
   const animation = props?.animation || "default";
   if (animation === "none") return null;
@@ -2295,8 +2506,9 @@ class ScreenStackManager extends ViewManager {
     // fits, and falls back to "Back"; an explicit `header_back_title` wins.
     const explicit = previous?.props.header_back_title;
     const previousTitle = previous?.props.title == null ? "" : String(previous.props.title);
-    view.back.textContent = explicit != null && explicit !== "" ? String(explicit)
-      : previousTitle && previousTitle.length <= 12 ? previousTitle : "Back";
+    view.backLabels = explicit != null && explicit !== "" ? [String(explicit), "Back", ""]
+      : previousTitle && previousTitle.length <= 12 ? [previousTitle, "Back", ""] : ["Back", ""];
+    this.fitBackLabel(view);
     const tint = parseColor(o.header_tint_color, scheme);
     view.back.style.color = tint ?? "";
     const bar = o.header_style && typeof o.header_style === "object" ? o.header_style : {};
@@ -2315,7 +2527,30 @@ class ScreenStackManager extends ViewManager {
       }
     }
   }
-  childrenChanged(view) {
+  /**
+   * Like UINavigationBar, shorten the back button when it would run into the
+   * title: the previous screen's title, then "Back", then the chevron alone.
+   */
+  fitBackLabel(view) {
+    const labels = view.backLabels || ["Back"];
+    const room = () => {
+      const header = view.header.clientWidth;
+      if (!header) return true; // not laid out yet; the next frame refits
+      const side = (header - view.titleEl.offsetWidth) / 2 - 12;
+      return view.back.scrollWidth <= side;
+    };
+    for (const label of labels) {
+      view.back.textContent = label;
+      view.back.classList.toggle("pn-stack-back-chevron", !label);
+      if (!label || room()) break;
+    }
+    view.back.setAttribute("aria-label", labels[0] || "Back");
+  }
+  /**
+   * Show the top screen (and any screens a `transparent_modal` top lets
+   * through); hide the rest, except a screen a push is still sliding over.
+   */
+  syncVisibility(view) {
     const children = view.children;
     const visible = new Set();
     for (let index = children.length - 1; index >= 0; index--) {
@@ -2325,25 +2560,61 @@ class ScreenStackManager extends ViewManager {
     for (const child of children) {
       child.el.classList.add("pn-stack-screen");
       child.el.classList.toggle("pn-screen-transparent", child.props.presentation === "transparent_modal");
-      child.el.style.display = visible.has(child) ? "" : "none";
+      if (child !== view.covered) child.el.style.display = visible.has(child) ? "" : "none";
     }
-    this.refreshHeader(view);
-    view.ctx.nativeStackChanged?.();
+  }
+  childrenChanged(view) {
+    const children = view.children;
     const top = children[children.length - 1] || null;
     const previous = view.topTag;
     view.topTag = top ? top.tag : null;
-    if (!top || previous == null || previous === top.tag || !top.el.isConnected) return;
+    const changed = !!top && previous != null && previous !== top.tag && top.el.isConnected;
     const known = view.seen || (view.seen = new Set());
-    if (known.has(top.tag)) return; // revealed by a pop, not pushed
-    this.enter(top);
+    const pushed = changed && !known.has(top.tag);
+    // Every screen in the stack now is "known": its reappearance after a pop
+    // is a reveal, not a push. (A root stack never gets a `frame` call.)
+    for (const child of children) known.add(child.tag);
+    // The screen a push covers stays on stage until the new one has slid over it.
+    const covered = pushed ? children.find((child) => child.tag === previous && child !== top) : null;
+    if (covered) {
+      view.covered?.el.classList.remove("pn-under");
+      view.covered = covered;
+    }
+    this.syncVisibility(view);
+    this.refreshHeader(view);
+    view.ctx.nativeStackChanged?.();
+    const reveal = view.revealFrom;
+    view.revealFrom = null;
+    if (pushed) this.enter(view, top, covered);
+    else if (changed && reveal === "pn-screen-right") this.reveal(top);
   }
-  enter(child) {
+  /** Play a push: the new screen slides (or fades) in and a card push nudges the covered one aside. */
+  enter(view, child, covered) {
     const cls = screenTransition(child.props);
-    if (!cls) return;
+    const settle = () => {
+      if (!covered || view.covered !== covered) return;
+      view.covered = null;
+      // Hide the covered screen, unless a quick pop already made it the top again.
+      this.syncVisibility(view);
+      covered.el.classList.remove("pn-under");
+    };
+    if (!cls) {
+      settle();
+      return;
+    }
     const el = child.el;
-    el.classList.add(cls);
-    // Two frames so the initial transform is committed before it transitions away.
-    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove(cls)));
+    placeOffStage(el, cls);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      el.classList.remove(cls);
+      if (covered && cls === "pn-screen-right") covered.el.classList.add("pn-under");
+    }));
+    setTimeout(settle, SCREEN_TRANSITION_MS + 40);
+  }
+  /** Play the second half of a card pop: the revealed screen slides back from beneath. */
+  reveal(child) {
+    const el = child.el;
+    placeOffStage(el, "pn-under");
+    requestAnimationFrame(() => el.classList.remove("pn-under"));
   }
   /** A child is leaving (pop): animate a snapshot of it out over the revealed screen. */
   childWillDetach(view, child) {
@@ -2355,15 +2626,13 @@ class ScreenStackManager extends ViewManager {
     ghost.style.pointerEvents = "none";
     ghost.removeAttribute("data-pn-tag");
     view.body.appendChild(ghost);
+    view.revealFrom = cls;
     requestAnimationFrame(() => ghost.classList.add(cls));
     setTimeout(() => ghost.remove(), SCREEN_TRANSITION_MS + 40);
   }
   frame(view, x, y, w, h) {
     super.frame(view, x, y, w, h);
-    // Every child laid out at least once is "known": its reappearance
-    // after a pop is a reveal, not a push.
-    view.seen ||= new Set();
-    for (const child of view.children) view.seen.add(child.tag);
+    if (view.back.style.display !== "none") this.fitBackLabel(view);
   }
   destroy(view) {
     view.ctx.nativeStackChanged?.();

@@ -11,10 +11,11 @@
 // stands in for UINavigationBar and reads the same option names
 // `HostModule.applyOptions` does on iOS.
 
-import { screenTransition } from "./renderer.js";
+import { placeOffStage, screenTransition } from "./renderer.js";
 import { DevSupport } from "./devsupport.js";
 import { phaseLabel, renderReport } from "./devtools/report.js";
 
+/** The status bar height when the shell's metrics don't give one. */
 const STATUS_BAR = 47;
 const HEADER = 44;
 const TRANSITION_MS = 280;
@@ -84,10 +85,14 @@ export class Screen {
     return screenTransition(this.options);
   }
 
+  /** Height of the device's status bar, or 0 while the app hides it. */
+  statusBarHeight() {
+    return this.host.statusBarHidden ? 0 : this.host.frameMetrics().top ?? STATUS_BAR;
+  }
+
   /** Top offset of the content area (status bar + header when shown). */
   contentTop() {
-    const bar = this.host.statusBarHidden ? 0 : STATUS_BAR;
-    return bar + (this.options.header_shown === false || this.stackOwnsHeader ? 0 : HEADER);
+    return this.statusBarHeight() + (this.options.header_shown === false || this.stackOwnsHeader ? 0 : HEADER);
   }
 
   /** Hide the host header while a root-level native stack draws its own bar. */
@@ -105,12 +110,12 @@ export class Screen {
    * (what `Dimensions.get("screen")` and `PixelRatio` read).
    */
   viewport() {
-    const { width, height, bottomInset } = this.host.frameMetrics();
+    const { width, height, bottomInset, leftInset = 0, rightInset = 0 } = this.host.frameMetrics();
     const top = this.contentTop();
     return {
       width,
       height: Math.max(0, height - top),
-      insets: { top: 0, left: 0, bottom: bottomInset, right: 0 },
+      insets: { top: 0, left: leftInset, bottom: bottomInset, right: rightInset },
       keyboard_height: 0,
       color_scheme: this.host.scheme(),
       scale: window.devicePixelRatio || 1,
@@ -122,7 +127,7 @@ export class Screen {
 
   layout() {
     const top = this.contentTop();
-    this.header.style.top = `${this.host.statusBarHidden ? 0 : STATUS_BAR}px`;
+    this.header.style.top = `${this.statusBarHeight()}px`;
     this.content.style.top = `${top}px`;
     if (!this.created) return;
     const payload = JSON.stringify(this.viewport());
@@ -226,7 +231,7 @@ export class PreviewHost {
     this.screensEl.appendChild(screen.el);
     screen.applyOptions({});
     const enter = animated ? screen.transition() : null;
-    if (enter) screen.el.classList.add(enter);
+    if (enter) placeOffStage(screen.el, enter);
     const payload = { path: path || null, args: argsJson ?? null, ...screen.viewport() };
     // Python attaches the screen's root through `Host.attach_root`.
     this.hostEvent(screen.id, "create", JSON.stringify(payload));
