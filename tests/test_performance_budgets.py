@@ -20,7 +20,6 @@ import pytest
 
 import pythonnative as pn
 from pythonnative import diagnostics, journal
-from pythonnative.bridge.commits import PROTOCOL_VERSION, CommitState
 from pythonnative.sdk import schema
 from pythonnative.testing import render
 
@@ -146,19 +145,15 @@ def test_element_construction_and_render_skip_signature_binding(monkeypatch: pyt
     assert result.get_by_text("cell 3")
 
 
-def test_release_commits_skip_python_prop_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_release_renders_never_validate_props_in_python(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The renderer core validates every commit; release builds skip the Python walk entirely."""
     validated: List[str] = []
     monkeypatch.setattr(schema.ComponentSchema, "validate", lambda self, *a, **k: validated.append(self.name))
-    envelope = {
-        "version": PROTOCOL_VERSION,
-        "application": "budget",
-        "surface": 1,
-        "revision": 1,
-        "ops": [["c", 1, "Text", {"text": "hi"}]],
-    }
     diagnostics.set_dev_mode(False)
-    CommitState().prepare(envelope)
+    try:
+        result = render(_Grid(0))
+        result.rerender(_Grid(1))
+        result.unmount()
+    finally:
+        diagnostics.set_dev_mode(True)
     assert validated == []
-    diagnostics.set_dev_mode(True)
-    CommitState().prepare(envelope)
-    assert validated == ["Text"]

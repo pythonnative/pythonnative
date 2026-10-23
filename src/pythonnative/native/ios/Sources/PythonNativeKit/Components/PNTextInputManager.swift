@@ -32,7 +32,7 @@ public final class PNTextInputManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! TextInputProps(props, validated: true)
+        let typed = TextInputProps(props)
 
         guard let state = PNViewState.existing(for: view) else { return }
         let field = view as? UITextField
@@ -151,6 +151,12 @@ public final class PNTextInputManager: PNComponentManager {
         return CGSize(width: max(size.width, 100), height: max(size.height, 36))
     }
 
+    /// Measure with the text the user typed, which an uncontrolled field's props don't carry.
+    public override func preparePrototype(_ prototype: UIView, live: UIView) {
+        if let field = prototype as? UITextField, let typed = live as? UITextField { field.text = typed.text }
+        if let area = prototype as? UITextView, let typed = live as? UITextView { area.text = typed.text }
+    }
+
     public override func command(view: UIView, name: String, args: [String: Any]) -> Any? {
         switch name {
         case "focus":
@@ -197,7 +203,7 @@ public final class PNTextInputManager: PNComponentManager {
               let revision = pending["revision"] as? Int,
               revision >= (state.extras["edit_revision"] as? Int ?? 0), let value = pending["value"] as? String else { return }
         setText(view, value)
-        PNLayout.invalidate(state.tag)
+        PNCoreBridge.invalidate(tag: state.tag)
     }
 
     static func setText(_ view: UIView, _ text: String) {
@@ -356,7 +362,7 @@ final class PNTextInputDelegate: NSObject, UITextFieldDelegate, UITextViewDelega
             PNTextInputManager.setText(view, text)
         }
         PNEvents.emit(view, "on_change", [text])
-        PNLayout.invalidate(state.tag)
+        PNCoreBridge.invalidate(tag: state.tag)
     }
 
     private func emitSelection() {

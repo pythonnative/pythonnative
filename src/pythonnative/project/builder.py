@@ -29,6 +29,7 @@ builder stops at producing installable/archivable artifacts.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import platform as platform_module
@@ -276,7 +277,9 @@ def _stage_runtime(name: str, destination: Path) -> None:
                 if not (source / platform / managed / rel).exists():
                     path.unlink()
     shutil.copytree(source / platform, destination / runtime_name, dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
-    shutil.copytree(source / "yoga", destination / "yoga", dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
+    # The renderer core (with the Yoga release it embeds) is compiled into
+    # both native runtimes from the same sources.
+    shutil.copytree(source / "core", destination / "core", dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
     from ..sdk.codegen import generate
 
     generated = destination / "contracts"
@@ -383,6 +386,16 @@ class Builder:
                     raise BuildError(str(error)) from error
                 if locked is None:
                     raise BuildError(f"Release dependencies need pn.lock. Run 'pn deps {platform} --lock' first.")
+        elif self.config.requirements:
+            from .lockfile import requirements
+
+            try:
+                requirements(self.config, targets)
+            except deps.DependencyError as error:
+                # Development builds may resolve unlocked requirements; only
+                # release builds insist on a current lock.
+                self.log(f"Warning: {error} Resolving the current requirements without it for this development build.")
+                self.config = dataclasses.replace(self.config, use_lock=False)
 
         build_dir = self.build_root / platform
         build_dir.mkdir(parents=True, exist_ok=True)

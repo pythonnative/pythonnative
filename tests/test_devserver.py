@@ -229,12 +229,24 @@ def test_protected_routes_accept_query_header_or_cookie(server: DevServer, path:
     assert _get(server, path, auth=False, headers={"Cookie": cookie})[0] == 200
 
 
-@pytest.mark.parametrize("path", ["/", "/index.html", "/static/shell.js", "/static/bridge.js", "/static/schema.js"])
+@pytest.mark.parametrize(
+    "path",
+    ["/", "/index.html", "/static/shell.js", "/static/bridge.js", "/static/core/mount.js", "/static/core/pn_core.js"],
+)
 def test_page_and_renderer_files_stay_public(server: DevServer, path: str) -> None:
     status, headers, _ = _raw(server, path, {})
     assert status == 200
     assert "set-cookie" not in headers
     assert "access-control-allow-origin" not in headers
+
+
+def test_the_webassembly_core_is_served_as_wasm(server: DevServer) -> None:
+    status, headers, body = _raw(server, "/static/core/pn_core.wasm", {})
+    assert status == 200
+    assert headers["content-type"] == "application/wasm"
+    assert body[:4] == b"\0asm"
+    # The page no longer validates commits itself, so there is no schema module.
+    assert _raw(server, "/static/schema.js", {})[0] == 404
 
 
 def test_page_trades_the_query_token_for_a_cookie_and_redirects(server: DevServer) -> None:
@@ -347,7 +359,7 @@ def _client(server: DevServer, role: str = "client", token: Any = _SERVER_TOKEN)
 
 def _compatible_hello() -> Dict[str, Any]:
     """A protocol-2 hello from a debug build of this framework version."""
-    from pythonnative.bridge.commits import PROTOCOL_VERSION
+    from pythonnative.bridge import PROTOCOL_VERSION
     from pythonnative.devserver.compat import _framework_version
 
     return {

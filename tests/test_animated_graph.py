@@ -159,30 +159,41 @@ def test_operator_divide_by_zero_is_safe() -> None:
 # ======================================================================
 
 
+class _PushRecorder(FakeBackend):
+    """Record writes the animation layer sends without animating."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.pushed: List[Any] = []
+
+    def set_animated_property(self, tag: int, prop_name: str, value: Any) -> None:
+        self.pushed.append((tag, prop_name, value))
+
+
 def test_derived_node_pushes_to_native_attachment() -> None:
-    backend = FakeBackend()
+    backend = _PushRecorder()
     set_backend(backend)
     try:
         v = AnimatedValue(0.0)
         iv = v.interpolate([0, 1], [0, 100])
         iv.attach(9, "translate_y")
-        backend.animated.clear()
+        backend.pushed.clear()
         v.set_value(0.5)
-        assert (9, "translate_y", 50.0) in backend.animated
+        assert (9, "translate_y", 50.0) in backend.pushed
     finally:
         set_backend(None)
 
 
 def test_derived_chain_pushes_through_operators() -> None:
-    backend = FakeBackend()
+    backend = _PushRecorder()
     set_backend(backend)
     try:
         v = AnimatedValue(1.0)
         node = v * 10 + 5
         node.attach(3, "translate_x")
-        backend.animated.clear()
+        backend.pushed.clear()
         v.set_value(2.0)
-        assert (3, "translate_x", 25.0) in backend.animated
+        assert (3, "translate_x", 25.0) in backend.pushed
     finally:
         set_backend(None)
 
@@ -312,7 +323,9 @@ class _AcceptingBackend(FakeBackend):
         return None
 
 
-def test_values_with_derived_dependents_stay_on_python_driver() -> None:
+def test_values_with_derived_dependents_drive_their_graph() -> None:
+    from pythonnative.animated import native_animation_message
+
     backend = _AcceptingBackend()
     set_backend(backend)
     try:
@@ -322,18 +335,11 @@ def test_values_with_derived_dependents_stay_on_python_driver() -> None:
         iv.attach(2, "opacity")
 
         Animated.timing(v, to=100.0, duration=30, easing="linear").start()
-        # The interpolation needs per-frame Python evaluation, so the
-        # native driver must decline.
-        assert backend.native_started == []
-
-        deadline = time.monotonic() + 2.0
-        while time.monotonic() < deadline and v.value < 99.9:
-            time.sleep(0.01)
-        assert abs(v.value - 100.0) < 0.1
-        assert abs(float(iv.value) - 0.0) < 0.01
-        # The interpolated attachment was driven too.
-        opacity_values = [val for tag, prop, val in backend.animated if (tag, prop) == (2, "opacity")]
-        assert opacity_values and abs(opacity_values[-1]) < 0.01
+        # The interpolation is part of the installed graph, so one core
+        # driver on the source value drives both bindings.
+        assert [(tag, prop) for tag, _id, prop in backend.native_started] == [(1, f"_pn_graph:{id(v)}")]
+        native_animation_message({"id": backend.native_started[0][1], "finished": True, "value": 100.0})
+        assert v.value == 100.0 and abs(float(iv.value)) < 0.01
     finally:
         set_backend(None)
 

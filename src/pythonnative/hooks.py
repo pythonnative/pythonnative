@@ -404,15 +404,7 @@ class HookState:
         pending = self._pending_layout_effects
         self._pending_layout_effects = []
         self._pending_layout_effects_mark = 0
-        for idx, effect_fn, deps in pending:
-            _, prev_cleanup = self.layout_effects[idx]
-            _run_cleanup(prev_cleanup)
-            token = _scope.set(self.task_scope)
-            try:
-                cleanup = _activate_effect(effect_fn)
-            finally:
-                _scope.reset(token)
-            self.layout_effects[idx] = (_copy_deps(deps), cleanup)
+        _run_effects(self.layout_effects, pending, self.task_scope)
 
     def flush_pending_effects(self) -> None:
         """Run passive effects queued during render, after native commit.
@@ -423,19 +415,15 @@ class HookState:
         that return an awaitable) run as tasks on the framework loop;
         their cleanup cancels the task, and a callable returned by the
         coroutine runs as an additional cleanup once it completed.
+
+        An effect that raises leaves no cleanup behind (its previous one
+        already ran), and the component's remaining effects still run;
+        the first error then propagates to the nearest error boundary.
         """
         pending = self._pending_effects
         self._pending_effects = []
         self._pending_effects_mark = 0
-        for idx, effect_fn, deps in pending:
-            _, prev_cleanup = self.effects[idx]
-            _run_cleanup(prev_cleanup)
-            token = _scope.set(self.task_scope)
-            try:
-                cleanup = _activate_effect(effect_fn)
-            finally:
-                _scope.reset(token)
-            self.effects[idx] = (_copy_deps(deps), cleanup)
+        _run_effects(self.effects, pending, self.task_scope)
 
     def cleanup_all_effects(self) -> None:
         """Run every outstanding cleanup function, then clear state.
@@ -532,6 +520,31 @@ def _deps_changed(prev: Any, current: Deps, ctx: Optional[HookState] = None, hoo
 def _copy_deps(deps: Deps) -> Optional[List[object]]:
     """Snapshot a dependency sequence so later in-place edits can't hide a change."""
     return None if deps is None else list(deps)
+
+
+def _run_effects(slots: List[Any], pending: List[Any], task_scope: Any) -> None:
+    """Run queued effects into their ``(deps, cleanup)`` slots, re-raising the first failure.
+
+    Each slot's previous cleanup runs, and is cleared, before its effect
+    does, so an effect that raises can't leave a cleanup that would run a
+    second time when its boundary unmounts the component.
+    """
+    error: BaseException | None = None
+    for idx, effect_fn, deps in pending:
+        _, prev_cleanup = slots[idx]
+        slots[idx] = (_copy_deps(deps), None)
+        try:
+            _run_cleanup(prev_cleanup)
+            token = _scope.set(task_scope)
+            try:
+                slots[idx] = (_copy_deps(deps), _activate_effect(effect_fn))
+            finally:
+                _scope.reset(token)
+        except Exception as exc:
+            if error is None:
+                error = exc
+    if error is not None:
+        raise error
 
 
 def _run_cleanup(cleanup: Any) -> None:

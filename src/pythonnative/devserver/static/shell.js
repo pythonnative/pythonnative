@@ -1,8 +1,10 @@
-// Entry point for the browser preview: wires the bridge, the DOM
-// renderer, and the screen host together and drives the toolbar.
+// Entry point for the browser preview: wires the bridge, the renderer
+// core (WebAssembly), the DOM renderer, and the screen host together and
+// drives the toolbar.
 
 import { Bridge } from "./bridge.js";
 import { Renderer } from "./renderer.js";
+import { startCore } from "./core/mount.js";
 import { PreviewHost } from "./host.js";
 import { color as parseColor } from "./colors.js";
 import { assets } from "./assets.js";
@@ -99,7 +101,16 @@ class Shell {
     this.startClock();
     // The stage shrinks when the console opens or resizes, not only with the window.
     new ResizeObserver(() => this.fitFrame()).observe(this.stage);
-    this.bridge.connect();
+    // The renderer core runs in the page; connect once it's instantiated.
+    startCore(this.renderer, { send: (kind, tag, name, payload) => this.bridge.callback(kind, tag, name, payload) })
+      .then((core) => {
+        this.core = core;
+        this.bridge.connect();
+      })
+      .catch((error) => {
+        this.logLine("error", `the renderer core failed to load: ${error?.stack || error}`);
+        this.showConsole(true);
+      });
   }
 
   // -- preferences --------------------------------------------------------
@@ -269,9 +280,6 @@ class Shell {
 
   rendererContext() {
     return {
-      emit: (tag, name, args) => this.bridge.callback("event", tag, name, JSON.stringify(args ?? [])),
-      gesture: (tag, phase, info) => this.bridge.send(["gesture", tag, phase, info]),
-      animationFinished: (id, finished) => this.bridge.callback("animation", 0, "", JSON.stringify({ id, finished })),
       scheme: () => this.scheme,
       nativeStackChanged: () => this.host?.nativeStackChanged(),
       overlays: () => this.overlays,
@@ -286,6 +294,18 @@ class Shell {
         const rect = this.screens.getBoundingClientRect();
         return { x: (event.clientX - rect.left) / this.scale, y: (event.clientY - rect.top) / this.scale };
       },
+      // An element's laid-out origin in window points (transforms, such as a
+      // screen sliding in, don't count): what a container reports to the core.
+      windowOrigin: (el) => {
+        let x = 0;
+        let y = 0;
+        for (let node = el; node && node !== this.screens && node !== this.overlays; node = node.offsetParent) {
+          x += node.offsetLeft - (node === el ? 0 : node.scrollLeft);
+          y += node.offsetTop - (node === el ? 0 : node.scrollTop);
+          if (node.offsetParent === null) break;
+        }
+        return { x, y };
+      },
       statusBar: (opts) => {
         this.statusBarState = { ...this.statusBarState, ...opts };
         this.applyStatusBar();
@@ -299,12 +319,15 @@ class Shell {
 
   installBridgeHandlers() {
     const b = this.bridge;
-    b.handlers.apply = (message) => this.renderer.apply(message[2]);
-    b.handlers.command = (message) => this.renderer.command(message[2], message[3], message[4]);
-    b.handlers.animate = (message) => this.renderer.animate(message[2], message[3]);
-    b.handlers.call = (message) => message[2] === "Layout"
-      ? {ok: true, value: this.renderer.computeLayout(JSON.parse(message[4]).args)}
-      : this.host.call(message[2], message[3], message[4]);
+    // Python's calls into the core (`pythonnative.bridge.web.WebTransport`):
+    // JSON text in, the core's JSON text out.
+    b.handlers.load_contracts = (message) => this.core.loadContracts(message[2]);
+    b.handlers.commit = (message) => this.core.commit(message[2]);
+    b.handlers.layout = (message) => this.core.layout(message[2]);
+    b.handlers.command = (message) => this.core.command(message[2], message[3], message[4], message[5], message[6]);
+    b.handlers.animate = (message) => this.core.animate(message[2], message[3], message[4]);
+    b.handlers.measure = (message) => this.core.measure(message[2], message[3]);
+    b.handlers.call = (message) => this.host.call(message[2], message[3], message[4]);
 
     b.onOpen = () => {
       this.setConnected(true);
@@ -321,7 +344,8 @@ class Shell {
       this.setConnected(false);
       if (wasConnected) {
         this.host.clear();
-        this.renderer.reset();
+        // The next session compiles its contracts and mounts on a fresh core.
+        this.core.reset();
         this.logLine("info", "disconnected from pn start; retrying...");
       } else {
         this.explainRefusal();
@@ -378,14 +402,14 @@ class Shell {
         $("pn-project-name").textContent = this.project;
         document.title = `${this.project || "PythonNative"} preview`;
         this.entry = payload.entry || null;
-        this.renderer.reset();
+        // Python remounts under a new application id; the core's first
+        // commit for it resets the surface's views.
         await assets.ready;
         await this.host.start(this.entry);
         this.logLine("ok", `mounted ${this.entry}`);
         break;
       }
       case "remount":
-        this.renderer.reset();
         await this.host.start(this.entry);
         break;
       case "log":

@@ -11,19 +11,23 @@ import pythonnative as pn
 from pythonnative import runtime
 from pythonnative.animation_graph import serialize
 from pythonnative.bridge import codec
-from pythonnative.bridge.commits import CommitError
 from pythonnative.bridge.fake import FakeTransport
 from pythonnative.mutations import CreateOp, DestroyOp, InsertOp, UpdateOp
-from pythonnative.native_views.bridge_backend import BridgeBackend
+from pythonnative.native_views.bridge_backend import BridgeBackend, CommitError
 from pythonnative.query import QueryClient
 from pythonnative.sdk.schema import ComponentSchema, NativeField
+
+
+def _identity(backend: BridgeBackend) -> dict[str, object]:
+    """The committed surface identity the core stamps on native events."""
+    return {"application": backend._application, "surface": backend.surface, "revision": backend._revision}
 
 
 def test_text_echo_acknowledges_only_the_native_edits_python_has_seen() -> None:
     transport = FakeTransport()
     backend = BridgeBackend(transport)
     backend.apply_mutations([CreateOp(1, "TextInput", {"value": ""})])
-    event = backend._commit.acknowledgement() | {"sequence": 1, "args": ["20"], "edit_revision": 2}
+    event = _identity(backend) | {"sequence": 1, "args": ["20"], "edit_revision": 2}
     assert backend.accept_event(1, "on_change", event)
     backend.apply_mutations([UpdateOp(1, {"value": "20"})])
     assert transport.views[1].props["_pn_edit_revision"] == 2
@@ -161,14 +165,14 @@ def test_rejected_acknowledgement_poisoning_and_explicit_reset(monkeypatch: pyte
     transport = FakeTransport()
     backend = BridgeBackend(transport)
     backend.apply_mutations([CreateOp(1, "View", {})])
-    original = transport.apply
-    monkeypatch.setattr(transport, "apply", lambda payload: codec.dumps({"ok": True, "revision": 999}))
+    original = transport.commit
+    monkeypatch.setattr(transport, "commit", lambda envelope: codec.dumps({"ok": True, "revision": 999}))
     with pytest.raises(CommitError, match="rejected"):
         backend.apply_mutations([CreateOp(2, "Text", {"text": "uncommitted"})])
     assert backend.resolve_view(2) is None
     with pytest.raises(CommitError, match="failed"):
         backend.apply_mutations([CreateOp(3, "Text", {})])
-    monkeypatch.setattr(transport, "apply", original)
+    monkeypatch.setattr(transport, "commit", original)
     backend.reset()
     backend.apply_mutations([CreateOp(4, "View", {})])
     assert backend.live_view_count() == 1
@@ -181,11 +185,10 @@ def test_invalid_tree_commit_has_no_partial_effect() -> None:
         backend.apply_mutations([CreateOp(1, "View", {}), InsertOp(1, 1, 0)])
     assert transport.views == {}
     backend.apply_mutations([CreateOp(1, "View", {})])
-    envelope = backend._commit.acknowledgement() | {
+    envelope = _identity(backend) | {
         "sequence": 1,
         "args": [{"x": 0, "y": 0, "width": 10, "height": 10}],
     }
-    envelope.pop("ok")
     assert backend.accept_event(1, "on_layout", envelope)
     assert not backend.accept_event(1, "on_layout", envelope)
     backend.apply_mutations([DestroyOp(1)])

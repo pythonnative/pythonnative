@@ -38,18 +38,22 @@ populated as appropriate for the gesture kind.
 
 Gesture descriptors are frozen dataclasses: numeric configuration plus
 your callbacks. The reconciler serializes the configuration into plain
-dicts for the native handler (prop diffing never compares closures)
-and routes the callbacks through the same tag-based event channel as
-`on_press` et al.
+dicts in the view's `gestures` prop (prop diffing never compares
+closures) and routes the callbacks through the same tag-based event
+channel as `on_press` et al.
 
-Recognition itself is native:
+Recognition itself runs on the platform's UI thread, never in Python:
 
-- **iOS** attaches real `UIGestureRecognizer` instances.
-- **Android** processes `MotionEvent` streams with Kotlin recognizers
-  and an arbiter in the native rendering library.
-- **The browser preview** streams the page's pointer events into the
-  Python [`GestureArbiter`][pythonnative.gestures.GestureArbiter],
-  which also supports headless recognition tests.
+- **iOS** attaches real `UIGestureRecognizer` instances, which
+  coordinate with scroll views, the back swipe, and system gestures.
+- **Android**, **the browser preview**, and **headless tests** forward
+  pointer events to the renderer core's gesture engine, the same C++
+  recognizers, velocity tracking, activation and failure offsets, and
+  composition rules on every one of them.
+
+A recognized gesture reaches Python as an ordinary event and updates any
+animated bindings (`Animated.event`) in the core first, so a drag keeps
+moving while Python is busy.
 
 Gestures listed side by side in the `gestures=` list recognize
 *simultaneously*. Use the composition combinators below when you need
@@ -90,8 +94,9 @@ pn.View(
 With `Exclusive`, a single tap reports only after the double-tap
 window closes, and a double tap suppresses the single-tap callback
 entirely; you get exactly one of the two. On iOS this maps to
-`requireGestureRecognizerToFail`; Android's Kotlin arbiter and the
-browser's Python arbiter implement the corresponding priority rules.
+`requireGestureRecognizerToFail`; the core's gesture engine implements
+the corresponding priority rules for Android, the browser preview, and
+tests.
 
 ## Fling
 
@@ -245,9 +250,44 @@ arbitrary view.
 
 ## Testing
 
-The arbiter that powers Android and desktop recognition is pure
-Python, so gesture logic is unit-testable with scripted pointer
-streams; see `tests/test_gestures.py` for ready-made patterns.
+Headless tests run the core's gesture engine, the one Android and the
+browser preview use, so gesture logic is testable with scripted pointer
+streams. [`FakeTransport.pointer`][pythonnative.bridge.fake.FakeTransport.pointer]
+feeds `(phase, pointer, x, y, window_x, window_y, time)` events to a
+mounted view's gestures, with phases from `pythonnative.bridge.core`
+(`POINTER_DOWN`, `POINTER_MOVE`, `POINTER_UP`, `POINTER_CANCEL`) and
+times in seconds:
+
+```python
+import pythonnative as pn
+from pythonnative import gestures
+from pythonnative.bridge.core import POINTER_DOWN, POINTER_UP
+from pythonnative.testing import render
+
+
+def test_tap_counts() -> None:
+    taps = []
+    result = render(
+        pn.View(
+            test_id="card",
+            style={"width": 100, "height": 100},
+            gestures=[gestures.Tap(on_tap=taps.append)],
+        )
+    )
+    card = result.get_by_test_id("card")
+    result.backend.native.pointer(
+        card.tag,
+        [(POINTER_DOWN, 0, 50, 50, 50, 50, 0.0), (POINTER_UP, 0, 50, 50, 50, 50, 0.05)],
+    )
+    result.settle()
+    assert len(taps) == 1
+```
+
+Time-based recognizers (long press, multi-tap windows) advance with
+`FakeTransport.poll_gestures(tag, time)`; `gesture_deadline(tag)` says
+when they next need it. `tests/gesture_harness.py` and
+`tests/test_gestures.py` in the repository have more patterns. iOS
+recognizers have their own tests in the native test suite.
 
 ## Next steps
 

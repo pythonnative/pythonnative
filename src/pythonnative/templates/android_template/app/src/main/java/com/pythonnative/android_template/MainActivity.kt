@@ -1,6 +1,7 @@
 package com.pythonnative.android_template
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -28,16 +29,23 @@ import com.pythonnative.runtime.modules.BuiltinModules
  * `NavHostFragment` from `activity_main.xml`, and their messages wait in the
  * bridge's mailbox until the host is installed, while the system splash
  * screen stays up.
+ *
+ * The manifest declares `android:configChanges` for rotation, dark mode,
+ * font scale, density, and locale, so the activity (and the Python screens
+ * it hosts) survives them: [onConfigurationChanged] re-measures and tells
+ * Python instead.
  */
 class MainActivity : AppCompatActivity() {
     private val TAG = javaClass.simpleName
     @Volatile private var pythonReady = false
     private var settled = false
+    private var configuration: Configuration? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate() called")
         PNBridge.setContext(this)
+        configuration = Configuration(resources.configuration)
 
         // Keep the splash screen (the window background before Android 12)
         // drawn until Python has started.
@@ -96,6 +104,12 @@ class MainActivity : AppCompatActivity() {
         }
         pythonReady = true
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) BuiltinModules.onActivityResumed()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        PNBridge.configurationChanged(this, configuration, newConfig)
+        configuration = Configuration(newConfig)
     }
 
     override fun onDestroy() {

@@ -53,6 +53,13 @@ Python facades, browser metadata, and a property reference. Generated Python
 methods preserve defaults and keyword arguments. Generated `on_prepared`
 subscriptions accept typed callbacks and return an unsubscribe function.
 
+Nothing generated validates values. At startup the renderer core compiles the
+merged contract document (built-ins plus every plugin's `schema.json`) into
+indexed tables, then checks every commit, view command, and module call
+against them, on every platform. A rejected commit names the component and
+the property. The Swift and Kotlin wrappers only decode values the core has
+already accepted.
+
 Native mappings require string keys. Integers must fit JavaScript's exact
 integer range, numbers must be finite, and booleans don't count as numbers.
 Record field names must be Python identifiers; use a mapping for other JSON
@@ -71,7 +78,7 @@ make `Platform.supports` return true.
 
 Use `PNTypedComponentManager<BadgeProps>` on iOS and
 `TypedComponentManager<BadgeProps>` on Android. The `applyTyped` method receives
-checked props. `has_count` distinguishes a changed property from one absent in
+props the core has checked. `has_count` distinguishes a changed property from one absent in
 a partial update. Common view props live in `PNViewProps`; they aren't repeated
 in every generated component. Use `PNComponentEvents.Badge.on_press` to emit
 the declared payload.
@@ -183,10 +190,11 @@ a provider plugin if your application needs an Android image editor.
 `NativeModuleError("unsupported")` on Android, where remote push needs a
 provider extension.
 
-Only clients that speak the current protocol (5) are supported. Rebuild the app
-after changing declarations,
-native sources, or native dependencies. Startup checks the exact contract
-fingerprint and Yoga version before mounting. Fast Refresh handles Python
+Only clients that speak the current protocol (7) are supported. Rebuild the
+app after changing declarations, native sources, or native dependencies.
+Startup checks the exact contract fingerprint compiled into the native library
+before mounting, and a mismatch fails with "Native component contracts
+changed. Rebuild the app with 'pn run'." Fast Refresh handles Python
 application changes within that compiled interface.
 
 ## Verify contracts

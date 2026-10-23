@@ -1,10 +1,12 @@
 """Tests for the native bridge: codec, transport routing, view backend, modules, hosts.
 
-Everything here runs against ``FakeTransport``, which decodes the same
-JSON the Swift and Kotlin runtimes receive. The tests therefore pin the
-wire protocol described in ``docs/concepts/bridge.md`` from the Python
-side: what a commit serializes to, how events and module results come
-back, and how the on-device screen host drives navigation.
+Everything here runs against ``FakeTransport``, which commits to the
+same renderer core the Swift and Kotlin runtimes embed and mounts the
+binary transactions it produces. The tests therefore pin the wire
+protocol described in ``docs/concepts/bridge.md`` from the Python side:
+what a commit serializes to, what the UI thread mounts, how events and
+module results come back, and how the on-device screen host drives
+navigation.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from pythonnative.bridge.fake import FakeTransport
 from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.hooks import use_state
-from pythonnative.mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
+from pythonnative.mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
 from pythonnative.native_modules import registry as modules
 from pythonnative.native_views import get_backend, set_backend
 from pythonnative.native_views.bridge_backend import BridgeBackend, NativeViewRef
@@ -89,24 +91,21 @@ def test_split_props_keeps_callables_python_side() -> None:
     assert "obj" in python
 
 
-def test_encode_transaction_shapes() -> None:
+def test_build_transaction_shapes() -> None:
     render = lambda i: i  # noqa: E731
     ops: List[Mutation] = [
         CreateOp(1, "Column", {"flex": 1, "_pn_events": frozenset({"on_press"})}),
         CreateOp(2, "VirtualList", {"horizontal": True, "on_bind_row": render}),
         UpdateOp(1, {"flex": UNSET, "padding": 4}),
         InsertOp(1, 2, 0),
-        SetFrameOp(2, 0, 0, 100.5, math.nan),
         DestroyOp(2),
     ]
-    text, sidecar = codec.encode_transaction(ops)
-    decoded = codec.loads(text)
-    assert decoded == [
+    encoded, sidecar = codec.build_transaction(ops)
+    assert codec.loads(codec.dumps(encoded)) == [
         ["c", 1, "Column", {"flex": 1, "_pn_events": ["on_press"]}],
         ["c", 2, "VirtualList", {"horizontal": True}],
         ["u", 1, {"padding": 4}, ["flex"]],
         ["i", 1, 2, 0],
-        ["f", 2, 0.0, 0.0, 100.5, 0.0],
         ["d", 2],
     ]
     assert sidecar == [(2, {"on_bind_row": render})]
@@ -191,17 +190,17 @@ def test_application_callback_runs_inline_on_its_owner(transport: FakeTransport)
 def test_backend_applies_transaction_and_tracks_tags(backend: BridgeBackend, transport: FakeTransport) -> None:
     backend.apply_mutations(
         [
-            CreateOp(1, "Column", {"flex": 1}),
+            CreateOp(1, "Column", {"flex": 1, "padding": 8}),
             CreateOp(2, "Text", {"text": "hi", "_pn_events": frozenset({"on_press"})}),
             InsertOp(1, 2, 0),
-            SetFrameOp(2, 8, 8, 100, 20),
         ]
     )
-    assert len(transport.transactions) == 1
+    backend.compute_layout([1], 300, 500)
     assert transport.views[1].type_name == "Column"
     assert transport.views[1].children == [transport.views[2]]
-    assert transport.views[2].props == {"text": "hi", "_pn_events": ["on_press"]}
-    assert transport.views[2].frame == (8.0, 8.0, 100.0, 20.0)
+    assert transport.views[2].props["text"] == "hi"
+    assert transport.views[2].props["_pn_events"] == ["on_press"]
+    assert transport.views[2].frame == (8.0, 8.0, 284.0, 16.0)  # stretched across the padded column
     ref = backend.resolve_view(2)
     assert isinstance(ref, NativeViewRef) and ref.tag == 2 and ref.type_name == "Text"
     assert backend.live_view_count() == 2
@@ -212,24 +211,25 @@ def test_backend_applies_transaction_and_tracks_tags(backend: BridgeBackend, tra
     assert backend.live_view_count() == 1
 
 
-def test_backend_measure_command_and_animation(backend: BridgeBackend, transport: FakeTransport) -> None:
+def test_backend_command_and_animation(backend: BridgeBackend, transport: FakeTransport) -> None:
     backend.apply_mutations([CreateOp(7, "Text", {"text": "x"})])
-    assert backend.measure_intrinsic(7, math.inf, 200) == (60.0, 16.0)
-    assert backend.measure_intrinsic(99, 10, 10) == (0.0, 0.0)
-
     backend.apply_mutations([CreateOp(8, "ScrollView", {}), CreateOp(9, "TextInput", {})])
     transport.command_results["get_scroll_offset"] = {"x": 0, "y": 42}
-    assert backend.command(8, "get_scroll_offset", {}) == {"x": 0, "y": 42}
-    assert backend.command(9, "focus") is None
+    assert backend.command(8, "get_scroll_offset", {}).result() == {"x": 0, "y": 42}
+    assert backend.command(9, "focus").result() is None
     assert transport.commands[-1] == (9, "focus", {})
     with pytest.raises(TypeError, match="Unknown command"):
         backend.command(7, "focus")
 
     backend.set_animated_property(7, "opacity", 0.5)
-    assert transport.animations[-1] == (7, {"op": "set", "prop": "opacity", "value": 0.5})
-    assert backend.start_animation(7, 3, "opacity", {"type": "timing", "to": 1.0, "duration": 100}) is True
-    transport.animate_results["cancel"] = {"value": 0.7}
-    assert backend.cancel_animation(7, 3) == 0.7
+    assert transport.writes[-1] == (7, "opacity", 0.5)
+    assert (
+        backend.start_animation(
+            7, 3, "opacity", {"kind": "timing", "from": 0.0, "to": 1.0, "duration_ms": 100, "easing": "linear"}
+        )
+        is True
+    )
+    backend.cancel_animation(7, 3)
     assert backend.start_animation(404, 1, "opacity", {}) is False
 
 
@@ -357,17 +357,14 @@ def test_destroyed_view_drops_queued_event(transport: FakeTransport) -> None:
     assert seen == ["press"]
 
 
-def test_animation_completion_callback_routes_to_animated(
-    transport: FakeTransport, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_animation_messages_route_to_animated(transport: FakeTransport, monkeypatch: pytest.MonkeyPatch) -> None:
     from pythonnative import animated
 
     seen: List[Any] = []
-    monkeypatch.setattr(
-        animated, "native_animation_completed", lambda anim_id, finished=True: seen.append((anim_id, finished))
-    )
-    transport.complete_animation(9, finished=False)
-    assert seen == [(9, False)]
+    monkeypatch.setattr(animated, "native_animation_message", seen.append)
+    message = {"completed": [{"id": 9, "finished": False, "value": 0.25}]}
+    bridge.native_callback("animation", 0, "", codec.dumps(message))
+    assert seen == [message]
 
 
 # ======================================================================
@@ -617,36 +614,24 @@ def test_drawing_only_commit_skips_layout_until_geometry_changes(
 ) -> None:
     from pythonnative.profiling import Profiler
 
-    def layout(_method: str, _args: Dict[str, Any]) -> Dict[str, Any]:
-        identity = transport.commit_state.acknowledgement()
-        identity.pop("ok")
-        return identity | {"frames": [], "metrics": {"layout_ns": 1000, "views": 1}}
-
-    transport.module_handlers["Layout"] = layout
     with Profiler() as profiler:
         backend.apply_mutations([CreateOp(91, "Text", {"text": "before"})])
         backend.compute_layout([91], 300, 500)
         backend.apply_mutations([UpdateOp(91, {"color": "#ff0000", "opacity": 0.5})])
         backend.compute_layout([91], 300, 500)
         assert profiler.counters["layout.requests"] == 1
-        backend.apply_mutations([UpdateOp(91, {"text": "a longer label"})])
-        backend.compute_layout([91], 300, 500)
-        assert profiler.counters["layout.requests"] == 2
         backend.compute_layout([91], 500, 300)
-        assert profiler.counters["layout.requests"] == 3
-        assert profiler.counters["native.layout.views"] == 3
+        assert profiler.counters["layout.requests"] == 2
 
 
 def test_geometry_from_an_obsolete_revision_cannot_update_the_tree(backend: BridgeBackend) -> None:
     accepted: list[Any] = []
     backend.on_layout = accepted.append
     backend.apply_mutations([CreateOp(92, "Text", {"text": "before"})])
-    identity = backend._commit.acknowledgement()
-    identity.pop("ok")
+    identity = {"application": backend._application, "surface": backend.surface, "revision": backend._revision}
     backend.apply_mutations([UpdateOp(92, {"text": "after"})])
     backend.accept_layout(identity | {"frames": [[92, 0, 0, 10, 10]]})
     assert accepted == []
-    current = backend._commit.acknowledgement()
-    current.pop("ok")
+    current = identity | {"revision": backend._revision}
     backend.accept_layout(current | {"frames": [[92, 0, 0, 20, 10]]})
     assert accepted == [[[92, 0, 0, 20, 10]]]

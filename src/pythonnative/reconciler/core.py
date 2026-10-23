@@ -49,7 +49,7 @@ from ..component import Component
 from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element
 from ..equality import equal, equal_props
 from ..errors import add_component_frame, complete_component_stack
-from ..events import extract_events, get_event_registry
+from ..events import EVENTS_PROP, extract_events, get_event_registry
 from ..hooks import Context, HookState, install_hook_state, provider_environment, restore_hook_state
 from ..journal import Journal, JournalDict
 from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
@@ -59,7 +59,7 @@ from ..scheduler import TransitionQueue, schedule_trigger
 from ..suspense import Suspend, run_eagerly
 from .boundaries import BoundaryMixin, HydrationMap
 from .children import plan_child_moves
-from .layout_pass import LayoutMixin, affects_layout
+from .layout_pass import LayoutMixin
 from .vnode import VNode, next_tag, normalize_children
 
 __all__ = ["MAX_RENDER_PASSES", "Reconciler"]
@@ -85,7 +85,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     Args:
         backend: An object implementing the backend protocol
-            (``apply_mutations``, ``resolve_view``, ``measure_intrinsic``,
+            (``apply_mutations``, ``resolve_view``, ``compute_layout``,
             ``command``). PythonNative ships the bridge backend for iOS,
             Android, and the browser preview; tests use
             [`FakeBackend`][pythonnative.testing.FakeBackend].
@@ -1017,8 +1017,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         if before_roots == after_roots:
             return
         if container is not None and container.tag is not None:
-            if self._sync_native_children(container.tag, before, self._flattened_child_roots(container)):
-                self._mark_layout_dirty(container)
+            self._sync_native_children(container.tag, before, self._flattened_child_roots(container))
 
     def _route_error(self, vnode: VNode, exc: BaseException) -> None:
         """Route a render or effect failure to the nearest ``ErrorBoundary`` ancestor.
@@ -1123,9 +1122,6 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         if changed:
             if old.tag is not None:
                 self._ops.append(UpdateOp(old.tag, changed))
-            old.measure_cache = None
-            if affects_layout(old.element.type, changed):
-                self._mark_layout_dirty(old)
         old.clean_props = new_clean
 
         old_ref = old.element.props.get("ref")
@@ -1140,8 +1136,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         for child in children:
             child.parent = old
         old.element = new_el
-        if old.tag is not None and self._sync_native_children(old.tag, before, self._flattened_child_roots(old)):
-            self._mark_layout_dirty(old)
+        if old.tag is not None:
+            self._sync_native_children(old.tag, before, self._flattened_child_roots(old))
         return old
 
     def _reconcile_component(self, old: VNode, new_el: Element) -> VNode:
@@ -1359,7 +1355,6 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             self._destroyed_tags.add(node.tag)
         node.children = []
         node.parent = None
-        node.layout_node = None
 
     # ------------------------------------------------------------------
     # Native structure helpers
@@ -1470,6 +1465,14 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             clean["_pn_animated_events"] = bindings
         if props.get("ref") is not None or "on_layout" in events:
             clean["_pn_layout"] = True
+        if "on_layout" in events:
+            # The core reports layout itself; native never fires it, and
+            # leaving it out keeps a layout-only wrapper flattenable.
+            names = clean[EVENTS_PROP] - {"on_layout"}
+            if names:
+                clean[EVENTS_PROP] = names
+            else:
+                del clean[EVENTS_PROP]
         return clean, events
 
     @staticmethod

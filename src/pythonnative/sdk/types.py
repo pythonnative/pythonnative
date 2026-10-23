@@ -28,6 +28,8 @@ class NativeField:
     platforms: tuple[str, ...] = ("ios", "android", "web")
     description: str = ""
     python_only: bool = False
+    flatten: bool = False
+    """A layout-only prop: setting it keeps a view eligible for flattening."""
 
 
 _record_types: dict[str, type] = {}

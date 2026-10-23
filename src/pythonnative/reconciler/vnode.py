@@ -19,7 +19,6 @@ from .. import journal as _journal
 from ..component import Component
 from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element, type_label
 from ..hooks import Context, HookState
-from ..layout import LayoutNode
 
 __all__ = [
     "DETACHED_TYPES",
@@ -172,10 +171,7 @@ class VNode:
         "mounted",
         "rendered",
         "clean_props",
-        "measure_cache",
         "last_frame",
-        "layout_node",
-        "layout_dirty",
         "hidden_by_suspense",
         "error",
         "suspense_showing_fallback",
@@ -211,20 +207,8 @@ class VNode:
         # Native-safe props (events and reconciler-owned keys stripped)
         # from the last commit; the baseline for prop diffing.
         self.clean_props: Dict[str, Any] = {}
-        # Cache for the leaf intrinsic-size measure callback:
-        # ``(max_w, max_h, width, height)``. Invalidated whenever the
-        # node's props change, so unchanged leaves skip native
-        # ``measure_intrinsic`` calls entirely.
-        self.measure_cache: Optional[Tuple[float, float, float, float]] = None
-        # Last frame sent to the native side; unchanged frames are
-        # skipped (frame diffing).
+        # The last frame the core reported for this node.
         self.last_frame: Optional[Tuple[float, float, float, float]] = None
-        # Cached LayoutNode reused across passes while the subtree is
-        # clean (see the layout mixin).
-        self.layout_node: Optional[LayoutNode] = None
-        # True when this node's layout-relevant props or child list
-        # changed since the last layout pass.
-        self.layout_dirty: bool = True
         # True while an enclosing Suspense boundary hides this native
         # root (``display: "none"`` override) during an update-time
         # suspension.

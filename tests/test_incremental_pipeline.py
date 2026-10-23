@@ -12,7 +12,6 @@ import pythonnative as pn
 from pythonnative import runtime
 from pythonnative.bridge import codec
 from pythonnative.bridge.fake import FakeTransport
-from pythonnative.bridge.list_store import ListStore
 from pythonnative.events import get_event_registry
 from pythonnative.native_views import set_backend
 from pythonnative.native_views.bridge_backend import BridgeBackend
@@ -35,7 +34,7 @@ def test_list_data_updates_only_changed_metadata_and_preserves_mounted_state() -
     source = pn.ListData((Item(str(i), str(i)) for i in range(100_000)), key=lambda item: item.id)
     result = render(pn.FlatList(data=source, render_item=row, item_height=44), viewport=None)
     tag = result.get_by_type("VirtualList").tag
-    keys = result.backend.list_stores[tag].keys
+    keys = result.backend.list_store(tag).keys
     with Profiler() as profile:
         source.update("0", Item("0", "changed"))
         result.settle()
@@ -44,8 +43,7 @@ def test_list_data_updates_only_changed_metadata_and_preserves_mounted_state() -
     assert len(codec.dumps(packet)) < 120
     assert profile.counters["list.snapshot_rows"] == 0
     assert profile.counters["list.incremental_changes"] == 1
-    assert profile.counters["list.rows_validated"] == 1
-    assert result.backend.list_stores[tag].keys is keys
+    assert result.backend.list_store(tag).keys == keys
     assert result.get_by_text("0: changed")
     assert len(result.get_all_by_type("Text")) < 60
     result.unmount()
@@ -57,7 +55,7 @@ def test_switching_from_a_mutated_incremental_source_replaces_all_native_keys() 
     result = render(pn.FlatList(data=source, render_item=row))
     source.clear()
     result.rerender(pn.FlatList(data=[Item("z", "Z")], render_item=row, key_extractor=lambda item, index: item.id))
-    store = result.backend.list_stores[result.get_by_type("VirtualList").tag]
+    store = result.backend.list_store(result.get_by_type("VirtualList").tag)
     assert store.keys == ["z"]
     assert result.get_by_text("0: Z")
     result.unmount()
@@ -89,7 +87,7 @@ def test_window_events_do_not_read_old_indices_through_a_mutated_source() -> Non
     on_bind({"revision": revision, "index": 1, "key": "b"})
     assert not seen
     result.settle()
-    store = result.backend.list_stores[result.get_by_type("VirtualList").tag]
+    store = result.backend.list_store(result.get_by_type("VirtualList").tag)
     assert not store.keys
     result.unmount()
 
@@ -105,7 +103,7 @@ def test_list_data_batch_move_remove_and_insert_keep_indices_and_keys() -> None:
         source.remove("a")
         source.insert(1, Item("d", "D"))
     result.settle()
-    store = result.backend.list_stores[result.get_by_type("VirtualList").tag]
+    store = result.backend.list_store(result.get_by_type("VirtualList").tag)
     assert store.keys == ["c", "d", "b"]
     assert result.get_by_text("0: C")
     assert result.get_by_text("1: D")
@@ -145,15 +143,37 @@ def test_list_data_validates_before_mutation_and_notifies_successful_batch_prefi
 
 @pytest.mark.parametrize("seed", range(5))
 def test_randomized_list_patches_match_a_reference_sequence(seed: int) -> None:
+    """The core's list datasets apply random patches like a plain reference list, atomically."""
+    from pythonnative.bridge import PROTOCOL_VERSION, contract_document
+
+    transport = FakeTransport(surface=60)
+    transport.core.load_contracts(contract_document(), "host")
+    commit_revision = 0
+
+    def commit(op: list[Any]) -> bool:
+        nonlocal commit_revision
+        envelope = {
+            "version": PROTOCOL_VERSION,
+            "application": "lists",
+            "surface": 60,
+            "revision": commit_revision + 1,
+            "ops": [op],
+        }
+        ack = codec.loads(transport.commit(codec.dumps(envelope)))
+        commit_revision += 1 if ack["ok"] else 0
+        return bool(ack["ok"])
+
+    assert commit(["c", 1, "VirtualList", {"dataset": {"base": 0, "revision": 1, "changes": [["reset", []]]}}])
     rng = random.Random(seed)
-    store = ListStore()
     expected: list[str] = []
+    versions: dict[str, int] = {}
+    revision = 1
     for step in range(250):
-        revision = store.revision
         choice = rng.choice(["i", "u", "d", "m"]) if expected else "i"
         if choice == "i":
             index, key = rng.randrange(len(expected) + 1), str(step)
             expected.insert(index, key)
+            versions[key] = 1
             change: list[Any] = ["i", index, [key, 1, 44, False]]
         elif choice == "d":
             key = expected.pop(rng.randrange(len(expected)))
@@ -165,20 +185,18 @@ def test_randomized_list_patches_match_a_reference_sequence(seed: int) -> None:
             change = ["m", key, index]
         else:
             key = rng.choice(expected)
-            change = ["u", [key, store.rows[key].revision + 1, rng.randrange(1, 200), False]]
-        store.apply({"base": revision, "revision": revision + 1, "changes": [change]})
-        assert store.keys == expected
-        assert set(store.rows) == set(expected)
-        before = dict(store.rows)
-        with pytest.raises(ValueError):
-            store.apply(
-                {
-                    "base": revision + 1,
-                    "revision": revision + 2,
-                    "changes": [["i", 0, ["new", 1, 44, False]], ["d", "missing"]],
-                }
-            )
-        assert store.rows == before and store.keys == expected and store.revision == revision + 1
+            versions[key] += 1
+            change = ["u", [key, versions[key], rng.randrange(1, 200), False]]
+        assert commit(["u", 1, {"dataset": {"base": revision, "revision": revision + 1, "changes": [change]}}, []])
+        revision += 1
+        assert transport.list_keys(1) == expected
+        bad = {
+            "base": revision,
+            "revision": revision + 1,
+            "changes": [["i", 0, ["new", 1, 44, False]], ["d", "missing"]],
+        }
+        assert not commit(["u", 1, {"dataset": bad}, []])
+        assert transport.list_keys(1) == expected and transport.list_revisions[1] == revision
 
 
 class DelayedTransport(FakeTransport):
@@ -191,14 +209,14 @@ class DelayedTransport(FakeTransport):
         self.reject = False
         self.worker_threads: list[str] = []
 
-    def apply(self, transaction_json: str) -> str:
+    def commit(self, transaction_json: str) -> str:
         self.worker_threads.append(threading.current_thread().name)
         self.entered.set()
         if not self.gate.wait(3):
             raise TimeoutError("Test didn't release native commit")
         if self.reject:
             return codec.dumps({"ok": False, "failed": False, "error": "test rejection"})
-        return super().apply(transaction_json)
+        return super().commit(transaction_json)
 
 
 async def entered(transport: DelayedTransport) -> None:
@@ -295,7 +313,7 @@ def test_two_reconcilers_serialize_commits_and_mount_replacement_waits() -> None
         transport.gate.set()
         await asyncio.wait_for(asyncio.gather(first.wait_for_commit(), second.wait_for_commit()), 2)
         assert sorted(view.props["text"] for view in transport.views.values()) == ["replacement", "second"]
-        assert backend._commit.revision == 4
+        assert backend._revision == 4
         first.unmount()
         second.unmount()
         await asyncio.gather(first.wait_for_commit(), second.wait_for_commit())
@@ -338,21 +356,6 @@ def test_append_and_remove_update_the_previous_last_rows_separator() -> None:
     result.unmount()
 
 
-def test_shared_list_trace() -> None:
-    import json
-    from pathlib import Path
-
-    store = ListStore()
-    for case in json.loads((Path(__file__).parent / "contracts/list-trace.json").read_text()):
-        if case["valid"]:
-            store.apply(case["packet"])
-        else:
-            with pytest.raises(ValueError):
-                store.apply(case["packet"])
-        assert store.keys == case["keys"], case["name"]
-        assert store.revision == case["revision"], case["name"]
-
-
 def test_events_wait_for_refs_and_layout_effects() -> None:
     from pythonnative.bridge import _on_event
 
@@ -379,9 +382,7 @@ def test_events_wait_for_refs_and_layout_effects() -> None:
         _on_event(
             tag,
             "on_press",
-            codec.dumps(
-                {"application": backend._commit.application, "surface": 1, "revision": 1, "sequence": 1, "args": []}
-            ),
+            codec.dumps({"application": backend._application, "surface": 1, "revision": 1, "sequence": 1, "args": []}),
         )
         assert clicks == []
         transport.gate.set()
@@ -404,8 +405,8 @@ def test_host_refresh_waits_for_pending_mount_and_recovers_unknown_outcome(monke
     class LostAcknowledgement(DelayedTransport):
         lose_ack = False
 
-        def apply(self, payload: str) -> str:
-            reply = super().apply(payload)
+        def commit(self, payload: str) -> str:
+            reply = super().commit(payload)
             return "null" if self.lose_ack else reply
 
     async def exercise() -> None:

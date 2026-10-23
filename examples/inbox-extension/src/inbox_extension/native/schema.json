@@ -1,5 +1,5 @@
 {
-  "protocol": 6,
+  "protocol": 7,
   "yoga": "3.2.1",
   "components": {
     "InboxBadge": {
@@ -27,7 +27,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "height": {
@@ -52,7 +53,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "min_width": {
@@ -77,7 +79,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "max_width": {
@@ -102,7 +105,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "min_height": {
@@ -127,7 +131,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "max_height": {
@@ -152,7 +157,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "aspect_ratio": {
@@ -167,7 +173,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "flex": {
@@ -182,7 +189,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "flex_grow": {
@@ -197,7 +205,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "flex_shrink": {
@@ -212,7 +221,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "flex_basis": {
@@ -237,7 +247,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "flex_direction": {
@@ -257,7 +268,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "flex_wrap": {
@@ -276,7 +288,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "justify_content": {
@@ -304,7 +317,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "align_items": {
@@ -333,7 +347,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "align_self": {
@@ -362,7 +377,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "align_content": {
@@ -385,7 +401,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "direction": {
@@ -403,7 +420,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "display": {
@@ -421,7 +439,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "position": {
@@ -439,7 +458,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "top": {
@@ -464,7 +484,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "right": {
@@ -489,7 +510,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "bottom": {
@@ -514,7 +536,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "left": {
@@ -539,7 +562,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "start": {
@@ -564,7 +588,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "end": {
@@ -589,7 +614,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding": {
@@ -715,7 +741,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding_top": {
@@ -740,7 +767,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding_bottom": {
@@ -765,7 +793,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding_left": {
@@ -790,7 +819,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding_right": {
@@ -815,7 +845,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding_start": {
@@ -840,7 +871,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding_end": {
@@ -865,7 +897,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding_horizontal": {
@@ -890,7 +923,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "padding_vertical": {
@@ -915,7 +949,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin": {
@@ -1046,7 +1081,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin_top": {
@@ -1076,7 +1112,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin_bottom": {
@@ -1106,7 +1143,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin_left": {
@@ -1136,7 +1174,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin_right": {
@@ -1166,7 +1205,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin_start": {
@@ -1196,7 +1236,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin_end": {
@@ -1226,7 +1267,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin_horizontal": {
@@ -1256,7 +1298,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "margin_vertical": {
@@ -1286,7 +1329,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "gap": {
@@ -1301,7 +1345,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "row_gap": {
@@ -1316,7 +1361,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "column_gap": {
@@ -1331,7 +1377,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": true
           }
         },
         "overflow": {
@@ -1350,7 +1397,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "background_color": {
@@ -1388,7 +1436,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "color": {
@@ -1426,7 +1475,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_color": {
@@ -1464,7 +1514,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "placeholder_color": {
@@ -1502,7 +1553,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "tint_color": {
@@ -1540,7 +1592,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_width": {
@@ -1555,7 +1608,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_style": {
@@ -1574,7 +1628,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_radius": {
@@ -1589,7 +1644,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_top_left_radius": {
@@ -1604,7 +1660,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_top_right_radius": {
@@ -1619,7 +1676,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_bottom_left_radius": {
@@ -1634,7 +1692,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_bottom_right_radius": {
@@ -1649,7 +1708,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_top_width": {
@@ -1664,7 +1724,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_right_width": {
@@ -1679,7 +1740,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_bottom_width": {
@@ -1694,7 +1756,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_left_width": {
@@ -1709,7 +1772,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_top_color": {
@@ -1747,7 +1811,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_right_color": {
@@ -1785,7 +1850,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_bottom_color": {
@@ -1823,7 +1889,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "border_left_color": {
@@ -1861,7 +1928,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "font_size": {
@@ -1876,7 +1944,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "font_family": {
@@ -1891,7 +1960,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "font_weight": {
@@ -1918,7 +1988,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "bold": {
@@ -1933,7 +2004,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "italic": {
@@ -1948,7 +2020,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "text_align": {
@@ -1970,7 +2043,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "text_decoration": {
@@ -1989,7 +2063,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "text_transform": {
@@ -2009,7 +2084,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "line_height": {
@@ -2024,7 +2100,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "letter_spacing": {
@@ -2039,7 +2116,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "max_lines": {
@@ -2054,7 +2132,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "text_shadow_color": {
@@ -2092,7 +2171,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "text_shadow_offset": {
@@ -2145,7 +2225,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "text_shadow_radius": {
@@ -2160,7 +2241,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "shadow_color": {
@@ -2198,7 +2280,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "shadow_offset": {
@@ -2251,7 +2334,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "shadow_opacity": {
@@ -2266,7 +2350,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "shadow_radius": {
@@ -2281,7 +2366,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "elevation": {
@@ -2296,7 +2382,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "opacity": {
@@ -2311,7 +2398,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "transform": {
@@ -2762,7 +2850,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "z_index": {
@@ -2777,7 +2866,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "pointer_events": {
@@ -2797,7 +2887,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "count": {
@@ -2812,7 +2903,8 @@
               "web"
             ],
             "description": "",
-            "python_only": false
+            "python_only": false,
+            "flatten": false
           }
         },
         "on_press": {
@@ -2833,7 +2925,8 @@
         "_pn_layout": {
           "type": "boolean",
           "native": {
-            "invalidates_layout": false
+            "invalidates_layout": false,
+            "flatten": true
           }
         },
         "_pn_events": {
@@ -6395,7 +6488,12 @@
       "platforms": [
         "ios",
         "android"
-      ]
+      ],
+      "flatten": false,
+      "adopt_flattened": false,
+      "detach_children": false,
+      "clip": false,
+      "portal": false
     }
   },
   "modules": {

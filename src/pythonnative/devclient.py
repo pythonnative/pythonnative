@@ -321,7 +321,7 @@ def _bundled_distributions(exclude: str) -> Dict[str, str]:
 def _runtime(overlay: str) -> Dict[str, Any]:
     from importlib.metadata import PackageNotFoundError, version
 
-    from .bridge.commits import PROTOCOL_VERSION
+    from .bridge import PROTOCOL_VERSION
     from .sdk import schema
 
     try:
@@ -732,8 +732,11 @@ class DevClient:
             self._log(f"[pn dev] installed {name} {package.get('version') or ''} ({len(files)} files)")
         try:
             os.makedirs(root, exist_ok=True)
-            with open(os.path.join(root, _PACKAGES_MANIFEST), "w", encoding="utf-8") as handle:
+            # Replace atomically so a reader never sees a partial manifest.
+            path = os.path.join(root, _PACKAGES_MANIFEST)
+            with open(path + ".tmp", "w", encoding="utf-8") as handle:
                 json.dump(manifest, handle)
+            os.replace(path + ".tmp", path)
         except OSError:
             pass
         if root not in sys.path:

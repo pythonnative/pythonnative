@@ -7,9 +7,7 @@ from typing import Any
 import pytest
 
 import pythonnative as pn
-from pythonnative.bridge.commits import PROTOCOL_VERSION, CommitState, ViewState
 from pythonnative.events import get_event_registry
-from pythonnative.profiling import Profiler
 from pythonnative.reconciler import Reconciler
 from pythonnative.runtime import run_blocking
 from pythonnative.testing import FakeBackend, render
@@ -110,26 +108,6 @@ def test_failed_render_keeps_committed_tree_refs_events_and_effects() -> None:
     assert rec.root is not None and rec.root.children[0].element.props["title"] == "old"
     rec.reconcile(pn.Column(pn.Button("recovered", ref=old_ref, on_press=old_callback)))
     rec.unmount()
-
-
-def test_commit_overlay_work_depends_on_changed_records() -> None:
-    state = CommitState("app", 1, views={i: ViewState("Text", {"text": "before"}) for i in range(1, 10001)})
-    untouched = state.views[2]
-    with Profiler() as profiler:
-        candidate = state.prepare(
-            {
-                "version": PROTOCOL_VERSION,
-                "application": "app",
-                "surface": 1,
-                "revision": 1,
-                "ops": [["u", 1, {"text": "after"}, []]],
-            }
-        )
-    assert state.views[1].props["text"] == "before"
-    assert candidate.views[2] is untouched
-    assert profiler.counters["commit.records_copied"] == 1
-    state = candidate.publish()
-    assert state.views[1].props["text"] == "after"
 
 
 def test_positional_only_name_can_also_be_in_keyword_arguments() -> None:

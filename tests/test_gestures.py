@@ -1,5 +1,5 @@
 """Tests for the gesture system: descriptors, serialization, and the
-pure-Python `GestureArbiter` used by the browser preview (and as the reference semantics).
+renderer core's `GestureArbiter`, which every platform runs on its UI thread.
 
 The arbiter tests drive scripted pointer streams (positions in points,
 times in seconds) and assert on the emitted payloads, which is exactly
@@ -13,9 +13,9 @@ import math
 from typing import Any, Dict, List, Tuple
 
 import pytest
+from gesture_harness import GestureArbiter
 
 from pythonnative.gestures import (
-    GestureArbiter,
     GestureEvent,
     GestureState,
     Pan,

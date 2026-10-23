@@ -18,7 +18,6 @@ import com.pythonnative.runtime.bridge.str
 import com.pythonnative.runtime.bridge.value
 import com.pythonnative.runtime.graphics.SvgPath
 import com.pythonnative.runtime.graphics.SvgTransform
-import com.pythonnative.runtime.layout.NativeLayout
 import org.json.JSONObject
 import kotlin.math.max
 import kotlin.math.min
@@ -29,7 +28,7 @@ import kotlin.math.roundToInt
  * records with `Canvas`. Coordinates are in `view_box` units and are
  * mapped into the view's bounds according to `preserve_aspect_ratio`.
  */
-class SvgManager : TypedComponentManager<SvgProps>({ values, partial, validated -> SvgProps(values, partial, validated) }) {
+class SvgManager : TypedComponentManager<SvgProps>({ values, partial -> SvgProps(values, partial) }) {
     override fun createView(context: Context, tag: Long, props: JSONObject): View = SvgView(context)
 
     override fun applyTyped(view: View, props: SvgProps, initial: Boolean) {
@@ -37,7 +36,6 @@ class SvgManager : TypedComponentManager<SvgProps>({ values, partial, validated 
         if (props.has_shapes) svg.shapes = props.shapes ?: emptyList()
         if (props.has_view_box) {
             svg.viewBox = SvgView.parseViewBox(props.view_box) ?: RectF(0f, 0f, 24f, 24f)
-            recordOf(svg)?.let { NativeLayout.invalidate(it.tag) }
         }
         if (props.has_preserve_aspect_ratio) svg.preserveAspectRatio = props.preserve_aspect_ratio?.rawValue ?: "meet"
         val paintKeys = listOf("fill", "stroke", "stroke_width", "stroke_linecap", "stroke_linejoin", "fill_rule", "color")
@@ -55,20 +53,6 @@ class SvgManager : TypedComponentManager<SvgProps>({ values, partial, validated 
         }
         svg.invalidate()
         ViewStyler.apply(svg, props.values)
-    }
-
-    override fun measure(view: View, maxWidth: Double, maxHeight: Double): FloatArray {
-        val svg = view as SvgView
-        var w = svg.viewBox.width()
-        var h = svg.viewBox.height()
-        if (w <= 0f || h <= 0f) { w = 24f; h = 24f }
-        if (maxWidth.isFinite() && maxWidth > 0 && maxWidth < 1e6 && w > maxWidth) {
-            h *= (maxWidth / w).toFloat(); w = maxWidth.toFloat()
-        }
-        if (maxHeight.isFinite() && maxHeight > 0 && maxHeight < 1e6 && h > maxHeight) {
-            w *= (maxHeight / h).toFloat(); h = maxHeight.toFloat()
-        }
-        return floatArrayOf(w, h)
     }
 }
 

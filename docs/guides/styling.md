@@ -577,8 +577,9 @@ see [Animations](animations.md).
 
 ## Flex layout
 
-PythonNative uses the shared Yoga flexbox engine, compiled into each mobile
-runtime and provided as WebAssembly in the browser preview (see
+PythonNative uses the Yoga flexbox engine inside the shared renderer core,
+compiled into each mobile app and provided as WebAssembly in the browser
+preview (see
 [Layout engine](../concepts/layout.md)). `View` is
 the universal flex container, and `Column`/`Row` are convenience
 wrappers that fix the direction.
@@ -601,11 +602,10 @@ These go in the `style` dict of `View`, `Column`, or `Row`:
 - `padding`: inner spacing (int for all sides, or dict).
 
 `align_items: "baseline"` (rows only) lines children up along a shared
-baseline instead of their top edges. Native text handlers report a
-size but not the position of the first line's baseline, so the engine
-approximates: a leaf's baseline is its height (leaves align along
-their bottom edges), and a container's baseline is that of its first
-in-flow child. Columns treat `"baseline"` as `"flex_start"`, matching
+baseline instead of their top edges. `Text` reports the position of
+its first line's baseline; other leaves use their height (they align
+along their bottom edges), and a container's baseline is that of its
+first in-flow child. Columns treat `"baseline"` as `"flex_start"`, matching
 Yoga.
 
 ### Child layout properties

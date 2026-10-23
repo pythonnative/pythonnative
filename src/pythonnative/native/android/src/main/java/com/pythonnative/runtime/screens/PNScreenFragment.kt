@@ -43,7 +43,10 @@ import org.json.JSONObject
  *
  * Viewport: `layout` is re-published on view size changes, window inset
  * changes (which include the keyboard through [PNKeyboard]), and
- * configuration changes such as font scale or rotation.
+ * configuration changes such as font scale or rotation. Those arrive in
+ * [onConfigurationChanged] only because the app's activity declares them
+ * in `android:configChanges`; without that, Android recreates the
+ * activity and every screen instead.
  */
 open class PNScreenFragment : Fragment() {
     /** The screen id assigned by [ScreenRegistry]. */
@@ -125,7 +128,8 @@ open class PNScreenFragment : Fragment() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        // Font scale, orientation, and UI mode changes handled in-place.
+        // Delivered only for the changes the activity's `android:configChanges`
+        // declares; `PNBridge.configurationChanged` re-measures for them.
         container?.let { publishLayout(it, force = true) }
     }
 

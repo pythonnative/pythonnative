@@ -56,6 +56,7 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
                 PNViewState.existing(for: imageView)?.extras.removeValue(forKey: "pending_source")
                 PNViewState.existing(for: imageView)?.extras.removeValue(forKey: "image_request")
                 imageView.image = nil
+                if let state = PNViewState.existing(for: imageView) { PNCoreBridge.reportIntrinsic(tag: state.tag, size: .zero) }
                 if !fallback.isEmpty { load(imageView, source: fallback, fallback: nil, silent: true) }
             }
         }
@@ -75,16 +76,6 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
             guard PNAssets.isAssetURI(source) || PNAssets.isAssetURI(fallback) else { continue }
             record.manager.update(view: imageView, changed: ["source": source.isEmpty ? NSNull() : source])
         }
-    }
-
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
-        guard let image = (view as? UIImageView)?.image else { return .zero }
-        var size = image.size
-        if maxW.isFinite, maxW > 0, size.width > maxW {
-            let scale = maxW / size.width
-            size = CGSize(width: maxW, height: size.height * scale)
-        }
-        return size
     }
 
     static func contentMode(_ name: String) -> UIView.ContentMode {
@@ -189,7 +180,8 @@ public final class PNImageManager: PNTypedComponentManager<ImageProps> {
         } else {
             imageView.image = resolved
         }
-        if let state = PNViewState.existing(for: imageView) { PNLayout.invalidate(state.tag) }
+        // The core sizes an unstyled image from what loaded (RFC 0007).
+        if let state = PNViewState.existing(for: imageView) { PNCoreBridge.reportIntrinsic(tag: state.tag, size: image.size) }
     }
 
     /// Decode with ImageIO before allocating a full bitmap; cap either edge at 4096 pixels.

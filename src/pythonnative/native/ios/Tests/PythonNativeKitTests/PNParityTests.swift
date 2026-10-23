@@ -1,4 +1,5 @@
 import XCTest
+import PNCore
 import UIKit
 @testable import PythonNativeKit
 
@@ -26,11 +27,13 @@ private let captureCallback: PNCallbackFn = { kind, tag, name, payload in
 
 final class PNParityTests: XCTestCase {
     private var window: UIWindow!
-    private var revision = 0
-    private let application = UUID().uuidString
+    private var core: PNCoreHarness!
+    private var revision: Int64 { core.revision }
+    private var application: String { core.application }
 
     override func setUp() {
         super.setUp()
+        core = PNCoreHarness()
         PNEventCapture.reset()
         PNBridge.shared.setCallback(captureCallback)
     }
@@ -44,11 +47,8 @@ final class PNParityTests: XCTestCase {
         super.tearDown()
     }
 
-    private func apply(_ ops: [[Any]]) {
-        revision += 1
-        let json = PNJSON.encode(["version": PNContracts.protocolVersion, "application": application, "surface": 1, "revision": revision, "ops": ops])
-        let result = PNJSON.decodeObject(PNCommit.apply(json))
-        XCTAssertEqual(result["ok"] as? Bool, true, String(describing: result))
+    private func apply(_ ops: [[Any]], file: StaticString = #filePath, line: UInt = #line) {
+        core.commit(ops, file: file, line: line)
     }
 
     private func settle(_ seconds: TimeInterval = 0.6) {
@@ -95,14 +95,14 @@ final class PNParityTests: XCTestCase {
     }
 
     func testGraphBindingsComposeTransformChannels() {
-        try! PNTransaction.apply([.create(tag: 5002, type: "View", props: [:])])
-        defer { PNAnimationGraph.forget(5002) }
-        PNAnimationGraph.install(["id": 501, "nodes": [
+        core.roots = [5002]
+        apply([["c", 5002, "View", ["background_color": "#000000"]]])
+        core.animate(tag: 5002, ["op": "graph", "graph": ["id": 501, "nodes": [
             ["id": 501, "kind": "value", "value": 0.0],
             ["id": 502, "kind": "value", "value": 0.0],
-        ], "bindings": [[5002, "translate_x", 501], [5002, "translate_y", 502]]])
-        PNAnimationGraph.set(501, 30)
-        PNAnimationGraph.set(502, 40)
+        ], "bindings": [[5002, "translate_x", 501], [5002, "translate_y", 502]]]])
+        core.animate(tag: 0, ["op": "set", "prop": "_pn_graph:501", "value": 30])
+        core.animate(tag: 0, ["op": "set", "prop": "_pn_graph:502", "value": 40])
         let view = PNViewRegistry.shared.view(for: 5002)!
         let parts = PNTransform.decompose(view.transform)
         XCTAssertEqual(parts.translateX, 30, accuracy: 0.001)
@@ -122,29 +122,27 @@ final class PNParityTests: XCTestCase {
         XCTAssertTrue(CATransform3DIsIdentity(view.layer.transform))
     }
 
-    // MARK: - Decay
+    // MARK: - Core animation
 
-    func testDecayFollowsReactNativeClosedForm() {
-        let x0 = 100.0, v0 = 2.0, d = 0.998
-        XCTAssertEqual(PNDecayDriver.finalValue(from: x0, velocity: v0, deceleration: d), x0 + v0 / (1 - d), accuracy: 1e-9)
-        for t in [0.0, 16.0, 250.0, 1000.0] {
-            XCTAssertEqual(PNDecayDriver.velocity(velocity: v0, deceleration: d, elapsedMs: t), v0 * pow(d, t), accuracy: 1e-12)
-            XCTAssertEqual(PNDecayDriver.position(from: x0, velocity: v0, deceleration: d, elapsedMs: t), x0 + v0 * (1 - pow(d, t)) / (1 - d), accuracy: 1e-9)
+    func testCoreTimingDriverWritesFramesToTheView() {
+        core.roots = [5004]
+        apply([["c", 5004, "View", ["opacity": 1, "background_color": "#000000"]]])
+        core.animate(tag: 5004, ["op": "start", "id": 7, "prop": "opacity",
+                                 "spec": ["kind": "timing", "to": 0, "duration_ms": 100, "easing": "linear"]])
+        let view = PNViewRegistry.shared.view(for: 5004)!
+        var seen: [CGFloat] = []
+        for frame in 0..<12 {
+            _ = pn_core_animation_frame(PNCore.handle, Double(frame) * 1000 / 60)
+            PNMounter.applyWrites()
+            seen.append(view.alpha)
         }
-        XCTAssertEqual(PNDecayDriver.position(from: x0, velocity: v0, deceleration: d, elapsedMs: 0), x0)
-        XCTAssertFalse(PNDecayDriver.isAtRest(from: x0, velocity: v0, deceleration: d, elapsedMs: 500))
-        // |v| drops under 0.001 pt/ms after ln(0.0005) / ln(0.998) ~ 3800 ms.
-        XCTAssertTrue(PNDecayDriver.isAtRest(from: x0, velocity: v0, deceleration: d, elapsedMs: 4000))
-        var frames: [Double] = []
-        var completed = false
-        let driver = PNDecayDriver(from: x0, velocity: v0, deceleration: d, frame: { frames.append($0) }, completion: { completed = true })
-        XCTAssertFalse(driver.advance(elapsedMs: 500))
-        XCTAssertEqual(frames.last!, x0 + v0 * (1 - pow(d, 500)) / (1 - d), accuracy: 1e-9)
-        XCTAssertTrue(driver.advance(elapsedMs: 10_000))
-        XCTAssertEqual(driver.currentValue, driver.finalValue, "a finished decay lands exactly on its rest point")
-        XCTAssertFalse(completed, "the display link, not advance, reports completion")
-        XCTAssertEqual(PNDecayDriver.clamp(1.5), 0.999_999)
-        XCTAssertEqual(PNDecayDriver.clamp(.nan), PNDecayDriver.defaultDeceleration)
+        XCTAssertLessThan(seen[3], 1)
+        XCTAssertGreaterThan(seen[3], 0)
+        XCTAssertEqual(seen.last ?? 1, 0, accuracy: 0.001)
+        XCTAssertEqual(pn_core_animation_frame(PNCore.handle, 1000), 0, "nothing left to drive")
+        settle(0.2)
+        let done = PNEventCapture.all.filter { $0.kind == "animation" && $0.payload["id"] as? Int == 7 }
+        XCTAssertEqual(done.last?.payload["finished"] as? Bool, true)
     }
 
     // MARK: - Screen presentation and animation
@@ -252,7 +250,7 @@ final class PNParityTests: XCTestCase {
     // MARK: - VirtualList
 
     func testVirtualListEmitsScrollOnlyWhenWired() throws {
-        try PNTransaction.apply([.create(tag: 5301, type: "VirtualList", props: ["dataset": ["base": 0, "revision": 1, "changes": [["reset", [["a", 1, 40.0, false], ["b", 1, 40.0, false]]]]]])])
+        apply([["c", 5301, "VirtualList", ["dataset": ["base": 0, "revision": 1, "changes": [["reset", [["a", 1, 40.0, false], ["b", 1, 40.0, false]]]]]]]])
         let list = try XCTUnwrap(PNViewRegistry.shared.view(for: 5301) as? UICollectionView)
         list.frame = CGRect(x: 0, y: 0, width: 200, height: 50)
         list.delegate?.scrollViewDidScroll?(list)
@@ -274,9 +272,9 @@ final class PNParityTests: XCTestCase {
         // view is born in this revision, so the event must carry it.
         let start = try XCTUnwrap(PNEventCapture.events(named: "on_load_start").first)
         XCTAssertEqual(start.payload["application"] as? String, application)
-        XCTAssertEqual(start.payload["revision"] as? Int, revision)
+        XCTAssertEqual(start.payload["revision"] as? Int, Int(revision))
         let end = try XCTUnwrap(PNEventCapture.events(named: "on_load_end").first)
-        XCTAssertEqual(end.payload["revision"] as? Int, revision)
+        XCTAssertEqual(end.payload["revision"] as? Int, Int(revision))
     }
 
     // MARK: - Viewport, keyboard, device
@@ -410,7 +408,7 @@ final class PNParityTests: XCTestCase {
         XCTAssertTrue(view.isAccessibilityElement, "auto restores the `accessible` prop")
 
         // Custom actions report their `name`, not their label.
-        try PNTransaction.apply([.create(tag: 5602, type: "View", props: ["_pn_events": ["on_accessibility_action"]])])
+        apply([["c", 5602, "View", ["_pn_events": ["on_accessibility_action"]]]])
         let wired = try XCTUnwrap(PNViewRegistry.shared.view(for: 5602))
         manager.update(view: wired, changed: ["accessibility_actions": [["name": "activate", "label": "Go"]]])
         let action = try XCTUnwrap(wired.accessibilityCustomActions?.first)

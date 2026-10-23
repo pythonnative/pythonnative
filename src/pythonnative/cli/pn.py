@@ -65,7 +65,12 @@ from ..project import doctor as doctor_mod
 from ..project import fingerprint as fingerprint_mod
 from ..project.android import collect_logcat_filters
 from ..project.config import CONFIG_FILENAME, AppConfig, ConfigError, render_default_toml
+from ..project.plugins import PluginError
 from . import launch
+
+# Failures a build reports as one line instead of a traceback: a stale or
+# incomplete lock and an unusable plugin are as ordinary as a failed build.
+_BUILD_ERRORS = (builder_mod.BuildError, deps_mod.DependencyError, PluginError)
 
 DEFAULT_DEV_PORT = 8765
 """Port `pn start` listens on unless `--port` says otherwise."""
@@ -511,12 +516,7 @@ def deps_command(args: argparse.Namespace) -> None:
             f"across {len(targets)} target(s)...\n"
         )
     resolutions = deps_mod.resolve_all(config, targets, runner=runner, python=python)
-    if getattr(args, "lock", False):
-        from ..project.lockfile import write
-
-        path = write(config, resolutions)
-        if not as_json:
-            print(f"Wrote {path}")
+    failed = [res for res in resolutions if not res.ok]
 
     if as_json:
         print(
@@ -531,7 +531,22 @@ def deps_command(args: argparse.Namespace) -> None:
         )
     else:
         print(deps_mod.format_report(resolutions, requirements=config.requirements))
-    if any(not res.ok for res in resolutions):
+    if getattr(args, "lock", False):
+        if failed:
+            if not as_json:
+                labels = ", ".join(res.target.label for res in failed)
+                print(f"\nNot writing pn.lock: a lock needs every target to resolve, and {labels} didn't.")
+            sys.exit(1)
+        from ..project.lockfile import write
+
+        try:
+            path = write(config, resolutions)
+        except deps_mod.DependencyError as exc:
+            print(f"Error: {exc}", file=sys.stderr if as_json else sys.stdout)
+            sys.exit(1)
+        if not as_json:
+            print(f"Wrote {path}")
+    if failed:
         sys.exit(1)
 
 
@@ -842,7 +857,7 @@ def run_project(args: argparse.Namespace) -> None:
     else:
         try:
             prepared = builder.prepare(platform, ios_sdks=ios_sdks)
-        except builder_mod.BuildError as exc:
+        except _BUILD_ERRORS as exc:
             print(f"Error: {exc}")
             sys.exit(1)
         if prepare_only:
@@ -873,7 +888,7 @@ def run_project(args: argparse.Namespace) -> None:
                 link=link,
                 show_logs=show_logs,
             )
-    except builder_mod.BuildError as exc:
+    except _BUILD_ERRORS as exc:
         print(f"Error: {exc}")
         sys.exit(1)
     if artifact is not None and not reuse:
@@ -1134,7 +1149,7 @@ def build_project(args: argparse.Namespace) -> None:
                 artifacts = builder_mod.BuildArtifacts(paths=[app_path])
             else:
                 artifacts = builder.build_ios_archive(prepared, upload=upload)
-    except builder_mod.BuildError as exc:
+    except _BUILD_ERRORS as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 

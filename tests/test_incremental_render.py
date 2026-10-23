@@ -135,7 +135,7 @@ def test_flush_dirty_skips_descendant_already_covered_by_ancestor() -> None:
         render_counts["outer"] += 1
         value, set_outer = use_state(0)
         setters["outer"] = set_outer
-        return Element("Column", {"text": str(value)}, [inner()])
+        return Element("Column", {"test_id": str(value)}, [inner()])
 
     rec, _backend = _make_reconciler()
     rec.mount(outer())

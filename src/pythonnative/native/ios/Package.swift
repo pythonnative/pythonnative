@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "PythonNativeKit", targets: ["PythonNativeKit"]),
     ],
     dependencies: [
-        .package(path: "../yoga"),
+        .package(path: "../core"),
         // pn:packages
         // pn:end-packages
     ],
@@ -16,7 +16,7 @@ let package = Package(
         .target(
             name: "PythonNativeKit",
             dependencies: [
-                .product(name: "YogaCore", package: "yoga"),
+                .product(name: "PNCore", package: "core"),
                 // pn:products
                 // pn:end-products
             ],

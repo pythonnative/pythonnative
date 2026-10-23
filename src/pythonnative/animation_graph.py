@@ -98,12 +98,11 @@ def install(node: Any, *, detached_tag: int | None = None) -> dict[str, Any] | N
     """Synchronize native graph ownership when a binding is attached or removed."""
     from .animated import _backend
 
-    backend = _backend()
-    handler = getattr(backend, "install_animation_graph", None)
-    if handler is None:
-        return None
     graph = serialize(node)
     tag = graph["bindings"][0][0] if graph["bindings"] else detached_tag
+    handler = getattr(_backend(tag), "install_animation_graph", None)
+    if handler is None:
+        return None
     if tag is not None:
         handler(tag, graph)
     return graph

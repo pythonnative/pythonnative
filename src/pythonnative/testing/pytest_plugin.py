@@ -6,9 +6,10 @@ provides:
 - an autouse fixture that turns on development diagnostics for each
   test (prop and style validation, hook-order checks, and warnings, as
   in a debug build), then resets the framework afterwards: the
-  headless asyncio loop is shut down (cancelling leaked tasks), and the
-  event registry, default query client, and recorded diagnostics
-  warnings are cleared, so one test's leftovers never reach the next;
+  headless asyncio loop is shut down (cancelling leaked tasks), the host
+  renderer core forgets every surface, and the event registry, default
+  query client, and recorded diagnostics warnings are cleared, so one
+  test's leftovers never reach the next;
 - ``pn_clock``, a [`FakeClock`][pythonnative.testing.FakeClock] installed
   on the framework loop for the test (see
   [`fake_clock`][pythonnative.testing.fake_clock]).
@@ -31,7 +32,8 @@ __all__ = ["pn_clock"]
 @pytest.fixture(autouse=True)
 def _pn_fresh_runtime() -> Iterator[None]:
     """Run each test in dev mode, then reset the framework so loops, listeners, caches, and warnings never leak."""
-    from .. import diagnostics, query, runtime
+    from .. import animated, diagnostics, query, runtime
+    from ..bridge.fake import reset_fakes
     from ..events import get_event_registry
 
     diagnostics.set_dev_mode(True)
@@ -39,6 +41,8 @@ def _pn_fresh_runtime() -> Iterator[None]:
     diagnostics.reset_dev_mode()
 
     runtime._shutdown_for_tests()
+    reset_fakes()
+    animated._tag_backends.clear()
     get_event_registry().reset()
     query._reset_for_tests()
     diagnostics.clear_warnings()

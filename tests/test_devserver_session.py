@@ -47,7 +47,7 @@ def server(tmp_path: Path) -> Iterator[DevServer]:
 
 
 def _protocol() -> int:
-    from pythonnative.bridge.commits import PROTOCOL_VERSION
+    from pythonnative.bridge import PROTOCOL_VERSION
 
     return PROTOCOL_VERSION
 
@@ -396,7 +396,9 @@ def test_packages_are_synced_into_the_overlay(
     )
     client.start()
     try:
-        _wait(lambda: (overlay / "site-packages" / "iniconfig" / "__init__.py").exists(), timeout=10)
+        # The manifest is written after the package files, so wait for it.
+        _wait(lambda: (overlay / "site-packages" / ".pn-packages.json").exists(), timeout=10)
+        assert (overlay / "site-packages" / "iniconfig" / "__init__.py").exists()
         manifest = json.loads((overlay / "site-packages" / ".pn-packages.json").read_text())
         assert "iniconfig" in manifest
         assert client._installed_packages()["iniconfig"] == manifest["iniconfig"]["version"]

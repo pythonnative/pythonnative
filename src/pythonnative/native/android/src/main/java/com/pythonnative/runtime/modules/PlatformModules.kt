@@ -205,13 +205,16 @@ class LocalizationModule : LocalizationImplementation {
     override fun get_locales(): List<Map<String, PNJSONValue>> = locales().map { describe(it) }
     override fun get_timezone(): String = TimeZone.getDefault().id
 
+    /** Emit a `change` event with the current locales and time zone. */
+    fun publish() {
+        LocalizationEvents.change(mapOf("locales" to PNJSONValue(get_locales()), "timezone" to PNJSONValue(get_timezone())))
+    }
+
     fun attach(activity: Activity) {
         if (receiver != null) return
         val r = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                MainThread.runOnMain {
-                    LocalizationEvents.change(mapOf("locales" to PNJSONValue(get_locales()), "timezone" to PNJSONValue(get_timezone())))
-                }
+                MainThread.runOnMain { publish() }
             }
         }
         try {

@@ -327,6 +327,9 @@ export class PreviewHost {
 
   /** Handle `["call", id, module, method, envelopeJson]`; returns the JSON result text. */
   async call(module, method, envelopeJson) {
+    // Mount what Python committed first, so a module (`Host.attach_root`)
+    // always sees the views it names, as on iOS and Android.
+    this.renderer.host?.drain();
     let envelope = {};
     try {
       envelope = envelopeJson ? JSON.parse(envelopeJson) || {} : {};
@@ -393,6 +396,8 @@ export class PreviewHost {
           const view = host.renderer.views.get(Number(tag));
           if (!s || !view) throw new Error("attach_root: unknown screen or view");
           s.attachRoot(view);
+          // Containers inside the root (a native stack) now have a size to report.
+          host.renderer.reportContainers();
           return s.viewport();
         },
         detach_root({ screen, tag }) {

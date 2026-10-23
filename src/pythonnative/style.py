@@ -47,6 +47,64 @@ from typing import (
 
 from . import diagnostics
 
+LAYOUT_STYLE_KEYS = frozenset(
+    {
+        "width",
+        "height",
+        "min_width",
+        "max_width",
+        "min_height",
+        "max_height",
+        "flex",
+        "flex_grow",
+        "flex_shrink",
+        "flex_basis",
+        "flex_wrap",
+        "align_self",
+        "align_content",
+        "position",
+        "top",
+        "right",
+        "bottom",
+        "left",
+        "start",
+        "end",
+        "margin",
+        "margin_top",
+        "margin_bottom",
+        "margin_left",
+        "margin_right",
+        "margin_start",
+        "margin_end",
+        "margin_horizontal",
+        "margin_vertical",
+        "padding",
+        "padding_top",
+        "padding_bottom",
+        "padding_left",
+        "padding_right",
+        "padding_start",
+        "padding_end",
+        "padding_horizontal",
+        "padding_vertical",
+        "border_width",
+        "border_top_width",
+        "border_right_width",
+        "border_bottom_width",
+        "border_left_width",
+        "flex_direction",
+        "justify_content",
+        "align_items",
+        "gap",
+        "row_gap",
+        "column_gap",
+        "aspect_ratio",
+        "direction",
+        "display",
+    }
+)
+"""Style keys that affect layout (the renderer core hands them to Yoga)."""
+
 # ======================================================================
 # Atomic value types
 # ======================================================================

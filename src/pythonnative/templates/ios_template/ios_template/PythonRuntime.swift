@@ -6,9 +6,11 @@
 //  Python.xcframework is linked at build time, so a missing runtime is
 //  a build error, never a silent runtime fallback.
 //
-//  After the interpreter starts, `pythonnative.bootstrap.start()` binds
-//  the PythonNativeKit C exports, registers the Python callback, verifies
-//  the protocol version, and imports the app's entry module. Everything
+//  The renderer core's platform callbacks are installed before Python
+//  starts. After the interpreter starts, `pythonnative.bootstrap.start()`
+//  binds the PythonNativeKit and renderer core C exports, registers the
+//  Python callback, verifies the protocol version, and imports the app's
+//  entry module. Everything
 //  else (screens, modules, deep links) flows over that bridge; nothing
 //  else here calls Python functions by name.
 //
@@ -89,6 +91,8 @@ final class PythonRuntime {
         dispatchPrecondition(condition: .onQueue(.main))
         guard case .idle = phase else { return }
         phase = .starting
+        // Python's first commit measures and mounts through these callbacks.
+        PNCoreBridge.install()
         startupQueue.async {
             var failure: String?
             do {
@@ -144,9 +148,9 @@ final class PythonRuntime {
     }
 
     /// Run `pythonnative.bootstrap.start(dev, strict=True, entry=...)`: it
-    /// binds the `pn_bridge_*` symbols, registers the native -> Python
-    /// callback, verifies the protocol version against
-    /// `pn_bridge_protocol_version()`, routes `print()` to the console,
+    /// binds the `pn_bridge_*` and `pn_core_*` symbols, registers the
+    /// native -> Python callback, verifies the renderer core's protocol
+    /// version, routes `print()` to the console,
     /// warms the asyncio runtime, and imports the entry module.
     private func connectBridge() throws {
         #if DEBUG
@@ -159,7 +163,7 @@ final class PythonRuntime {
             try callList(module: "pythonnative.bootstrap", function: "start", [dev, true, entry])
         } catch let error as PythonRuntimeError {
             throw PythonRuntimeError.startup(
-                "Bridge bootstrap failed (native protocol v\(pn_bridge_protocol_version())):\n\(error.description)"
+                "Bridge bootstrap failed (renderer core protocol v\(PNCoreBridge.protocolVersion)):\n\(error.description)"
             )
         }
         guard PNBridge.shared.hasCallback else {

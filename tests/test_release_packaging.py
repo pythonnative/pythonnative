@@ -43,7 +43,7 @@ def wheel_files(python: str, platform: str) -> dict[str, bytes]:
     suffix = "pyd" if platform == "win_amd64" else "so"
     return {
         **dict.fromkeys(checker.PACKAGE_FILES, b"resource"),
-        f"pythonnative/_yoga.{python}.{suffix}": b"native library",
+        f"pythonnative/_core.{python}.{suffix}": b"native library",
         f"pythonnative-{VERSION}.dist-info/METADATA": METADATA.encode(),
         f"pythonnative-{VERSION}.dist-info/WHEEL": (
             f"Wheel-Version: 1.0\nRoot-Is-Purelib: false\nTag: {python}-{python}-{platform}\n".encode()
@@ -68,7 +68,8 @@ def distributions(tmp_path: Path) -> Path:
     source_files = {
         **dict.fromkeys(("src/" + name for name in checker.PACKAGE_FILES), b"source"),
         "setup.py": b"build configuration",
-        "tests/test_layout.py": b"layout tests",
+        "tests/test_core.py": b"renderer core tests",
+        "tests/contracts/validation.json": b"[]",
         "PKG-INFO": METADATA.encode(),
         "pyproject.toml": f'[project]\nversion = "{VERSION}"\n'.encode(),
     }
@@ -98,7 +99,7 @@ def test_missing_artifact_blocks_publish(distributions: Path, pattern: str) -> N
         checker.check_distributions(distributions, VERSION)
 
 
-@pytest.mark.parametrize("damage", ["version", "tags", "pure", "extension", "resource"])
+@pytest.mark.parametrize("damage", ["version", "tags", "pure", "extension", "resource", "wasm"])
 def test_bad_wheel_contents_block_publish(distributions: Path, damage: str) -> None:
     path = next(distributions.glob("*cp313-cp313-win_amd64.whl"))
     files = wheel_files("cp313", "win_amd64")
@@ -111,9 +112,12 @@ def test_bad_wheel_contents_block_publish(distributions: Path, damage: str) -> N
     elif damage == "pure":
         files[wheel] = files[wheel].replace(b"false", b"true")
     elif damage == "extension":
-        del files["pythonnative/_yoga.cp313.pyd"]
+        del files["pythonnative/_core.cp313.pyd"]
+    elif damage == "wasm":
+        # The browser preview's renderer core must ship in every wheel.
+        del files["pythonnative/devserver/static/core/pn_core.wasm"]
     else:
-        del files["pythonnative/native/yoga/yoga/Yoga.h"]
+        del files["pythonnative/native/core/yoga/Yoga.h"]
     write_wheel(path, files)
     with pytest.raises(ValueError):
         checker.check_distributions(distributions, VERSION)
@@ -187,6 +191,8 @@ DEV_ONLY_LAZY_IMPORTS = {
     # Contract derivation; only a development checkout whose generated
     # `_builtin_contracts.json` predates a protocol change reaches it.
     ("pythonnative.components", "_install_contracts", "pythonnative.sdk.builtins"),
+    # Animations run on the host core only off device, where no backend exists.
+    ("pythonnative.animated", "_driver_backend", "pythonnative.bridge.fake"),
 }
 
 

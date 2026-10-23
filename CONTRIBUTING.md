@@ -133,11 +133,13 @@ of the source tree. Keep these in version control:
   Commit schema updates alongside their Python definitions and native
   implementations.
 - Dependency locks, including `uv.lock` and example apps' `pn.lock` files.
-- Vendored Yoga source and browser distribution files under
-  `src/pythonnative/native/yoga/` and `src/pythonnative/devserver/static/yoga/`.
-  The browser distribution includes its JavaScript/WebAssembly runtime, type
-  declarations, and source maps. Preserve upstream licenses and document the
-  version, source, and any local modifications when updating vendored code.
+- Vendored Yoga source under `src/pythonnative/native/core/yoga/`. Preserve
+  upstream licenses and document the version, source, and any local
+  modifications when updating vendored code.
+- The renderer core's WebAssembly build for the browser preview,
+  `src/pythonnative/devserver/static/core/pn_core.js` and `pn_core.wasm`.
+  Rebuild it with `python scripts/build-core-wasm.py` (Emscripten 4.0.10)
+  whenever the core changes; CI fails when it drifts from the sources.
 
 After changing a built-in factory's signature, the contracts, or their
 generators, regenerate the checked-in files from the repository root:

@@ -19,14 +19,13 @@ import math
 from collections.abc import Mapping
 from typing import Any, Dict, List, Sequence, Tuple, Union
 
-from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
+from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
 
 __all__ = [
     "INF",
     "NEG_INF",
     "build_transaction",
     "dumps",
-    "encode_transaction",
     "loads",
     "split_props",
     "to_jsonable",
@@ -165,36 +164,9 @@ def build_transaction(
             encoded.append(["i", op.parent_tag, op.child_tag, op.index])
         elif isinstance(op, DestroyOp):
             encoded.append(["d", op.tag])
-        elif isinstance(op, SetFrameOp):
-            encoded.append(["f", op.tag, _num(op.x), _num(op.y), _num(op.width), _num(op.height)])
-        else:  # pragma: no cover - the reconciler only emits the five op kinds
+        else:  # pragma: no cover - the reconciler only emits the four op kinds
             raise TypeError(f"Unknown mutation op: {op!r}")
     return encoded, sidecar
-
-
-def encode_transaction(
-    ops: Sequence[Mutation], types: Mapping[int, str] | None = None
-) -> Tuple[str, List[Tuple[int, Dict[str, Any]]]]:
-    """Encode a mutation batch as the bridge's transaction JSON.
-
-    A convenience over [`build_transaction`][pythonnative.bridge.codec.build_transaction]
-    for callers that want the serialized op list alone (tests and
-    tooling); the backend serializes the whole envelope itself.
-
-    Returns:
-        ``(json_text, python_props)``; see ``build_transaction``.
-    """
-    encoded, sidecar = build_transaction(ops, types)
-    return dumps(encoded), sidecar
-
-
-def _num(value: float) -> float:
-    """Clamp a frame coordinate to a finite float (native treats NaN/inf as 0)."""
-    try:
-        f = float(value)
-    except (TypeError, ValueError):
-        return 0.0
-    return f if math.isfinite(f) else 0.0
 
 
 def dumps(value: Any) -> str:

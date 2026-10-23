@@ -20,7 +20,8 @@ interface PNPlugin {
 /**
  * Registry of component managers (by element type) and native modules
  * (by module name). Built-ins are registered on first use, followed by
- * the generated plugin registrations.
+ * the generated plugin registrations. Managers are looked up from the
+ * core's measurement workers too, so component lookups are synchronized.
  */
 object PNRegistry {
     private val componentFactories = HashMap<String, () -> ComponentManager>()
@@ -30,6 +31,7 @@ object PNRegistry {
     private var builtinsRegistered = false
 
     /** Register (or override) the manager factory for element type `name`. */
+    @Synchronized
     fun registerComponent(name: String, factory: () -> ComponentManager) {
         componentFactories[name] = factory
         managers.remove(name)
@@ -46,6 +48,7 @@ object PNRegistry {
     }
 
     /** The manager for element type `name`, or `null` when unknown. */
+    @Synchronized
     fun managerFor(name: String): ComponentManager? {
         ensureBuiltins()
         managers[name]?.let { return it }
@@ -68,6 +71,7 @@ object PNRegistry {
     }
 
     /** Register built-in components and modules plus generated plugins (idempotent). */
+    @Synchronized
     fun ensureBuiltins() {
         if (builtinsRegistered) return
         builtinsRegistered = true

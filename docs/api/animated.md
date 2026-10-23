@@ -5,10 +5,11 @@ animations declaratively by binding [`AnimatedValue`][pythonnative.AnimatedValue
 instances to the `style` of an `Animated.View`, `Animated.Text`, or
 `Animated.Image`. The reconciler holds a `ref` to the underlying
 native view. Connected values, derived expressions, and style bindings
-form a graph evaluated by the renderer, so supported animations bypass
-Python reconciliation on each frame. Unattached values, Python listeners,
-callable easing functions, and backends that decline native animation use
-the Python ticker.
+form a graph the renderer core evaluates on the UI thread, so animations
+bypass Python reconciliation on each frame. Unattached values and values
+with Python listeners have the core report each frame's value to Python,
+and a callable easing function is sampled into a curve the core
+interpolates.
 
 A few types frame the surface:
 

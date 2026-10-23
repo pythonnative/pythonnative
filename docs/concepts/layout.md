@@ -1,46 +1,111 @@
 # Layout engine
 
-PythonNative uses Yoga 3.2.1 for flexbox layout on every renderer. The vendored
-C++ source compiles into the Python host binding, Swift runtime, and Android
-runtime. The browser preview uses Yoga WebAssembly from the same release.
-Native leaf widgets supply intrinsic sizes and text baselines.
+PythonNative uses Yoga 3.2.1 for flexbox layout. The vendored C++ source
+compiles into the renderer core, the C++ library every target links: the
+iOS and Android apps, the `pythonnative._core` extension that tests load,
+and the browser preview's WebAssembly build. Layout runs in the core, on
+the thread that commits, never on the platform UI thread. One set of rules
+therefore lays out devices, the preview, and headless tests.
 
 ## Layout and commits
 
-Rendering first commits view creation, relationships, and props. The native
-layout pass then computes geometry and returns changed frames as a batch.
-Layout effects run after those frames exist, followed by passive effects.
-Viewport changes, text edits, and image completion can invalidate geometry.
+Rendering commits view creation, relationships, and props. The core
+validates the commit, applies it to its shadow tree, lays out the roots
+that changed, and returns the changed frames of observed views (those with
+a ref or an `on_layout` callback) in the acknowledgement. Layout effects
+run after those frames are published, followed by passive effects. The UI
+thread mounts the commit afterward, with each view's frame.
 
-Native screens and recycled rows own their physical content rectangles. Yoga
-lays out each detached logical root within its native container's available
-space. Providers and component ownership continue through those containers.
+Native changes can invalidate geometry too: a container reports a new
+size, an image finishes loading, or the font scale changes. The platform
+reports these to the core without waiting. The core relayouts on a
+worker, queues a frame-only mount transaction, and sends Python the
+observed frames as a `layout` message. See
+[The native bridge](bridge.md#threads-and-the-deadlock-rule) for the
+threads involved.
 
-## Headless layout
+### Surfaces and detached roots
 
-Headless tests use `LayoutNode` and `calculate_layout()` through the host Yoga
-binding. Stub intrinsic measurements make geometry tests deterministic. Real
-font metrics and platform control sizes must also be tested on devices.
+The surface's screen roots lay out against the viewport Python's host
+reports in each commit. Some subtrees live in platform containers instead
+of in their parent's box: the children of `VirtualList`, `Modal`, and
+`ScreenStack`, `Portal` content, and navigation header slots. Each is a
+detached root that lays out against the size its container reports
+through `pn_core_report_container`. Until a container reports, its root
+uses its parent container's size or the viewport. List rows lay out
+against the list's width (vertical lists) or height (horizontal lists),
+with the other axis unbounded. Providers and component ownership continue
+through those containers.
+
+## Measurement
+
+Leaves declare how the core sizes them in their contract. A leaf is a
+measured view with no children; containers size from their style and
+children.
+
+| Mode | Components | How |
+| --- | --- | --- |
+| `container` | `View`, `Row`, `Column`, `ScrollView`, `Pressable`, `Modal`, `Screen`, and the other containers | Style and children only; never measured |
+| `text` | `Text` | Thread-safe platform text layout through the platform's `measure` callback, plus the first baseline for `align_items: "baseline"` |
+| `image` | `Image` | Computed in the core from the intrinsic size the platform reports once the image loads (`pn_core_report_intrinsic`), scaled down to fit |
+| `svg` | `Svg` | Computed in the core from `view_box` (24 by 24 without one) |
+| `fill` | `VirtualList` | Takes the available space |
+| `intrinsic` | `Button`, `TextInput`, `Switch`, `Slider`, `ProgressBar`, `ActivityIndicator`, `Checkbox`, `Picker`, `SegmentedControl`, `DatePicker`, `TabBar` | A prototype widget configured with the props and measured on the UI thread |
+
+An `intrinsic` measurement keeps the platform's own sizing (UIKit's
+`sizeThatFits`, Android's `View.measure`) by making one synchronous hop
+to the UI thread from the core's worker. The UI thread never waits for
+the core, so the hop can't deadlock. A text input whose content changes
+asks the core to re-measure it, and a font scale or content size change
+re-measures every leaf. The engine respects the size a leaf returns,
+then clamps it to the active `min_*` and `max_*` constraints.
+
+Custom components choose a mode with
+[`define_component(..., measurement=...)`][pythonnative.sdk.define_component]:
+`"intrinsic"` (the default), `"native"` for a manager that can measure
+from props on any thread, or `"container"`. See
+[Custom native components](../guides/custom-native-components.md#measurement).
+
+## View flattening
+
+A `View`, `Row`, `Column`, or `Spacer` that only affects layout isn't
+mounted. Each contract field says whether it allows flattening. Layout
+style keys do, apart from `display` and border widths; everything else
+blocks it, including paint props (background, border, shadow, opacity,
+transform, `overflow`), event handlers, gestures, animated bindings, and
+accessibility and test props, which screen readers and Maestro use to
+address views. An `on_layout` callback or a ref doesn't block flattening,
+because the core answers layout events and `measure_in_window` from its
+shadow tree.
+
+The core mounts a flattened view's children into its nearest mounted
+ancestor at the flattened position, offsetting their frames by the
+flattened ancestors' positions. When an update adds a blocking prop, the
+core creates the view and moves its mounted descendants into it in the
+same transaction; removing the prop reverses that. Commands addressed to
+a flattened view fail with "view #N isn't mounted (it only affects
+layout)". Your component tree, refs, and test queries are unchanged:
+flattening only changes what the platform mounts.
 
 ## Installation and app builds
 
-The host binding is included in the platform-specific PythonNative wheel.
-Precompiled wheels cover CPython 3.13 and 3.14 on macOS (Intel and Apple
-Silicon), Linux with glibc (x86-64 and ARM64), and Windows (x86-64). Pip or uv
-selects the matching wheel. Building from a source distribution requires a
-C++20 compiler.
+The host build of the core is the `pythonnative._core` extension in the
+platform-specific PythonNative wheel. Precompiled wheels cover CPython
+3.13 and 3.14 on macOS (Intel and Apple Silicon), Linux with glibc (x86-64
+and ARM64), and Windows (x86-64). Pip or uv selects the matching wheel.
+Building from a source distribution requires a C++20 compiler.
 
-Device builds compile the bundled Yoga source for the application target.
-Xcode builds the `YogaCore` Swift package for iOS devices or simulators;
-Gradle invokes CMake and the Android NDK for the configured Android ABIs.
-The mobile renderer calls this native library through Swift or Kotlin, so it
-doesn't load the desktop Python extension. See the [iOS](../guides/ios.md)
+Device builds compile the core, with the Yoga release it embeds, for the
+application target. Xcode builds it as the `PNCore` Swift package for
+iOS devices or simulators; Gradle invokes CMake and the Android NDK to
+build `libpncore.so` for the configured Android ABIs. The mobile apps
+don't load the desktop Python extension. See the [iOS](../guides/ios.md)
 and [Android](../guides/android.md) guides for toolchain setup.
 
 ## Style keys
 
-The engine recognises (and the reconciler routes to it) the following
-style keys, listed as `pythonnative.layout.LAYOUT_STYLE_KEYS`:
+The core lays out with the following style keys, listed as
+`pythonnative.style.LAYOUT_STYLE_KEYS`:
 
 | Group | Keys |
 |---|---|
@@ -61,23 +126,10 @@ content box.
 or a dict with any of `horizontal`, `vertical`, `left`, `top`,
 `right`, `bottom`.
 
-## Intrinsic measurement
-
-Leaf widgets (`Text`, `Button`, `Image`, `TextInput`, `Switch`,
-`Slider`, `ProgressBar`, `ActivityIndicator`) ask their backend for
-an intrinsic size when neither dimension is fixed. The handler
-implements `measure_intrinsic(view, max_w, max_h)`:
-
-- iOS uses the native manager and `UIView.sizeThatFits` with UIKit text metrics.
-- Android wraps `View.measure(...)` with `MeasureSpec.AT_MOST` /
-  `UNSPECIFIED`.
-
-The engine respects whatever size the widget returns, then clamps it
-to the active `min_*` / `max_*` constraints.
-
-`ScrollView` is a special case: the engine deliberately makes the
-scroll axis unbounded so that children can be larger than the
-viewport, and the wrapper itself is clipped to the available space.
+Scrolling containers (`ScrollView`, `VirtualList`, and `ScreenStack`)
+clip their content and shrink to the available space unless their style
+says otherwise. A `ScrollView`'s children can be larger than the
+viewport; the platform scroll view sizes its content to them.
 
 ## Absolute positioning
 
@@ -115,31 +167,31 @@ in CSS.
 
 ## Testing layouts
 
-Use the host Yoga binding to test layout without a simulator or emulator:
+Headless tests lay out with the shipping core. Render a component and
+read the frames it computed:
 
 ```python
-from pythonnative.layout import LayoutNode, calculate_layout
+import pytest
 
-root = LayoutNode(
-    style={"flex_direction": "row", "padding": 10, "gap": 5,
-           "width": 200, "height": 100},
-    children=[
-        LayoutNode(style={"width": 50, "height": 20}),
-        LayoutNode(style={"flex": 1, "height": 20}),
-    ],
-)
-calculate_layout(root, 400, 300)
+import pythonnative as pn
+from pythonnative.testing import render
 
-assert root.children[0].x == 10  # padding-left
-assert root.children[1].x == 65  # 10 + 50 + 5
-assert root.children[1].width == 125  # 200 - 10 - 10 - 50 - 5
+
+def test_row_distributes_flex_children():
+    result = render(
+        pn.Row(
+            pn.View(test_id="a", style={"flex": 1, "height": 20}),
+            pn.View(test_id="b", style={"flex": 2, "height": 20}),
+            style={"width": 310, "gap": 10},
+        )
+    )
+    a, b = result.get_by_test_id("a"), result.get_by_test_id("b")
+    assert a.frame[2] == pytest.approx(100)
+    assert b.frame[0] == pytest.approx(110)
 ```
 
-The reconciler also exposes
-[`Reconciler.compute_layout_for_test`][pythonnative.reconciler.core.Reconciler.compute_layout_for_test]
-so you can render a real component tree (with the mock registry) and
-inspect the computed `LayoutNode` tree without having to dig into
-private attributes.
+The fake platform measures leaves with fixed sizes, so geometry tests are
+deterministic. See [Testing layouts](../guides/testing.md#testing-layouts).
 
 ## Limits
 
@@ -153,7 +205,8 @@ Wrapping (`flex_wrap: "wrap"` / `"wrap_reverse"`) and RTL flipping
 the inherited direction) are both supported.
 
 Supported properties follow the public `Style` annotations and the pinned Yoga
-version. Platform font metrics can produce different intrinsic sizes.
+version. Platform font metrics can produce different intrinsic sizes, so test
+text and control sizes on your deployment targets.
 
 ## Next steps
 
@@ -161,5 +214,5 @@ version. Platform font metrics can produce different intrinsic sizes.
   [Component properties](../api/component-properties.md).
 - Read about how the engine is wired in:
   [Reconciliation](reconciliation.md).
-- See the platform side of `set_frame` /
-  `measure_intrinsic`: [Native views](native-views.md).
+- See the platform side of frames and measurement:
+  [Native views](native-views.md).

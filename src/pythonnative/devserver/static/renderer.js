@@ -1,22 +1,35 @@
-import {ListStore} from "./list-store.js";
-import specification from "./schema.js";
-import {validateRemoval, validateProps, normalize, requiresRecreation, validateCommand} from "./contracts.js";
-import { AnimationGraph } from "./animation_graph.js";
-import {computeLayout, disposeLayout, stackHeaderHeight, updateLayout, insertLayout} from "./layout.js";
-// The DOM "native runtime" for the browser preview.
+// The DOM mounting layer for the browser preview.
 //
-// This module plays the role PythonNativeKit (Swift) and the pythonnative
-// Gradle module (Kotlin) play on device: it applies transactions
-// (create/update/insert/destroy ops), answers `command` and `animate`,
-// and raises `callback("event", ...)` for user interaction. Yoga WebAssembly computes layout beside these views;
-// frames use points, represented by CSS pixels inside the phone frame.
+// This module plays the role `PNMounter` (Swift) and `Mounter` (Kotlin)
+// play on device. The renderer core runs in the page as WebAssembly
+// (`core/mount.js`): it validates each commit, lays it out with Yoga,
+// flattens layout-only views, and hands this renderer decoded mount
+// transactions (create, update, insert, delete, frame, and command ops),
+// which it applies through the component managers. The renderer measures
+// text and intrinsic leaves for the core, reports container and image
+// sizes back to it, forwards input to it (`pn_core_event` and
+// `pn_core_pointer`), and applies its animated writes. Frames use points,
+// represented by CSS pixels inside the phone frame.
 //
 // Component managers mirror the Swift `PN*Manager` classes prop for
-// prop (see docs/concepts/bridge.md and the iOS sources). Shared contracts
-// validate the wire interface before a manager changes a widget.
+// prop (see docs/concepts/bridge.md and the iOS sources).
 
 import { color as parseColor, isColorProp } from "./colors.js";
 import { assets } from "./assets.js";
+import { POINTER_CANCEL, POINTER_DOWN, POINTER_MOVE, POINTER_UP } from "./core/mount.js";
+
+/** Height of a native-stack navigation bar, and of one with a large title. */
+export const STACK_HEADER = 44;
+export const STACK_LARGE_HEADER = 96;
+
+/**
+ * Height of the navigation bar a native-stack `Screen` reserves above its
+ * content, read from the same options the iOS and Android stacks read.
+ */
+export function stackHeaderHeight(props) {
+  if (!props || props.header_shown === false) return 0;
+  return props.header_large_title ? STACK_LARGE_HEADER : STACK_HEADER;
+}
 
 const INF = 1e6;
 const isFiniteConstraint = (v) => typeof v === "number" && v > 0 && v < INF / 2;
@@ -642,6 +655,19 @@ class TextManager extends ViewManager {
     view.measureCache = { key, size };
     return size;
   }
+  /** The first line's baseline at `width`: where a zero-height inline box sits on it. */
+  baseline(view, width, height) {
+    if (!measureRoot) measureRoot = document.getElementById("pn-measure") || document.body;
+    const clone = view.el.cloneNode(true);
+    Object.assign(clone.style, { position: "static", display: "block", width: width > 0 ? px(width) : "auto", height: "auto", transform: "none", visibility: "hidden" });
+    const probe = document.createElement("span");
+    probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+    clone.prepend(probe);
+    measureRoot.appendChild(clone);
+    const value = probe.getBoundingClientRect().bottom - clone.getBoundingClientRect().top;
+    clone.remove();
+    return Number.isFinite(value) && value > 0 ? Math.min(value, height) : height;
+  }
 }
 
 class ButtonManager extends ViewManager {
@@ -730,6 +756,8 @@ class TextInputManager extends ViewManager {
         el.value = el.value.slice(0, limit);
       }
       view.ctx.emit(view.tag, "on_change", [el.value]);
+      // A multiline input grows with its text: the core measures it again.
+      view.ctx.invalidate?.(view.tag);
       this.reportContentSize(view);
     });
     // `select_text_on_focus`: select on focus, and keep the selection through
@@ -866,7 +894,18 @@ class TextInputManager extends ViewManager {
   measure(view, maxW) {
     const width = isFiniteConstraint(maxW) ? Math.max(100, Math.min(maxW, 100)) : 100;
     if (view.el.tagName === "TEXTAREA") {
-      const [, h] = measureElement(view.el, maxW, INF, { block: true });
+      // A textarea's own height follows its rows, not its text: lay a copy
+      // out at the offered width and read the text's extent instead.
+      if (!measureRoot) measureRoot = document.getElementById("pn-measure") || document.body;
+      const box = document.createElement("div");
+      box.style.cssText = `position:absolute;visibility:hidden;width:${isFiniteConstraint(maxW) ? px(maxW) : `${width}px`}`;
+      const clone = view.el.cloneNode(true);
+      clone.value = view.el.value;
+      Object.assign(clone.style, { position: "static", display: "block", width: "100%", height: "0px", transform: "none" });
+      box.appendChild(clone);
+      measureRoot.appendChild(box);
+      const h = Math.ceil(clone.scrollHeight + clone.offsetHeight - clone.clientHeight);
+      box.remove();
       return [isFiniteConstraint(maxW) ? maxW : width, Math.max(36, h)];
     }
     return [isFiniteConstraint(maxW) ? Math.max(100, Math.min(maxW, 100)) : 100, 36];
@@ -937,6 +976,8 @@ class ImageManager extends ViewManager {
         img.style.transition = "";
         img.style.opacity = "";
       }
+      // The core sizes an image without an explicit size from what loaded.
+      view.ctx.reportIntrinsic?.(view.tag, view.natural[0], view.natural[1]);
       view.ctx.emit(view.tag, "on_load", [{ width: view.natural[0], height: view.natural[1] }]);
       loadEnd();
     });
@@ -1012,19 +1053,6 @@ class ImageManager extends ViewManager {
   }
   destroy(view) {
     if (view.unsubscribeAssets) view.unsubscribeAssets();
-  }
-  measure(view, maxW, maxH) {
-    if (!view.natural) return [0, 0];
-    let [w, h] = view.natural;
-    if (isFiniteConstraint(maxW) && w > maxW) {
-      h = (h * maxW) / w;
-      w = maxW;
-    }
-    if (isFiniteConstraint(maxH) && h > maxH) {
-      w = (w * maxH) / h;
-      h = maxH;
-    }
-    return [w, h];
   }
 }
 
@@ -1954,12 +1982,6 @@ function buildSvg(shapes, root, scheme = "light") {
   return svg;
 }
 
-function viewBoxSize(text) {
-  const parts = String(text || "").trim().split(/[\s,]+/).map(Number);
-  if (parts.length === 4 && parts.every(Number.isFinite) && parts[2] > 0 && parts[3] > 0) return [parts[2], parts[3]];
-  return [24, 24];
-}
-
 class SvgManager extends ViewManager {
   create(view, props) {
     const el = document.createElement("div");
@@ -1984,18 +2006,6 @@ class SvgManager extends ViewManager {
   }
   refreshColors(view) {
     this.update(view, { shapes: view.props.shapes });
-  }
-  measure(view, maxW, maxH) {
-    let [w, h] = viewBoxSize(view.props.view_box);
-    if (isFiniteConstraint(maxW) && w > maxW) {
-      h = (h * maxW) / w;
-      w = maxW;
-    }
-    if (isFiniteConstraint(maxH) && h > maxH) {
-      w = (w * maxH) / h;
-      h = maxH;
-    }
-    return [w, h];
   }
 }
 
@@ -2130,10 +2140,12 @@ class ModalManager extends ViewManager {
   container(view) {
     return view.sheet;
   }
-  /** The content lays out against the sheet (or the whole frame before the sheet is on stage). */
-  layerSize(view) {
-    const sheet = view.sheet.isConnected ? view.sheet : view.ctx.overlays();
-    return [sheet.clientWidth || view.ctx.frameWidth(), sheet.clientHeight || 0];
+  /** The content lays out against the sheet once it's on stage (the core uses the window until then). */
+  reportContainers(view, report) {
+    if (view.shown) report(view.tag, view.sheet);
+  }
+  observed(view) {
+    return [view.sheet];
   }
   frame() {}
   update(view, changed) {
@@ -2222,9 +2234,11 @@ class PortalManager extends ViewManager {
     return view.layer;
   }
   /** The portal's children lay out against the whole device frame, like a window-level overlay. */
-  layerSize(view) {
-    const layer = view.ctx.overlays();
-    return [layer.clientWidth || view.ctx.frameWidth(), layer.clientHeight || 0];
+  reportContainers(view, report) {
+    report(view.tag, view.ctx.overlays());
+  }
+  observed(view) {
+    return [view.ctx.overlays()];
   }
   frame() {}
   update() {}
@@ -2341,11 +2355,21 @@ class WebViewManager extends ViewManager {
   }
 }
 
+/**
+ * `VirtualList`: the core holds the dataset (keys, extents, and sticky
+ * flags), validated in the commit and published here with
+ * `pn_core_list_apply` when a mount carries a `dataset` patch. Python binds
+ * row roots for the window this list reports (`on_window`); each row is a
+ * detached root the core lays out at the list's width, and the list stacks
+ * them at prefix-sum offsets of their measured (or declared) extents.
+ */
 class VirtualListManager extends ViewManager {
   create(view, props) {
     view.el = document.createElement("div"); view.el.className = "pn-view pn-vlist";
     view.spacer = document.createElement("div"); view.spacer.className = "pn-vlist-spacer";
-    view.el.appendChild(view.spacer); view.listStore = new ListStore(); view.lastWindow = "";
+    view.el.appendChild(view.spacer);
+    view.rows = {revision: 0, keys: [], extents: [], sticky: [], indices: new Map(), measured: new Map(), offsets: [0], dirty: false};
+    view.lastWindow = "";
     view.el.addEventListener("scroll", () => {
       this.childrenChanged(view);
       if (view.hasEvent("on_scroll")) view.ctx.emit(view.tag, "on_scroll", [scrollPayload(view.el)]);
@@ -2353,48 +2377,88 @@ class VirtualListManager extends ViewManager {
     this.update(view, props);
   }
   container(view) { return view.spacer; }
-  update(view, props) {
-    super.update(view, props);
+  update(view, changed) {
+    super.update(view, changed);
     view.el.style.overflow = "auto";
-    if (props.dataset) {
-      const horizontal = view.props.horizontal, offset = horizontal ? view.el.scrollLeft : view.el.scrollTop;
-      const store = view.listStore, index = store.indexAt(offset), key = store.keys[index], delta = offset - store.offset(index);
-      store.apply(props.dataset);
-      if (store.indices.has(key)) view.el[horizontal ? "scrollLeft" : "scrollTop"] = store.offset(store.indices.get(key)) + delta;
-    }
+    if ("dataset" in changed) this.publish(view);
     this.childrenChanged(view);
   }
-  measure(view, w, h) { return [w < 1e6 ? w : 0, h < 1e6 ? h : 0]; }
+  /** Apply the dataset patch the core published with this mount, keeping the first visible row in place. */
+  publish(view) {
+    const rows = view.rows, horizontal = !!view.props.horizontal;
+    const offset = horizontal ? view.el.scrollLeft : view.el.scrollTop;
+    const first = this.indexAt(view, offset), anchor = rows.keys[first], delta = offset - (rows.offsets[first] || 0);
+    const core = view.ctx.list?.();
+    if (!core) return;
+    const surface = view.ctx.surface(), tag = view.tag;
+    const patch = core.listApply(surface, tag);
+    // A recreated list view starts from the dataset the core already holds.
+    rows.revision = patch ? Number(patch.revision) : core.listRevision(surface, tag);
+    if (patch?.reset) rows.measured.clear();
+    const count = core.listCount(surface, tag);
+    rows.keys = new Array(count); rows.extents = new Array(count); rows.sticky = [];
+    for (let i = 0; i < count; i++) {
+      rows.keys[i] = core.listKey(surface, tag, i);
+      rows.extents[i] = core.listExtent(surface, tag, i);
+      if (core.listSticky(surface, tag, i)) rows.sticky.push(i);
+    }
+    rows.indices = new Map(rows.keys.map((key, i) => [key, i]));
+    for (const key of [...rows.measured.keys()]) if (!rows.indices.has(key)) rows.measured.delete(key);
+    this.reindex(view);
+    if (anchor != null && rows.indices.has(anchor)) view.el[horizontal ? "scrollLeft" : "scrollTop"] = rows.offsets[rows.indices.get(anchor)] + delta;
+  }
+  /** Prefix sums of the row extents: a row's measured size once it laid out, else its declared extent. */
+  reindex(view) {
+    const rows = view.rows, offsets = new Array(rows.keys.length + 1);
+    offsets[0] = 0;
+    for (let i = 0; i < rows.keys.length; i++) offsets[i + 1] = offsets[i] + (rows.measured.get(rows.keys[i]) ?? rows.extents[i]);
+    rows.offsets = offsets;
+    rows.dirty = false;
+  }
+  indexAt(view, offset) {
+    const offsets = view.rows.offsets, count = view.rows.keys.length;
+    let low = 0, high = Math.max(0, count - 1);
+    while (low < high) { const mid = (low + high + 1) >>> 1; if (offsets[mid] <= offset) low = mid; else high = mid - 1; }
+    return low;
+  }
   childrenChanged(view) {
-    const store = view.listStore; if (!store) return;
+    const rows = view.rows; if (!rows) return;
     const horizontal = !!view.props.horizontal;
     const offset = horizontal ? view.el.scrollLeft : view.el.scrollTop;
     const extent = (horizontal ? view.el.clientWidth : view.el.clientHeight) || 800;
-    const oldFirst = store.indexAt(offset), anchor = store.keys[oldFirst], anchorDelta = offset - store.offset(oldFirst);
-    for (const child of view.children) store.measure(child.props._pn_list_key, child.frame?.[horizontal ? "w" : "h"]);
-    const anchoredOffset = anchor == null ? offset : store.offset(store.indices.get(anchor)) + anchorDelta;
-    if (Math.abs(anchoredOffset - offset) > 0.5) view.el[horizontal ? "scrollLeft" : "scrollTop"] = anchoredOffset;
-    view.first = store.indexAt(anchoredOffset); view.last = store.keys.length ? store.indexAt(anchoredOffset + extent) : -1;
-    const sticky = horizontal ? -1 : store.sticky(view.first);
-    const nextSticky = store.stickyIndices.find(index => index > sticky);
+    const oldFirst = this.indexAt(view, offset), anchor = rows.keys[oldFirst], anchorDelta = offset - (rows.offsets[oldFirst] || 0);
     for (const child of view.children) {
-      const index = store.indices.get(child.props._pn_list_key);
+      const key = child.props._pn_list_key, size = child.frame?.[horizontal ? "w" : "h"];
+      if (!rows.indices.has(key) || !(size > 0)) continue;
+      const before = rows.measured.get(key) ?? rows.extents[rows.indices.get(key)];
+      if (Math.abs(before - size) >= 0.01) { rows.measured.set(key, size); rows.dirty = true; }
+    }
+    if (rows.dirty) this.reindex(view);
+    const anchoredOffset = anchor == null ? offset : rows.offsets[rows.indices.get(anchor)] + anchorDelta;
+    if (Math.abs(anchoredOffset - offset) > 0.5) view.el[horizontal ? "scrollLeft" : "scrollTop"] = anchoredOffset;
+    view.first = this.indexAt(view, anchoredOffset); view.last = rows.keys.length ? this.indexAt(view, anchoredOffset + extent) : -1;
+    const core = view.ctx.list?.();
+    const sticky = horizontal || !rows.keys.length || !core ? -1 : core.listStickyAt(view.ctx.surface(), view.tag, view.first);
+    const nextSticky = rows.sticky.find(index => index > sticky);
+    for (const child of view.children) {
+      const index = rows.indices.get(child.props._pn_list_key);
       if (index == null) { child.el.style.display = "none"; continue; }
-      let position = store.offset(index);
+      let position = rows.offsets[index];
       if (index === sticky) {
-        const size = store.offset(index + 1) - position;
-        position = Math.min(anchoredOffset, nextSticky == null ? Infinity : store.offset(nextSticky) - size);
+        const size = rows.offsets[index + 1] - position;
+        position = Math.min(anchoredOffset, nextSticky == null ? Infinity : rows.offsets[nextSticky] - size);
       }
       child.el.style.display = "";
       child.el.style[horizontal ? "left" : "top"] = px(position);
+      child.el.style[horizontal ? "top" : "left"] = "0px";
       child.el.style.zIndex = index === sticky ? "1024" : "";
     }
-    const range = store.offset(store.keys.length);
+    const range = rows.offsets[rows.keys.length];
     view.spacer.style[horizontal ? "width" : "height"] = px(range);
-    const identity = [store.revision, view.first, view.last, extent, sticky].join(":");
+    const identity = [rows.revision, view.first, view.last, extent, sticky].join(":");
     if (identity !== view.lastWindow) {
       view.lastWindow = identity;
-      view.ctx.emit(view.tag, "on_window", [{...scrollPayload(view.el), first:view.first, last:view.last, extent, range, sticky, revision:store.revision}]);
+      view.ctx.emit(view.tag, "on_window", [{...scrollPayload(view.el), first:view.first, last:view.last, extent, range, sticky, revision:rows.revision}]);
     }
   }
   command(view, name, args) {
@@ -2403,7 +2467,7 @@ class VirtualListManager extends ViewManager {
     const horizontal = !!view.props.horizontal;
     let offset = args[horizontal ? "x" : "y"] || 0;
     if (name === "scroll_to_end") offset = horizontal ? view.el.scrollWidth : view.el.scrollHeight;
-    if (name === "scroll_to_index") offset = view.listStore.offset(args.index);
+    if (name === "scroll_to_index") offset = view.rows.offsets[Math.max(0, Math.min(Number(args.index) || 0, view.rows.keys.length))];
     view.el.scrollTo({[horizontal ? "left" : "top"]: offset, behavior: args.animated ? "smooth" : "instant"});
     return null;
   }
@@ -2478,6 +2542,15 @@ class ScreenStackManager extends ViewManager {
   }
   container(view) {
     return view.body;
+  }
+  /** Each screen lays out in the stack's bounds below the navigation bar its own options draw. */
+  reportContainers(view, report) {
+    for (const child of view.children) {
+      if (!child.props._pn_header_slot) report(child.tag, view.el, stackHeaderHeight(child.props));
+    }
+  }
+  observed(view) {
+    return [view.el];
   }
   goBack(view) {
     if (view.children.length > 1 && view.hasEvent("on_native_back")) view.ctx.emit(view.tag, "on_native_back", [1]);
@@ -2651,6 +2724,25 @@ class ScreenManager extends ViewManager {
 }
 
 
+/**
+ * A component the preview has no widget for (a plugin's native view): a
+ * labeled box that the core sizes like the platform would, so the layout
+ * around it stays truthful.
+ */
+class PlaceholderManager extends ViewManager {
+  create(view, props) {
+    const el = document.createElement("div");
+    el.className = "pn-view pn-placeholder";
+    el.textContent = view.type;
+    el.title = `${view.type} has no browser preview implementation`;
+    view.el = el;
+    this.update(view, props);
+  }
+  measure(view, maxW) {
+    return [isFiniteConstraint(maxW) ? Math.min(maxW, 160) : 160, 44];
+  }
+}
+
 const MANAGERS = {
   View: ViewManager,
   Column: ViewManager,
@@ -2686,254 +2778,49 @@ const MANAGERS = {
 };
 
 // ---------------------------------------------------------------------------
-// Animations (PNAnimator equivalent)
+// Animated writes (PNAnimator equivalent)
 // ---------------------------------------------------------------------------
-
-/**
- * The named easings every renderer implements (`pythonnative.animated`
- * `_NAMED_EASING_BEZIERS`): React Native's `Easing.ease` is
- * `bezier(0.42, 0, 1, 1)`, and `ease_in` / `ease_out` / `ease_in_out` are
- * the CSS `ease-in` / `ease-out` / `ease-in-out` keywords; `quad` and
- * `cubic` are the bare powers.
- */
-const EASINGS = {
-  linear: (t) => t,
-  ease: cubicBezier(0.42, 0, 1, 1),
-  ease_in: cubicBezier(0.42, 0, 1, 1),
-  ease_out: cubicBezier(0, 0, 0.58, 1),
-  ease_in_out: cubicBezier(0.42, 0, 0.58, 1),
-  quad: (t) => t * t,
-  cubic: (t) => t * t * t,
-  bounce: (t) => {
-    const n1 = 7.5625;
-    const d1 = 2.75;
-    if (t < 1 / d1) return n1 * t * t;
-    if (t < 2 / d1) return n1 * (t -= 1.5 / d1) * t + 0.75;
-    if (t < 2.5 / d1) return n1 * (t -= 2.25 / d1) * t + 0.9375;
-    return n1 * (t -= 2.625 / d1) * t + 0.984375;
-  },
-};
-
-/**
- * Resolve a timing spec's `easing`: one of the names above, or a bare
- * `[x1, y1, x2, y2]` cubic bezier. Python validates before sending, so
- * anything else is `null` and the animation is declined (`{ok: false}`)
- * rather than played with a guessed curve. No `easing` means `ease_in_out`.
- */
-export function easingFor(spec) {
-  const value = spec && typeof spec === "object" && !Array.isArray(spec) ? spec.easing : spec;
-  if (value == null) return EASINGS.ease_in_out;
-  if (typeof value === "string") return EASINGS[value] || null;
-  if (Array.isArray(value) && value.length === 4 && value.every((n) => typeof n === "number" && Number.isFinite(n))) {
-    return cubicBezier(...value);
-  }
-  return null;
-}
-
-/**
- * React Native's decay model: `velocity` in points per millisecond decays
- * as `v0 * deceleration^t` (default `0.998`), so the value travels
- * `v0 / (1 - deceleration)` in total. The animation rests once the speed
- * drops under `DECAY_REST_VELOCITY` and lands on that final value.
- */
-export const DEFAULT_DECELERATION = 0.998;
-export const DECAY_REST_VELOCITY = 0.001;
-export function decayFinalValue(from, velocity, deceleration = DEFAULT_DECELERATION) {
-  const d = Number(deceleration) || DEFAULT_DECELERATION;
-  return Number(from) + (Number(velocity) || 0) / (1 - d);
-}
-/** Position and velocity after `elapsedMs` of decay from `(from, velocity)`. */
-export function decayAt(from, velocity, deceleration, elapsedMs) {
-  const d = Number(deceleration) || DEFAULT_DECELERATION;
-  const factor = Math.pow(d, Math.max(0, elapsedMs));
-  return [Number(from) + ((Number(velocity) || 0) * (1 - factor)) / (1 - d), (Number(velocity) || 0) * factor];
-}
-
-function cubicBezier(x1, y1, x2, y2) {
-  const sample = (t, a, b) => 3 * a * (1 - t) * (1 - t) * t + 3 * b * (1 - t) * t * t + t * t * t;
-  return (x) => {
-    let lo = 0;
-    let hi = 1;
-    let t = x;
-    for (let i = 0; i < 24; i++) {
-      const cx = sample(t, x1, x2);
-      if (Math.abs(cx - x) < 1e-4) break;
-      if (cx < x) lo = t;
-      else hi = t;
-      t = (lo + hi) / 2;
-    }
-    return sample(t, y1, y2);
-  };
-}
 
 const ANIM_TRANSFORM = new Set(["translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate", "rotate_x", "rotate_y"]);
 
-class Animator {
-  constructor(renderer) {
-    this.renderer = renderer;
-    this.active = new Map(); // id -> {view, prop, cancel}
-  }
-  set(view, prop, value) {
-    if (prop.startsWith("_pn_graph:")) { this.renderer.graph.set(Number(prop.slice(10)), value); return; }
-    if (ANIM_TRANSFORM.has(prop)) {
-      view.animTransform = view.animTransform || {};
-      view.animTransform[prop] = Number(value) || 0;
-      composeTransform(view);
-    } else if (prop === "opacity") {
-      view.el.style.opacity = String(value);
-    } else if (prop === "background_color") {
-      view.el.style.backgroundColor = parseColor(value, this.renderer.ctx.scheme()) ?? "";
-    } else if (prop === "color") {
-      view.el.style.color = parseColor(value, this.renderer.ctx.scheme()) ?? "";
-    }
-    view.animValues = view.animValues || {};
-    view.animValues[prop] = value;
-  }
-  current(view, prop) {
-    if (prop.startsWith("_pn_graph:")) return this.renderer.graph.values.get(Number(prop.slice(10))) || 0;
-    if (view.animValues && prop in view.animValues) return view.animValues[prop];
-    if (prop === "opacity") return view.el.style.opacity === "" ? 1 : Number(view.el.style.opacity);
-    if (prop === "scale" || prop === "scale_x" || prop === "scale_y") return 1;
-    return 0;
-  }
-  start(view, id, prop, spec) {
-    if (!spec || typeof spec !== "object") return false;
-    const kind = spec.kind;
-    const isColor = prop === "background_color" || prop === "color";
-    if (isColor) return false; // color interpolation stays on the Python ticker
-    const from = spec.from != null ? Number(spec.from) : Number(this.current(view, prop)) || 0;
-    let step;
-    let finished = false;
-    if (kind === "timing") {
-      const to = Number(spec.to);
-      const duration = Math.max(1, Number(spec.duration_ms) || 300);
-      const easing = easingFor(spec);
-      if (!easing) return false;
-      step = (elapsed) => {
-        const t = Math.min(1, elapsed / duration);
-        const value = from + (to - from) * easing(t);
-        return [value, t >= 1];
-      };
-    } else if (kind === "spring") {
-      const to = Number(spec.to);
-      const stiffness = Number(spec.stiffness) || 100;
-      const damping = Number(spec.damping) || 10;
-      const mass = Number(spec.mass) || 1;
-      let position = from;
-      let velocity = Number(spec.initial_velocity) || 0;
-      let last = 0;
-      step = (elapsed) => {
-        const dt = Math.min(0.064, (elapsed - last) / 1000);
-        last = elapsed;
-        const steps = Math.max(1, Math.ceil(dt / 0.004));
-        const h = dt / steps;
-        for (let i = 0; i < steps; i++) {
-          const force = -stiffness * (position - to) - damping * velocity;
-          velocity += (force / mass) * h;
-          position += velocity * h;
-        }
-        const done = Math.abs(velocity) < 0.01 && Math.abs(position - to) < 0.01;
-        return [done ? to : position, done];
-      };
-    } else if (kind === "decay") {
-      const velocity = Number(spec.velocity) || 0; // points per millisecond
-      const deceleration = Number(spec.deceleration) || DEFAULT_DECELERATION;
-      const final = decayFinalValue(from, velocity, deceleration);
-      step = (elapsed) => {
-        const [position, remaining] = decayAt(from, velocity, deceleration, elapsed);
-        // Rest once the speed drops under the shared threshold, landing on
-        // the projected value so Python and the page agree on the result.
-        const done = Math.abs(remaining) < DECAY_REST_VELOCITY;
-        return [done ? final : position, done];
-      };
-    } else {
-      return false;
-    }
-    const delay = Number(spec.delay_ms) || 0;
-    const startedAt = performance.now() + delay;
-    const handle = { view, prop, frame: 0 };
-    const tick = (now) => {
-      if (!this.active.has(id)) return;
-      if (now < startedAt) {
-        handle.frame = requestAnimationFrame(tick);
-        return;
-      }
-      const [value, done] = step(now - startedAt);
-      this.set(view, prop, value);
-      if (done) {
-        finished = true;
-        this.active.delete(id);
-        this.renderer.ctx.animationFinished(id, true);
-        return;
-      }
-      handle.frame = requestAnimationFrame(tick);
-    };
-    this.active.set(id, handle);
-    handle.frame = requestAnimationFrame(tick);
-    return true;
-  }
-  cancel(id) {
-    const handle = this.active.get(id);
-    if (!handle) return null;
-    this.active.delete(id);
-    cancelAnimationFrame(handle.frame);
-    this.renderer.ctx.animationFinished(id, false);
-    return { value: this.current(handle.view, handle.prop) };
-  }
-  cancelForView(view) {
-    for (const [id, handle] of [...this.active]) {
-      if (handle.view === view) {
-        this.active.delete(id);
-        cancelAnimationFrame(handle.frame);
-      }
-    }
-  }
+/** An animated angle in degrees (`"45deg"`, `"0.5rad"`, or a bare number of degrees). */
+function degrees(value) {
+  const n = typeof value === "string" ? parseFloat(value) : Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return typeof value === "string" && value.endsWith("rad") ? (n * 180) / Math.PI : n;
 }
 
 // ---------------------------------------------------------------------------
-// Gestures: forward pointer streams to the Python arbiter
+// Gestures: pointer streams go to the core's gesture engine
 // ---------------------------------------------------------------------------
 
 function installGestureSource(view) {
   if (view.gestureInstalled) return;
   view.gestureInstalled = true;
   const el = view.el;
-  // View-local `x`/`y` plus the window-relative `absolute_x`/`absolute_y`
-  // (`GestureEvent.absolute_x`), both in points inside the device frame.
-  const send = (phase, event) => {
-    const point = view.ctx.pointInFrame(event);
-    const absolute = view.ctx.pointInWindow ? view.ctx.pointInWindow(event) : { x: event.clientX, y: event.clientY };
-    view.ctx.gesture(view.tag, phase, {
-      id: event.pointerId,
-      x: point.x,
-      y: point.y,
-      absolute_x: absolute.x,
-      absolute_y: absolute.y,
-      specs: view.props.gestures || [],
-    });
-  };
+  const wired = () => Array.isArray(view.props.gestures) && view.props.gestures.length > 0;
   el.addEventListener("pointerdown", (event) => {
-    if (!Array.isArray(view.props.gestures) || !view.props.gestures.length) return;
+    if (!wired()) return;
     try {
       el.setPointerCapture(event.pointerId);
     } catch (err) {
       /* ignore */
     }
     view.gestureActive = true;
-    send("down", event);
+    view.ctx.pointer(view, POINTER_DOWN, event);
   });
   el.addEventListener("pointermove", (event) => {
-    if (view.gestureActive) send("move", event);
+    if (view.gestureActive) view.ctx.pointer(view, POINTER_MOVE, event);
   });
   el.addEventListener("pointerup", (event) => {
     if (!view.gestureActive) return;
     view.gestureActive = false;
-    send("up", event);
+    view.ctx.pointer(view, POINTER_UP, event);
   });
   el.addEventListener("pointercancel", (event) => {
     if (!view.gestureActive) return;
     view.gestureActive = false;
-    send("cancel", event);
+    view.ctx.pointer(view, POINTER_CANCEL, event);
   });
 }
 
@@ -2944,254 +2831,188 @@ function installGestureSource(view) {
 export class Renderer {
   /**
    * @param ctx {{
-   *   emit(tag, name, args), gesture(tag, phase, info),
-   *   animationFinished(id, finished), scheme(), overlays(), bottomInset(),
-   *   frameWidth(), pointInFrame(event), statusBar(opts)
+   *   scheme(), overlays(), bottomInset(), frameWidth(), pointInFrame(event),
+   *   pointInWindow(event), windowOrigin(el), statusBar(opts), nativeStackChanged()
    * }}
    */
   constructor(ctx) {
     this.ctx = {...ctx};
-    this.eventSequence = 0;
-    this.applying = null;
+    this.host = null;
+    this.surface = 1;
     this.ctx.emit = (tag, name, args) => {
-      this.graph.event(tag, name, args);
       const view = this.views.get(tag);
       const edit = name === "on_change" && view?.type === "TextInput" ? (view.editRevision = (view.editRevision || 0) + 1) : 0;
-      // A view emitting while its commit applies (an image starting to
-      // load during create) belongs to that commit's revision.
-      const identity = this.applying || this;
-      return ctx.emit(tag, name, {
-      application: identity.application, surface: identity.surface, revision: identity.revision,
-      sequence: ++this.eventSequence, args, edit_revision: edit,
-      });
+      this.host?.event(this.surface, tag, name, args, edit);
     };
+    this.ctx.pointer = (view, phase, event) => {
+      if (!this.host) return;
+      const local = this.ctx.pointInFrame(event);
+      const window = this.ctx.pointInWindow ? this.ctx.pointInWindow(event) : { x: event.clientX, y: event.clientY };
+      this.host.pointer(this.surface, view.tag, [{
+        phase, pointer: event.pointerId || 0, x: local.x, y: local.y, windowX: window.x, windowY: window.y,
+        time: (event.timeStamp || performance.now()) / 1000,
+      }]);
+    };
+    this.ctx.invalidate = (tag) => this.host?.core.invalidate(this.surface, tag);
+    this.ctx.reportIntrinsic = (tag, width, height) => this.host?.core.reportIntrinsic(this.surface, tag, width, height);
+    this.ctx.list = () => this.host?.core;
+    this.ctx.surface = () => this.surface;
     this.ctx.viewFor = (tag) => this.views.get(tag) || null;
     this.views = new Map();
     this.managers = {};
-    this.animator = new Animator(this);
-    this.graph = new AnimationGraph(this);
+    this.placeholder = new PlaceholderManager();
     this.dirtyContainers = new Set();
-    this.layoutDetached = new Set();
-    this.layoutObservers = new Set();
+    this.containers = new Set();
+    this.reported = new Map();
+    this.prototypes = new Map();
+    this.resizes = typeof ResizeObserver === "function" ? new ResizeObserver(() => this.reportContainers()) : null;
     for (const [name, Manager] of Object.entries(MANAGERS)) this.managers[name] = new Manager();
   }
 
+  /** Connect the core's platform host (`core/mount.js`). */
+  attach(host) {
+    this.host = host;
+  }
+
+  /** Destroy every view (a `reset` op, or the page leaving Python). */
   reset() {
     for (const view of this.views.values()) {
       try {
-        disposeLayout(view);
         view.manager.destroy(view);
       } catch (err) {
         /* ignore */
       }
+      this.host?.forgetGestures(view.tag);
       view.el.remove();
     }
     this.views.clear();
-    this.layoutDetached.clear();
-    this.layoutObservers.clear();
-    this.animator.active.clear();
+    this.dirtyContainers.clear();
+    this.containers.clear();
+    this.reported.clear();
+    for (const tag of [...this.prototypes.keys()]) this.forgetPrototype(tag);
+    this.resizes?.disconnect();
   }
 
-  // -- transactions ------------------------------------------------------
+  // -- mount transactions --------------------------------------------------
 
-  apply(envelope) {
-    const {version, application, surface, revision, ops} = envelope || {};
-    const fail = (error) => ({ok: false, application, surface, revision, error, failed: !!this.failed});
-    if (version !== specification.protocol || typeof application !== "string" || !application || !Number.isSafeInteger(surface) || surface < 1 || !Array.isArray(ops)) return fail(`invalid v${specification.protocol} commit`);
-    const replacing = this.application !== application;
-    if (revision !== (replacing ? 1 : this.revision + 1)) return fail("stale revision");
-    if (!replacing && surface !== this.surface) return fail("wrong surface");
-    if (this.failed && !replacing) return fail("failed surface requires remount");
-    const edited = new Map(), deleted = new Set(), listPatches = new Set();
-    const get = tag => deleted.has(tag) ? null : edited.get(tag) || (replacing ? null : this.views.get(tag));
-    const edit = tag => {
-      if (!edited.has(tag)) {
-        const view = get(tag);
-        if (!view) throw new Error("unknown tag");
-        edited.set(tag, {type: view.type, children: view.children.map(child => child.tag), parentTag: view.parent?.tag});
-      }
-      return edited.get(tag);
-    };
-    const parentOf = tag => edited.has(tag) ? edited.get(tag).parentTag : get(tag)?.parent?.tag;
+  /** Apply one decoded transaction; the first failing op fails it (and the surface). */
+  applyTransaction(transaction) {
+    this.surface = transaction.surface;
     try {
-      for (const op of ops) {
-        if (!Array.isArray(op) || op.length !== {c:4,u:4,i:4,d:2}[op[0]] || !Number.isSafeInteger(op[1]) || op[1] <= 0) return fail("invalid operation");
-        const [code, tag] = op;
-        if ((code === "c" ? op[2] : get(tag)?.type) === "VirtualList" && (code === "c" || code === "u") && Object.hasOwn(op[code === "c" ? 3 : 2], "dataset")) {
-          if (listPatches.has(tag)) return fail("multiple list patches in one commit");
-          listPatches.add(tag);
-        }
-        if (code === "c") {
-          if (get(tag) || !this.managers[op[2]] || !validateProps(specification, op[2], op[3])) return fail("invalid create");
-          if (op[2] === "VirtualList") new ListStore().prepare(op[3].dataset);
-          deleted.delete(tag);
-          edited.set(tag, {type: op[2], children: [], parentTag: null});
-        } else {
-          const view = get(tag);
-          if (!view) return fail("unknown tag");
-          if (code === "u" && (!validateProps(specification, view.type, op[2], true) || !validateRemoval(specification, view.type, op[2], op[3]))) return fail("invalid properties");
-          if (code === "u" && view.type === "VirtualList" && Object.hasOwn(op[2], "dataset")) this.views.get(tag).listStore.prepare(op[2].dataset);
-          if (code === "i") {
-            if (!get(op[2]) || !Number.isSafeInteger(op[3]) || op[3] < 0) return fail("invalid insertion");
-            for (let ancestor = tag; ancestor; ancestor = parentOf(ancestor)) if (ancestor === op[2]) return fail("cycle");
-            const child = edit(op[2]);
-            if (child.parentTag) {
-              const old = edit(child.parentTag);
-              old.children.splice(old.children.indexOf(op[2]), 1);
-            }
-            const parent = edit(tag);
-            if (op[3] > parent.children.length) return fail("invalid insertion index");
-            parent.children.splice(op[3], 0, op[2]); child.parentTag = tag;
-          } else if (code === "d") {
-            if (view.children.length) return fail("destroy children first");
-            const parent = parentOf(tag);
-            if (parent) { const siblings = edit(parent).children; siblings.splice(siblings.indexOf(tag), 1); }
-            edited.delete(tag); deleted.add(tag);
-          }
-        }
-      }
-    } catch (error) { return fail(String(error)); }
-    if (Object.hasOwn(envelope, "layout")) {
-      if (!envelope.layout || typeof envelope.layout !== "object" || Array.isArray(envelope.layout)) return fail("invalid layout request");
-      const {roots, width, height} = envelope.layout;
-      if (!Array.isArray(roots) || roots.some(tag => !get(tag)) || !Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) return fail("invalid layout request");
-    }
-    const mutationStarted = performance.now();
-    try {
-      if (replacing && this.application) this.reset();
-      this.applying = {application, surface, revision};
-      for (const op of ops) this.applyOne(op);
+      for (const op of transaction.ops) this.applyOp(op);
       for (const view of this.dirtyContainers) if (this.views.has(view.tag)) view.manager.childrenChanged(view);
+    } finally {
       this.dirtyContainers.clear();
-      this.applying = null;
-      this.failed = false; this.application = application; this.surface = surface; this.revision = revision;
-      return {ok: true, application, surface, revision,
-        ...(envelope.layout ? {layout: this.computeLayout(envelope.layout)} : {}),
-        metrics:{mutation_ns: Math.round((performance.now() - mutationStarted)*1e6)}};
-    } catch (error) { this.applying = null; this.reset(); this.failed = true; return fail(String(error)); }
+    }
+    this.reportContainers();
   }
 
-  computeLayout(request) {
-    const started = performance.now(), frames = computeLayout(this, request);
-    return {application: this.application, surface: this.surface, revision: this.revision, frames,
-      metrics:{layout_ns:Math.round((performance.now()-started)*1e6), visited:this.layoutVisited || 0}};
-  }
-
-  applyOne(op) {
-    switch (op[0]) {
-      case "c": {
-        const [, tag, type, props] = op;
-        const manager = this.managers[type];
-        const view = {
-          tag,
-          type,
-          props: { ...(props || {}) },
-          manager,
-          ctx: this.ctx,
-          children: [],
-          parent: null,
-          frame: null,
-          el: null,
-          hasEvent: null,
-        };
-        view.hasEvent = (name) => Array.isArray(view.props._pn_events) && view.props._pn_events.includes(name);
-        manager.create(view, view.props);
-        view.el.dataset.pnTag = String(tag);
-        view.el.dataset.pnType = type;
-        if (Array.isArray(view.props.gestures) && view.props.gestures.length) installGestureSource(view);
-        updateLayout(view, props);
-        if (props._pn_layout) this.layoutObservers.add(view);
-        this.views.set(tag, view);
-        return;
-      }
-      case "u": {
-        const [, tag, changed, removed] = op;
-        const view = this.views.get(tag);
-        if (!view || !changed) return;
-        const normalized = normalize(specification, view.type, changed, removed);
-        Object.assign(view.props, changed);
-        for (const key of removed) delete view.props[key];
-        if (requiresRecreation(specification, view.type, changed, removed)) {
-          const old = view.el, focused = document.activeElement === old;
-          const selection = [old.selectionStart, old.selectionEnd];
-          const scroll = [old.scrollLeft, old.scrollTop];
-          if (view.type === "TextInput" && (!("value" in changed) || (changed._pn_edit_revision || 0) < (view.editRevision || 0))) view.props.value = old.value;
-          const edited = view.editRevision || 0;
-          view.editRevision = 0;
-          view.manager.destroy(view);
-          view.manager.create(view, view.props);
-          view.editRevision = edited;
-          old.replaceWith(view.el);
-          view.el.dataset.pnTag = String(tag); view.el.dataset.pnType = view.type;
-          const container = view.manager.container(view);
-          for (const child of view.children) container.appendChild(child.el);
-          view.manager.childrenChanged(view);
-          if (view.frame) view.manager.frame(view, view.frame.x, view.frame.y, view.frame.w, view.frame.h);
-          view.el.scrollLeft = scroll[0]; view.el.scrollTop = scroll[1];
-          if (focused) view.el.focus();
-          if (selection[0] != null && view.el.setSelectionRange) view.el.setSelectionRange(...selection);
-        } else view.manager.update(view, normalized);
-        const fields = specification.components[view.type]?.props || {};
-        const affectsMeasurement = [...Object.keys(changed), ...removed].some(key => fields[key]?.native?.invalidates_layout !== false);
-        updateLayout(view, changed, removed, affectsMeasurement);
-        if (view.requestLayoutFrame) this.layoutObservers.add(view); else this.layoutObservers.delete(view);
-        if ("gestures" in changed || removed.includes("gestures")) {
-          if (Array.isArray(view.props.gestures) && view.props.gestures.length) installGestureSource(view);
-          else this.ctx.gesture(tag, "clear", {});
-        }
-        return;
-      }
-      case "i": {
-        const [, parentTag, childTag, index] = op;
-        const parent = this.views.get(parentTag);
-        const child = this.views.get(childTag);
-        if (!parent || !child) return;
-        if (child.parent && child.parent !== parent) {
-          const idx = child.parent.children.indexOf(child);
-          if (idx >= 0) child.parent.children.splice(idx, 1);
-          this.dirtyContainers.add(child.parent);
-        } else if (child.parent === parent) {
-          const idx = parent.children.indexOf(child);
-          if (idx >= 0) parent.children.splice(idx, 1);
-        }
-        const at = Math.max(0, Math.min(index, parent.children.length));
-        parent.children.splice(at, 0, child);
-        child.parent = parent;
-        insertLayout(this, parent, child);
-        const container = parent.manager.container(parent);
-        const before = parent.children[at + 1] ? parent.children[at + 1].el : null;
-        if (before && before.parentNode === container) container.insertBefore(child.el, before);
-        else container.appendChild(child.el);
-        applyPointerInheritance(child, parent);
-        this.dirtyContainers.add(parent);
-        return;
-      }
-      case "d": {
-        const [, tag] = op;
-        const view = this.views.get(tag);
-        if (!view) return;
-        this.destroyView(view);
-        return;
-      }
-      default:
-        console.warn("[pn] unknown op", op);
+  applyOp(op) {
+    switch (op.kind) {
+      case "reset": this.reset(); return;
+      case "create": this.create(op.tag, op.component, op.props); return;
+      case "update": this.update(this.require(op.tag, "update"), op.props, op.removed, op.recreate); return;
+      case "insert": this.insert(this.require(op.parent, "insert"), this.require(op.tag, "insert"), op.index); return;
+      case "delete": this.destroyView(this.require(op.tag, "delete")); return;
+      case "frame": this.frame(this.require(op.tag, "frame"), op.frame); return;
+      case "command": this.command(op); return;
+      default: throw new Error(`unknown mount op ${op.kind}`);
     }
   }
 
+  require(tag, what) {
+    const view = this.views.get(tag);
+    if (!view) throw new Error(`${what}: unknown tag ${tag}`);
+    return view;
+  }
+
+  /** A view record and its element, before it joins the tree. */
+  build(tag, type, props, ctx = this.ctx) {
+    const manager = this.managers[type] || this.placeholder;
+    const view = { tag, type, props: { ...(props || {}) }, manager, ctx, children: [], parent: null, frame: null, el: null, hasEvent: null };
+    view.hasEvent = (name) => Array.isArray(view.props._pn_events) && view.props._pn_events.includes(name);
+    manager.create(view, view.props);
+    return view;
+  }
+
+  create(tag, type, props) {
+    if (this.views.has(tag)) throw new Error(`create: tag ${tag} already exists`);
+    const view = this.build(tag, type, props);
+    view.el.dataset.pnTag = String(tag);
+    view.el.dataset.pnType = type;
+    if (Array.isArray(view.props.gestures) && view.props.gestures.length) installGestureSource(view);
+    this.views.set(tag, view);
+    this.watchContainer(view);
+  }
+
+  update(view, changed, removed, recreate) {
+    Object.assign(view.props, changed);
+    for (const key of removed) delete view.props[key];
+    if (recreate) this.recreate(view, changed);
+    else view.manager.update(view, changed);
+    if (Array.isArray(view.props.gestures) && view.props.gestures.length) installGestureSource(view);
+  }
+
+  /** Rebuild a widget in place (a creation-only prop changed), keeping its children, frame, focus, and text selection. */
+  recreate(view, changed) {
+    const old = view.el, focused = document.activeElement === old;
+    const selection = [old.selectionStart, old.selectionEnd];
+    const scroll = [old.scrollLeft, old.scrollTop];
+    if (view.type === "TextInput" && (!("value" in changed) || (changed._pn_edit_revision || 0) < (view.editRevision || 0))) view.props.value = old.value;
+    const edited = view.editRevision || 0;
+    view.editRevision = 0;
+    view.manager.destroy(view);
+    view.gestureInstalled = false;
+    this.unwatchContainer(view);
+    view.manager.create(view, view.props);
+    view.editRevision = edited;
+    old.replaceWith(view.el);
+    view.el.dataset.pnTag = String(view.tag); view.el.dataset.pnType = view.type;
+    const container = view.manager.container(view);
+    for (const child of view.children) container.appendChild(child.el);
+    view.manager.childrenChanged(view);
+    if (view.frame) view.manager.frame(view, view.frame.x, view.frame.y, view.frame.w, view.frame.h);
+    view.el.scrollLeft = scroll[0]; view.el.scrollTop = scroll[1];
+    if (focused) view.el.focus();
+    if (selection[0] != null && view.el.setSelectionRange) view.el.setSelectionRange(...selection);
+    this.watchContainer(view);
+  }
+
+  /** Move-aware: a child under another parent leaves it first. */
+  insert(parent, child, index) {
+    if (child.parent && child.parent !== parent) {
+      const idx = child.parent.children.indexOf(child);
+      if (idx >= 0) child.parent.children.splice(idx, 1);
+      this.dirtyContainers.add(child.parent);
+    } else if (child.parent === parent) {
+      const idx = parent.children.indexOf(child);
+      if (idx >= 0) parent.children.splice(idx, 1);
+    }
+    const at = Math.max(0, Math.min(index, parent.children.length));
+    parent.children.splice(at, 0, child);
+    child.parent = parent;
+    const container = parent.manager.container(parent);
+    const before = parent.children[at + 1] ? parent.children[at + 1].el : null;
+    if (before && before.parentNode === container) container.insertBefore(child.el, before);
+    else container.appendChild(child.el);
+    applyPointerInheritance(child, parent);
+    this.dirtyContainers.add(parent);
+  }
+
+  /** Delete one view; it also leaves its parent, and children still under it (moved later) leave it. */
   destroyView(view) {
-    this.layoutDetached.delete(view);
-    this.layoutObservers.delete(view);
-    this.graph.forget(view.tag);
-    this.animator.cancelForView(view);
     if (view.parent && view.parent.manager.childWillDetach) view.parent.manager.childWillDetach(view.parent, view);
-    for (const child of [...view.children]) this.destroyView(child);
+    for (const child of view.children) {
+      child.parent = null;
+      child.el.remove();
+    }
+    view.children = [];
     if (view.parent) {
       const idx = view.parent.children.indexOf(view);
       if (idx >= 0) view.parent.children.splice(idx, 1);
       this.dirtyContainers.add(view.parent);
       view.parent = null;
     }
-    disposeLayout(view);
     try {
       view.manager.destroy(view);
     } catch (err) {
@@ -3199,45 +3020,146 @@ export class Renderer {
     }
     view.el.remove();
     this.views.delete(view.tag);
-    this.ctx.gesture(view.tag, "clear", {});
+    this.dirtyContainers.delete(view);
+    this.forgetPrototype(view.tag);
+    this.reported.delete(view.tag);
+    this.unwatchContainer(view);
+    this.host?.forgetGestures(view.tag);
   }
 
-  // -- synchronous requests ---------------------------------------------
-
-  command(tag, name, argsJson) {
-    const view = this.views.get(tag);
-    if (!view) return null;
-    let args = {};
-    try {
-      args = argsJson ? JSON.parse(argsJson) || {} : {};
-    } catch (err) {
-      args = {};
-    }
-    if (!validateCommand(specification, view.type, name, args)) throw new Error("Invalid view command");
-    const result = view.manager.command(view, name, args);
-    return result === undefined ? null : result;
+  /** A frame relative to the mounted parent (flattened ancestors already folded in). */
+  frame(view, [x, y, w, h]) {
+    view.frame = { x, y, w, h };
+    view.manager.frame(view, x, y, w, h);
+    if (view.parent) this.dirtyContainers.add(view.parent);
+    if (view.children.length) this.dirtyContainers.add(view);
   }
 
-  animate(tag, requestJson) {
-    const view = this.views.get(tag);
-    let request;
+  command(op) {
+    const view = this.views.get(op.tag);
+    if (!view) {
+      this.host?.commandResult(op.call_id, false, null, `unknown view ${op.tag}`);
+      return;
+    }
+    let value;
     try {
-      request = JSON.parse(requestJson);
+      value = view.manager.command(view, op.name, op.arguments || {});
+    } catch (error) {
+      this.host?.commandResult(op.call_id, false, null, String(error?.message || error));
+      return;
+    }
+    this.host?.commandResult(op.call_id, true, value === undefined ? null : value);
+  }
+
+  // -- container sizes -----------------------------------------------------
+
+  watchContainer(view) {
+    if (!view.manager.reportContainers) return;
+    this.containers.add(view);
+    for (const el of view.manager.observed?.(view) || []) this.resizes?.observe(el);
+  }
+
+  unwatchContainer(view) {
+    if (!this.containers.delete(view)) return;
+    for (const el of view.manager.observed?.(view) || []) this.resizes?.unobserve(el);
+  }
+
+  /**
+   * Report the size (and window origin) of every container a detached root
+   * lays out in: each stack screen, a presented modal's sheet, and the portal
+   * layer. The core relayouts those roots when a size changes.
+   */
+  reportContainers() {
+    if (!this.host) return;
+    for (const view of this.containers) {
+      if (!this.views.has(view.tag)) continue;
+      view.manager.reportContainers(view, (tag, el, inset = 0) => {
+        const width = el.clientWidth, height = el.clientHeight - inset;
+        if (!el.isConnected || width <= 0 || height <= 0) return;
+        const origin = this.ctx.windowOrigin ? this.ctx.windowOrigin(el) : { x: 0, y: 0 };
+        const key = `${origin.x},${origin.y + inset},${width},${height}`;
+        if (this.reported.get(tag) === key) return;
+        this.reported.set(tag, key);
+        this.host.core.reportContainer(this.surface, tag, origin.x, origin.y + inset, width, height);
+      });
+    }
+  }
+
+  // -- measurement (called by the core during a commit or a layout) ----------
+
+  /**
+   * Measure a leaf the way the platforms do: a prototype element built from
+   * the props, measured off-screen with the fonts and styles it renders
+   * with. `text` and `intrinsic` share this path; `native` (a plugin's
+   * measurement) has no browser implementation, so it measures the
+   * placeholder.
+   */
+  measure({ tag, component, props, width, widthMode, height, heightMode }) {
+    const maxW = widthMode ? width : INF;
+    const maxH = heightMode ? height : INF;
+    // A text input sizes to what the user typed, which Python may not know yet.
+    if (component === "TextInput" && !("value" in props)) {
+      const live = this.views.get(tag);
+      if (live?.el && "value" in live.el) props.value = live.el.value;
+    }
+    const proto = this.prototype(tag, component, props);
+    if (!measureRoot) measureRoot = document.getElementById("pn-measure") || document.body;
+    measureRoot.appendChild(proto.el);
+    try {
+      return proto.manager.measure(proto, maxW, maxH);
+    } finally {
+      proto.el.remove();
+    }
+  }
+
+  /** A text leaf's first baseline, from its last measured prototype. */
+  baseline(tag, width, height) {
+    const proto = this.prototypes.get(tag)?.view;
+    return proto?.manager.baseline ? proto.manager.baseline(proto, width, height) : height;
+  }
+
+  /** The prototype for `tag`, rebuilt when its props change; its events go nowhere. */
+  prototype(tag, component, props) {
+    const key = `${component}:${JSON.stringify(props)}`;
+    const cached = this.prototypes.get(tag);
+    if (cached && cached.key === key) return cached.view;
+    this.forgetPrototype(tag);
+    const ctx = { ...this.ctx, emit() {}, pointer() {}, invalidate() {}, reportIntrinsic() {} };
+    const view = this.build(-tag, component, props, ctx);
+    this.prototypes.set(tag, { key, view });
+    return view;
+  }
+
+  forgetPrototype(tag) {
+    const cached = this.prototypes.get(tag);
+    if (!cached) return;
+    this.prototypes.delete(tag);
+    try {
+      cached.view.manager.destroy(cached.view);
     } catch (err) {
-      return null;
+      /* ignore */
     }
-    if (!request || typeof request !== "object") return null;
-    if (request.op === "graph") { this.graph.install(request.graph); return null; }
-    if (request.op === "cancel") return this.animator.cancel(request.id);
-    if (!view) return request.op === "start" ? { ok: false } : null;
-    if (request.op === "set") {
-      this.animator.set(view, request.prop, request.value);
-      return null;
+  }
+
+  // -- animated writes ------------------------------------------------------
+
+  /** Apply one animated prop write (`pn_core_take_writes`). */
+  applyAnimated(tag, prop, value) {
+    const view = this.views.get(tag);
+    if (!view || value == null) return;
+    if (ANIM_TRANSFORM.has(prop)) {
+      view.animTransform = view.animTransform || {};
+      view.animTransform[prop] = prop.startsWith("rotate") ? degrees(value) : Number(value) || 0;
+      composeTransform(view);
+    } else if (prop === "opacity") {
+      view.el.style.opacity = String(value);
+    } else if (prop === "background_color") {
+      view.el.style.backgroundColor = parseColor(value, this.ctx.scheme()) ?? "";
+    } else if (prop === "color") {
+      view.el.style.color = parseColor(value, this.ctx.scheme()) ?? "";
     }
-    if (request.op === "start") {
-      return { ok: this.animator.start(view, request.id, request.prop, request.spec) };
-    }
-    return null;
+    view.animValues = view.animValues || {};
+    view.animValues[prop] = value;
   }
 
   /** Re-apply every color-bearing prop after a light/dark switch. */

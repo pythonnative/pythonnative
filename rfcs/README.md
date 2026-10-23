@@ -88,3 +88,4 @@ ceremony.
 | [0004](0004-pythonic-authoring-model.md) | Pythonic authoring model | Implemented |
 | [0005](0005-fast-and-small.md) | Fast and small | Implemented |
 | [0006](0006-dev-client-and-devtools.md) | Dev client and DevTools | Implemented |
+| [0007](0007-shared-renderer-core.md) | Shared renderer core | Implemented |

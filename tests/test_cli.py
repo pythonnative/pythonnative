@@ -716,6 +716,25 @@ def test_deps_lock_is_usable_on_both_mac_architectures(
         assert "--hash=sha256:" + "a" * 64 in pinned
 
 
+def test_deps_lock_reports_every_target_before_refusing_a_partial_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_deps_project(tmp_path))
+    runner = _FakePipRunner(fail_when=lambda args: any(a.startswith("android_") for a in args))
+    monkeypatch.setattr(pn_cli.builder_mod, "SubprocessRunner", lambda: runner)
+    monkeypatch.setattr(pn_cli.deps_mod, "host_simulator_arch", lambda: "arm64")
+
+    with pytest.raises(SystemExit) as exit_info:
+        pn_cli.deps_command(argparse.Namespace(platform=None, json=False, python=None, lock=True))
+
+    assert exit_info.value.code == 1
+    out = capsys.readouterr().out
+    assert "Traceback" not in out
+    assert "[ok] numpy 2.2.1" in out and "No matching distribution found for numpy" in out
+    assert "Not writing pn.lock: a lock needs every target to resolve" in out
+    assert not (tmp_path / "pn.lock").exists()
+
+
 def test_deps_command_platform_filter_and_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

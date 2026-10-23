@@ -1,7 +1,7 @@
 """Tests for the pan activation rules shared by every renderer.
 
-The pure-Python ``GestureArbiter`` is the executable specification the
-iOS, Android, and browser recognizers follow, so these scripted pointer
+The renderer core's ``GestureArbiter`` is the one implementation the
+iOS, Android, and browser recognizers share, so these scripted pointer
 streams pin down exactly when a ``Pan`` with ``active_offset_*``,
 ``fail_offset_*``, ``max_pointers``, ``min_velocity``, and
 ``min_distance`` activates, fails, or is cancelled.
@@ -12,8 +12,9 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 import pytest
+from gesture_harness import GestureArbiter
 
-from pythonnative.gestures import DEFAULT_PAN_MIN_DISTANCE, GestureArbiter, Pan, serialize_gestures
+from pythonnative.gestures import DEFAULT_PAN_MIN_DISTANCE, Pan, serialize_gestures
 
 Emitted = List[Tuple[int, Dict[str, Any]]]
 

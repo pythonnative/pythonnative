@@ -3,19 +3,22 @@
 The reconciler talks to exactly one object, obtained from
 [`get_backend`][pythonnative.native_views.get_backend], through a small
 protocol: ``apply_mutations`` (one ordered batch of
-create/update/insert/destroy/frame ops per commit, see
-`pythonnative.mutations`), ``resolve_view``, ``measure_intrinsic``,
-``command``, and the animation hooks (``set_animated_property``,
-``start_animation``, ``cancel_animation``). Two implementations exist:
+create/update/insert/destroy ops per commit, see
+`pythonnative.mutations`), ``prepare_layout`` and ``compute_layout``,
+``resolve_view``, ``command``, and the animation hooks
+(``set_animated_property``, ``start_animation``, ``cancel_animation``).
+Two implementations exist, and both commit to the renderer core:
 
 - [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
   (iOS, Android, and the browser preview): serializes each commit and
-  hands it to the native runtime through the bridge; the Swift and
-  Kotlin component managers, or the preview page's DOM applier, own
-  every platform view. Python holds no native objects. ``resolve_view``
-  answers with a [`NativeViewRef`][pythonnative.native_views.NativeViewRef].
+  hands it to the core, which lays it out and queues it for the
+  platform's UI thread, where the Swift and Kotlin component managers,
+  or the preview page's DOM managers, own every platform view. Python
+  holds no native objects. ``resolve_view`` answers with a
+  [`NativeViewRef`][pythonnative.native_views.NativeViewRef].
 - [`FakeBackend`][pythonnative.testing.FakeBackend] (headless tests):
-  keeps an inspectable tree of fake views. Tests install one with
+  the bridge backend over the host build of the core, plus an
+  inspectable tree of fake views. Tests install one with
   [`set_backend`][pythonnative.native_views.set_backend].
 
 Platform selection happens lazily on first use, so this package imports

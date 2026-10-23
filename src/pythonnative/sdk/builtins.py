@@ -18,27 +18,73 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from ..components.events import LayoutEvent
-from ..layout import LAYOUT_STYLE_KEYS
-from ..style import Style
+from ..style import LAYOUT_STYLE_KEYS, Style
 from ..svg import SvgShape
 from .schema import COMPONENTS, RUNTIME_PROPS, ComponentSchema, NativeField, register_schema, type_schema
 
-# These types own native child layout or physical child presentation.
-CONTAINERS = frozenset(
+# How the renderer core sizes each built-in leaf (RFC 0007). Everything
+# else is a container: its style and children decide its size.
+MEASUREMENTS = {
+    "Text": "text",
+    "Image": "image",
+    "Svg": "svg",
+    "VirtualList": "fill",
+    **dict.fromkeys(
+        (
+            "ActivityIndicator",
+            "Button",
+            "Checkbox",
+            "DatePicker",
+            "Picker",
+            "ProgressBar",
+            "SegmentedControl",
+            "Slider",
+            "Switch",
+            "TabBar",
+            "TextInput",
+        ),
+        "intrinsic",
+    ),
+}
+
+# Layout-only wrappers the core may leave unmounted, and the containers
+# that accept the children of a flattened wrapper.
+FLATTENABLE = frozenset({"View", "Row", "Column", "Spacer"})
+ADOPTERS = frozenset(
     {
         "View",
-        "Column",
         "Row",
-        "ScrollView",
+        "Column",
+        "Pressable",
+        "TouchableOpacity",
+        "SafeAreaView",
+        "KeyboardAvoidingView",
         "Screen",
-        "ScreenStack",
-        "Modal",
-        "Portal",
-        "VirtualList",
         "LinearGradient",
         "BlurView",
     }
 )
+DETACHING = frozenset({"VirtualList", "Modal", "ScreenStack"})
+CLIPPING = frozenset({"ScrollView", "VirtualList", "ScreenStack"})
+
+# Style keys that only position and size a view. ``display`` and border
+# widths also change what's drawn, so they keep a view mounted.
+FLATTEN_KEYS = (
+    LAYOUT_STYLE_KEYS
+    - {"display", "border_width", "border_top_width", "border_right_width", "border_bottom_width", "border_left_width"}
+) | {"_pn_layout"}
+
+
+def _layout_metadata(name: str) -> dict[str, Any]:
+    """The renderer core's layout metadata for built-in component ``name``."""
+    return {
+        "measurement": MEASUREMENTS.get(name, "container"),
+        "flatten": name in FLATTENABLE,
+        "adopt_flattened": name in ADOPTERS,
+        "detach_children": name in DETACHING,
+        "clip": name in CLIPPING,
+        "portal": name == "Portal",
+    }
 
 
 # Style shorthands ``resolve_style`` expands in Python; the wire carries
@@ -91,11 +137,9 @@ def install(factories: dict[str, Any]) -> None:
                 else (key, annotation, dataclasses.field(default=default))
             )
         props_type = dataclasses.make_dataclass(f"{name}Props", fields, frozen=True, kw_only=True)
-        schema = ComponentSchema.from_dataclass(
-            name,
-            props_type,
-            measurement="container" if name in CONTAINERS else "intrinsic",
-            platforms=("ios", "android", "web"),
+        schema = dataclasses.replace(
+            ComponentSchema.from_dataclass(name, props_type, platforms=("ios", "android", "web")),
+            **_layout_metadata(name),
         )
         wire = dict(style_fields) | schema.props
         # Some controls supply their role internally rather than exposing an
@@ -117,6 +161,7 @@ def install(factories: dict[str, Any]) -> None:
             wire[key]["native"] = dataclasses.asdict(
                 NativeField(
                     python_only=key == "ref",
+                    flatten=key in FLATTEN_KEYS,
                     invalidates_layout=key in LAYOUT_STYLE_KEYS
                     or key
                     in {
@@ -232,7 +277,7 @@ def install(factories: dict[str, Any]) -> None:
                 name,
                 base.props | extra,
                 required=("dataset",) if name == "VirtualList" else (),
-                measurement="container",
+                **_layout_metadata(name),
             )
         )
 

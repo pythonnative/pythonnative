@@ -1,27 +1,36 @@
-"""An in-process stand-in for the native side of the bridge.
+"""The host renderer core with Python playing the platform's UI thread.
 
-[`FakeTransport`][pythonnative.bridge.fake.FakeTransport] decodes the
-same JSON the Swift and Kotlin runtimes receive and keeps a tiny view
-tree so tests can assert on what *would* have reached native: created
-types and props, insert order, frames, commands, animation requests,
-and module calls. It also lets tests play the native side, firing
-events and module results back through
-[`native_callback`][pythonnative.bridge.native_callback].
+[`FakeTransport`][pythonnative.bridge.fake.FakeTransport] commits to the
+host build of the same C++ core the apps link, so tests see the shipping
+validation, layout, flattening, list datasets, animation, and gestures. It
+mounts each transaction right away into a small tree of
+[`FakeNativeView`][pythonnative.bridge.fake.FakeNativeView] objects, so
+tests can assert on what the platform would have mounted: created types
+and props, insert order, frames, commands, animated writes, and module
+calls. It also lets tests play the native side, firing events, pointers,
+and module results back into Python.
+
+Every transport owns one core surface, so several can live in one test.
+They share the process's core and one Python platform, which routes each
+surface's mounts, measurements, and messages to its transport. Display
+frames for animations run as timers on the framework loop, so a
+[`FakeClock`][pythonnative.testing.FakeClock] drives them.
 """
 
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Dict, List, Optional, Tuple
+import weakref
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from . import codec
-from .commits import PROTOCOL_VERSION, CommitState
+from .core import PROTOCOL_VERSION, MountOp, MountTransaction, Platform, RendererCore, decode_transaction, load_core
 
-__all__ = ["FakeNativeView", "FakeTransport"]
+__all__ = ["DEFAULT_MEASURE", "FakeNativeView", "FakeTransport", "reset_fakes"]
 
 
 class FakeNativeView:
-    """One decoded native view: type, merged props, children, and frame."""
+    """One mounted view: type, merged props, mounted children, frame, and animated values."""
 
     def __init__(self, tag: int, type_name: str, props: Dict[str, Any]) -> None:
         self.tag = tag
@@ -30,6 +39,7 @@ class FakeNativeView:
         self.children: List["FakeNativeView"] = []
         self.parent: Optional["FakeNativeView"] = None
         self.frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
+        self.animated: Dict[str, Any] = {}
 
     def __repr__(self) -> str:
         return f"<native {self.type_name} tag={self.tag}>"
@@ -45,124 +55,276 @@ DEFAULT_MEASURE: Dict[str, Tuple[float, float]] = {
     "TextInput": (120.0, 32.0),
     "TabBar": (320.0, 49.0),
 }
+"""What the fake platform measures for content-sized leaves (and reports for loaded images)."""
+
+
+# ======================================================================
+# The shared fake platform
+# ======================================================================
+
+_transports: "weakref.WeakValueDictionary[int, FakeTransport]" = weakref.WeakValueDictionary()
+_installed: Optional[RendererCore] = None
+_frame_handle: Any = None
+_work_handle: Any = None
+_mounting = False
+
+
+def _owner(surface: int) -> Optional["FakeTransport"]:
+    return _transports.get(int(surface))
+
+
+def _measure(
+    surface: int,
+    tag: int,
+    component: str,
+    mode: int,
+    props: Dict[str, Any],
+    width: float,
+    width_mode: int,
+    height: float,
+    height_mode: int,
+) -> Tuple[float, float]:
+    transport = _owner(surface)
+    if transport is None:
+        return (0.0, 0.0)
+    transport.measured.append((tag, component))
+    max_width = width if width_mode else float("inf")
+    max_height = height if height_mode else float("inf")
+    if transport.measurer is not None:
+        return transport.measurer(tag, component, props, max_width, max_height)
+    del mode
+    return transport.measure_table.get(component, (0.0, 0.0))
+
+
+def _emit(kind: str, surface: int, tag: int, name: str, payload: str) -> None:
+    transport = _owner(surface)
+    if transport is not None:
+        transport._callback(kind, tag, name, payload)
+
+
+def _schedule_work() -> None:
+    # Deferred work (relayout after an image loads) runs on a later loop
+    # turn, after Python has accepted the commit that caused it.
+    global _work_handle
+    if _work_handle is not None:
+        return
+    from ..runtime import get_loop
+
+    _work_handle = get_loop().call_soon(_run_work)
+
+
+def _run_work() -> None:
+    global _work_handle
+    _work_handle = None
+    if _installed is not None:
+        _installed.work()
+        _mount_all()
+
+
+def _request_frames() -> None:
+    global _frame_handle
+    if _frame_handle is not None:
+        return
+    from ..runtime import get_loop
+
+    _frame_handle = get_loop().call_soon(_frame)
+
+
+def _frame() -> None:
+    """One display frame on the framework loop's clock."""
+    global _frame_handle
+    from ..runtime import get_loop
+
+    loop = get_loop()
+    running = _installed is not None and _installed.animation_frame(loop.time() * 1000.0)
+    _take_writes()
+    _mount_all()
+    _frame_handle = loop.call_later(1.0 / 60.0, _frame) if running else None
+
+
+def _take_writes() -> None:
+    if _installed is None:
+        return
+    for tag, prop, value in _installed.take_writes():
+        for transport in list(_transports.values()):
+            view = transport.views.get(tag)
+            if view is not None or transport.owns(tag):
+                transport.writes.append((tag, prop, value))
+                if view is not None:
+                    view.animated[prop] = value
+                break
+
+
+def _mount_all() -> None:
+    """Apply every queued transaction to the transport owning its surface."""
+    global _mounting
+    if _installed is None or _mounting:
+        return
+    _mounting = True
+    try:
+        while True:
+            taken = _installed.mount_next()
+            if taken is None:
+                break
+            data, ident = taken
+            transaction = decode_transaction(data)
+            transport = _owner(transaction.surface)
+            error: Optional[str] = None
+            if transport is not None:
+                transport.transactions.append(transaction)
+                try:
+                    for op in transaction.ops:
+                        transport._apply(op)
+                except AssertionError as exc:
+                    error = str(exc)
+            _installed.mount_finished(ident, error)
+            _take_writes()
+    finally:
+        _mounting = False
+
+
+def _install(core: RendererCore) -> None:
+    global _installed
+    if _installed is core:
+        return
+    core.set_platform(
+        Platform(
+            schedule_mount=lambda: None,
+            schedule_work=_schedule_work,
+            request_frames=_request_frames,
+            measure=_measure,
+            emit=_emit,
+        )
+    )
+    _installed = core
+
+
+def reset_fakes() -> None:
+    """Forget every fake surface and the core's state (the pytest plugin calls this between tests)."""
+    global _frame_handle, _work_handle
+    for handle in (_frame_handle, _work_handle):
+        if handle is not None:
+            handle.cancel()
+    _frame_handle = None
+    _work_handle = None
+    _transports.clear()
+    if _installed is not None:
+        _installed.reset()
+    from . import _loaded_contracts
+
+    _loaded_contracts.clear()  # the reset dropped every compiled contract
+
+
+# ======================================================================
+# The transport
+# ======================================================================
 
 
 class FakeTransport:
-    """Decode bridge traffic into inspectable Python structures.
+    """Commit to the host core and record what the UI thread would mount.
+
+    Args:
+        surface: The core surface this transport's backend commits to
+            (``1``, the device surface, by default).
+        measure: Sizes the fake platform measures, by component name.
 
     Attributes:
-        views: Live views by tag.
-        transactions: Every decoded transaction (list of op lists).
-        commands: ``(tag, name, args)`` tuples in call order.
-        animations: ``(tag, request)`` tuples in call order.
+        core: The bound host core.
+        views: Mounted views by tag (flattened views never appear).
+        transactions: Every decoded mount transaction.
+        commands: ``(tag, name, args)`` tuples in the order the UI thread ran them.
+        writes: ``(tag, prop, value)`` animated writes, in order.
         calls: ``(module, method, args)`` tuples in call order.
+        measured: ``(tag, component)`` pairs the core asked the platform to measure.
     """
 
     name = "fake"
+    asynchronous_commits = False
 
     def __init__(
-        self, *, version: int = PROTOCOL_VERSION, measure: Optional[Dict[str, Tuple[float, float]]] = None
+        self,
+        *,
+        surface: int = 1,
+        version: int = PROTOCOL_VERSION,
+        measure: Optional[Dict[str, Tuple[float, float]]] = None,
+        core: Optional[RendererCore] = None,
     ) -> None:
+        self.surface = surface
         self._version = version
-        self.commit_state = CommitState()
+        self.core = core if core is not None else load_core()
+        _install(self.core)
+        _transports[surface] = self
         self.measure_table = dict(DEFAULT_MEASURE if measure is None else measure)
+        self.measurer: Optional[Callable[[int, str, Dict[str, Any], float, float], Tuple[float, float]]] = None
+        """Optional ``(tag, component, props, max_width, max_height) -> size`` override."""
         self.views: Dict[int, FakeNativeView] = {}
-        self.transactions: List[List[Any]] = []
+        self.transactions: List[MountTransaction] = []
         self.commands: List[Tuple[int, str, Dict[str, Any]]] = []
-        self.animations: List[Tuple[int, Dict[str, Any]]] = []
+        self.writes: List[Tuple[int, str, Any]] = []
         self.calls: List[Tuple[str, str, Dict[str, Any]]] = []
+        self.measured: List[Tuple[int, str]] = []
         self.command_results: Dict[str, Any] = {}
-        self.animate_results: Dict[str, Any] = {"start": {"ok": True}}
+        self.command_handler: Optional[Callable[[FakeNativeView, str, Dict[str, Any]], Any]] = None
         self.module_handlers: Dict[str, ModuleHandler] = {}
         self.pending_calls: List[Tuple[str, int, str, Dict[str, Any]]] = []
         self.callback: Optional[Callable[[str, int, str, str], Optional[str]]] = None
+        self.list_revisions: Dict[int, int] = {}
+        self.reports_images = True
+        """Report each mounted ``Image``'s measured size as if it loaded, as a platform loader would."""
+        self._tags: set[int] = set()
 
-    # -- Transport protocol ----------------------------------------------
+    def bind(self, backend: Any) -> None:
+        """Route this surface's messages to ``backend`` unless a callback was installed."""
+        if self.callback is None:
+            from . import dispatch
+
+            self.callback = lambda kind, tag, name, payload: dispatch(kind, tag, name, payload, backend)
+
+    def owns(self, tag: int) -> bool:
+        """Whether ``tag`` was ever mounted on this transport's surface."""
+        return tag in self._tags
+
+    # -- Transport protocol ------------------------------------------------
 
     def protocol_version(self) -> int:
-        """Return the protocol version compiled into the native library."""
+        """Return the protocol version compiled into the renderer core."""
         return self._version
 
     def set_callback(self, callback: Callable[[str, int, str, str], None]) -> None:
         """Install ``callback`` as the native -> Python entry point."""
         self.callback = callback
 
-    def apply(self, transaction_json: str) -> str:
-        """Validate a full revision before applying any native mutations."""
-        envelope = json.loads(transaction_json)
-        if self.commit_state.application and envelope.get("application") != self.commit_state.application:
-            self.commit_state = CommitState()
-            self.views.clear()
-        candidate = self.commit_state.prepare(envelope)
-        ops = envelope["ops"]
-        self.transactions.append(ops)
-        for op in ops:
-            self._apply_one(op)
-        self.commit_state = candidate.publish()
-        return codec.dumps(candidate.acknowledgement())
+    def load_contracts(self, document: str) -> None:
+        """Compile the merged component contracts into the host core."""
+        self.core.load_contracts(document, "host")
 
-    def _apply_one(self, op: List[Any]) -> None:
-        code = op[0]
-        if code == "c":
-            _, tag, type_name, props = op
-            if tag in self.views:
-                raise AssertionError(f"create: tag {tag} already exists")
-            self.views[tag] = FakeNativeView(tag, type_name, props)
-        elif code == "u":
-            _, tag, changed, removed = op
-            view = self._require(tag, "update")
-            view.props.update(changed)
-            for key in removed:
-                view.props.pop(key, None)
-        elif code == "i":
-            _, parent_tag, child_tag, index = op
-            parent = self._require(parent_tag, "insert")
-            child = self._require(child_tag, "insert")
-            if child.parent is not None:
-                child.parent.children.remove(child)
-            index = max(0, min(int(index), len(parent.children)))
-            parent.children.insert(index, child)
-            child.parent = parent
-        elif code == "d":
-            _, tag = op
-            if tag not in self.views:
-                raise AssertionError(f"destroy: unknown tag {tag}")
-            view = self.views.pop(tag)
-            if view.parent is not None:
-                view.parent.children.remove(view)
-                view.parent = None
-        elif code == "f":
-            _, tag, x, y, w, h = op
-            self._require(tag, "set_frame").frame = (float(x), float(y), float(w), float(h))
-        else:
-            raise AssertionError(f"unknown opcode {code!r}")
+    def commit(self, envelope_json: str) -> str:
+        """Commit, then mount the resulting transaction as the UI thread would."""
+        ack = self.core.commit(envelope_json)
+        _mount_all()
+        return ack
 
-    def _require(self, tag: int, what: str) -> FakeNativeView:
-        view = self.views.get(tag)
-        if view is None:
-            raise AssertionError(f"{what}: unknown tag {tag}")
-        return view
+    def layout(self, request_json: str) -> str:
+        """Lay out without a commit and mount the frames."""
+        result = self.core.layout(request_json)
+        _mount_all()
+        return result
 
-    def measure(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
-        """Return the intrinsic ``(width, height)`` of the view ``tag`` under the constraints."""
-        view = self.views.get(tag)
-        if view is None:
-            return (0.0, 0.0)
-        return self.measure_table.get(view.type_name, (0.0, 0.0))
+    def command(self, surface: int, tag: int, name: str, args_json: str, call_id: int) -> str:
+        """Queue a view command and run it on the fake UI thread."""
+        result = self.core.command(surface, tag, name, args_json, call_id)
+        _mount_all()
+        return result
 
-    def command(self, tag: int, name: str, args_json: str) -> Optional[str]:
-        """Run an imperative command on one view; returns its JSON result or ``None``."""
-        args = codec.loads(args_json) or {}
-        self.commands.append((tag, name, args))
-        result = self.command_results.get(name)
-        return None if result is None else codec.dumps(result)
+    def animate(self, surface: int, tag: int, request_json: str) -> str:
+        """Queue an animation request and run it on the fake UI thread."""
+        result = self.core.animate(surface, tag, request_json)
+        _mount_all()
+        return result
 
-    def animate(self, tag: int, request_json: str) -> Optional[str]:
-        """Handle an animation request (``set`` / ``start`` / ``cancel``) for one view."""
-        request = codec.loads(request_json) or {}
-        self.animations.append((tag, request))
-        result = self.animate_results.get(str(request.get("op")))
-        return None if result is None else codec.dumps(result)
+    def measure(self, surface: int, tag: int) -> str:
+        """The shadow and window frames of a view."""
+        return self.core.measure(surface, tag)
 
     def call(self, module: str, method: str, args_json: str) -> Optional[str]:
         """Call a native module method with a ``{"call_id", "args"}`` envelope."""
@@ -182,15 +344,127 @@ class FakeTransport:
             return codec.dumps({"pending": True})
         return codec.dumps({"ok": True, "value": codec.to_jsonable(value)})
 
+    # -- the fake UI thread ------------------------------------------------
+
+    def drain(self) -> None:
+        """Mount queued transactions and run the core's deferred work until both are idle."""
+        _mount_all()
+        global _work_handle
+        if _work_handle is not None:
+            _work_handle.cancel()
+            _work_handle = None
+            self.core.work()
+            _mount_all()
+
+    @property
+    def animating(self) -> bool:
+        """Whether display frames are scheduled for running animations."""
+        return _frame_handle is not None
+
+    def _apply(self, op: MountOp) -> None:
+        if op.kind == "reset":
+            self.views.clear()
+        elif op.kind == "create":
+            if op.tag in self.views:
+                raise AssertionError(f"create: tag {op.tag} already exists")
+            self.views[op.tag] = FakeNativeView(op.tag, op.component, op.props)
+            self._tags.add(op.tag)
+            if op.component == "VirtualList" and "dataset" in op.props:
+                self._publish_list(op.tag)
+            if op.component in ("Image", "ImageBackground") and self.reports_images and op.props.get("source"):
+                width, height = self.measure_table.get("Image", (0.0, 0.0))
+                if width > 0 and height > 0:
+                    self.core.report_intrinsic(self.surface, op.tag, width, height)
+        elif op.kind == "update":
+            view = self._require(op.tag, "update")
+            view.props.update(op.props)
+            for key in op.removed:
+                view.props.pop(key, None)
+            if view.type_name == "VirtualList" and "dataset" in op.props:
+                self._publish_list(op.tag)
+        elif op.kind == "insert":
+            parent = self._require(op.parent, "insert")
+            child = self._require(op.tag, "insert")
+            if child.parent is not None:
+                child.parent.children.remove(child)
+            index = max(0, min(int(op.index), len(parent.children)))
+            parent.children.insert(index, child)
+            child.parent = parent
+        elif op.kind == "delete":
+            deleted = self.views.pop(op.tag, None)
+            if deleted is None:
+                raise AssertionError(f"delete: unknown tag {op.tag}")
+            if deleted.parent is not None:
+                deleted.parent.children.remove(deleted)
+                deleted.parent = None
+        elif op.kind == "frame":
+            self._require(op.tag, "frame").frame = op.frame
+        elif op.kind == "command":
+            view = self._require(op.tag, "command")
+            arguments = dict(op.arguments or {})
+            self.commands.append((op.tag, op.name, arguments))
+            if self.command_handler is not None:
+                result = self.command_handler(view, op.name, arguments)
+            else:
+                result = self.command_results.get(op.name)
+            self._callback(
+                "command",
+                0,
+                "",
+                codec.dumps({"call_id": op.call_id, "ok": True, "value": codec.to_jsonable(result)}),
+            )
+
+    def _publish_list(self, tag: int) -> None:
+        edits = self.core.list_apply(self.surface, tag)
+        if edits is not None:
+            self.list_revisions[tag] = int(json.loads(edits)["revision"])
+        else:
+            # A recreated list view starts from the dataset the core already holds.
+            self.list_revisions[tag] = self.core.list_revision(self.surface, tag)
+
+    def _require(self, tag: int, what: str) -> FakeNativeView:
+        view = self.views.get(tag)
+        if view is None:
+            raise AssertionError(f"{what}: unknown tag {tag}")
+        return view
+
     # -- Playing the native side ------------------------------------------
 
-    def fire(self, tag: int, name: str, *args: Any) -> None:
-        """Emit a view event as native would."""
-        self._event_sequence = getattr(self, "_event_sequence", 0) + 1
-        envelope = self.commit_state.acknowledgement()
-        envelope.pop("ok")
-        envelope.update(sequence=self._event_sequence, args=[codec.to_jsonable(a) for a in args])
-        self._callback("event", tag, name, codec.dumps(envelope))
+    def fire(self, tag: int, name: str, *args: Any, edit_revision: int = 0) -> None:
+        """Emit a view event as the platform would, through the core's stamping."""
+        payload = json.dumps([codec.to_jsonable(a) for a in args], separators=(",", ":"))
+        self.core.event(self.surface, tag, name, payload, edit_revision)
+        _take_writes()
+
+    def pointer(self, tag: int, events: Sequence[Tuple[int, int, float, float, float, float, float]]) -> bool:
+        """Feed ``(phase, pointer, x, y, window_x, window_y, time)`` events to a view's gestures."""
+        active = self.core.pointer(self.surface, tag, list(events))
+        _take_writes()
+        return active
+
+    def gesture_deadline(self, tag: int) -> Optional[float]:
+        """When a view's gestures next need polling, or ``None``."""
+        return self.core.gesture_deadline(self.surface, tag)
+
+    def poll_gestures(self, tag: int, time: float) -> None:
+        """Advance time-based gestures for one view (long press, multi-tap windows)."""
+        self.core.gesture_poll(self.surface, tag, time)
+        _take_writes()
+
+    def report_container(self, tag: int, width: float, height: float, x: float = 0.0, y: float = 0.0) -> None:
+        """Report a detached root's container size and relayout."""
+        self.core.report_container(self.surface, tag, x, y, width, height)
+        self.drain()
+
+    def report_intrinsic(self, tag: int, width: float, height: float) -> None:
+        """Report a loaded image's size and relayout."""
+        self.core.report_intrinsic(self.surface, tag, width, height)
+        self.drain()
+
+    def invalidate(self, tag: int) -> None:
+        """Re-measure one leaf and relayout."""
+        self.core.invalidate(self.surface, tag)
+        self.drain()
 
     def emit_module_event(self, module: str, event: str, payload: Any = None) -> None:
         """Push an unsolicited module event (``AppState`` ``change``, ...) into Python."""
@@ -213,10 +487,6 @@ class FakeTransport:
         """Deliver a screen lifecycle event as the native host would."""
         self._callback("host", screen, event, codec.dumps(codec.to_jsonable(payload)))
 
-    def complete_animation(self, anim_id: int, finished: bool = True) -> None:
-        """Report a native animation as finished (or interrupted) to Python."""
-        self._callback("animation", 0, "", codec.dumps({"id": anim_id, "finished": finished}))
-
     def _callback(self, kind: str, tag: int, name: str, payload: str) -> None:
         if self.callback is None:
             raise AssertionError("FakeTransport has no callback; install it with pythonnative.bridge.set_transport")
@@ -225,12 +495,20 @@ class FakeTransport:
     # -- Introspection -----------------------------------------------------
 
     def find(self, type_name: str) -> List[FakeNativeView]:
-        """Every live view whose type is ``type_name``, in creation order."""
+        """Every mounted view whose type is ``type_name``, in creation order."""
         return [v for v in self.views.values() if v.type_name == type_name]
 
     def roots(self) -> List[FakeNativeView]:
-        """Views with no parent (the attached screen roots and detached subtrees)."""
+        """Mounted views with no parent (the attached screen roots and detached subtrees)."""
         return [v for v in self.views.values() if v.parent is None]
+
+    def list_keys(self, tag: int) -> List[str]:
+        """The keys the UI thread's data source holds for a list."""
+        return self.core.list_keys(self.surface, tag)
+
+    def list_rows(self, tag: int) -> List[Tuple[str, int, float, bool]]:
+        """The ``(key, revision, extent, sticky)`` rows the UI thread holds for a list."""
+        return self.core.list_rows(self.surface, tag)
 
     @staticmethod
     def pending() -> object:

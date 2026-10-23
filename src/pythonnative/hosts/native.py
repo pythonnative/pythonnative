@@ -15,13 +15,11 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 from .. import appearance, diagnostics, platform_metrics
 from ..bridge import codec
 from ..native_modules.registry import native_module
-from .base import ScreenHost, flush_hosts
+from .base import ScreenHost
 
 __all__ = ["NativeScreenHost", "dispatch_host_event", "host_for_screen", "live_hosts"]
 
 _HOSTS: Dict[int, "NativeScreenHost"] = {}
-_SCHEDULED: Dict[int, ScreenHost] = {}
-_flush_pending = False
 
 
 def host_for_screen(screen_id: int) -> Optional["NativeScreenHost"]:
@@ -36,32 +34,6 @@ def live_hosts() -> Sequence["NativeScreenHost"]:
 
 def _host_module() -> Any:
     return native_module("Host")
-
-
-# ======================================================================
-# Deferred renders
-# ======================================================================
-
-
-def _flush_scheduled() -> None:
-    global _flush_pending
-    _flush_pending = False
-    hosts = list(_SCHEDULED.values())
-    _SCHEDULED.clear()
-    if hosts:
-        diagnostics.log(f"render_scheduler: flushing {len(hosts)} host(s)")
-    flush_hosts(hosts)
-
-
-def _request_flush() -> None:
-    """Queue one application-thread flush of every scheduled host."""
-    global _flush_pending
-    if _flush_pending:
-        return
-    _flush_pending = True
-    from ..runtime import call_threadsafe
-
-    call_threadsafe(_flush_scheduled)
 
 
 # ======================================================================
@@ -133,7 +105,6 @@ class NativeScreenHost(ScreenHost):
     def on_destroy(self) -> None:
         """Forget the screen id, then tear down the tree."""
         _HOSTS.pop(self.screen_id, None)
-        _SCHEDULED.pop(id(self), None)
         super().on_destroy()
 
     def apply_metrics(self, payload: Any) -> None:
@@ -162,20 +133,6 @@ class NativeScreenHost(ScreenHost):
         if dims.width > 0 and dims.height > 0:
             return (dims.width, dims.height)
         return None
-
-    def _schedule_render_async(self) -> bool:
-        if self._render_scheduled:
-            return True
-        self._render_scheduled = True
-        _SCHEDULED[id(self)] = self
-        try:
-            _request_flush()
-        except Exception as exc:
-            self._render_scheduled = False
-            _SCHEDULED.pop(id(self), None)
-            diagnostics.log(f"request_render: bridge defer failed ({exc!r}); rendering synchronously")
-            return False
-        return True
 
     def _attach_root(self, native_view: Any) -> None:
         tag = getattr(native_view, "tag", None)
@@ -230,7 +187,6 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
     - ``back_pressed``: pops a handled screen, otherwise asks native to
       finish it (``Host.finish``).
     - ``reload``: remount after the development error overlay.
-    - ``flush``: run deferred renders now.
 
     Native delivers every event asynchronously and ignores the return
     value; only tests read ``create``'s ``{"root": tag}``.
@@ -238,9 +194,6 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
     screen_id = int(screen_id)
     if event == "create":
         return _create(screen_id, payload if isinstance(payload, dict) else {})
-    if event == "flush":
-        _flush_scheduled()
-        return None
     if event == "appearance":
         _publish_metrics(payload)
         return None
@@ -270,6 +223,9 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
         return None
     if event == "destroy":
         host.on_destroy()
+        return None
+    if event in ("start", "stop"):
+        # Visibility without focus; ``resume`` and ``pause`` carry what Python needs.
         return None
     diagnostics.log(f"dispatch_host_event: unknown event {event!r}")
     return None
@@ -336,7 +292,4 @@ def _root_json(host: ScreenHost) -> str:
 
 
 def _reset_for_tests() -> None:
-    global _flush_pending
     _HOSTS.clear()
-    _SCHEDULED.clear()
-    _flush_pending = False

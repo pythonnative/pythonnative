@@ -1,4 +1,5 @@
 import XCTest
+import PNCore
 @testable import PythonNativeKit
 
 final class PNGestureTests: XCTestCase {
@@ -80,23 +81,17 @@ final class PNGestureTests: XCTestCase {
         XCTAssertNil(coordinator.direction(of: recognizers[0]))
     }
 
-    func testAnimatorTimingParameters() {
-        let timing = PNAnimator.timingParameters(kind: "timing", spec: ["duration_ms": 250, "easing": "linear"])
-        XCTAssertEqual(timing?.duration ?? 0, 0.25, accuracy: 0.0001)
-        let spring = PNAnimator.timingParameters(kind: "spring", spec: ["stiffness": 100, "damping": 10, "mass": 1, "from": 0, "to": 1])
-        XCTAssertGreaterThan(spring?.duration ?? 0, 0.15)
-        XCTAssertTrue(spring?.parameters is UISpringTimingParameters)
-        XCTAssertTrue(PNAnimator.curve(for: [0.1, 0.2, 0.3, 0.4]) is UICubicTimingParameters)
-        XCTAssertNil(PNAnimator.timingParameters(kind: "timing", spec: ["easing": "wobble"]), "unknown easing names never fall back")
-    }
-
     func testAnimatorSetAppliesImmediately() {
-        try! PNTransaction.apply([.create(tag: 50, type: "View", props: [:])])
-        _ = PNAnimator.shared.handle(tag: 50, request: ["op": "set", "prop": "opacity", "value": 0.25])
+        let core = PNCoreHarness()
+        core.roots = [50]
+        core.commit([["c", 50, "View", ["opacity": 1, "background_color": "#000000"]]])
+        core.animate(tag: 50, ["op": "set", "prop": "opacity", "value": 0.25])
         XCTAssertEqual(PNViewRegistry.shared.view(for: 50)?.alpha ?? 0, 0.25, accuracy: 0.001)
-        _ = PNAnimator.shared.handle(tag: 50, request: ["op": "set", "prop": "translate_x", "value": 12])
+        core.animate(tag: 50, ["op": "set", "prop": "translate_x", "value": 12])
         XCTAssertEqual(PNViewRegistry.shared.view(for: 50)?.transform.tx ?? 0, 12, accuracy: 0.001)
-        let rejected = PNAnimator.shared.handle(tag: 50, request: ["op": "start", "id": 1, "prop": "opacity", "spec": ["kind": "mystery"]])
-        XCTAssertEqual((rejected as? [String: Any])?["ok"] as? Bool, false)
+        let request = PNJSON.encode(["op": "start", "id": 1, "prop": "opacity", "spec": ["kind": "mystery"]])
+        let reply = request.withCString { pn_core_animate(PNCore.handle, PNCore.surface, 50, $0) }
+        defer { pn_core_free(reply) }
+        XCTAssertEqual(PNJSON.decodeObject(reply.map { String(cString: $0) })["ok"] as? Bool, false)
     }
 }

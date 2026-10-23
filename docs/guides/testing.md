@@ -4,9 +4,11 @@ PythonNative is built so that the bulk of your application logic can
 be tested without a device or simulator. The reconciler talks to
 native widgets exclusively through the batched mutation protocol (see
 [Native views](../concepts/native-views.md)); `pythonnative.testing`
-swaps in an in-memory backend so a render produces a tree of plain
-Python objects that `pytest` can introspect, and gives you Testing
-Library-style queries to do it.
+swaps in a backend that commits to the host build of the same renderer
+core the apps link, so tests validate, lay out, animate, and recognize
+gestures with the code that ships. A render produces a tree of plain
+Python objects that `pytest` can introspect, and Testing Library-style
+queries help you do it.
 
 ## What to test
 
@@ -275,12 +277,15 @@ the latest title in `title`.
 
 ## Testing layouts
 
-Headless tests call Yoga through the `pythonnative.layout` host binding.
-The fake backend supplies deterministic intrinsic measurements; it doesn't
-reproduce platform fonts or control metrics. Rendered views carry their
-computed `frame` (`x, y, width, height`) once
-`render` runs the layout pass for the default 390x844 viewport (pass
-`viewport=(w, h)` to change it, or `viewport=None` to skip layout):
+Headless tests lay out in the renderer core, with the same Yoga rules,
+detached roots, and flattening as a device. The fake platform measures
+leaves with fixed sizes
+([`DEFAULT_INTRINSIC`][pythonnative.testing.DEFAULT_INTRINSIC]: a `Text`
+is 60 by 16, for example); pass `FakeBackend(intrinsic={...})` to change
+them. It doesn't reproduce platform fonts or control metrics. Rendered
+views carry the `frame` (`x, y, width, height`) the core computed for the
+default 390x844 viewport (pass `viewport=(w, h)` to change it, or
+`viewport=None` to skip layout):
 
 ```python
 def test_row_distributes_flex_children():
@@ -296,9 +301,9 @@ def test_row_distributes_flex_children():
     assert b.frame[0] == pytest.approx(a.frame[2] + 10)
 ```
 
-For the engine alone, build `LayoutNode` trees and call
-`calculate_layout` directly (see
-[`pythonnative.layout`](../api/layout.md)).
+Frames on the logical views are relative to their logical parents, the
+way `on_layout` reports them. To check what the platform would mount
+instead, read the transport (see below).
 
 ## Testing native modules
 
@@ -337,15 +342,46 @@ to test your error handling. User cancellations and denials are
 ordinary return values (`None` from `Camera.launch_camera`, `False`
 from `Permissions.request`), so fake those by returning them.
 
-## Testing the bridge
+## Testing what the platform mounts
 
-The reconciler's on-device backend serializes commits to JSON. To assert
-on what native would receive (or to test a custom component's props at
-the wire level), install a
-[`FakeTransport`][pythonnative.bridge.fake.FakeTransport]: it decodes
-transactions and keeps a native-style view tree, and lets tests inject
-events, module results, and host lifecycle from the "native" side.
-`tests/test_bridge.py` in the repository is the reference for this
+[`FakeBackend`][pythonnative.testing.FakeBackend] commits through a
+[`FakeTransport`][pythonnative.bridge.fake.FakeTransport], available as
+`result.backend.native`. The transport plays the platform's UI thread:
+it decodes each binary mount transaction the core queues and keeps the
+mounted tree, so tests can assert on what a device would receive.
+
+```python
+def test_layout_wrappers_are_flattened() -> None:
+    result = render(pn.Column(pn.Row(pn.Text("a"), pn.Text("b"), style={"padding": 10})))
+    backend = result.backend
+    assert backend.live_view_count() == 4     # Column, Row, and two Texts
+    assert backend.mounted_view_count() == 3  # the Row only affects layout
+    text = backend.native.find("Text")[0]
+    assert text.parent.type_name == "Column"
+    assert text.frame[:2] == (10.0, 10.0)   # offset by the flattened Row
+```
+
+| Attribute or method | What it holds |
+| --- | --- |
+| `native.views`, `find(type)`, `roots()` | Mounted [`FakeNativeView`][pythonnative.bridge.fake.FakeNativeView]s with merged props, mounted children, frames relative to the nearest mounted ancestor, and animated values |
+| `native.transactions` | Every decoded [`MountTransaction`][pythonnative.bridge.core.MountTransaction] |
+| `native.commands` | `(tag, name, args)` view commands in the order the UI thread ran them |
+| `native.writes` (also `backend.animated`) | `(tag, prop, value)` animated prop writes from the core's animator |
+| `native.calls` | `(module, method, args)` native module calls |
+| `native.measured` | `(tag, component)` pairs the core asked the platform to measure |
+| `backend.list_store(tag)` | A `VirtualList`'s dataset as the UI thread's data source sees it: revision, keys, and rows |
+| `backend.request_list(tag, first)` | Simulates the native list viewport requesting rows from `first` |
+
+The transport also plays the native side in the other direction:
+`fire(tag, name, *args)` sends a view event through the core's stamping,
+`pointer(tag, events)` feeds gestures (see
+[Gestures](gestures.md#testing)), `report_container` and
+`report_intrinsic` report native sizes and relayout, and
+`emit_module_event`, `resolve_pending`, and `host_event` deliver module
+and host messages. Animations advance on the framework loop's clock, so a
+[`FakeClock`][pythonnative.testing.FakeClock] drives them. Every
+`FakeTransport` owns its own core surface, so several can live in one
+test. `tests/test_bridge.py` in the repository is the reference for this
 style.
 
 ## Testing native code
@@ -360,8 +396,9 @@ cd src/pythonnative/templates/android_template
 ./gradlew :pythonnative:testDebugUnitTest
 ```
 
-Both drive component managers and modules with decoded transactions and
-promise envelopes, so a wire-format change is caught on every side. Add
+Both drive the mounting layer, component managers, and modules with
+mount transactions and promise envelopes, so a wire-format change is
+caught on every side. Add
 cases there when you change a manager or module rather than relying on
 the Maestro E2E suite alone.
 
@@ -431,4 +468,5 @@ Two optional suites need the network and are skipped by default:
 - Wrap subtrees with [Error boundaries](error-boundaries.md) so test
   failures don't crash unrelated assertions.
 - See how the fake backend fits underneath: [Native views](../concepts/native-views.md).
+- The wire formats the transport decodes: [The native bridge](../concepts/bridge.md).
 - Browse the API: [Testing](../api/testing.md).

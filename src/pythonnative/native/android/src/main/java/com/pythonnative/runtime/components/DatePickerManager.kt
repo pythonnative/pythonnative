@@ -33,7 +33,7 @@ class DatePickerManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = DatePickerProps(props, validated = true)
+        val typed = DatePickerProps(props)
 
         val btn = view as Button
         if (typed.has_disabled) btn.isEnabled = props.value("disabled") != true

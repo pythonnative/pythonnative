@@ -35,10 +35,12 @@ resources, and real SwiftPM and Maven dependencies.
 | `PNPlugin` entry | Swift and Kotlin | Registers the managers (and any native modules) by name. |
 | `pn_plugin.json` | Plugin root | Tells `pn build` which entry to call on each platform and which contract file to merge. |
 
-The native runtime runs Yoga over the committed styles. Managers receive
-absolute frames through `setFrame` and implement `measure` for content-sized
-leaves. See [Generated native contracts](native-contracts.md) for the
-schema vocabulary, typed adapters, and plugin contract registration.
+The renderer core validates every commit against your contract and runs
+Yoga over the committed styles, off the UI thread. Managers receive frames
+relative to the parent view through `setFrame` and implement `measure` so
+the core can size the widget (see [Measurement](#measurement)). See
+[Generated native contracts](native-contracts.md) for the schema
+vocabulary, typed adapters, and plugin contract registration.
 
 ## Project layout
 
@@ -93,11 +95,12 @@ Badge = define_component("Badge", BadgeProps)
 `Props` is a frozen dataclass, so the reconciler's equality diff stays
 cheap. [`define_component`][pythonnative.sdk.define_component] registers
 `BadgeProps` as the component's schema (the contract generator emits it,
-the commit validator checks it) and returns the factory, which validates
+the renderer core validates commits against it) and returns the factory,
+which validates
 keyword arguments against `BadgeProps`, resolves `style` through
 [`resolve_style`][pythonnative.style.resolve_style], and returns a regular
 [`Element`][pythonnative.Element]. `NativeField(invalidates_layout=True)`
-tells the renderer that a `text` change needs a new measurement.
+tells the renderer core that a `text` change needs a new measurement.
 
 Props cross the bridge as JSON. Stick to strings, numbers, booleans,
 lists, dicts, and the record types described in
@@ -181,6 +184,10 @@ final class BadgeManager: PNTypedComponentManager<BadgeProps> {
 }
 ```
 
+The core calls `measure` on the main thread with a prototype `BadgeView`
+that `makeView` built and `applyTyped` configured from the props, and
+caches the size, so `measure` should depend only on the view's props.
+
 `applyTyped` receives the full props on create (`initial == true`) and
 only the changed keys on update; `has_text` distinguishes a changed
 property from one absent in a partial update, and fields are optional
@@ -206,7 +213,7 @@ import com.pythonnative.runtime.components.TypedComponentManager
 import com.pythonnative.runtime.components.ViewStyler
 import org.json.JSONObject
 
-class BadgeManager : TypedComponentManager<BadgeProps>({ values, partial, validated -> BadgeProps(values, partial, validated) }) {
+class BadgeManager : TypedComponentManager<BadgeProps>({ values, partial -> BadgeProps(values, partial) }) {
     override fun createView(context: Context, tag: Long, props: JSONObject): View =
         TextView(context).apply {
             gravity = Gravity.CENTER
@@ -329,6 +336,25 @@ def InboxRow() -> pn.Node:
         style={"gap": 8, "align_items": "center"},
     )
 ```
+
+## Measurement
+
+A component with no children is a measured leaf. `define_component`'s
+`measurement` argument tells the core how to size it:
+
+| `measurement` | How the core sizes the view |
+|---|---|
+| `"intrinsic"` (the default) | Builds a prototype widget from the props and calls the manager's `measure` on the UI thread, then caches the result. Works for any widget. |
+| `"native"` | Calls the manager's thread-safe `measureNative` from the core's worker, with the props and the constraints, without touching the UI thread. Implement it with thread-safe APIs only (text layout, arithmetic), never with live views. |
+| `"container"` | Never measures: the style and children decide the size. |
+
+```python
+Badge = define_component("Badge", BadgeProps, measurement="intrinsic")
+```
+
+Children of a custom component lay out like any container's. Views with
+a custom component type are always mounted; only built-in layout
+wrappers are flattened.
 
 ## Events
 

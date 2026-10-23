@@ -4,13 +4,13 @@ import UIKit
 
 final class PNLifecycleTests: XCTestCase {
     private var window: UIWindow!
-    private var revision = 0
-    private let application = UUID().uuidString
-    private func apply(_ ops: [[Any]]) {
-        revision += 1
-        let json = PNJSON.encode(["version": PNContracts.protocolVersion, "application": application, "surface": 1, "revision": revision, "ops": ops])
-        let result = PNJSON.decodeObject(PNCommit.apply(json))
-        XCTAssertEqual(result["ok"] as? Bool, true, String(describing: result))
+    private var core: PNCoreHarness!
+    override func setUp() {
+        super.setUp()
+        core = PNCoreHarness()
+    }
+    private func apply(_ ops: [[Any]], file: StaticString = #filePath, line: UInt = #line) {
+        core.commit(ops, file: file, line: line)
     }
     private func settle() {
         let ready = expectation(description: "native transition completes")
@@ -35,6 +35,7 @@ final class PNLifecycleTests: XCTestCase {
         super.tearDown()
     }
     func testNativeStackPushPopKeepsOriginalScreenAttached() throws {
+        core.roots = [801]
         apply([["c", 801, "ScreenStack", ["flex": 1]], ["c", 802, "Screen", ["title": "Inbox", "flex": 1]],
                ["c", 803, "Text", ["text": "Original screen"]], ["i", 802, 803, 0], ["i", 801, 802, 0]])
         let stack = try XCTUnwrap(PNViewRegistry.shared.view(for: 801))
@@ -45,7 +46,6 @@ final class PNLifecycleTests: XCTestCase {
         window.rootViewController = controller
         window.makeKeyAndVisible()
         settle()
-        _ = PNLayout.compute(["roots": [801], "width": 390, "height": 844])
         XCTAssertTrue(first.window === window)
         apply([["c", 804, "Screen", ["title": "Detail", "flex": 1]], ["c", 805, "Text", ["text": "Detail screen"]],
                ["i", 804, 805, 0], ["i", 801, 804, 1]])
@@ -88,6 +88,7 @@ final class PNLifecycleTests: XCTestCase {
         XCTAssertEqual(replacement.offset(from: replacement.beginningOfDocument, to: range.end), 4)
     }
     func testNativeHeaderSlotsAndModalPresentationKeepScreenOwnership() throws {
+        core.roots = [821]
         apply([["c", 821, "ScreenStack", ["flex": 1]],
                ["c", 822, "Screen", ["title": "Inbox", "flex": 1]],
                ["c", 823, "View", ["_pn_header_slot": "right", "width": 80, "height": 44]],

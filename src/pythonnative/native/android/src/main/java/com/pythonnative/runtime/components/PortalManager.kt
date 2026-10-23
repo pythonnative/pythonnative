@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import com.pythonnative.runtime.core.PNCore
 import com.pythonnative.runtime.screens.ScreenRegistry
 import org.json.JSONObject
 
@@ -12,12 +13,14 @@ import org.json.JSONObject
  * non-clickable overlay added directly to the screen's fragment
  * container (the same parent as the screen root, so portal coordinates
  * equal viewport coordinates). The overlay attaches lazily on the first
- * child insert and re-homes itself if the container changed.
+ * child insert and re-homes itself if the container changed. Its size is
+ * the container the core lays the portal's children out in.
  */
 class PortalManager : ComponentManager() {
     override fun createView(context: Context, tag: Long, props: JSONObject): View {
         val overlay = FrameLayout(context)
         overlay.isClickable = false
+        PNCore.observeContainer(overlay, tag)
         return overlay
     }
 

@@ -49,10 +49,17 @@ pn deps android --lock
 pn deps ios --lock
 ```
 
+`pn deps --lock` prints the full resolution report first. A lock has to
+cover every target, so if any target fails to resolve, it says which ones
+failed, doesn't write `pn.lock`, and exits with status 1. Fix the failing
+requirement (or the target's wheel availability) and run it again.
+
 Commit the lock with your application. Changing requirements or replacing a
-local wheel requires refreshing it. Releases reject missing or stale locks;
-development builds can still resolve unlocked requirements. Native extension
-manifests pin SwiftPM and Maven dependencies to exact versions.
+local wheel requires refreshing it. Release builds reject missing or stale
+locks. A development build (`pn run`, or `pn build --debug`) with a stale
+lock prints a warning and resolves the current requirements without the lock,
+so you can keep iterating before you refresh it. Native extension manifests
+pin SwiftPM and Maven dependencies to exact versions.
 
 ## What a release bundle leaves out
 
@@ -65,9 +72,9 @@ modules that exist only for development:
   `pythonnative/preview.py`, `pythonnative/bridge/web.py`);
 - the dev client and Fast Refresh (`pythonnative/devclient.py`,
   `pythonnative/hot_reload.py`, `pythonnative/refresh.py`);
-- the test helpers (`pythonnative/testing`);
+- the test helpers (`pythonnative/testing`, `pythonnative/bridge/fake.py`);
 - the SDK code generators (`pythonnative/sdk/codegen.py`,
-  `contract_codegen.py`, `module_codegen.py`, and their templates).
+  `builtins.py`, `module_codegen.py`, and their templates).
 
 The runtime never imports them, and the test suite checks that it stays
 that way, so a release app behaves exactly like a debug build that isn't

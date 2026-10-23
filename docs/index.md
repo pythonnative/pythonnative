@@ -24,8 +24,8 @@ def Counter(initial: int = 0) -> pn.Node:
 
 That same `Counter` mounts as a `UILabel` plus a `UIButton` inside a
 `UIView` on iOS, and as a `TextView` plus a `Button` inside a
-`FrameLayout` on Android. The shared Yoga layout engine interprets
-`flex`, `padding`, and `position` beside the native widgets.
+`FrameLayout` on Android. A shared C++ renderer core interprets
+`flex`, `padding`, and `position` with Yoga, off the UI thread.
 Platform controls and fonts supply their own intrinsic sizes.
 
 ## Why PythonNative?

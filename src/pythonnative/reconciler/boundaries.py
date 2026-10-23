@@ -70,10 +70,6 @@ class BoundaryMixin:
     def _create_wrapper(self, element: Element, owner: str) -> VNode:
         raise NotImplementedError  # pragma: no cover
 
-    # ``_mark_layout_dirty`` comes from the layout mixin; it is not stubbed
-    # here because a stub would shadow it in the reconciler's MRO.
-    _mark_layout_dirty: Callable[[VNode], None]
-
     def request_render(self) -> None:  # pragma: no cover
         """Ask for another render pass (provided by the concrete reconciler)."""
         ...
@@ -332,7 +328,6 @@ class BoundaryMixin:
                 root.hidden_by_suspense = True
                 if root.tag is not None:
                     self._ops.append(UpdateOp(root.tag, {"display": "none"}))
-                self._mark_layout_dirty(root)
 
     def _reveal_suspense_content(self, node: VNode) -> None:
         """Lift the ``display`` override from the boundary's content roots."""
@@ -343,7 +338,6 @@ class BoundaryMixin:
                 root.hidden_by_suspense = False
                 if root.tag is not None:
                     self._ops.append(UpdateOp(root.tag, {"display": root.clean_props.get("display", UNSET)}))
-                self._mark_layout_dirty(root)
 
     def _refresh_suspense_fallback(self, node: VNode) -> None:
         """Reconcile a showing fallback against the latest ``fallback`` prop."""

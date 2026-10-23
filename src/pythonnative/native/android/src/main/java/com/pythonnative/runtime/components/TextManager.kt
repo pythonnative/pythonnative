@@ -290,11 +290,11 @@ class TextManager : ComponentManager() {
     override fun createView(context: Context, tag: Long, props: JSONObject): View = TextView(context)
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = TextProps(props, validated = true)
+        val typed = TextProps(props)
 
         val tv = view as TextView
         val merged = propsOf(tv)
-        val mergedTyped = TextProps(merged, validated = true)
+        val mergedTyped = TextProps(merged)
         val fontScaling = mergedTyped.allow_font_scaling != false
         if (typed.has_spans || typed.has_text || typed.has_text_transform || typed.has_allow_font_scaling || typed.has_selectable) {
             val transform = merged.str("text_transform")
