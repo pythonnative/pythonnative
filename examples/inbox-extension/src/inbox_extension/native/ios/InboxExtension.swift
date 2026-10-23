@@ -21,8 +21,8 @@ private final class InboxBadgeManager: PNTypedComponentManager<InboxBadgeProps> 
         guard let button = view as? UIButton else { return view }
         // Attach after creation so the view's state retains the action target.
         PNActionTarget.attach(button, events: .touchUpInside) { [weak button] in
-            guard let button = button,
-                  let props = try? InboxBadgeProps(PNViewState.existing(for: button)?.props ?? [:]) else { return }
+            guard let button = button else { return }
+            let props = InboxBadgeProps(PNViewState.existing(for: button)?.props ?? [:])
             PNComponentEvents.InboxBadge.on_press(button, props.count ?? 0)
         }
         return button
