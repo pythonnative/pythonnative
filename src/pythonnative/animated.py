@@ -26,7 +26,7 @@ completion contract. The core primitives are:
   descriptors for ``Animated.timing`` (``Easing.ease_in_out``,
   ``Easing.bezier(0.2, 0.8, 0.2, 1.0)``, ...). Every renderer evaluates
   the same curve definitions; a plain Python callable is still accepted
-  but ticks in Python.
+  and crosses the bridge as a sampled curve.
 - ``Animated.event``: build an event-prop callback that copies event
   fields into animated values (``on_scroll=pn.Animated.event(y=v)``).
 - ``Animated.diff_clamp``: accumulate an input's *deltas* into a
@@ -35,27 +35,27 @@ completion contract. The core primitives are:
   components whose ``style`` may contain animated nodes, including
   inside ``transform`` entries.
 
-Driver architecture (the **native driver**):
+Driver architecture:
 
-Mounted bindings install a serialized graph of connected values, arithmetic,
-interpolation, and view properties. When an animation starts, PythonNative
-offers its timing, spring, or decay specification to the renderer through
-the backend's ``start_animation`` hook (see
-[`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]).
+Every animation runs in the renderer core's animator on the platform's UI
+thread (RFC 0007), at the display's refresh rate. Mounted bindings install
+a serialized graph of connected values, arithmetic, interpolation, and view
+properties; starting an animation hands its timing, spring, or decay
+specification to the core through the backend's ``start_animation`` hook
+(see [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]).
+The core evaluates the graph and applies its bindings without Python work
+on every frame. Completion settles the
+[`AnimatedValue`][pythonnative.animated.AnimatedValue] and resolves
+awaiting tasks.
 
-- **Accepted**: the renderer evaluates the graph and applies its bindings
-  without Python work on every frame. Completion callbacks settle the
-  [`AnimatedValue`][pythonnative.animated.AnimatedValue] and resolve
-  awaiting tasks.
-- **Declined** (unattached values, callable easings,
-  values feeding Python-side listeners, or an unsupported backend): a single
-  background thread ticks the animation at ~60 Hz from Python, pushing
-  each frame through ``set_animated_property``. Semantics are
-  identical; only the frame source differs.
+A value with Python listeners, or one no view is bound to, asks the core to
+report its value every frame, and Python updates the value and runs the
+listeners. A Python easing callable is sampled into a curve the core
+interpolates. Headless code without a mounted screen animates on the host
+build of the same core, so tests see the shipping math.
 
-On mobile, scroll and gesture bindings feed graph values before input is
-queued to Python. Derived expressions can run in the renderer alongside their
-source drivers. Backends without graph support use Python for derived bindings.
+Scroll and gesture bindings feed graph values on the UI thread before input
+is queued to Python.
 
 Example:
     ```python
@@ -87,7 +87,6 @@ import functools
 import itertools
 import math
 import threading
-import time
 import weakref
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, FrozenSet, Generator, List, Mapping, Optional, Sequence, Tuple, Union, cast
@@ -97,17 +96,8 @@ from .hooks import Ref, use_effect, use_ref
 from .runtime import resolve_future
 from .style import Style, StyleProp, resolve_style
 
-# Maximum frame rate at which the Python fallback ticker drives
-# animations (native-driven animations run at the display's refresh
-# rate, managed by the platform).
-_TARGET_FPS = 60.0
-_FRAME_DT = 1.0 / _TARGET_FPS
-
-# Upper bound on how much wall-clock time the fallback loop will try to
-# catch up on in a single iteration after thread starvation. At 60 fps
-# this is ~333 ms of simulated motion; further drift is dropped to keep
-# the loop responsive.
-_MAX_CATCHUP_FRAMES = 20
+# Samples taken from a Python easing callable for the core to interpolate.
+_EASING_SAMPLES = 64
 
 # Velocity (points per millisecond) below which a decay animation is at
 # rest. React Native's ``DecayAnimation`` stops when a frame moves the
@@ -199,9 +189,8 @@ def _bounce(t: float) -> float:
     return 7.5625 * t * t + 0.984375
 
 
-# Canonical definitions of the named easings. Every renderer (the Python
-# ticker, Swift, Kotlin, and the browser preview) implements exactly these
-# curves under these names; they follow React Native's ``Easing`` module,
+# Canonical definitions of the named easings. The renderer core implements
+# exactly these curves under these names for every platform; they follow React Native's ``Easing`` module,
 # where ``ease`` is ``bezier(0.42, 0, 1, 1)`` and ``ease_in`` /
 # ``ease_out`` / ``ease_in_out`` are ``Easing.in`` / ``out`` / ``inOut``
 # of it, which coincide with the CSS ``ease-in`` / ``ease-out`` /
@@ -235,8 +224,8 @@ class EasingSpec:
     Build instances through the [`Easing`][pythonnative.animated.Easing]
     namespace (``Easing.ease_in_out``, ``Easing.bezier(...)``) rather
     than directly. The descriptor crosses the bridge as data, so the
-    native drivers can run the curve on the UI thread, and it evaluates
-    identically in Python for the fallback ticker and for tests.
+    renderer core can run the curve on the UI thread, and it evaluates
+    identically in Python for tests.
 
     Attributes:
         name: One of the named curves (``"linear"``, ``"ease"``,
@@ -361,13 +350,30 @@ def _easing_function(easing: Union[EasingSpec, Callable[[float], float]]) -> Cal
     return easing
 
 
-def _backend() -> Any:
-    """Return the active view backend (the animation backend), or ``None`` off device.
+# The backend that owns each bound view tag. Tags are unique in a process,
+# so a value bound to a headless test's views reaches that test's backend
+# even when no process-wide backend is installed.
+_tag_backends: "weakref.WeakValueDictionary[int, Any]" = weakref.WeakValueDictionary()
+
+
+def release_view_backend(backend: Any, tags: Any) -> None:
+    """Forget that ``backend`` owns ``tags`` (its views were destroyed or its surface reset)."""
+    for tag in tags:
+        if _tag_backends.get(tag) is backend:
+            del _tag_backends[tag]
+
+
+def _backend(tag: Optional[int] = None) -> Any:
+    """Return the backend owning ``tag``, else the process's view backend, or ``None`` off device.
 
     Headless code that never installed a backend (plain ``AnimatedValue``
     arithmetic in a unit test) still works: every caller treats ``None``
     as "no renderer to push to."
     """
+    if tag is not None:
+        owner = _tag_backends.get(tag)
+        if owner is not None:
+            return owner
     from .native_views import get_backend
 
     try:
@@ -457,13 +463,13 @@ class AnimatedNode:
             attachments = list(self._attachments)
             children = list(self._children)
         if push_native and attachments:
-            backend = _backend()
-            if backend is not None:
-                try:
-                    for tag, prop in attachments:
+            for tag, prop in attachments:
+                backend = _backend(tag)
+                if backend is not None:
+                    try:
                         backend.set_animated_property(tag, prop, current)
-                except Exception:
-                    pass
+                    except Exception:
+                        pass
         for _prop, cb in subs:
             try:
                 cb(current)
@@ -474,16 +480,20 @@ class AnimatedNode:
 
     # -- bindings ----------------------------------------------------------
 
-    def attach(self, tag: int, prop: str) -> Callable[[], None]:
+    def attach(self, tag: int, prop: str, backend: Any = None) -> Callable[[], None]:
         """Bind this node to ``prop`` of the native view under ``tag``.
 
         The current value is pushed immediately so the view reflects it
-        even if no animation is running. Returns a detach callable.
+        even if no animation is running. ``backend`` is the backend that
+        owns the view (the process's backend by default). Returns a detach
+        callable.
         """
         binding = (tag, prop)
+        if backend is not None:
+            _tag_backends[tag] = backend
         with self._lock:
             self._attachments.append(binding)
-        backend = _backend()
+        backend = _backend(tag)
         if backend is not None:
             try:
                 backend.set_animated_property(tag, prop, self.value)
@@ -660,9 +670,10 @@ class AnimatedValue(AnimatedNode):
 
         graph = install(self)
         if graph and graph["bindings"]:
-            backend = _backend()
+            tag = graph["bindings"][0][0]
+            backend = _backend(tag)
             if backend is not None:
-                backend.set_animated_property(graph["bindings"][0][0], f"_pn_graph:{id(self)}", float(new_value))
+                backend.set_animated_property(tag, f"_pn_graph:{id(self)}", float(new_value))
 
     def _apply(self, new_value: float, push_native: bool) -> None:
         with self._lock:
@@ -671,13 +682,13 @@ class AnimatedValue(AnimatedNode):
             attachments = list(self._attachments)
             children = list(self._children)
         if push_native and attachments:
-            backend = _backend()
-            if backend is not None:
-                try:
-                    for tag, prop in attachments:
+            for tag, prop in attachments:
+                backend = _backend(tag)
+                if backend is not None:
+                    try:
                         backend.set_animated_property(tag, prop, new_value)
-                except Exception:
-                    pass
+                    except Exception:
+                        pass
         for prop, cb in subs:
             try:
                 cb(new_value)
@@ -695,9 +706,8 @@ class AnimatedValue(AnimatedNode):
             previous.cancel()
 
     def stop_animation(self) -> None:
-        """Cancel any in-flight animation on this value (native or Python)."""
+        """Cancel any in-flight animation on this value."""
         self._adopt_native_group(None)
-        _manager.cancel_for_value(self)
 
     def __repr__(self) -> str:
         return f"AnimatedValue({self._value:g})"
@@ -958,7 +968,9 @@ class AnimatedEvent:
                 sample = float(raw)
             except (TypeError, ValueError):
                 continue
-            if getattr(_backend(), "install_animation_graph", None) is not None:  # None backend: plain set
+            bound = node.attachments()
+            owner = _backend(bound[0][0] if bound else None)
+            if getattr(owner, "install_animation_graph", None) is not None:  # None backend: plain set
                 # The renderer evaluated the installed graph at the input
                 # timestamp, so this frame is already on screen. Update the
                 # Python cell, its listeners, and stateful dependents such
@@ -971,100 +983,6 @@ class AnimatedEvent:
                 self._listener(payload, *args)
             except Exception:
                 pass
-
-
-# ======================================================================
-# Python fallback driver
-# ======================================================================
-
-
-class _AnimationManager:
-    """Single-threaded fallback driver for Python-ticked animations.
-
-    Holds a list of ``_RunningAnimation`` instances and ticks them at
-    ~60 Hz. The thread starts on first use and idles when nothing is
-    active. Native-driven animations never touch this loop.
-    """
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._animations: List[_RunningAnimation] = []
-        self._thread: Optional[threading.Thread] = None
-        self._stopped = False
-
-    def add(self, anim: "_RunningAnimation") -> None:
-        with self._lock:
-            self._animations.append(anim)
-            self._ensure_thread_locked()
-
-    def remove(self, anim: "_RunningAnimation") -> None:
-        with self._lock:
-            try:
-                self._animations.remove(anim)
-            except ValueError:
-                pass
-
-    def cancel_for_value(self, value: AnimatedValue) -> None:
-        """Cancel every queued/running Python-driven animation on ``value``."""
-        with self._lock:
-            stale = [a for a in self._animations if a.value is value]
-            for anim in stale:
-                self._animations.remove(anim)
-        for anim in stale:
-            anim._finish(finished=False)
-
-    def _ensure_thread_locked(self) -> None:
-        if self._thread is not None and self._thread.is_alive():
-            return
-        self._thread = threading.Thread(target=self._loop, daemon=True, name="pn-animated")
-        self._thread.start()
-
-    def _loop(self) -> None:
-        last = time.monotonic()
-        # Clamping the per-tick dt is important for numerical stability:
-        # an underdamped spring with a 0.3 s step explodes immediately,
-        # and the animation thread can be starved for several frames
-        # during render bursts. We integrate physics on a clamped dt
-        # (max 2 target frames) and sub-step when wall-clock has
-        # advanced more than that, so the perceived motion still tracks
-        # real time at most a couple of frames behind. After an extreme
-        # starvation (e.g. the app was backgrounded for seconds) we cap
-        # the catch-up at ``_MAX_CATCHUP_FRAMES`` worth of physics; any
-        # further wall-clock drift is dropped on the floor, which keeps
-        # the loop responsive instead of spinning forward through
-        # hundreds of substeps.
-        max_step = _FRAME_DT * 2.0
-        max_catchup = _FRAME_DT * _MAX_CATCHUP_FRAMES
-        while not self._stopped:
-            now = time.monotonic()
-            dt = now - last
-            last = now
-            with self._lock:
-                active = list(self._animations)
-            if not active:
-                time.sleep(0.05)
-                last = time.monotonic()
-                continue
-            remaining = min(dt, max_catchup)
-            while remaining > 0.0:
-                step = remaining if remaining <= max_step else max_step
-                remaining -= step
-                for anim in active:
-                    if getattr(anim, "_completed", False):
-                        continue
-                    try:
-                        finished = anim.advance(step)
-                    except Exception:
-                        # A crashing integrator must still release its
-                        # awaiters; report it as interrupted.
-                        anim._finish(finished=False)
-                        finished = True
-                    if finished:
-                        self.remove(anim)
-            time.sleep(_FRAME_DT)
-
-
-_manager = _AnimationManager()
 
 
 # ======================================================================
@@ -1112,106 +1030,8 @@ def _invoke_completion(callback: CompletionCallback, result: AnimationResult) ->
 
 
 # ======================================================================
-# Python-driven animation primitives (the fallback path)
+# Driving animations in the renderer core
 # ======================================================================
-
-
-class _RunningAnimation:
-    """Base class for Python-ticked animations; ``advance()`` returns True when done."""
-
-    def __init__(self, value: AnimatedValue) -> None:
-        self.value = value
-        self._completion_futures: List[asyncio.Future[AnimationResult]] = []
-        self._completion_callbacks: List[CompletionCallback] = []
-        self._completed = False
-        self.result: Optional[AnimationResult] = None
-
-    def add_completion_future(self, future: asyncio.Future[AnimationResult]) -> None:
-        """Register ``future`` to be resolved with the result when the animation ends."""
-        self._completion_futures.append(future)
-        if self._completed and self.result is not None:
-            resolve_future(future, self.result)
-
-    def add_completion_callback(self, callback: CompletionCallback) -> None:
-        """Register ``callback`` to receive the result when the animation ends."""
-        if self._completed and self.result is not None:
-            _invoke_completion(callback, self.result)
-            return
-        self._completion_callbacks.append(callback)
-
-    def advance(self, dt: float) -> bool:
-        raise NotImplementedError
-
-    def _finish(self, finished: bool = True) -> None:
-        if self._completed:
-            return
-        self._completed = True
-        result = AnimationResult(finished=finished)
-        self.result = result
-        for fut in self._completion_futures:
-            resolve_future(fut, result)
-        for callback in self._completion_callbacks:
-            _invoke_completion(callback, result)
-
-
-class _TimingAnimation(_RunningAnimation):
-    def __init__(
-        self,
-        value: AnimatedValue,
-        to: float,
-        duration: float,
-        easing: Callable[[float], float],
-    ) -> None:
-        super().__init__(value)
-        self._from = value.value
-        self._to = float(to)
-        self._duration = max(0.001, float(duration) / 1000.0)
-        self._easing = easing
-        self._elapsed = 0.0
-
-    def advance(self, dt: float) -> bool:
-        self._elapsed += dt
-        progress = min(1.0, self._elapsed / self._duration)
-        eased = self._easing(progress)
-        new_val = self._from + (self._to - self._from) * eased
-        self.value.set_value(new_val)
-        if progress >= 1.0:
-            self._finish()
-            return True
-        return False
-
-
-class _SpringAnimation(_RunningAnimation):
-    """Damped harmonic spring driver."""
-
-    def __init__(
-        self,
-        value: AnimatedValue,
-        to: float,
-        stiffness: float,
-        damping: float,
-        mass: float,
-        initial_velocity: float = 0.0,
-    ) -> None:
-        super().__init__(value)
-        self._to = float(to)
-        self._velocity = float(initial_velocity)
-        self._stiffness = float(stiffness)
-        self._damping = float(damping)
-        self._mass = float(mass)
-        self._rest_threshold = 0.001
-
-    def advance(self, dt: float) -> bool:
-        x = self.value.value
-        a = (-self._stiffness * (x - self._to) - self._damping * self._velocity) / self._mass
-        self._velocity += a * dt
-        new_x = x + self._velocity * dt
-        self.value.set_value(new_x)
-        if abs(new_x - self._to) < self._rest_threshold and abs(self._velocity) < self._rest_threshold:
-            self.value.set_value(self._to)
-            self._finish()
-            return True
-        return False
 
 
 def _decay_final_value(start: float, velocity: float, deceleration: float) -> float:
@@ -1219,74 +1039,43 @@ def _decay_final_value(start: float, velocity: float, deceleration: float) -> fl
     return start + velocity / (1.0 - deceleration)
 
 
-class _DecayAnimation(_RunningAnimation):
-    """React Native's decay model, evaluated in closed form.
-
-    With ``t`` in milliseconds and ``v0`` in points per millisecond:
-
-    - ``v(t) = v0 * deceleration ** t``
-    - ``x(t) = x0 + v0 * (1 - deceleration ** t) / (1 - deceleration)``
-    - ``x(inf) = x0 + v0 / (1 - deceleration)``
-
-    The animation rests when ``|v(t)| < DECAY_REST_VELOCITY`` and snaps
-    to the projected final value, so the Python ticker and the native
-    drivers (which report completion against the same projection) land
-    on the identical number.
-    """
-
-    def __init__(self, value: AnimatedValue, velocity: float, deceleration: float) -> None:
-        super().__init__(value)
-        self._from = value.value
-        self._velocity0 = float(velocity)
-        self._deceleration = float(deceleration)
-        self._elapsed_ms = 0.0
-        self._final = _decay_final_value(self._from, self._velocity0, self._deceleration)
-
-    def advance(self, dt: float) -> bool:
-        self._elapsed_ms += dt * 1000.0
-        factor = self._deceleration**self._elapsed_ms
-        velocity = self._velocity0 * factor
-        if abs(velocity) < DECAY_REST_VELOCITY:
-            self.value.set_value(self._final)
-            self._finish()
-            return True
-        self.value.set_value(self._from + self._velocity0 * (1.0 - factor) / (1.0 - self._deceleration))
-        return False
+_headless: Any = None
 
 
-class _DelayAnimation(_RunningAnimation):
-    def __init__(self, duration_ms: float) -> None:
-        super().__init__(AnimatedValue(0.0))
-        self._elapsed = 0.0
-        self._duration = max(0.001, duration_ms / 1000.0)
+def _driver_backend(tag: Optional[int] = None) -> Any:
+    """The backend whose core runs an animation: the view's, the screen's, or a headless one off device."""
+    backend = _backend(tag or None)
+    if backend is not None:
+        return backend
+    global _headless
+    from .bridge.fake import FakeTransport, _owner
 
-    def advance(self, dt: float) -> bool:
-        self._elapsed += dt
-        if self._elapsed >= self._duration:
-            self._finish()
-            return True
-        return False
+    if _headless is None or _owner(0) is not _headless.transport:
+        from .bridge import dispatch
+        from .native_views.bridge_backend import BridgeBackend
 
-
-# ======================================================================
-# Native-driven animation group
-# ======================================================================
+        transport = FakeTransport(surface=0)
+        headless = BridgeBackend(transport, surface=0)
+        transport.set_callback(lambda kind, tag, name, payload: dispatch(kind, tag, name, payload, headless))
+        _headless = headless
+    return _headless
 
 
 class _NativeAnimationGroup:
-    """One logical animation fanned out to N natively-animated views.
+    """One logical animation fanned out to every driver it needs in the core.
 
-    Each attached ``(tag, prop)`` binding gets its own ``anim_id``; the
-    group completes when the platform reports completion for all of
-    them. Cancellation asks each platform handler for the current
-    presentation value so the ``AnimatedValue`` lands wherever the view
-    visually was.
+    A value bound through a graph gets one driver on its graph node; a
+    value bound only to view props gets one per ``(tag, prop)``; an
+    unbound value gets one standalone driver. Each has its own
+    ``anim_id``; the group completes when the core reports completion
+    for all of them. Drivers marked ``report`` send their value every
+    frame, which updates the ``AnimatedValue`` and its listeners.
     """
 
     def __init__(self, value: AnimatedValue, final_value: float) -> None:
         self.value = value
         self.final_value = final_value
-        self._targets: Dict[int, Tuple[int, str]] = {}  # anim_id -> (tag, prop)
+        self._targets: Dict[int, Tuple[int, str, Any]] = {}  # anim_id -> (tag, prop, backend)
         self._pending: set = set()
         self._completion_futures: List[asyncio.Future[AnimationResult]] = []
         self._completion_callbacks: List[CompletionCallback] = []
@@ -1295,9 +1084,9 @@ class _NativeAnimationGroup:
         self.result: Optional[AnimationResult] = None
         self._lock = threading.Lock()
 
-    def add_target(self, anim_id: int, tag: int, prop: str) -> None:
+    def add_target(self, anim_id: int, tag: int, prop: str, backend: Any) -> None:
         with self._lock:
-            self._targets[anim_id] = (tag, prop)
+            self._targets[anim_id] = (tag, prop, backend)
             self._pending.add(anim_id)
         _native_groups[anim_id] = self
 
@@ -1317,7 +1106,12 @@ class _NativeAnimationGroup:
         if done and self.result is not None:
             _invoke_completion(callback, self.result)
 
-    def target_completed(self, anim_id: int, finished: bool) -> None:
+    def report(self, value: float) -> None:
+        """A frame's value from a reporting driver."""
+        if not self._completed and self.value._native_group is self:
+            self.value._apply(value, push_native=False)
+
+    def target_completed(self, anim_id: int, finished: bool, value: Optional[float]) -> None:
         with self._lock:
             self._pending.discard(anim_id)
             if not finished:
@@ -1326,29 +1120,22 @@ class _NativeAnimationGroup:
             all_finished = self._all_finished
         _native_groups.pop(anim_id, None)
         if remaining == 0:
-            self._settle(self.final_value if all_finished else None, finished=all_finished)
+            end = self.final_value if all_finished else value
+            self._settle(end, finished=all_finished)
 
     def cancel(self) -> None:
-        """Cancel all in-flight native animations, syncing to presentation values."""
+        """Stop every driver; the value lands where the core stopped it when that arrives."""
         with self._lock:
             targets = dict(self._targets)
             self._pending.clear()
-        presentation: Optional[float] = None
-        backend = _backend()
-        try:
-            if backend is None:
-                raise RuntimeError("no backend")
-            for anim_id, (tag, _prop) in targets.items():
+        for anim_id, (tag, _prop, backend) in targets.items():
+            if _native_groups.get(anim_id) is self:
+                _native_groups[anim_id] = _Cancelled(self.value)
+            try:
+                backend.cancel_animation(tag, anim_id)
+            except Exception:
                 _native_groups.pop(anim_id, None)
-                current = backend.cancel_animation(tag, anim_id)
-                if current is not None:
-                    try:
-                        presentation = float(current)
-                    except (TypeError, ValueError):
-                        pass
-        except Exception:
-            pass
-        self._settle(presentation, finished=False)
+        self._settle(None, finished=False)
 
     def _settle(self, end_value: Optional[float], finished: bool) -> None:
         with self._lock:
@@ -1364,8 +1151,8 @@ class _NativeAnimationGroup:
         if self.value._native_group is self:
             self.value._native_group = None
         if end_value is not None:
-            # The native side already shows this value; update the
-            # Python cell (and listeners) without re-pushing.
+            # The renderer already shows this value; update the Python
+            # cell (and listeners) without re-pushing.
             self.value._apply(end_value, push_native=False)
         for fut in futures:
             resolve_future(fut, result)
@@ -1373,27 +1160,46 @@ class _NativeAnimationGroup:
             _invoke_completion(callback, result)
 
 
-# anim_id -> group, for routing completion callbacks from platform handlers.
-_native_groups: Dict[int, _NativeAnimationGroup] = {}
+class _Cancelled:
+    """Where a cancelled driver's final value goes once the core reports it."""
+
+    def __init__(self, value: AnimatedValue) -> None:
+        self.value = value
+
+    def target_completed(self, anim_id: int, finished: bool, value: Optional[float]) -> None:
+        _native_groups.pop(anim_id, None)
+        if value is not None and self.value._native_group is None:
+            self.value._apply(value, push_native=False)
+
+    def report(self, value: float) -> None:
+        del value
 
 
-def native_animation_completed(anim_id: int, finished: bool = True) -> None:
-    """Report a natively-driven animation as settled.
+# anim_id -> group, for routing the core's animation messages.
+_native_groups: Dict[int, Any] = {}
 
-    Called by platform handlers from their completion callbacks (iOS
-    ``UIView`` completion blocks, Android ``withEndAction`` /
-    ``DynamicAnimation.OnAnimationEndListener``). Safe to call from any
-    thread; unknown ids are ignored (e.g. an animation cancelled
-    moments before its completion fired).
 
-    Args:
-        anim_id: The id passed to the backend's ``start_animation``.
-        finished: ``False`` when the platform reports the animation was
-            interrupted rather than running to completion.
+def native_animation_message(message: Dict[str, Any]) -> None:
+    """Route an ``animation`` message from the core: a frame report or a completion.
+
+    Completions carry ``{"id", "finished", "value"}`` (``finished`` is
+    ``False`` when the driver was cancelled or superseded); reports carry
+    ``{"id", "value"}``. Unknown ids are ignored (an animation cancelled
+    moments before its completion arrived).
     """
+    try:
+        anim_id = int(message.get("id", 0))
+    except (TypeError, ValueError):
+        return
     group = _native_groups.get(anim_id)
-    if group is not None:
-        group.target_completed(anim_id, finished)
+    if group is None:
+        return
+    value = message.get("value")
+    number = float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+    if "finished" in message:
+        group.target_completed(anim_id, bool(message.get("finished")), number)
+    elif number is not None:
+        group.report(number)
 
 
 def _projected_final_value(spec: Dict[str, Any]) -> float:
@@ -1401,8 +1207,7 @@ def _projected_final_value(spec: Dict[str, Any]) -> float:
 
     For ``decay`` this is React Native's closed form
     ``from + velocity / (1 - deceleration)`` with ``velocity`` in points
-    per millisecond; every native decay driver reports completion
-    against the same projection.
+    per millisecond; the core's decay driver settles on the same number.
     """
     kind = spec.get("kind")
     if kind == "decay":
@@ -1414,16 +1219,12 @@ def _projected_final_value(spec: Dict[str, Any]) -> float:
     return float(spec.get("to", spec.get("from", 0.0)))
 
 
-def _start_native(value: AnimatedValue, spec: Dict[str, Any]) -> Optional[_NativeAnimationGroup]:
-    """Offer ``spec`` to the platform for every binding of ``value``.
+def _start_native(value: AnimatedValue, spec: Dict[str, Any]) -> _NativeAnimationGroup:
+    """Start ``spec`` in the core for every binding of ``value``.
 
-    Returns the live group when **all** bindings accepted the native
-    animation; otherwise rolls back any accepted targets and returns
-    ``None`` so the caller falls back to the Python ticker.
+    Raises:
+        RuntimeError: When the core refuses the animation (an invalid spec).
     """
-    backend = _backend()
-    if backend is None:
-        return None
     from .animation_graph import install
 
     graph = install(value)
@@ -1431,29 +1232,23 @@ def _start_native(value: AnimatedValue, spec: Dict[str, Any]) -> Optional[_Nativ
         targets = [(graph["bindings"][0][0], f"_pn_graph:{id(value)}")]
     else:
         targets = value.attachments()
-        if value._has_dependents():
-            return None
-    if not targets or value.has_listeners():
-        return None
-
+    report = value.has_listeners() or value._has_dependents() and not graph or not targets
+    if not targets:
+        targets = [(0, f"_pn_value:{id(value)}")]
     group = _NativeAnimationGroup(value, _projected_final_value(spec))
-    accepted: List[Tuple[int, int]] = []  # (anim_id, tag)
-    for tag, prop in targets:
+    started: List[Tuple[int, int, Any]] = []
+    for index, (tag, prop) in enumerate(targets):
+        backend = _driver_backend(tag)
         anim_id = next(_anim_id_counter)
-        try:
-            ok = backend.start_animation(tag, anim_id, prop, spec)
-        except Exception:
-            ok = False
-        if not ok:
-            for prev_id, prev_tag in accepted:
-                _native_groups.pop(prev_id, None)
-                try:
-                    backend.cancel_animation(prev_tag, prev_id)
-                except Exception:
-                    pass
-            return None
-        group.add_target(anim_id, tag, prop)
-        accepted.append((anim_id, tag))
+        group.add_target(anim_id, tag, prop, backend)
+        request = dict(spec, report=bool(report and index == 0))
+        if not backend.start_animation(tag, anim_id, prop, request):
+            for previous_id, previous_tag, previous_backend in started:
+                _native_groups.pop(previous_id, None)
+                previous_backend.cancel_animation(previous_tag, previous_id)
+            _native_groups.pop(anim_id, None)
+            raise RuntimeError(f"The renderer core refused the animation {spec!r}")
+        started.append((anim_id, tag, backend))
     return group
 
 
@@ -1517,24 +1312,14 @@ class _AwaitableAnimation:
 class _AnimationHandle(_AwaitableAnimation):
     """Public handle returned by ``Animated.timing`` / ``.spring`` / ``.decay``.
 
-    Each ``.start()`` call snapshots the value's current state, prefers
-    the native driver, and falls back to a fresh Python-ticked
-    animation otherwise (matches React Native: the ``Animated.timing``
-    return value is reusable).
+    Each ``.start()`` call snapshots the value's current state and starts
+    a fresh run in the renderer core (matches React Native: the
+    ``Animated.timing`` return value is reusable).
     """
 
-    def __init__(
-        self,
-        value: Optional[AnimatedValue],
-        spec_factory: Callable[[], Dict[str, Any]],
-        fallback_factory: Callable[[], _RunningAnimation],
-        native_eligible: bool = True,
-    ) -> None:
+    def __init__(self, value: AnimatedValue, spec_factory: Callable[[], Dict[str, Any]]) -> None:
         self._value = value
         self._spec_factory = spec_factory
-        self._fallback_factory = fallback_factory
-        self._native_eligible = native_eligible
-        self._python_anim: Optional[_RunningAnimation] = None
         self._native_group: Optional[_NativeAnimationGroup] = None
 
     def start(self, callback: Optional[CompletionCallback] = None) -> "_AnimationHandle":
@@ -1546,20 +1331,11 @@ class _AnimationHandle(_AwaitableAnimation):
                 when this run ends (finished or interrupted).
         """
         self.stop()
-        if self._value is not None and self._native_eligible:
-            spec = self._spec_factory()
-            group = _start_native(self._value, spec)
-            if group is not None:
-                self._native_group = group
-                self._value._adopt_native_group(group)
-                if callback is not None:
-                    group.add_completion_callback(callback)
-                return self
-        anim = self._fallback_factory()
-        self._python_anim = anim
+        group = _start_native(self._value, self._spec_factory())
+        self._native_group = group
+        self._value._adopt_native_group(group)
         if callback is not None:
-            anim.add_completion_callback(callback)
-        _manager.add(anim)
+            group.add_completion_callback(callback)
         return self
 
     def stop(self) -> None:
@@ -1567,21 +1343,12 @@ class _AnimationHandle(_AwaitableAnimation):
         if self._native_group is not None:
             group = self._native_group
             self._native_group = None
-            if self._value is not None and self._value._native_group is group:
+            if self._value._native_group is group:
                 self._value._native_group = None
             group.cancel()
-        if self._python_anim is not None:
-            anim = self._python_anim
-            self._python_anim = None
-            anim._finish(finished=False)
-            _manager.remove(anim)
 
     def _is_running(self) -> bool:
-        if self._native_group is not None and not self._native_group._completed:
-            return True
-        if self._python_anim is not None and not self._python_anim._completed:
-            return True
-        return False
+        return self._native_group is not None and not self._native_group._completed
 
     async def _drive(self) -> AnimationResult:
         # (Re)start unless an instance is currently mid-flight, so a
@@ -1592,13 +1359,38 @@ class _AnimationHandle(_AwaitableAnimation):
             self.start()
         loop = asyncio.get_running_loop()
         future: asyncio.Future[AnimationResult] = loop.create_future()
-        if self._native_group is not None:
-            self._native_group.add_completion_future(future)
-        elif self._python_anim is not None:
-            self._python_anim.add_completion_future(future)
-        else:
+        if self._native_group is None:
             return AnimationResult(finished=True)
+        self._native_group.add_completion_future(future)
         return await future
+
+
+class _DelayHandle(_AwaitableAnimation):
+    """``Animated.delay``: wait on the application loop, stoppable like an animation."""
+
+    def __init__(self, duration_ms: float) -> None:
+        self._duration = max(0.0, float(duration_ms)) / 1000.0
+        self._task: Optional[asyncio.Task[AnimationResult]] = None
+
+    def start(self, callback: Optional[CompletionCallback] = None) -> "_DelayHandle":
+        """Start waiting, fire-and-forget."""
+        from .runtime import run_async
+
+        run_async(_run_with_callback(self._drive(), callback))
+        return self
+
+    def stop(self) -> None:
+        if self._task is not None:
+            self._task.cancel()
+
+    async def _drive(self) -> AnimationResult:
+        self._task = asyncio.ensure_future(asyncio.sleep(self._duration, AnimationResult(finished=True)))
+        try:
+            return await self._task
+        except asyncio.CancelledError:
+            return AnimationResult(finished=False)
+        finally:
+            self._task = None
 
 
 class _CompositeAnimation(_AwaitableAnimation):
@@ -1703,7 +1495,7 @@ class _LoopAnimation(_AwaitableAnimation):
 
     def _collect_values(self, item: Any, out: List[AnimatedValue]) -> None:
         if isinstance(item, _AnimationHandle):
-            if item._value is not None and item._value not in out:
+            if item._value not in out:
                 out.append(item._value)
         elif isinstance(item, _CompositeAnimation):
             for sub in item._items:
@@ -1834,7 +1626,10 @@ def _make_animated_factory(
         style = kwargs.pop("style", None)
         plain_style, bindings = _resolve_style_with_values(style)
 
-        ref = use_ref(None)
+        own_ref = use_ref(None)
+        # A caller's ref receives the view's handle; the bindings read the
+        # tag from whichever ref the view publishes to.
+        ref = kwargs.pop("ref", None) or own_ref
         attached: Ref[List[Callable[[], None]]] = use_ref([])
 
         def _attach_bindings() -> None:
@@ -1844,7 +1639,8 @@ def _make_animated_factory(
             # Derived nodes can be rebuilt on every render. Install their new
             # bindings before releasing the old ones so a running native graph
             # never temporarily loses every owner.
-            detachers = [value.attach(tag, _animated_prop_name(prop)) for prop, value in bindings.items()]
+            owner = getattr(getattr(ref, "current", None), "_backend", None)
+            detachers = [value.attach(tag, _animated_prop_name(prop), owner) for prop, value in bindings.items()]
             previous = attached.current
             attached.current = detachers
             for detach in previous:
@@ -1858,8 +1654,8 @@ def _make_animated_factory(
 
             return _cleanup
 
-        # Re-attach whenever the binding set changes identity.
-        use_effect(_attach_bindings, [tuple(sorted((k, id(v)) for k, v in bindings.items()))])
+        # Re-attach whenever the binding set or the ref changes identity.
+        use_effect(_attach_bindings, [ref, tuple(sorted((k, id(v)) for k, v in bindings.items()))])
         use_effect(_unmount_bindings, [])
 
         if element_type == "Text":
@@ -1923,9 +1719,9 @@ class _AnimatedNamespace:
             easing: An [`Easing`][pythonnative.animated.Easing] descriptor
                 (``Easing.ease_out``, ``Easing.bezier(...)``), one of the
                 names in ``EASING_NAMES`` as a string, or a
-                ``progress -> eased`` callable. Descriptors and names run
-                on the native driver; a callable can't cross the bridge,
-                so it disables the native driver and ticks in Python.
+                ``progress -> eased`` callable. A callable is sampled
+                once, when the animation starts, into a curve the
+                renderer core interpolates.
 
         Raises:
             ValueError: For an unknown easing name.
@@ -1933,21 +1729,22 @@ class _AnimatedNamespace:
                 a name, nor a callable.
         """
         curve = _resolve_easing(easing)
-        native_eligible = isinstance(curve, EasingSpec)
 
         def _spec() -> Dict[str, Any]:
+            if isinstance(curve, EasingSpec):
+                wire: Any = curve.to_wire()
+            else:
+                steps = _EASING_SAMPLES - 1
+                wire = {"samples": [float(curve(i / steps)) for i in range(_EASING_SAMPLES)]}
             return {
                 "kind": "timing",
                 "from": value.value,
                 "to": float(to),
                 "duration_ms": float(duration),
-                "easing": curve.to_wire() if isinstance(curve, EasingSpec) else "custom",
+                "easing": wire,
             }
 
-        def _fallback() -> _RunningAnimation:
-            return _TimingAnimation(value, to, duration, _easing_function(curve))
-
-        return _AnimationHandle(value, _spec, _fallback, native_eligible=native_eligible)
+        return _AnimationHandle(value, _spec)
 
     @staticmethod
     def spring(
@@ -1972,10 +1769,7 @@ class _AnimatedNamespace:
                 "initial_velocity": float(initial_velocity),
             }
 
-        def _fallback() -> _RunningAnimation:
-            return _SpringAnimation(value, to, stiffness, damping, mass, initial_velocity)
-
-        return _AnimationHandle(value, _spec, _fallback)
+        return _AnimationHandle(value, _spec)
 
     @staticmethod
     def decay(
@@ -2021,10 +1815,7 @@ class _AnimatedNamespace:
                 "deceleration": float(deceleration),
             }
 
-        def _fallback() -> _RunningAnimation:
-            return _DecayAnimation(value, velocity, deceleration)
-
-        return _AnimationHandle(value, _spec, _fallback)
+        return _AnimationHandle(value, _spec)
 
     @staticmethod
     def parallel(animations: List[Any]) -> _CompositeAnimation:
@@ -2085,16 +1876,9 @@ class _AnimatedNamespace:
         return _LoopAnimation(animation, iterations=iterations, reset=reset)
 
     @staticmethod
-    def delay(duration: float) -> _AnimationHandle:
+    def delay(duration: float) -> _DelayHandle:
         """Wait ``duration`` ms before continuing in a sequence."""
-
-        def _spec() -> Dict[str, Any]:
-            return {"kind": "delay", "duration_ms": float(duration)}
-
-        def _fallback() -> _RunningAnimation:
-            return _DelayAnimation(duration)
-
-        return _AnimationHandle(None, _spec, _fallback)
+        return _DelayHandle(duration)
 
     @staticmethod
     def event(listener: Optional[Callable[..., None]] = None, **bindings: AnimatedValue) -> AnimatedEvent:
@@ -2200,5 +1984,5 @@ __all__ = [
     "Easing",
     "EasingSpec",
     "use_animated_value",
-    "native_animation_completed",
+    "native_animation_message",
 ]

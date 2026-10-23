@@ -7,11 +7,13 @@ single `apply_mutations` call on the process-wide view backend returned
 by [`get_backend`][pythonnative.native_views.get_backend]. On device
 that backend is the
 [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend],
-which builds the wire transaction once, validates it once, serializes it
-once, and hands it to the Swift and Kotlin component managers over the
-[native bridge](bridge.md). The browser preview uses the same backend
-with a WebSocket transport to the page. Headless tests install a
-[`FakeBackend`][pythonnative.testing.FakeBackend] with
+which builds the wire commit once, serializes it once, and hands it to
+the renderer core over the [native bridge](bridge.md); the core validates
+and lays it out and queues mount transactions for the Swift and Kotlin
+component managers. The browser preview uses the same backend with a
+WebSocket transport to the page. Headless tests install a
+[`FakeBackend`][pythonnative.testing.FakeBackend], which commits to the
+host build of the core, with
 [`set_backend`][pythonnative.native_views.set_backend]; there is no
 Python view-handler layer, and `get_backend` raises off device when no
 backend was installed.

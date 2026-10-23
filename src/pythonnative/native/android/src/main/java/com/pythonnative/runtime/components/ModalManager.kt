@@ -13,6 +13,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.core.view.WindowCompat
 import com.pythonnative.runtime.bridge.JsonUtil
+import com.pythonnative.runtime.core.PNCore
 import com.pythonnative.runtime.bridge.str
 import com.pythonnative.runtime.bridge.value
 import org.json.JSONObject
@@ -43,7 +44,7 @@ class ModalManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = ModalProps(props, validated = true)
+        val typed = ModalProps(props)
 
         val state = stateOf(view)
         // Only react when `visible` itself changed; a re-render while the
@@ -107,6 +108,8 @@ class ModalManager : ComponentManager() {
             if (isOverlay) 0x00000000 else PNColor.parse(props.value("background_color")) ?: PNTheme.background(ctx),
         )
         dialog.setContentView(content, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // The children lay out against the dialog's content size.
+        recordOf(placeholder)?.let { PNCore.observeContainer(content, it.tag) }
         dialog.window?.let { window ->
             if (isOverlay) {
                 window.setBackgroundDrawable(ColorDrawable(0x00000000))
@@ -123,7 +126,7 @@ class ModalManager : ComponentManager() {
             }
             PNColor.parse(props.value("status_bar_color"))?.let { window.statusBarColor = it }
         }
-        applyStatusBar(dialog, ModalProps(props, validated = true).status_bar_translucent == true)
+        applyStatusBar(dialog, ModalProps(props).status_bar_translucent == true)
         // Back and backdrop taps ask Python (`on_request_close`) instead of dismissing.
         dialog.setCanceledOnTouchOutside(false)
         dialog.setCancelable(false)

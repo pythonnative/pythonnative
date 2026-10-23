@@ -217,8 +217,8 @@ open class PNViewProps {
 }
 
 public final class ActivityIndicatorProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("ActivityIndicator", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("ActivityIndicator props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -240,8 +240,8 @@ public final class ActivityIndicatorProps: PNViewProps, PNNativeProps {
 }
 
 public final class BlurViewProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("BlurView", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("BlurView props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -263,8 +263,8 @@ public final class BlurViewProps: PNViewProps, PNNativeProps {
 }
 
 public final class ButtonProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Button", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Button props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -288,8 +288,8 @@ public final class ButtonProps: PNViewProps, PNNativeProps {
 }
 
 public final class CheckboxProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Checkbox", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Checkbox props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -315,8 +315,8 @@ public final class CheckboxProps: PNViewProps, PNNativeProps {
 }
 
 public final class ColumnProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Column", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Column props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -334,8 +334,8 @@ public final class ColumnProps: PNViewProps, PNNativeProps {
 }
 
 public final class DatePickerProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("DatePicker", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("DatePicker props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -365,8 +365,8 @@ public final class DatePickerProps: PNViewProps, PNNativeProps {
 }
 
 public final class ImageProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Image", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Image props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -404,8 +404,8 @@ public final class ImageProps: PNViewProps, PNNativeProps {
 }
 
 public final class ImageBackgroundProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("ImageBackground", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("ImageBackground props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -427,8 +427,8 @@ public final class ImageBackgroundProps: PNViewProps, PNNativeProps {
 }
 
 public final class KeyboardAvoidingViewProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("KeyboardAvoidingView", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("KeyboardAvoidingView props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -450,8 +450,8 @@ public final class KeyboardAvoidingViewProps: PNViewProps, PNNativeProps {
 }
 
 public final class LinearGradientProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("LinearGradient", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("LinearGradient props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -477,8 +477,8 @@ public final class LinearGradientProps: PNViewProps, PNNativeProps {
 }
 
 public final class ModalProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Modal", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Modal props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -516,8 +516,8 @@ public final class ModalProps: PNViewProps, PNNativeProps {
 }
 
 public final class PickerProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Picker", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Picker props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -545,8 +545,8 @@ public final class PickerProps: PNViewProps, PNNativeProps {
 }
 
 public final class PortalProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Portal", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Portal props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -564,8 +564,8 @@ public final class PortalProps: PNViewProps, PNNativeProps {
 }
 
 public final class PressableProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Pressable", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Pressable props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -599,8 +599,8 @@ public final class PressableProps: PNViewProps, PNNativeProps {
 }
 
 public final class ProgressBarProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("ProgressBar", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("ProgressBar props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -624,8 +624,8 @@ public final class ProgressBarProps: PNViewProps, PNNativeProps {
 }
 
 public final class RefreshControlProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("RefreshControl", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("RefreshControl props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -647,8 +647,8 @@ public final class RefreshControlProps: PNViewProps, PNNativeProps {
 }
 
 public final class RowProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Row", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Row props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -666,8 +666,8 @@ public final class RowProps: PNViewProps, PNNativeProps {
 }
 
 public final class SafeAreaViewProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("SafeAreaView", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("SafeAreaView props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -687,8 +687,8 @@ public final class SafeAreaViewProps: PNViewProps, PNNativeProps {
 }
 
 public final class ScreenProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Screen", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Screen props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -744,8 +744,8 @@ public final class ScreenProps: PNViewProps, PNNativeProps {
 }
 
 public final class ScreenStackProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("ScreenStack", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("ScreenStack props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -765,8 +765,8 @@ public final class ScreenStackProps: PNViewProps, PNNativeProps {
 }
 
 public final class ScrollViewProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("ScrollView", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("ScrollView props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -818,8 +818,8 @@ public final class ScrollViewProps: PNViewProps, PNNativeProps {
 }
 
 public final class SegmentedControlProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("SegmentedControl", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("SegmentedControl props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -845,8 +845,8 @@ public final class SegmentedControlProps: PNViewProps, PNNativeProps {
 }
 
 public final class SliderProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Slider", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Slider props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -886,8 +886,8 @@ public final class SliderProps: PNViewProps, PNNativeProps {
 }
 
 public final class SpacerProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Spacer", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Spacer props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -907,8 +907,8 @@ public final class SpacerProps: PNViewProps, PNNativeProps {
 }
 
 public final class StatusBarProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("StatusBar", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("StatusBar props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -934,8 +934,8 @@ public final class StatusBarProps: PNViewProps, PNNativeProps {
 }
 
 public final class SvgProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Svg", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Svg props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -971,8 +971,8 @@ public final class SvgProps: PNViewProps, PNNativeProps {
 }
 
 public final class SwitchProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Switch", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Switch props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -1000,8 +1000,8 @@ public final class SwitchProps: PNViewProps, PNNativeProps {
 }
 
 public final class TabBarProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("TabBar", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("TabBar props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -1031,8 +1031,8 @@ public final class TabBarProps: PNViewProps, PNNativeProps {
 }
 
 public final class TextProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("Text", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("Text props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -1064,8 +1064,8 @@ public final class TextProps: PNViewProps, PNNativeProps {
 }
 
 public final class TextInputProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("TextInput", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("TextInput props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -1133,8 +1133,8 @@ public final class TextInputProps: PNViewProps, PNNativeProps {
 }
 
 public final class TouchableOpacityProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("TouchableOpacity", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("TouchableOpacity props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -1160,8 +1160,8 @@ public final class TouchableOpacityProps: PNViewProps, PNNativeProps {
 }
 
 public final class ViewProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("View", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("View props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -1179,8 +1179,8 @@ public final class ViewProps: PNViewProps, PNNativeProps {
 }
 
 public final class VirtualListProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("VirtualList", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("VirtualList props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }
@@ -1212,8 +1212,8 @@ public final class VirtualListProps: PNViewProps, PNNativeProps {
 }
 
 public final class WebViewProps: PNViewProps, PNNativeProps {
-    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {
-        guard validated || PNContracts.validate("WebView", partial ? values.filter { !($0.value is NSNull) } : values, partial: partial) else { throw NativeDecodeError.invalid("WebView props") }
+    // The renderer core validated these values before they were mounted.
+    public init(_ values: [String: Any], partial: Bool = true) {
         super.init(values)
     }
     public var has_flex: Bool { values["flex"] != nil }

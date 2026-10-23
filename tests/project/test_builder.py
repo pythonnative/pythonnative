@@ -208,6 +208,28 @@ def test_prepare_ios_installs_requirements_per_slice(tmp_path: Path, monkeypatch
     assert any("iphonesimulator" in p for cmd in pip_cmds for p in cmd if p.startswith("ios_"))
 
 
+def test_debug_prepare_warns_about_a_stale_lock_and_resolves_unlocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    root = _project(tmp_path, _TOML + '\n[requirements]\npackages = ["httpx==0.27.0", "numpy"]\n')
+    (root / "pn.lock").write_text(
+        '{"version": 1, "python": "3.13", "requirements": ["httpx"], "indexes": [], "targets": {}}\n',
+        encoding="utf-8",
+    )
+    cfg = AppConfig.load(root)
+    messages: list[str] = []
+    runner = RecordingRunner()
+    Builder(cfg, runner=runner, log=messages.append).prepare("ios")
+
+    assert any("pn.lock doesn't match this app" in message and "development build" in message for message in messages)
+    pip_cmds = [cmd for cmd in runner.commands if "pip" in cmd and "--target" in cmd]
+    assert len(pip_cmds) == 2
+    assert all("httpx==0.27.0" in cmd and "--no-deps" not in cmd for cmd in pip_cmds)
+    with pytest.raises(BuildError, match="doesn't match"):
+        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True)
+
+
 def test_prepare_ios_release_requires_a_matching_interpreter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _fake_ios_runtime(tmp_path, monkeypatch)
     monkeypatch.setattr(builder_mod.bytecode, "compiler_for", lambda version: None)

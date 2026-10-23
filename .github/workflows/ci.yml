@@ -69,6 +69,17 @@ jobs:
       - run: uv sync --locked --group dev
       - run: uv run python scripts/run-browser-tests.py
 
+  # The browser preview runs the renderer core as checked-in WebAssembly;
+  # rebuild it with the pinned Emscripten and fail if it drifted.
+  core-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.10
+      - run: python3 scripts/build-core-wasm.py --check
+
   # The Swift half of the rendering core: decoders, component managers,
   # gestures, and module promises run under XCTest on a simulator.
   native-ios:

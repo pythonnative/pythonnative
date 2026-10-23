@@ -7,7 +7,7 @@ prune src/pythonnative/native/android/.gradle
 prune src/pythonnative/native/android/.cxx
 prune src/pythonnative/native/ios/.build
 prune src/pythonnative/native/ios/.swiftpm
-prune src/pythonnative/native/yoga/.build
+prune src/pythonnative/native/core/.build
 prune src/pythonnative/templates/android_template/app/build
 prune src/pythonnative/templates/android_template/.gradle
 prune src/pythonnative/templates/ios_template/build

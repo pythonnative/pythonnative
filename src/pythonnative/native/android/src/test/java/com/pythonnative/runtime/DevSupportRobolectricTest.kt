@@ -9,9 +9,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.pythonnative.generated.PNValues
 import com.pythonnative.generated.ViewProps
-import com.pythonnative.runtime.bridge.Op
 import com.pythonnative.runtime.bridge.PNRegistry
-import com.pythonnative.runtime.bridge.TransactionApplier
+import com.pythonnative.runtime.mount.MountOp
+import com.pythonnative.runtime.mount.Mounter
 import com.pythonnative.runtime.bridge.ViewRecord
 import com.pythonnative.runtime.components.ComponentManager
 import com.pythonnative.runtime.components.SpacerManager
@@ -39,7 +39,7 @@ import org.robolectric.annotation.Config
 private class UndecodableManager : ComponentManager() {
     override fun createView(context: android.content.Context, tag: Long, props: JSONObject): View = View(context)
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        ViewProps(JSONObject().put("opacity", "loud"), validated = true).opacity
+        ViewProps(JSONObject().put("opacity", "loud")).opacity
     }
 }
 
@@ -47,13 +47,13 @@ private class UndecodableManager : ComponentManager() {
 @Config(sdk = [34])
 class DevSupportRobolectricTest {
     private lateinit var activity: Activity
-    private lateinit var applier: TransactionApplier
+    private lateinit var applier: Mounter
     private val devSupport get() = BuiltinModules.devSupport
 
     @Before fun start() {
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         PNBridge.setContext(activity)
-        applier = TransactionApplier(PNBridge.registry)
+        applier = Mounter(PNBridge.registry)
     }
 
     @After fun stop() {
@@ -61,7 +61,7 @@ class DevSupportRobolectricTest {
         call("set_perf_monitor", JSONObject().put("visible", false).put("lines", JSONArray()))
         call("highlight", JSONObject().put("tag", JSONObject.NULL).put("label", ""))
         com.pythonnative.runtime.modules.HostModule().call("dismiss_error", JSONObject(), Promise(0, "Host"))
-        for (record in PNBridge.registry.all()) applier.applyOp(Op.Destroy(record.tag))
+        for (record in PNBridge.registry.all()) applier.applyOp(MountOp.Delete(record.tag))
         PNRegistry.registerComponent("Spacer") { SpacerManager() }
         devSupport.detach(activity)
         PNBridge.clearContext(activity)
@@ -176,7 +176,7 @@ class DevSupportRobolectricTest {
 
     @Test fun generatedGettersRecordDecodeFailuresInsteadOfThrowing() {
         PNValues.takeDecodeFailure()
-        val props = ViewProps(JSONObject().put("opacity", "loud").put("flex", 1), validated = true)
+        val props = ViewProps(JSONObject().put("opacity", "loud").put("flex", 1))
         assertNull(props.opacity)
         assertEquals(1.0, props.flex!!, 0.0)
         val failure = PNValues.takeDecodeFailure()
@@ -187,7 +187,7 @@ class DevSupportRobolectricTest {
     @Test fun decodeFailureFailsTheOperation() {
         PNRegistry.registerComponent("Spacer") { UndecodableManager() }
         try {
-            applier.applyOp(Op.Create(9901, "Spacer", JSONObject()))
+            applier.applyOp(MountOp.Create(9901, "Spacer", JSONObject()))
             fail("expected the create to fail")
         } catch (error: IllegalStateException) {
             assertTrue(error.message, error.message!!.startsWith("props for Spacer tag 9901: field opacity didn't decode"))

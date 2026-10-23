@@ -22,7 +22,6 @@ public final class PNSvgManager: PNTypedComponentManager<SvgProps> {
         if props.has_view_box {
             svg.viewBox = PNSvgView.parseViewBox(props.view_box) ?? CGRect(x: 0, y: 0, width: 24, height: 24)
             redraw = true
-            if let state = PNViewState.existing(for: svg) { PNLayout.invalidate(state.tag) }
         }
         if props.has_preserve_aspect_ratio {
             svg.preserveAspectRatio = props.preserve_aspect_ratio?.rawValue ?? "meet"
@@ -46,18 +45,6 @@ public final class PNSvgManager: PNTypedComponentManager<SvgProps> {
         PNViewStyler.applyCommon(svg, props.values)
     }
 
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
-        guard let svg = view as? PNSvgView else { return .zero }
-        var size = svg.viewBox.size
-        if size.width <= 0 || size.height <= 0 { size = CGSize(width: 24, height: 24) }
-        if maxW.isFinite, maxW > 0, size.width > maxW {
-            size = CGSize(width: maxW, height: size.height * maxW / size.width)
-        }
-        if maxH.isFinite, maxH > 0, size.height > maxH {
-            size = CGSize(width: size.width * maxH / size.height, height: maxH)
-        }
-        return size
-    }
 }
 
 /// Root paint defaults applied to shapes that leave an attribute unset.

@@ -1,10 +1,18 @@
-"""WebSocket transport for the browser renderer.
+"""WebSocket transport for the browser preview.
 
-Network I/O and request settlement execute independently of the application
-asyncio loop. Python owns the component tree; the page owns DOM widgets and Yoga
-layout. Revisioned commits receive explicit acknowledgements, and callbacks
-are queued onto the Python application thread. No asyncio loop is pumped by
-the browser transport.
+The page runs the renderer core as WebAssembly, the same C++ core the iOS
+and Android apps link (RFC 0007), and mounts its transactions into DOM
+widgets. This transport is Python's side of it: every call a device
+transport makes into the core (``load_contracts``, ``commit``, ``layout``,
+``command``, ``animate``, ``measure``) becomes a request over the dev
+server's WebSocket that the page answers with the core's own JSON reply.
+Everything the core emits (events, layout, animation, and host messages)
+and every command result comes back as a callback, which is queued onto
+the Python application thread, as on device. Native module calls go to the
+page for the modules it implements and to the Python fallbacks otherwise.
+
+Network I/O and request settlement run independently of the application
+asyncio loop; no asyncio loop is pumped by the browser transport.
 """
 
 from __future__ import annotations
@@ -16,7 +24,7 @@ import sys
 import threading
 import time
 import traceback
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 from . import PROTOCOL_VERSION, codec
 
@@ -26,7 +34,6 @@ BROWSER_MODULES = frozenset(
     {
         "DevSupport",
         "Host",
-        "Layout",
         "Alert",
         "Clipboard",
         "Linking",
@@ -46,6 +53,8 @@ BROWSER_MODULES = frozenset(
 REQUEST_TIMEOUT_S = 15.0
 """How long a synchronous request waits for the page before giving up."""
 
+NO_PAGE = "no browser preview page is attached"
+
 Callback = Callable[[str, int, str, str], None]
 
 
@@ -59,7 +68,7 @@ class _Waiter:
 
 
 class WebTransport:
-    """Bridge transport whose native side is a browser page.
+    """Bridge transport whose renderer core and widgets live in a browser page.
 
     Install it with ``pythonnative.bridge.set_transport`` and hand it to
     ``DevServer.set_preview_channel``; the page does the rest.
@@ -82,8 +91,6 @@ class WebTransport:
         self._main: "queue.Queue[Callable[[], None]]" = queue.Queue()
         self._main_thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
-        self._gestures: Dict[int, Tuple[str, Any]] = {}
-        self._gesture_timer: Optional[Any] = None
         self._warned_no_peer = False
         self._python_modules: Dict[str, Any] = {}
         self.on_dev_message: Optional[Callable[[Dict[str, Any]], None]] = None
@@ -92,37 +99,64 @@ class WebTransport:
         """Called on the application thread with ``True`` on connect and ``False`` on disconnect."""
 
     # ------------------------------------------------------------------
-    # Transport protocol
+    # Transport protocol: the renderer core in the page
     # ------------------------------------------------------------------
 
     def protocol_version(self) -> int:
-        """The page speaks whatever this package speaks; they ship together."""
+        """The page's core speaks whatever this package speaks; they ship together."""
         return PROTOCOL_VERSION
 
     def set_callback(self, callback: Callback) -> None:
         """Install the native -> Python entry point (``bridge.native_callback``)."""
         self._callback = callback
 
-    def apply(self, transaction_json: str) -> str:
-        """Wait for the page to acknowledge this exact commit revision."""
-        return codec.dumps(self._request(["apply", None, codec.loads(transaction_json)]))
+    def load_contracts(self, document: str) -> None:
+        """Compile the merged component contracts into the page's core.
 
-    def command(self, tag: int, name: str, args_json: str) -> Optional[str]:
-        """Run an imperative command on one view; returns its JSON result or ``None``."""
-        result = self._request(["command", None, int(tag), name, args_json])
-        return _as_json_text(result)
+        A page that connects later starts with a fresh core; the transport
+        forgets what it loaded then, so the next commit loads them again.
 
-    def animate(self, tag: int, request_json: str) -> Optional[str]:
-        """Handle an animation request (``set`` / ``start`` / ``cancel``) for one view."""
-        result = self._request(["animate", None, int(tag), request_json])
-        return _as_json_text(result)
+        Raises:
+            RuntimeError: When the core rejects the document.
+        """
+        error = self._request(["load_contracts", None, document])
+        if isinstance(error, str) and error:
+            raise RuntimeError(f"The renderer core rejected the component contracts: {error}")
+
+    def commit(self, envelope_json: str) -> str:
+        """Validate, apply, and lay out one commit in the page; returns its acknowledgement."""
+        return self._text(self._request(["commit", None, envelope_json]), _failure("commit"))
+
+    def layout(self, request_json: str) -> str:
+        """Lay out without a commit; returns ``{"ok", "value": layout}``."""
+        return self._text(self._request(["layout", None, request_json]), _failure("layout"))
+
+    def command(self, surface: int, tag: int, name: str, args_json: str, call_id: int) -> str:
+        """Queue a view command; its result arrives as a ``command`` message."""
+        message = ["command", None, int(surface), int(tag), name, args_json, int(call_id)]
+        return self._text(self._request(message), _failure(f"command {name!r}"))
+
+    def animate(self, surface: int, tag: int, request_json: str) -> str:
+        """Queue an animation request behind pending mounts."""
+        return self._text(self._request(["animate", None, int(surface), int(tag), request_json]), _failure("animate"))
+
+    def measure(self, surface: int, tag: int) -> str:
+        """The shadow and window frames of a view, as JSON (``"null"`` when unknown)."""
+        return self._text(self._request(["measure", None, int(surface), int(tag)]), "null")
 
     def call(self, module: str, method: str, args_json: str) -> Optional[str]:
-        """Call a native module: ``Host.post`` locally, page modules over the wire, others in Python."""
+        """Call a native module: page modules over the wire, the others in Python."""
         if module in BROWSER_MODULES:
             result = self._request(["call", None, module, method, args_json])
             return _as_json_text(result)
         return self._call_python_module(module, method, args_json)
+
+    @staticmethod
+    def _text(result: Any, default: str) -> str:
+        """The core's JSON text from a page reply, or ``default`` when there was none."""
+        if isinstance(result, str) and result:
+            return result
+        return default
 
     # ------------------------------------------------------------------
     # Application thread and fallback queue
@@ -222,9 +256,6 @@ class WebTransport:
             return
         if kind == "cb":
             self.post_to_application(lambda: self._deliver_fire_and_forget(message))
-            return
-        if kind == "gesture":
-            self.post_to_application(lambda: self._deliver_gesture(message))
             return
         if kind == "dev":
             payload = message[1] if len(message) > 1 and isinstance(message[1], dict) else {}
@@ -327,86 +358,14 @@ class WebTransport:
             hook(payload)
 
     def _peer_changed(self, connected: bool) -> None:
-        if not connected:
-            self._gestures.clear()
+        if connected:
+            # A new page starts with a fresh core: compile the contracts again.
+            from . import _loaded_contracts
+
+            _loaded_contracts.pop(self, None)
         hook = self.on_peer_changed
         if hook is not None:
             hook(connected)
-
-    # -- gestures --------------------------------------------------------
-
-    def _deliver_gesture(self, message: List[Any]) -> None:
-        """Feed a pointer event to the tag's arbiter (built from the specs the page sends)."""
-        if len(message) < 4:
-            return
-        _, tag, phase, info = message[:4]
-        if not isinstance(info, dict):
-            return
-        tag = int(tag)
-        arbiter = self._arbiter_for(tag, info.get("specs"))
-        if arbiter is None:
-            return
-        t = float(info.get("t", time.monotonic()))
-        pointer = int(info.get("id", 0))
-        x = float(info.get("x", 0.0))
-        y = float(info.get("y", 0.0))
-        # The page sends window coordinates beside the view-local ones; the
-        # arbiter reports them as ``GestureEvent.absolute_x`` / ``absolute_y``.
-        absolute_x = _optional_float(info.get("absolute_x"))
-        absolute_y = _optional_float(info.get("absolute_y"))
-        if phase == "down":
-            arbiter.pointer_down(pointer, x, y, t, absolute_x=absolute_x, absolute_y=absolute_y)
-        elif phase == "move":
-            arbiter.pointer_move(pointer, x, y, t, absolute_x=absolute_x, absolute_y=absolute_y)
-        elif phase == "up":
-            arbiter.pointer_up(pointer, x, y, t, absolute_x=absolute_x, absolute_y=absolute_y)
-        elif phase == "cancel":
-            arbiter.cancel(t)
-        elif phase == "clear":
-            self._gestures.pop(tag, None)
-            return
-        self._schedule_gesture_poll()
-
-    def _arbiter_for(self, tag: int, specs: Any) -> Any:
-        if not isinstance(specs, list) or not specs:
-            self._gestures.pop(tag, None)
-            return None
-        key = json.dumps(specs, sort_keys=True)
-        existing = self._gestures.get(tag)
-        if existing is not None and existing[0] == key:
-            return existing[1]
-        from ..events import dispatch_event
-        from ..gestures import make_arbiter
-
-        def _emit(index: int, payload: Dict[str, Any]) -> None:
-            dispatch_event(tag, f"gesture:{index}", payload)
-
-        arbiter = make_arbiter([s for s in specs if isinstance(s, dict)], _emit)
-        self._gestures[tag] = (key, arbiter)
-        return arbiter
-
-    def _schedule_gesture_poll(self) -> None:
-        """Arm one timer for the earliest recognizer deadline (long press, multi-tap windows)."""
-        deadlines = [d for _, arb in self._gestures.values() if (d := arb.next_deadline()) is not None]
-        if not deadlines:
-            return
-        delay = max(0.0, min(deadlines) - time.monotonic())
-        from ..runtime import get_loop
-
-        loop = get_loop()
-        if self._gesture_timer is not None:
-            try:
-                self._gesture_timer.cancel()
-            except Exception:
-                pass
-        self._gesture_timer = loop.call_later(delay + 0.001, self._poll_gestures)
-
-    def _poll_gestures(self) -> None:
-        self._gesture_timer = None
-        now = time.monotonic()
-        for _, arbiter in list(self._gestures.values()):
-            arbiter.poll(now)
-        self._schedule_gesture_poll()
 
     # -- Python module fallbacks ------------------------------------------
 
@@ -452,12 +411,9 @@ class WebTransport:
             return codec.dumps({"ok": True, "value": None})
 
 
-def _optional_float(value: Any) -> Optional[float]:
-    """A finite float from the wire, or ``None`` when the page didn't send one."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    f = float(value)
-    return f if f == f and f not in (float("inf"), float("-inf")) else None
+def _failure(what: str) -> str:
+    """The core-shaped reply for a request no page answered."""
+    return codec.dumps({"ok": False, "error": f"{what} failed: {NO_PAGE} (or it didn't answer)"})
 
 
 def _as_json_text(result: Any) -> Optional[str]:

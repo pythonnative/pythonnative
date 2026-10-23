@@ -218,10 +218,19 @@ final class PNSvgTests: XCTestCase {
         XCTAssertEqual(svg.viewBox, CGRect(x: 0, y: 0, width: 48, height: 24))
         XCTAssertEqual(svg.rootPaint.stroke, "#ff0000")
         XCTAssertEqual(svg.rootPaint.strokeWidth, 2)
-        XCTAssertEqual(manager.measure(view: svg, maxW: .infinity, maxH: .infinity), CGSize(width: 48, height: 24))
-        XCTAssertEqual(manager.measure(view: svg, maxW: 24, maxH: .infinity), CGSize(width: 24, height: 12))
         manager.update(view: svg, changed: ["shapes": []])
         XCTAssertTrue(svg.shapes.isEmpty)
+    }
+
+    func testCoreSizesSvgFromItsViewBox() throws {
+        let core = PNCoreHarness()
+        core.roots = [1]
+        core.commit([["c", 1, "Column", ["align_items": "flex_start"]],
+                     ["c", 2, "Svg", ["view_box": "0 0 48 24"]],
+                     ["c", 3, "Svg", ["view_box": "0 0 48 24", "width": 24]],
+                     ["i", 1, 2, 0], ["i", 1, 3, 1]])
+        XCTAssertEqual(PNViewRegistry.shared.view(for: 2)?.bounds.size, CGSize(width: 48, height: 24))
+        XCTAssertEqual(PNViewRegistry.shared.view(for: 3)?.bounds.size, CGSize(width: 24, height: 12))
     }
 
     func testTabBarIconFromShapesAndMissingSpec() {

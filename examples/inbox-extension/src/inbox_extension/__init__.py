@@ -37,7 +37,8 @@ class InboxToolsProtocol(Protocol):
     async def prepare(self, records: list[InboxRecord], *, limit: int = 10, delay_ms: int = 50) -> InboxBatch: ...
 
 
-InboxBadge = define_component("InboxBadge", InboxBadgeProps)
+# The badge sizes to its label, which only the platform widget can measure.
+InboxBadge = define_component("InboxBadge", InboxBadgeProps, measurement="intrinsic")
 register_schema(ModuleSchema.from_protocol("InboxTools", InboxToolsProtocol, events={"prepared": InboxBatch}))
 
 from .api import InboxTools  # noqa: E402

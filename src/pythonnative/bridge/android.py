@@ -1,10 +1,12 @@
-"""Android transport: the ``com.pythonnative.runtime.PNBridge`` class via Chaquopy.
+"""Android transport: ``libpncore.so`` through ``ctypes``, modules through Chaquopy.
 
-``PNBridge`` is the only Java class Python touches. Its static methods
-mirror the C entry points used on iOS (see ``docs/concepts/bridge.md``).
-The reverse direction (native -> Python) is installed by the template's
-``MainActivity``, which implements ``PythonHost`` by calling
-[`pythonnative.bridge.native_callback`][pythonnative.bridge.native_callback]
+Kotlin loads the renderer core before Python starts, registers its
+platform callbacks, and exports the library's path in ``PN_CORE_LIBRARY``;
+Python opens the same loaded image. Commits go to the core. Native module
+calls go to the ``com.pythonnative.runtime.PNBridge`` class, the only Java
+class Python touches. The reverse direction (native -> Python) is installed
+by the template's ``MainActivity``, which implements ``PythonHost`` by
+calling [`pythonnative.bridge.native_callback`][pythonnative.bridge.native_callback]
 through Chaquopy; this transport therefore has nothing to register.
 """
 
@@ -12,18 +14,20 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
+from .core import RendererCore, load_core
+
 __all__ = ["AndroidTransport"]
 
 BRIDGE_CLASS = "com.pythonnative.runtime.PNBridge"
 
 
 class AndroidTransport:
-    """Thin wrapper over the static ``PNBridge`` methods."""
+    """The renderer core plus the static ``PNBridge`` module entry point."""
 
     name = "android"
     asynchronous_commits = True
 
-    def __init__(self, bridge_class: Any = None) -> None:
+    def __init__(self, bridge_class: Any = None, core: Optional[RendererCore] = None) -> None:
         if bridge_class is None:
             from java import jclass
 
@@ -35,22 +39,35 @@ class AndroidTransport:
                     "'pn build android' so the pythonnative Gradle module is included."
                 ) from exc
         self._bridge = bridge_class
+        self.core = core if core is not None else load_core()
 
     def protocol_version(self) -> int:
-        """Return the protocol version compiled into the native library."""
-        return int(self._bridge.protocolVersion())
+        """Return the protocol version compiled into the renderer core."""
+        return self.core.protocol_version()
 
-    def apply(self, transaction_json: str) -> str:
-        """Apply one serialized transaction (a JSON array of ops)."""
-        return str(self._bridge.apply(transaction_json))
+    def load_contracts(self, document: str) -> None:
+        """Compile the merged component contracts into the core."""
+        self.core.load_contracts(document, "android")
 
-    def command(self, tag: int, name: str, args_json: str) -> Optional[str]:
-        """Run an imperative command on one view; returns its JSON result or ``None``."""
-        return _opt_str(self._bridge.command(int(tag), name, args_json))
+    def commit(self, envelope_json: str) -> str:
+        """Validate, apply, and lay out one commit; returns its acknowledgement."""
+        return self.core.commit(envelope_json)
 
-    def animate(self, tag: int, request_json: str) -> Optional[str]:
-        """Handle an animation request (``set`` / ``start`` / ``cancel``) for one view."""
-        return _opt_str(self._bridge.animate(int(tag), request_json))
+    def layout(self, request_json: str) -> str:
+        """Lay out without a commit."""
+        return self.core.layout(request_json)
+
+    def command(self, surface: int, tag: int, name: str, args_json: str, call_id: int) -> str:
+        """Queue a view command behind pending mounts."""
+        return self.core.command(surface, tag, name, args_json, call_id)
+
+    def animate(self, surface: int, tag: int, request_json: str) -> str:
+        """Queue an animation request behind pending mounts."""
+        return self.core.animate(surface, tag, request_json)
+
+    def measure(self, surface: int, tag: int) -> str:
+        """The shadow and window frames of a view."""
+        return self.core.measure(surface, tag)
 
     def call(self, module: str, method: str, args_json: str) -> Optional[str]:
         """Call a native module method with a ``{"call_id", "args"}`` envelope."""

@@ -60,9 +60,13 @@ def write(config: AppConfig, resolutions: Sequence[Resolution]) -> Path:
 
 
 def read(config: AppConfig) -> dict[str, Any] | None:
-    """Read a lock and reject stale requirements instead of silently resolving."""
+    """Read a lock and reject stale requirements instead of silently resolving.
+
+    Returns ``None`` when there's no lock, or when ``config.use_lock`` is
+    off (a development build that chose to resolve unlocked).
+    """
     path = config.project_root / NAME
-    if not path.exists():
+    if not config.use_lock or not path.exists():
         return None
     value = json.loads(path.read_text(encoding="utf-8"))
     if (

@@ -258,7 +258,7 @@ Start `pn start` and relaunch to connect it.
 
 The browser preview runs your real Python in the `pn start` process and
 shares Python reconciliation, hooks, and logical navigation with device
-builds. Its renderer uses Yoga WebAssembly and DOM widgets, and
+builds. It runs the renderer core as WebAssembly with DOM widgets, and
 implements a subset of native modules (`Alert`, `Clipboard`, `Linking`,
 `Share`, `Haptics`, `NetInfo`, `AppState`, `Device`); everything else
 uses the pure-Python fallbacks in
@@ -301,9 +301,10 @@ PN_PROFILE=/tmp/pythonnative-trace.json pn preview
 
 Collection retains the latest 10,000 timing events and exports the trace at
 normal process exit. The trace identifies rendered components and separates
-Python preparation, acknowledgement, and native decode, queue, preflight,
-mutation, and layout durations. Counters cover bridge bytes/operations, list
-snapshot rows and patches, and mounted views. `Profiler.summary()` reports
+Python preparation and acknowledgement from the renderer core's validation,
+commit, and layout durations and the commit worker's wait. Counters cover
+bridge commits, bytes, and operations, list snapshot rows and patches, layout
+requests, queued commits, and views in the core's shadow tree. `Profiler.summary()` reports
 retained-sample p50/p95/max durations, work counters, and gauges.
 
 Setting `PN_PROFILE` here captures the preview's Python process; it doesn't

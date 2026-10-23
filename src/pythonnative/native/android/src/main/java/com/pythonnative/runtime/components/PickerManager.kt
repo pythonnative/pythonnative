@@ -43,7 +43,7 @@ class PickerManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
-        val typed = PickerProps(props, validated = true)
+        val typed = PickerProps(props)
 
         val spinner = view as Spinner
         val state = stateOf(spinner)

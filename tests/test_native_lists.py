@@ -34,16 +34,16 @@ def test_rows_inherit_provider_and_keep_state_by_key() -> None:
 
 def test_same_length_data_edits_advance_native_revision() -> None:
     result = render(pn.FlatList(data=["a", "b"], item_height=44))
-    first = result.backend.list_stores[result.get_by_type("VirtualList").tag].revision
+    first = result.backend.list_store(result.get_by_type("VirtualList").tag).revision
     result.rerender(pn.FlatList(data=["z", "b"], item_height=44))
-    assert result.backend.list_stores[result.get_by_type("VirtualList").tag].revision > first
+    assert result.backend.list_store(result.get_by_type("VirtualList").tag).revision > first
     assert result.get_by_text("z")
 
 
 def test_native_requests_are_bounded_and_stale_requests_are_ignored() -> None:
     result = render(pn.FlatList(data=list(range(10_000)), item_height=44))
     view = result.get_by_type("VirtualList")
-    store = result.backend.list_stores[view.tag]
+    store = result.backend.list_store(view.tag)
     revision = store.revision
     assert len(result.get_all_by_type("Text")) <= 56
     key = store.keys[5000]
@@ -88,12 +88,14 @@ def test_parent_renders_keep_dataset_revision_and_only_changed_items_advance() -
 
     result = render(pn.FlatList(data=["a", "b"], render_item=row))
     view = result.get_by_type("VirtualList")
-    store = result.backend.list_stores[view.tag]
+    store = result.backend.list_store(view.tag)
     revision, items = store.revision, [store.rows[key].revision for key in store.keys]
     result.rerender(pn.FlatList(data=["a", "b"], render_item=row))
+    store = result.backend.list_store(view.tag)
     assert store.revision == revision
     assert [store.rows[key].revision for key in store.keys] == items
     result.rerender(pn.FlatList(data=["changed", "b"], render_item=row))
+    store = result.backend.list_store(view.tag)
     assert [store.rows[key].revision for key in store.keys] == [items[0] + 1, items[1]]
     result.unmount()
 
@@ -127,7 +129,7 @@ def test_viewport_changes_reuse_dataset_metadata(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(lists, "_prepare_snapshot", prepare)
     result = render(pn.FlatList(data=range(100_000), item_height=44), viewport=None, settle_first=False)
     view = result.get_by_type("VirtualList")
-    store = result.backend.list_stores[view.tag]
+    store = result.backend.list_store(view.tag)
     keys, metadata = store.keys, store.rows
     for first in range(50, 500, 25):
         result.fire(view, "on_window", {"first": first, "last": first + 18, "extent": 800, "y": first * 44})

@@ -1,5 +1,6 @@
 """Generated native contracts match a clean Python interpreter."""
 
+import json
 import os
 import re
 import runpy
@@ -96,6 +97,18 @@ def test_checked_native_record_fixtures_match_python_annotations() -> None:
     fixtures = runpy.run_path("scripts/generate-native-contracts.py")["record_fixtures"]()
     for path, expected in fixtures.items():
         assert path.read_text() == expected
+
+
+def test_checked_core_mount_fixtures_match_the_core() -> None:
+    # Transaction ids stay unique for a process's lifetime, so record in a fresh one.
+    script = (
+        "import json, runpy\n"
+        "fixtures = runpy.run_path('scripts/generate-native-contracts.py')['core_fixtures']()\n"
+        "print(json.dumps({str(path): content for path, content in fixtures.items()}))\n"
+    )
+    output = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=True).stdout
+    for path, expected in json.loads(output).items():
+        assert Path(path).read_text() == expected, f"{path} is stale; run scripts/generate-native-contracts.py"
 
 
 def test_codegen_escapes_kotlin_literals_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -92,17 +92,16 @@ def generate(destination: str | Path) -> list[Path]:
         swift.extend(
             [
                 f"public final class {name}Props: PNViewProps, PNNativeProps {{",
-                "    public init(_ values: [String: Any], partial: Bool = true, validated: Bool = false) throws {",
-                f'        guard validated || PNContracts.validate("{name}", partial ? values.filter {{ !($0.value is NSNull) }} : values, partial: partial) else {{ throw NativeDecodeError.invalid("{name} props") }}',  # noqa: E501
+                "    // The renderer core validated these values before they were mounted.",
+                "    public init(_ values: [String: Any], partial: Bool = true) {",
                 "        super.init(values)",
                 "    }",
             ]
         )
         kotlin.extend(
             [
-                f"class {name}Props(values: JSONObject, partial: Boolean = true, "
-                "validated: Boolean = false): PNViewProps(values) {",
-                f'    init {{ require(validated || PNContracts.validate("{name}", if (partial) PNValues.withoutNulls(values) else values, partial)) {{ "Invalid {name} props" }} }}',  # noqa: E501
+                "// The renderer core validated these values before they were mounted.",
+                f"class {name}Props(values: JSONObject, partial: Boolean = true): PNViewProps(values) {{",
             ]
         )
         parameters, values = [], []
@@ -206,7 +205,6 @@ def generate(destination: str | Path) -> list[Path]:
     templates = Path(__file__).with_name("templates")
     outputs: dict[str, Any] = {
         "schema.json": encoded,
-        "schema.js": "export default " + encoded.strip() + ";\n",
         "NativeProps.swift": "\n".join(swift + sw_events),
         "NativeProps.kt": "\n".join(kotlin + kt_events),
         "NativeValues.swift": (templates / "values.swift").read_text() + "\n" + "\n".join(types.swift),
@@ -222,13 +220,15 @@ def generate(destination: str | Path) -> list[Path]:
     outputs["modules.py"] = "\n".join(
         headers + ["from pythonnative.native_modules.registry import native_module", "", modules["modules.py"]]
     )
-    from .contract_codegen import ContractCompiler
-
     for extension in ("swift", "kt"):
         template = (templates / f"contracts.{extension}").read_text(encoding="utf-8")
-        outputs[f"PNContracts.{extension}"] = ContractCompiler(kotlin=extension == "kt").generate(
-            spec, fingerprint(), template
-        )
+        for key, value in {
+            "fingerprint": fingerprint(),
+            "protocol": str(spec["protocol"]),
+            "yoga": spec["yoga"],
+        }.items():
+            template = template.replace("{{" + key + "}}", value)
+        outputs[f"PNContracts.{extension}"] = template
     paths = []
     for name, contents in outputs.items():
         if name.endswith(".py"):

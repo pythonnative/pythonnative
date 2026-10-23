@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from typing import Any, Optional
 
 import pytest
 
 import pythonnative as pn
 from pythonnative import runtime
+from pythonnative.native_views.bridge_backend import CommitError
 from pythonnative.testing import (
     IMPLICIT_ROLES,
     FakeBackend,
@@ -411,6 +413,11 @@ def test_settle_under_fake_clock_does_not_wait_for_long_timers(pn_clock: FakeClo
 # ----------------------------------------------------------------------
 
 
+def _ask(backend: FakeBackend, tag: int, name: str, args: Optional[dict] = None) -> Any:
+    """Run a command through the core and read the fake UI thread's answer."""
+    return backend.command(tag, name, args or {}).result()
+
+
 def test_text_input_commands() -> None:
     focus: list[str] = []
     result = render(
@@ -426,24 +433,27 @@ def test_text_input_commands() -> None:
     )
     backend = result.backend
     a, b = result.get_by_test_id("a"), result.get_by_test_id("b")
-    assert backend.command(a.tag, "get_value", {}) == "hello"
-    assert backend.command(a.tag, "focus", {}) is None
+    assert _ask(backend, a.tag, "get_value") == "hello"
+    assert _ask(backend, a.tag, "focus") is None
     assert backend.focused_tag == a.tag and focus == ["focus a"]
-    backend.command(a.tag, "focus", {})
+    _ask(backend, a.tag, "focus")
     assert focus == ["focus a"], "refocusing does not fire again"
-    backend.command(a.tag, "select_all", {})
+    _ask(backend, a.tag, "select_all")
     assert backend.selections[a.tag] == (0, 5)
-    backend.command(a.tag, "set_selection", {"start": 1, "end": 3})
+    _ask(backend, a.tag, "set_selection", {"start": 1, "end": 3})
     assert backend.selections[a.tag] == (1, 3)
-    backend.command(b.tag, "focus", {})
+    _ask(backend, b.tag, "focus")
     assert backend.focused_tag == b.tag and focus == ["focus a", "blur a"]
-    backend.command(b.tag, "blur", {})
+    _ask(backend, b.tag, "blur")
     assert backend.focused_tag is None
-    backend.command(a.tag, "clear", {})
-    assert backend.command(a.tag, "get_value", {}) == "" and a.value == ""
+    _ask(backend, a.tag, "clear")
+    assert _ask(backend, a.tag, "get_value") == "" and a.value == ""
     assert backend.commands[0] == (a.tag, "get_value", {})
-    assert backend.command(a.tag, "unknown", None) is None
-    assert backend.command(999, "get_value", {}) is None
+    # Commands are checked against the contract, as on a device.
+    with pytest.raises(TypeError, match="Unknown command"):
+        backend.command(a.tag, "unknown", None)
+    with pytest.raises(CommitError, match="stale view"):
+        backend.command(999, "get_value", {})
 
 
 def test_scroll_view_commands_track_an_offset_per_view() -> None:
@@ -455,35 +465,35 @@ def test_scroll_view_commands_track_an_offset_per_view() -> None:
     result = render(pn.Column(vertical, horizontal))
     backend = result.backend
     v, h = result.get_all_by_type("ScrollView")
-    assert backend.command(v.tag, "get_scroll_offset", {}) == {"x": 0.0, "y": 0.0}
-    backend.command(v.tag, "scroll_to_offset", {"x": 0, "y": 120, "animated": False})
-    assert backend.command(v.tag, "get_scroll_offset", {}) == {"x": 0.0, "y": 120.0}
-    assert backend.command(h.tag, "get_scroll_offset", {}) == {"x": 0.0, "y": 0.0}
-    backend.command(v.tag, "scroll_to_end", {})
-    assert backend.command(v.tag, "get_scroll_offset", {}) == {"x": 0.0, "y": 1500.0}
-    backend.command(h.tag, "scroll_to_end", {})
-    assert backend.command(h.tag, "get_scroll_offset", {})["x"] == 700.0
-    backend.command(v.tag, "scroll_to_top", {})
-    assert backend.scroll_offsets[v.tag] == {"x": 0.0, "y": 0.0}
+    assert _ask(backend, v.tag, "get_scroll_offset") == {"x": 0.0, "y": 0.0}
+    _ask(backend, v.tag, "scroll_to_offset", {"x": 0, "y": 120, "animated": False})
+    assert _ask(backend, v.tag, "get_scroll_offset") == {"x": 0.0, "y": 120.0}
+    assert _ask(backend, h.tag, "get_scroll_offset") == {"x": 0.0, "y": 0.0}
+    _ask(backend, v.tag, "scroll_to_end")
+    assert _ask(backend, v.tag, "get_scroll_offset") == {"x": 0.0, "y": 1500.0}
+    _ask(backend, h.tag, "scroll_to_end")
+    assert _ask(backend, h.tag, "get_scroll_offset")["x"] == 700.0
 
 
 def test_web_view_commands_return_stubs() -> None:
     result = render(pn.WebView(url="https://example.com"))
     backend = result.backend
     web = result.get_by_type("WebView")
-    assert backend.command(web.tag, "can_go_back", {}) is False
-    assert backend.command(web.tag, "can_go_forward", {}) is False
-    assert backend.command(web.tag, "get_url", {}) == "https://example.com"
-    assert backend.command(web.tag, "get_title", {}) is None
-    assert backend.command(web.tag, "reload", {}) is None
-    backend.command(web.tag, "load_url", {"url": "https://example.org"})
-    assert backend.command(web.tag, "get_url", {}) == "https://example.org"
+    assert _ask(backend, web.tag, "can_go_back") is False
+    assert _ask(backend, web.tag, "can_go_forward") is False
+    assert _ask(backend, web.tag, "get_url") == "https://example.com"
+    assert _ask(backend, web.tag, "reload") is None
+    _ask(backend, web.tag, "load_url", {"url": "https://example.org"})
+    assert _ask(backend, web.tag, "get_url") == "https://example.org"
 
 
-def test_command_signature_is_tag_name_args() -> None:
-    backend = FakeBackend()
-    assert backend.command(1, "anything", {"x": 1}) is None
-    assert backend.commands == [(1, "anything", {"x": 1})]
+def test_commands_reach_the_fake_ui_thread_in_order() -> None:
+    result = render(pn.TextInput(value="x"))
+    backend = result.backend
+    field = result.get_by_type("TextInput")
+    backend.command(field.tag, "focus", {})
+    backend.command(field.tag, "set_selection", {"start": 0, "end": 1})
+    assert backend.commands == [(field.tag, "focus", {}), (field.tag, "set_selection", {"start": 0, "end": 1})]
 
 
 # ----------------------------------------------------------------------

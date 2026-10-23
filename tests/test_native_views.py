@@ -10,8 +10,8 @@ from typing import Any
 import pytest
 
 import pythonnative.native_views as native_views
-from pythonnative.layout import LAYOUT_STYLE_KEYS
 from pythonnative.native_views import BridgeBackend, NativeViewRef, get_backend, parse_color_int, set_backend
+from pythonnative.style import LAYOUT_STYLE_KEYS
 from pythonnative.testing import FakeBackend
 
 # ======================================================================

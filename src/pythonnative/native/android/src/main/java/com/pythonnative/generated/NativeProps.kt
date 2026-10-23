@@ -217,8 +217,8 @@ open class PNViewProps(val values: JSONObject) {
     val `_pn_edit_revision`: Long? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_edit_revision"))) null else PNValues.decodeOrRecord("_pn_edit_revision") { PNValues.integer(values.get("_pn_edit_revision")) } }
 }
 
-class ActivityIndicatorProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("ActivityIndicator", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid ActivityIndicator props" } }
+// The renderer core validated these values before they were mounted.
+class ActivityIndicatorProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -237,8 +237,8 @@ class ActivityIndicatorProps(values: JSONObject, partial: Boolean = true, valida
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class BlurViewProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("BlurView", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid BlurView props" } }
+// The renderer core validated these values before they were mounted.
+class BlurViewProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -257,8 +257,8 @@ class BlurViewProps(values: JSONObject, partial: Boolean = true, validated: Bool
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class ButtonProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Button", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Button props" } }
+// The renderer core validated these values before they were mounted.
+class ButtonProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -279,8 +279,8 @@ class ButtonProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class CheckboxProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Checkbox", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Checkbox props" } }
+// The renderer core validated these values before they were mounted.
+class CheckboxProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -303,8 +303,8 @@ class CheckboxProps(values: JSONObject, partial: Boolean = true, validated: Bool
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class ColumnProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Column", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Column props" } }
+// The renderer core validated these values before they were mounted.
+class ColumnProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -319,8 +319,8 @@ class ColumnProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class DatePickerProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("DatePicker", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid DatePicker props" } }
+// The renderer core validated these values before they were mounted.
+class DatePickerProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -347,8 +347,8 @@ class DatePickerProps(values: JSONObject, partial: Boolean = true, validated: Bo
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class ImageProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Image", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Image props" } }
+// The renderer core validated these values before they were mounted.
+class ImageProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -383,8 +383,8 @@ class ImageProps(values: JSONObject, partial: Boolean = true, validated: Boolean
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class ImageBackgroundProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("ImageBackground", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid ImageBackground props" } }
+// The renderer core validated these values before they were mounted.
+class ImageBackgroundProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -403,8 +403,8 @@ class ImageBackgroundProps(values: JSONObject, partial: Boolean = true, validate
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class KeyboardAvoidingViewProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("KeyboardAvoidingView", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid KeyboardAvoidingView props" } }
+// The renderer core validated these values before they were mounted.
+class KeyboardAvoidingViewProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -423,8 +423,8 @@ class KeyboardAvoidingViewProps(values: JSONObject, partial: Boolean = true, val
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class LinearGradientProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("LinearGradient", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid LinearGradient props" } }
+// The renderer core validated these values before they were mounted.
+class LinearGradientProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -447,8 +447,8 @@ class LinearGradientProps(values: JSONObject, partial: Boolean = true, validated
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class ModalProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Modal", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Modal props" } }
+// The renderer core validated these values before they were mounted.
+class ModalProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -483,8 +483,8 @@ class ModalProps(values: JSONObject, partial: Boolean = true, validated: Boolean
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class PickerProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Picker", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Picker props" } }
+// The renderer core validated these values before they were mounted.
+class PickerProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -509,8 +509,8 @@ class PickerProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class PortalProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Portal", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Portal props" } }
+// The renderer core validated these values before they were mounted.
+class PortalProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -525,8 +525,8 @@ class PortalProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class PressableProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Pressable", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Pressable props" } }
+// The renderer core validated these values before they were mounted.
+class PressableProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -557,8 +557,8 @@ class PressableProps(values: JSONObject, partial: Boolean = true, validated: Boo
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class ProgressBarProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("ProgressBar", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid ProgressBar props" } }
+// The renderer core validated these values before they were mounted.
+class ProgressBarProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -579,8 +579,8 @@ class ProgressBarProps(values: JSONObject, partial: Boolean = true, validated: B
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class RefreshControlProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("RefreshControl", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid RefreshControl props" } }
+// The renderer core validated these values before they were mounted.
+class RefreshControlProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -599,8 +599,8 @@ class RefreshControlProps(values: JSONObject, partial: Boolean = true, validated
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class RowProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Row", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Row props" } }
+// The renderer core validated these values before they were mounted.
+class RowProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -615,8 +615,8 @@ class RowProps(values: JSONObject, partial: Boolean = true, validated: Boolean =
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class SafeAreaViewProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("SafeAreaView", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid SafeAreaView props" } }
+// The renderer core validated these values before they were mounted.
+class SafeAreaViewProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -633,8 +633,8 @@ class SafeAreaViewProps(values: JSONObject, partial: Boolean = true, validated: 
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class ScreenProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Screen", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Screen props" } }
+// The renderer core validated these values before they were mounted.
+class ScreenProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -687,8 +687,8 @@ class ScreenProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `unmount_on_blur`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("unmount_on_blur"))) null else PNValues.decodeOrRecord("unmount_on_blur") { PNValues.boolean(values.get("unmount_on_blur")) } }
 }
 
-class ScreenStackProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("ScreenStack", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid ScreenStack props" } }
+// The renderer core validated these values before they were mounted.
+class ScreenStackProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -705,8 +705,8 @@ class ScreenStackProps(values: JSONObject, partial: Boolean = true, validated: B
     val `on_native_back`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_native_back"))) null else PNValues.decodeOrRecord("on_native_back") { PNValues.boolean(values.get("on_native_back")) } }
 }
 
-class ScrollViewProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("ScrollView", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid ScrollView props" } }
+// The renderer core validated these values before they were mounted.
+class ScrollViewProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -755,8 +755,8 @@ class ScrollViewProps(values: JSONObject, partial: Boolean = true, validated: Bo
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class SegmentedControlProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("SegmentedControl", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid SegmentedControl props" } }
+// The renderer core validated these values before they were mounted.
+class SegmentedControlProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -779,8 +779,8 @@ class SegmentedControlProps(values: JSONObject, partial: Boolean = true, validat
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class SliderProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Slider", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Slider props" } }
+// The renderer core validated these values before they were mounted.
+class SliderProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -817,8 +817,8 @@ class SliderProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class SpacerProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Spacer", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Spacer props" } }
+// The renderer core validated these values before they were mounted.
+class SpacerProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { if (PNValues.isNull(values.get("flex"))) null else PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -835,8 +835,8 @@ class SpacerProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class StatusBarProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("StatusBar", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid StatusBar props" } }
+// The renderer core validated these values before they were mounted.
+class StatusBarProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -859,8 +859,8 @@ class StatusBarProps(values: JSONObject, partial: Boolean = true, validated: Boo
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { PNValues.string(values.get("accessibility_role")) } }
 }
 
-class SvgProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Svg", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Svg props" } }
+// The renderer core validated these values before they were mounted.
+class SvgProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -893,8 +893,8 @@ class SvgProps(values: JSONObject, partial: Boolean = true, validated: Boolean =
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class SwitchProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Switch", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Switch props" } }
+// The renderer core validated these values before they were mounted.
+class SwitchProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -919,8 +919,8 @@ class SwitchProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class TabBarProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("TabBar", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid TabBar props" } }
+// The renderer core validated these values before they were mounted.
+class TabBarProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -947,8 +947,8 @@ class TabBarProps(values: JSONObject, partial: Boolean = true, validated: Boolea
     val `shows_labels`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("shows_labels"))) null else PNValues.decodeOrRecord("shows_labels") { PNValues.boolean(values.get("shows_labels")) } }
 }
 
-class TextProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("Text", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid Text props" } }
+// The renderer core validated these values before they were mounted.
+class TextProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -977,8 +977,8 @@ class TextProps(values: JSONObject, partial: Boolean = true, validated: Boolean 
     val `spans`: List<PNJSONValue>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("spans"))) null else PNValues.decodeOrRecord("spans") { PNValues.array(values.get("spans")).map { item -> PNJSONValue(item ?: JSONObject.NULL) } } }
 }
 
-class TextInputProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("TextInput", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid TextInput props" } }
+// The renderer core validated these values before they were mounted.
+class TextInputProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -1043,8 +1043,8 @@ class TextInputProps(values: JSONObject, partial: Boolean = true, validated: Boo
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class TouchableOpacityProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("TouchableOpacity", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid TouchableOpacity props" } }
+// The renderer core validated these values before they were mounted.
+class TouchableOpacityProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -1067,8 +1067,8 @@ class TouchableOpacityProps(values: JSONObject, partial: Boolean = true, validat
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class ViewProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("View", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid View props" } }
+// The renderer core validated these values before they were mounted.
+class ViewProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -1083,8 +1083,8 @@ class ViewProps(values: JSONObject, partial: Boolean = true, validated: Boolean 
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
 
-class VirtualListProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("VirtualList", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid VirtualList props" } }
+// The renderer core validated these values before they were mounted.
+class VirtualListProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
@@ -1113,8 +1113,8 @@ class VirtualListProps(values: JSONObject, partial: Boolean = true, validated: B
     val `refresh_control`: PNScrollViewRefreshControl? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("refresh_control"))) null else PNValues.decodeOrRecord("refresh_control") { PNScrollViewRefreshControl.decode(values.get("refresh_control")) } }
 }
 
-class WebViewProps(values: JSONObject, partial: Boolean = true, validated: Boolean = false): PNViewProps(values) {
-    init { require(validated || PNContracts.validate("WebView", if (partial) PNValues.withoutNulls(values) else values, partial)) { "Invalid WebView props" } }
+// The renderer core validated these values before they were mounted.
+class WebViewProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")

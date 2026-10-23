@@ -99,7 +99,11 @@ _DISCOVERED: bool = False
 
 
 def define_component(
-    name: str, props: type, *, platforms: tuple[str, ...] = ("ios", "android")
+    name: str,
+    props: type,
+    *,
+    platforms: tuple[str, ...] = ("ios", "android"),
+    measurement: str = "intrinsic",
 ) -> Callable[..., Element]:
     """Declare a custom native component and return its typed element factory.
 
@@ -117,6 +121,11 @@ def define_component(
             ``style`` is added when the dataclass doesn't declare it.
         platforms: Platforms with an actual renderer. Browser
             placeholders don't count as native support.
+        measurement: How the renderer core sizes the view when it has
+            no children: ``"intrinsic"`` (the default) measures the
+            widget on the UI thread, ``"native"`` calls the manager's
+            thread-safe static measurement from the core's worker, and
+            ``"container"`` sizes it from its style alone.
 
     Returns:
         A callable producing [`Element`][pythonnative.Element] instances
@@ -127,13 +136,18 @@ def define_component(
     """
     if not (isinstance(props, type) and is_dataclass(props)):
         raise TypeError(f"define_component({name!r}): props must be a @dataclass type, got {props!r}")
+    if measurement not in ("intrinsic", "native", "container"):
+        raise ValueError(
+            f"define_component({name!r}): measurement must be 'intrinsic', 'native', or 'container', "
+            f"got {measurement!r}"
+        )
     from dataclasses import replace
     from typing import get_type_hints
 
     from ..style import Style, StyleProp
     from .schema import COMPONENTS, RUNTIME_PROPS, ComponentSchema, register_schema, type_schema
 
-    schema = ComponentSchema.from_dataclass(name, props, platforms=platforms)
+    schema = ComponentSchema.from_dataclass(name, props, platforms=platforms, measurement=measurement)
     common = COMPONENTS.get("View")
     style_keys = get_type_hints(Style)
     styles = {key: value for key, value in (common.props.items() if common else ()) if key in style_keys}

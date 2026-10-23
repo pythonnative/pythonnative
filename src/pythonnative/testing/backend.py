@@ -1,15 +1,17 @@
-"""In-memory backend implementing the batched mutation protocol.
+"""Headless backend: the shipping renderer core plus an inspectable tree.
 
-[`FakeBackend`][pythonnative.testing.FakeBackend] speaks the same
-protocol as the platform registries (``apply_mutations``,
-``resolve_view``, ``measure_intrinsic``, ``command``, plus the animation
-hooks) while keeping a real tree of
-[`FakeView`][pythonnative.testing.FakeView] objects, so tests can assert
-on structure, props, and frames without a device.
+[`FakeBackend`][pythonnative.testing.FakeBackend] is the bridge backend
+committing to the host build of the renderer core (RFC 0007), so every
+test validates, lays out, animates, and recognizes gestures with the code
+the apps link. Beside that it keeps the logical tree of
+[`FakeView`][pythonnative.testing.FakeView] objects the reconciler built,
+with the frames the core computed, so tests can assert on structure,
+props, and frames without a device. The transport's ``views`` show what
+the UI thread mounted, flattened layout-only views excluded.
 
 The fake raises on malformed transactions, including unknown tags, double
-destroys, and insertion into a destroyed parent. Production bridge renderers
-validate versioned commits before mutation and fail the surface on rejection.
+destroys, and insertion into a destroyed parent, and the core rejects
+invalid props the way it does on a device.
 
 Recorded op shapes (in ``FakeBackend.ops``):
 
@@ -17,7 +19,7 @@ Recorded op shapes (in ``FakeBackend.ops``):
 - ``("update", type_name, view.id, tuple(sorted(changed_keys)))``
 - ``("insert_child", parent.id, child.id, index)``
 - ``("destroy", view.id)``
-- ``("set_frame", view.id, x, y, w, h)``
+- ``("set_frame", view.id, x, y, w, h)`` (frames the core reported)
 
 Imperative commands (``FakeBackend.command``) are recorded in
 ``FakeBackend.commands`` and answered for the view types that have typed
@@ -31,11 +33,18 @@ navigation verbs), and ``VirtualList`` (``scroll_to_index``,
 
 from __future__ import annotations
 
+import itertools
+from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
-from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, SetFrameOp, UpdateOp
+from ..bridge.fake import FakeTransport
+from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
+from ..native_views.bridge_backend import BridgeBackend
 
 __all__ = ["DEFAULT_INTRINSIC", "IMPLICIT_ROLES", "FakeBackend", "FakeView"]
+
+# Surface 1 is the device's; each headless backend gets its own.
+_surfaces = itertools.count(2)
 
 DEFAULT_INTRINSIC: Dict[str, Tuple[float, float]] = {
     "Text": (60.0, 16.0),
@@ -44,7 +53,10 @@ DEFAULT_INTRINSIC: Dict[str, Tuple[float, float]] = {
     "TextInput": (120.0, 32.0),
     "TabBar": (320.0, 49.0),
 }
-"""Intrinsic sizes reported for content-sized leaves (what platform measure hooks would return)."""
+"""Sizes the fake platform measures for content-sized leaves.
+
+``Image`` reports its size as if it had loaded, the way a platform's image
+loader reports intrinsic sizes to the core."""
 
 IMPLICIT_ROLES: Dict[str, str] = {
     "Button": "button",
@@ -225,24 +237,49 @@ class FakeView:
         return "\n".join([line, *(c.dump(indent + 2) for c in self.children)])
 
 
-class FakeBackend:
-    """Tag-table backend recording one tuple per applied mutation.
+@dataclass(frozen=True)
+class ListRowSnapshot:
+    """One row of a list's dataset as the UI thread holds it."""
+
+    key: str
+    revision: int
+    extent: float
+    sticky: bool
+
+
+@dataclass(frozen=True)
+class ListSnapshot:
+    """A ``VirtualList``'s dataset as the UI thread's data source sees it."""
+
+    revision: int
+    keys: List[str]
+    rows: Dict[str, ListRowSnapshot]
+
+
+class FakeBackend(BridgeBackend):
+    """The bridge backend over the host core, recording one tuple per applied mutation.
 
     Args:
-        intrinsic: Override the intrinsic sizes used by
-            ``measure_intrinsic`` (defaults to
+        intrinsic: Override the sizes the fake platform measures (defaults to
             [`DEFAULT_INTRINSIC`][pythonnative.testing.backend.DEFAULT_INTRINSIC]).
     """
 
+    selective_layout = False
+
     def __init__(self, intrinsic: Optional[Dict[str, Tuple[float, float]]] = None) -> None:
         self.intrinsic = dict(DEFAULT_INTRINSIC if intrinsic is None else intrinsic)
+        surface = next(_surfaces)
+        transport = FakeTransport(surface=surface, measure=self.intrinsic)
+        super().__init__(transport, surface=surface)
+        self.native = transport
+        """The [`FakeTransport`][pythonnative.bridge.fake.FakeTransport]: what the UI thread mounted."""
+        transport.measurer = self._measure
+        transport.command_handler = self._run_command
         self.views: Dict[int, FakeView] = {}
         self.ops: List[Any] = []
         self.batches: List[List[Any]] = []
         self.measure_calls: List[int] = []
         self.commands: List[Tuple[int, str, Dict[str, Any]]] = []
-        self.animated: List[Tuple[int, str, Any]] = []
-        self.list_stores: dict[int, Any] = {}
         self.last_create_props: Dict[str, Any] = {}
         self.last_update_changes: Dict[str, Any] = {}
         self.focused_tag: Optional[int] = None
@@ -252,12 +289,17 @@ class FakeBackend:
         self.scroll_offsets: Dict[int, Dict[str, float]] = {}
         """Content offset per ``ScrollView`` tag, updated by ``scroll_to_offset`` and ``scroll_to_end``."""
 
+    @property
+    def animated(self) -> List[Tuple[int, str, Any]]:
+        """Every ``(tag, prop, value)`` the core's animator wrote, in order."""
+        return self.native.writes
+
     # ------------------------------------------------------------------
     # Commit channel
     # ------------------------------------------------------------------
 
-    def apply_mutations(self, ops: Sequence[Mutation]) -> None:
-        """Apply one committed batch to the view tree, recording each op in ``ops`` and ``batches``.
+    def apply_mutations(self, ops: Sequence[Mutation]) -> Any:
+        """Record one batch in ``ops`` and ``batches``, then commit it to the core.
 
         Raises ``AssertionError`` on malformed transactions (unknown tags, double creates or destroys).
         """
@@ -267,6 +309,21 @@ class FakeBackend:
             self.ops.append(recorded)
             batch.append(recorded)
         self.batches.append(batch)
+        return super().apply_mutations(ops)
+
+    def accept_layout(self, payload: Any) -> None:
+        """Record the core's frames on the logical views, then publish them."""
+        if isinstance(payload, dict) and isinstance(payload.get("frames"), list):
+            for tag, x, y, width, height in payload["frames"]:
+                view = self.views.get(int(tag))
+                # A root's frame belongs to the screen host, as on a device.
+                if view is None or view.parent is None:
+                    continue
+                frame = (float(x), float(y), float(width), float(height))
+                if view.frame != frame:
+                    view.frame = frame
+                    self.ops.append(("set_frame", view.id, *frame))
+        super().accept_layout(payload)
 
     def _apply_one(self, op: Mutation) -> Tuple[Any, ...]:
         if isinstance(op, CreateOp):
@@ -274,12 +331,6 @@ class FakeBackend:
                 raise AssertionError(f"create: tag {op.tag} already registered")
             view = FakeView(op.tag, op.type_name, op.props)
             self.views[op.tag] = view
-            if op.type_name == "VirtualList":
-                from ..bridge.list_store import ListStore
-
-                store = self.list_stores[op.tag] = ListStore()
-                if "dataset" in op.props:
-                    store.apply(op.props["dataset"])
             self.last_create_props = dict(op.props)
             return ("create", op.type_name, view.id)
 
@@ -292,8 +343,6 @@ class FakeBackend:
                     view.props.pop(key, None)
                 else:
                     view.props[key] = value
-            if view.type_name == "VirtualList" and "dataset" in op.changed_props:
-                self.list_stores[op.tag].apply(op.changed_props["dataset"])
             self.last_update_changes = dict(op.changed_props)
             return ("update", view.type_name, view.id, tuple(sorted(op.changed_props)))
 
@@ -316,17 +365,11 @@ class FakeBackend:
                 view.parent.children.remove(view)
                 view.parent = None
             view.destroyed = True
-            self.list_stores.pop(op.tag, None)
             self.selections.pop(op.tag, None)
             self.scroll_offsets.pop(op.tag, None)
             if self.focused_tag == op.tag:
                 self.focused_tag = None
             return ("destroy", view.id)
-
-        if isinstance(op, SetFrameOp):
-            view = self._require(op.tag, "set_frame")
-            view.frame = (op.x, op.y, op.width, op.height)
-            return ("set_frame", view.id, op.x, op.y, op.width, op.height)
 
         raise AssertionError(f"unknown mutation op: {op!r}")
 
@@ -337,26 +380,23 @@ class FakeBackend:
         return view
 
     # ------------------------------------------------------------------
-    # Imperative escape hatches
+    # The fake platform
     # ------------------------------------------------------------------
 
-    def resolve_view(self, tag: int) -> Optional[FakeView]:
-        """Return the live view registered under ``tag``, or ``None``."""
+    def _measure(
+        self, tag: int, component: str, props: Dict[str, Any], max_width: float, max_height: float
+    ) -> Tuple[float, float]:
+        view = self.views.get(tag)
+        if view is not None:
+            self.measure_calls.append(view.id)
+        return self.intrinsic.get(component, (0.0, 0.0))
+
+    def resolve_view(self, tag: int) -> Optional[FakeView]:  # type: ignore[override]
+        """Return the logical view registered under ``tag``, or ``None``."""
         return self.views.get(tag)
 
-    def measure_intrinsic(self, tag: int, max_width: float, max_height: float) -> Tuple[float, float]:
-        """Return the configured intrinsic size for the view's type and record the call in ``measure_calls``.
-
-        Unknown tags and types without an entry measure as ``(0.0, 0.0)``; the constraints are ignored.
-        """
-        view = self.views.get(tag)
-        if view is None:
-            return (0.0, 0.0)
-        self.measure_calls.append(view.id)
-        return self.intrinsic.get(view.type_name, (0.0, 0.0))
-
     def command(self, tag: int, name: str, args: Optional[Dict[str, Any]] = None) -> Any:
-        """Record an imperative view command in ``commands`` and answer it for known view types.
+        """Queue a view command through the core; the fake UI thread answers it.
 
         ``TextInput``: ``get_value`` returns the ``value`` prop; ``focus``
         and ``blur`` track ``focused_tag`` and fire ``on_focus`` /
@@ -366,20 +406,25 @@ class FakeBackend:
         ``scroll_to_end`` update ``scroll_offsets``; ``get_scroll_offset``
         returns ``{"x": ..., "y": ...}``. ``WebView``: ``can_go_back`` and
         ``can_go_forward`` are ``False``, ``get_url`` returns the ``url``
-        prop, ``load_url(url)`` replaces it, ``get_title`` is ``None``.
-        ``VirtualList``: ``scroll_to_index`` and ``scroll_to_end`` drive
-        the list request protocol. Anything else returns ``None``.
+        prop, ``load_url(url)`` replaces it. ``VirtualList``:
+        ``scroll_to_index`` and ``scroll_to_end`` drive the list request
+        protocol. Every command is recorded in ``commands``.
+
+        Returns:
+            A future holding the command's result.
         """
-        arguments = dict(args or {})
-        self.commands.append((tag, name, arguments))
-        view = self.views.get(tag)
+        return super().command(tag, name, args)
+
+    def _run_command(self, native: Any, name: str, arguments: Dict[str, Any]) -> Any:
+        self.commands.append((native.tag, name, dict(arguments)))
+        view = self.views.get(native.tag)
         if view is None:
             return None
         if view.type_name == "VirtualList":
             if name == "scroll_to_index":
-                self.request_list(tag, int(arguments["index"]))
+                self.request_list(view.tag, int(arguments["index"]))
             elif name == "scroll_to_end":
-                self.request_list(tag, max(0, len(self.list_stores[tag].keys) - 1))
+                self.request_list(view.tag, max(0, len(self.native.list_keys(view.tag)) - 1))
             return None
         if view.type_name == "TextInput":
             return self._text_input_command(view, name, arguments)
@@ -462,6 +507,13 @@ class FakeBackend:
             return None
         return None
 
+    def list_store(self, tag: int) -> ListSnapshot:
+        """The dataset the UI thread's data source holds for the ``VirtualList`` ``tag``."""
+        rows = [ListRowSnapshot(*row) for row in self.native.list_rows(tag)]
+        return ListSnapshot(
+            self.native.list_revisions.get(tag, 0), [row.key for row in rows], {row.key: row for row in rows}
+        )
+
     def request_list(self, tag: int, first: int, *, extent: float = 800.0) -> None:
         """Simulate a native viewport using the shared list request protocol."""
         from ..events import dispatch_event
@@ -469,27 +521,31 @@ class FakeBackend:
         view = self._require(tag, "request_list")
         if view.type_name != "VirtualList":
             raise TypeError("request_list requires a VirtualList tag")
-        store = self.list_stores[tag]
-        keys = store.keys
-        heights = [store.rows[key].extent for key in keys]
+        rows = self.native.list_rows(tag)
+        revision = self.native.list_revisions.get(tag, 0)
+        keys = [row[0] for row in rows]
+        heights = [row[2] for row in rows]
+        sticky = [row[3] for row in rows]
         first = max(0, min(first, len(keys) - 1))
         last, covered = first, 0.0
         while last < len(keys) and covered < extent:
             covered += heights[last]
             last += 1
         offset = sum(heights[:first])
+        pinned = next((i for i in range(first, -1, -1) if keys and sticky[i]), -1)
+        horizontal = bool(view.props.get("horizontal"))
         dispatch_event(
             tag,
             "on_window",
             {
-                "revision": store.revision,
-                "sticky": next((i for i in range(first, -1, -1) if keys and store.rows[keys[i]].sticky), -1),
+                "revision": revision,
+                "sticky": pinned,
                 "first": first,
                 "last": last - 1,
                 "extent": extent,
                 "range": sum(heights),
-                "x": offset if view.props.get("horizontal") else 0,
-                "y": 0 if view.props.get("horizontal") else offset,
+                "x": offset if horizontal else 0,
+                "y": 0 if horizontal else offset,
             },
         )
         dispatch_event(
@@ -498,8 +554,8 @@ class FakeBackend:
             {
                 "extent": extent,
                 "range": sum(heights),
-                "x": offset if view.props.get("horizontal") else 0,
-                "y": 0 if view.props.get("horizontal") else offset,
+                "x": offset if horizontal else 0,
+                "y": 0 if horizontal else offset,
             },
         )
         if keys:
@@ -507,34 +563,26 @@ class FakeBackend:
                 tag,
                 "on_bind_row",
                 {
-                    "sticky": next((i for i in range(first, -1, -1) if store.rows[keys[i]].sticky), -1),
+                    "sticky": pinned,
                     "key": keys[first],
                     "index": first,
-                    "revision": store.revision,
+                    "revision": revision,
                     "extent": extent,
                     "width": view.frame[2],
                 },
             )
-
-    def set_animated_property(self, tag: int, prop_name: str, value: Any) -> None:
-        """Record an animated property write in ``animated`` without touching ``props``."""
-        self.animated.append((tag, prop_name, value))
-
-    def start_animation(self, tag: int, anim_id: int, prop_name: str, spec: Dict[str, Any]) -> bool:
-        """Decline native animation (return ``False``) so animations run through the Python driver."""
-        return False
-
-    def cancel_animation(self, tag: int, anim_id: int) -> Any:
-        """Do nothing; the fake never starts native animations."""
-        return None
 
     # ------------------------------------------------------------------
     # Diagnostics
     # ------------------------------------------------------------------
 
     def live_view_count(self) -> int:
-        """Return how many views are currently registered (created and not yet destroyed)."""
+        """Return how many logical views are registered (created and not yet destroyed)."""
         return len(self.views)
+
+    def mounted_view_count(self) -> int:
+        """Return how many views the UI thread mounted (flattened views excluded)."""
+        return len(self.native.views)
 
     def ops_of(self, kind: str) -> List[Any]:
         """Every recorded op tuple whose first element is ``kind``."""

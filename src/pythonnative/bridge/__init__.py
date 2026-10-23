@@ -1,31 +1,35 @@
-"""The native bridge: one channel between Python and Swift / Kotlin.
+"""The bridge: Python's channel to the renderer core and the native platform.
 
-Everything that crosses into native code goes through a
-[`Transport`][pythonnative.bridge.Transport] (``apply`` a transaction, run a
-``command``, drive an ``animate`` request, or ``call`` a native module), and
-everything native sends back arrives at
-[`native_callback`][pythonnative.bridge.native_callback]. The protocol
-is documented in ``docs/concepts/bridge.md``.
+Commits, layout reads, view commands, and animation requests go to the
+renderer core (``include/pn_core.h``), which every target links: the iOS
+app binary, Android's ``libpncore.so``, the ``pythonnative._core`` host
+extension, and the browser preview's WebAssembly build. Native module
+calls go to the platform. Everything native sends back arrives at
+[`native_callback`][pythonnative.bridge.native_callback]. The protocol is
+documented in ``docs/concepts/bridge.md``.
 
-Under ``pn preview`` the native side is a browser page, reached through
-[`WebTransport`][pythonnative.bridge.web.WebTransport]; the preview
+Under ``pn preview`` the core and the widgets run in a browser page, reached
+through [`WebTransport`][pythonnative.bridge.web.WebTransport]; the preview
 installs it with [`set_transport`][pythonnative.bridge.set_transport]
-before any screen mounts. In headless tests there is no transport at
-all: native modules fall back to their Python implementations, and
-tests that want to exercise the bridge itself install a
-[`FakeTransport`][pythonnative.bridge.fake.FakeTransport].
+before any screen mounts. Headless tests use
+[`FakeTransport`][pythonnative.bridge.fake.FakeTransport], which runs the
+host build of the same core and plays the platform's UI thread in Python.
 """
 
 from __future__ import annotations
 
 import threading
-from typing import Callable, Optional, Protocol
+import weakref
+from typing import Any, Callable, Optional, Protocol
 
 from . import codec
+from .core import PROTOCOL_VERSION
 
 __all__ = [
     "PROTOCOL_VERSION",
     "Transport",
+    "contract_document",
+    "dispatch",
     "get_transport",
     "has_transport",
     "handshake",
@@ -33,33 +37,33 @@ __all__ = [
     "set_transport",
 ]
 
-from .commits import PROTOCOL_VERSION
-
-"""Bridge protocol version this Python package speaks."""
-
 
 class Transport(Protocol):
-    """The Python -> native half of the bridge.
-
-    Native and browser transports run Yoga beside their widgets. Only the
-    headless [`FakeTransport`][pythonnative.bridge.fake.FakeTransport] lays
-    out in Python, so it alone also answers ``measure`` and accepts frame
-    (``f``) operations.
-    """
+    """The Python -> core and Python -> platform half of the bridge."""
 
     name: str
+    asynchronous_commits: bool
 
     def protocol_version(self) -> int:
-        """Return the protocol version compiled into the native library."""
+        """Return the protocol version compiled into the renderer core."""
 
-    def apply(self, transaction_json: str) -> str:
-        """Apply one serialized transaction (a JSON array of ops)."""
+    def load_contracts(self, document: str) -> None:
+        """Compile the merged component contracts into the core."""
 
-    def command(self, tag: int, name: str, args_json: str) -> Optional[str]:
-        """Run an imperative command on one view; returns its JSON result or ``None``."""
+    def commit(self, envelope_json: str) -> str:
+        """Validate, apply, and lay out one commit; returns its acknowledgement."""
 
-    def animate(self, tag: int, request_json: str) -> Optional[str]:
-        """Handle an animation request (``set`` / ``start`` / ``cancel``) for one view."""
+    def layout(self, request_json: str) -> str:
+        """Lay out without a commit; returns ``{"ok", "value": layout}``."""
+
+    def command(self, surface: int, tag: int, name: str, args_json: str, call_id: int) -> str:
+        """Queue a view command; its result arrives as a ``command`` message."""
+
+    def animate(self, surface: int, tag: int, request_json: str) -> str:
+        """Queue an animation request behind pending mounts."""
+
+    def measure(self, surface: int, tag: int) -> str:
+        """The shadow and window frames of a view, as JSON."""
 
     def call(self, module: str, method: str, args_json: str) -> Optional[str]:
         """Call a native module method with a ``{"call_id", "args"}`` envelope."""
@@ -140,6 +144,34 @@ def set_transport(transport: Optional[Transport]) -> None:
         transport.set_callback(native_callback)
 
 
+def contract_document() -> str:
+    """Encode every registered component and module contract as one document (tooling and tests)."""
+    from ..sdk.schema import encode_builtin_contracts, manifest
+
+    return encode_builtin_contracts(manifest())
+
+
+_loaded_contracts: "weakref.WeakKeyDictionary[Any, str]" = weakref.WeakKeyDictionary()
+
+
+def ensure_contracts(transport: Optional[Transport] = None) -> None:
+    """Compile newly registered contracts into ``transport``'s core before they're used.
+
+    The core validates native module calls as well as commits, so this runs
+    at the handshake, before any module call, and again whenever a plugin
+    registers a component or module.
+    """
+    from ..sdk.schema import fingerprint, native_documents
+
+    target = transport if transport is not None else get_transport()
+    current = fingerprint()
+    if _loaded_contracts.get(target) == current:
+        return
+    for document in native_documents():
+        target.load_contracts(document)
+    _loaded_contracts[target] = current
+
+
 def handshake() -> int:
     """Verify the native library speaks our protocol version.
 
@@ -152,10 +184,11 @@ def handshake() -> int:
     version = get_transport().protocol_version()
     if version != PROTOCOL_VERSION:
         raise RuntimeError(
-            f"Bridge protocol mismatch: the native runtime speaks v{version} but pythonnative "
+            f"Bridge protocol mismatch: the renderer core speaks v{version} but pythonnative "
             f"expects v{PROTOCOL_VERSION}. Re-run 'pn build' so the staged template matches the "
             "installed pythonnative package."
         )
+    ensure_contracts()
     if getattr(get_transport(), "name", "") in {"ios", "android"}:
         from ..sdk.schema import YOGA_VERSION, fingerprint
 
@@ -189,14 +222,14 @@ def _deliver_continuous(tag: int, name: str, slot: list[str]) -> None:
 def native_callback(kind: str, tag: int, name: str, payload: str) -> None:
     """Single entry point for every native -> Python message.
 
-    Native delivers every message asynchronously, from its events thread,
-    and never waits for a result. This function never raises: failures
-    are reported through ``diagnostics`` so nothing propagates into UIKit
-    or the Android looper.
+    The core and the platform deliver every message asynchronously, from
+    an events thread, and never wait for a result. This function never
+    raises: failures are reported through ``diagnostics`` so nothing
+    propagates into UIKit or the Android looper.
 
     Args:
-        kind: ``"event"``, ``"module"``, ``"host"``, ``"animation"``, or
-            ``"layout"``.
+        kind: ``"event"``, ``"module"``, ``"host"``, ``"animation"``,
+            ``"layout"``, or ``"command"``.
         tag: View tag (events), screen id (host), otherwise ``0``.
         name: Event name, module name, or host event.
         payload: JSON text whose shape depends on ``kind``.
@@ -221,26 +254,42 @@ def native_callback(kind: str, tag: int, name: str, payload: str) -> None:
                 _continuous.clear()
             loop.call_soon_threadsafe(native_callback, kind, tag, name, payload)
         return
+    dispatch(kind, tag, name, payload)
+
+
+def dispatch(kind: str, tag: int, name: str, payload: str, backend: Any = None) -> None:
+    """Handle one native -> Python message on the application thread.
+
+    ``backend`` defaults to the process's view backend; headless backends
+    pass themselves, since a test may keep several alive at once.
+    """
     try:
-        if kind == "layout":
+        needs_backend = kind in ("layout", "event", "command") or (kind == "host" and name == "surface_failed")
+        if backend is None and needs_backend:
             from ..native_views import get_backend
 
-            get_backend().accept_layout(codec.loads(payload))
+            backend = get_backend()
+        if kind == "layout":
+            backend.accept_layout(codec.loads(payload))
         elif kind == "event":
-            _on_event(int(tag), name, payload)
+            _on_event(int(tag), name, payload, backend)
+        elif kind == "command":
+            backend.accept_command_result(codec.loads(payload))
         elif kind == "module":
             from ..native_modules.registry import dispatch_module_message
 
             dispatch_module_message(name, codec.loads(payload) or {})
         elif kind == "host":
-            from ..hosts.native import dispatch_host_event
+            if name == "surface_failed":
+                backend.surface_failed(codec.loads(payload))
+            else:
+                from ..hosts.native import dispatch_host_event
 
-            dispatch_host_event(int(tag), name, codec.loads(payload))
+                dispatch_host_event(int(tag), name, codec.loads(payload))
         elif kind == "animation":
-            from ..animated import native_animation_completed
+            from ..animated import native_animation_message
 
-            data = codec.loads(payload) or {}
-            native_animation_completed(int(data.get("id", 0)), bool(data.get("finished", True)))
+            native_animation_message(codec.loads(payload) or {})
         else:
             print(f"[pn.bridge] unknown callback kind {kind!r}")
     except Exception as exc:
@@ -252,13 +301,14 @@ def native_callback(kind: str, tag: int, name: str, payload: str) -> None:
             traceback.print_exc()
 
 
-def _on_event(tag: int, name: str, payload: str) -> None:
+def _on_event(tag: int, name: str, payload: str, backend: Any = None) -> None:
     from ..events import get_event_registry
 
     args = codec.loads(payload)
-    from ..native_views import get_backend
+    if backend is None:
+        from ..native_views import get_backend
 
-    backend = get_backend()
+        backend = get_backend()
     defer = getattr(backend, "defer_event", None)
     if defer is not None and defer(tag, name, args):
         return

@@ -103,10 +103,11 @@ final class PNManagerTests: XCTestCase {
         let manager = PNTextManager()
         let view = manager.createView(tag: 4, props: ["text": "hello world", "font_size": 20, "text_transform": "uppercase"])
         XCTAssertEqual((view as? UILabel)?.text, "HELLO WORLD")
-        let unconstrained = manager.measure(view: view, maxW: .infinity, maxH: .infinity)
+        let layout = PNTextLayout(["text": "hello world", "font_size": 20, "text_transform": "uppercase"])
+        let unconstrained = layout.measure(maxWidth: .infinity, maxHeight: .infinity)
         XCTAssertGreaterThan(unconstrained.width, 50)
         XCTAssertGreaterThan(unconstrained.height, 15)
-        let narrow = manager.measure(view: view, maxW: 60, maxH: 1e6)
+        let narrow = layout.measure(maxWidth: 60, maxHeight: 1e6)
         XCTAssertLessThanOrEqual(narrow.width, 60)
         XCTAssertGreaterThan(narrow.height, unconstrained.height, "wrapped text grows in height")
         XCTAssertEqual(PNTextManager.transform("hello big world", mode: "capitalize"), "Hello Big World")
@@ -126,18 +127,29 @@ final class PNManagerTests: XCTestCase {
         XCTAssertEqual(range.length, 5)
     }
 
-    func testVirtualListBindsRowsThroughRegistry() {
-        try! PNTransaction.apply([.create(tag: 40, type: "View", props: ["background_color": "#123456"])])
-        let manager = PNVirtualListManager()
-        guard let table = manager.createView(tag: 41, props: ["dataset": ["base": 0, "revision": 1, "changes": [["reset", [["a", 1, 50.0, false], ["b", 1, 50.0, false], ["c", 1, 50.0, false]]]]]]) as? UICollectionView else {
-            return XCTFail("expected a collection view")
-        }
+    func testVirtualListBindsRowsThroughTheCore() throws {
+        let core = PNCoreHarness()
+        core.roots = [41]
+        let rows: [[Any]] = [["a", 1, 50.0, false], ["b", 1, 50.0, false], ["c", 1, 50.0, false]]
+        core.commit([["c", 41, "VirtualList", ["flex": 1, "dataset": ["base": 0, "revision": 1, "changes": [["reset", rows]]]]]])
+        let table = try XCTUnwrap(PNViewRegistry.shared.view(for: 41) as? UICollectionView)
         XCTAssertEqual(table.numberOfItems(inSection: 0), 3)
         let delegate = table.delegate as? UICollectionViewDelegateFlowLayout
         XCTAssertEqual(delegate?.collectionView?(table, layout: table.collectionViewLayout, sizeForItemAt: IndexPath(item: 1, section: 0)).height, 50)
-        manager.update(view: table, changed: ["dataset": ["base": 1, "revision": 2, "changes": [["u", ["a", 2, 10.0, false]], ["u", ["b", 2, 20.0, false]], ["u", ["c", 2, 30.0, false]]]]])
+        core.commit([["u", 41, ["dataset": ["base": 1, "revision": 2, "changes": [["u", ["a", 2, 10.0, false]], ["u", ["b", 2, 20.0, false]], ["u", ["c", 2, 30.0, false]]]]], []]])
         XCTAssertEqual(delegate?.collectionView?(table, layout: table.collectionViewLayout, sizeForItemAt: IndexPath(item: 2, section: 0)).height, 30)
-        manager.destroy(view: table)
+    }
+
+    func testRecreatedVirtualListStartsFromThePublishedDataset() throws {
+        let core = PNCoreHarness()
+        core.roots = [42]
+        let rows: [[Any]] = [["a", 1, 50.0, false], ["b", 1, 50.0, false]]
+        core.commit([["c", 42, "VirtualList", ["flex": 1, "dataset": ["base": 0, "revision": 1, "changes": [["reset", rows]]]]]])
+        let old = try XCTUnwrap(PNViewRegistry.shared.view(for: 42))
+        XCTAssertNil(PNMounter.apply([.update(tag: 42, recreate: true, changed: [:], removed: [])]))
+        let table = try XCTUnwrap(PNViewRegistry.shared.view(for: 42) as? UICollectionView)
+        XCTAssertFalse(table === old)
+        XCTAssertEqual(table.numberOfItems(inSection: 0), 2)
     }
 
     func testScrollPayloadShape() {

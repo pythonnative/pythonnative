@@ -283,6 +283,10 @@ class AppConfig:
         android: Nested
             [`AndroidConfig`][pythonnative.project.config.AndroidConfig].
         project_root: Absolute path to the directory containing the config.
+        use_lock: Whether builds install from ``pn.lock``. This isn't a
+            ``pythonnative.toml`` setting: a development build turns it
+            off when the lock is stale and resolves the current
+            requirements instead.
     """
 
     app_id: str
@@ -303,6 +307,7 @@ class AppConfig:
     ios: IOSConfig = field(default_factory=IOSConfig)
     android: AndroidConfig = field(default_factory=AndroidConfig)
     project_root: Path = field(default_factory=Path.cwd)
+    use_lock: bool = True
 
     # -- Derived values -------------------------------------------------
 

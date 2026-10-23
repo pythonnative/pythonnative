@@ -4,8 +4,9 @@
 Run ``python scripts/benchmark-runtime.py [--output report.json]``. The
 numbers are host timings for comparing changes on one machine, not device
 measurements: ``import pythonnative`` in a fresh interpreter, element
-construction, re-rendering a 300-component tree headlessly, and preparing
-a commit for the bridge. ``tests/test_performance_budgets.py`` enforces
+construction, re-rendering a 300-component tree headlessly, and a first
+commit of 300 views to the renderer core (validation, layout, and the
+mount transaction, RFC 0007). ``tests/test_performance_budgets.py`` enforces
 the deterministic properties behind these timings.
 """
 
@@ -22,8 +23,8 @@ from typing import Any, Callable
 
 import pythonnative as pn
 from pythonnative import diagnostics
-from pythonnative.bridge import codec
-from pythonnative.bridge.commits import PROTOCOL_VERSION, CommitState
+from pythonnative.bridge import codec, contract_document
+from pythonnative.bridge.core import PROTOCOL_VERSION, load_core
 from pythonnative.testing import render
 
 _IMPORT = "import time; t = time.perf_counter(); import pythonnative; print(time.perf_counter() - t)"
@@ -65,11 +66,37 @@ def per_call_ms(action: Callable[[int], Any], repeat: int, rounds: int = 5) -> l
 
 
 def commit_envelope(views: int) -> dict[str, Any]:
-    """A first commit that mounts ``views`` text views under one container."""
+    """A first commit that mounts ``views`` text views under one container and lays them out."""
     ops: list[list[Any]] = [["c", 1, "View", {"flex": 1}]]
     for tag in range(2, views + 2):
         ops += [["c", tag, "Text", {"text": f"row {tag}", "font_size": 14}], ["i", 1, tag, tag - 2]]
-    return {"version": PROTOCOL_VERSION, "application": "bench", "surface": 1, "revision": 1, "ops": ops}
+    layout = {"roots": [1], "width": 390, "height": 844, "selective": True}
+    return {
+        "version": PROTOCOL_VERSION,
+        "application": "bench",
+        "surface": 1,
+        "revision": 1,
+        "ops": ops,
+        "layout": layout,
+    }
+
+
+def core_committer(envelope: dict[str, Any]) -> Callable[[int], Any]:
+    """Commit ``envelope`` as a fresh application each call and take its mount transaction."""
+    from pythonnative.bridge.fake import FakeTransport
+
+    transport = FakeTransport(surface=envelope["surface"])
+    transport.load_contracts(contract_document())
+    core = load_core()
+
+    def commit(index: int) -> None:
+        text = codec.dumps(envelope | {"application": f"bench-{index}"})
+        if not codec.loads(core.commit(text)).get("ok"):
+            raise RuntimeError("The renderer core rejected the benchmark commit")
+        while (transaction := core.mount_next()) is not None:
+            core.mount_finished(transaction[1])
+
+    return commit
 
 
 def summary(samples: list[float]) -> dict[str, float]:
@@ -96,9 +123,7 @@ def main() -> None:
         "import_ms": summary([seconds * 1000 for seconds in import_seconds(args.imports)]),
         "element_us": summary([ms * 1000 for ms in per_call_ms(lambda i: Cell(f"cell {i}", i), 2000)]),
         "rerender_300_ms": summary(per_call_ms(lambda i: tree.rerender(Grid(i)), 5)),
-        "commit_prepare_300_ms": summary(
-            per_call_ms(lambda i: (CommitState().prepare(envelope), codec.dumps(envelope)), 20)
-        ),
+        "core_commit_300_ms": summary(per_call_ms(core_committer(envelope), 20)),
     }
     text = json.dumps(report, indent=2)
     print(text)

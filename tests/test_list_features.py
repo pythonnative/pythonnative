@@ -190,7 +190,7 @@ def _section_list(**kwargs: Any) -> pn.Element:
 def test_sticky_header_stays_mounted_without_a_python_overlay() -> None:
     result = render(_section_list())
     view = result.get_by_type("VirtualList")
-    store = result.backend.list_stores[view.tag]
+    store = result.backend.list_store(view.tag)
     assert [i for i, key in enumerate(store.keys) if store.rows[key].sticky] == [0, 31]
     result.backend.request_list(view.tag, 25, extent=400)
     result.settle()

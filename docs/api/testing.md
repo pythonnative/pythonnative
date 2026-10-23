@@ -2,7 +2,8 @@
 
 `pythonnative.testing` renders components without a device or
 simulator. [`render`][pythonnative.testing.render] mounts an element
-into an in-memory [`FakeBackend`][pythonnative.testing.FakeBackend]
+into a [`FakeBackend`][pythonnative.testing.FakeBackend], which commits to
+the host build of the renderer core,
 and returns a [`RenderResult`][pythonnative.testing.RenderResult] with
 Testing Library-style queries and event helpers;
 [`render_hook`][pythonnative.testing.render_hook] does the same for a

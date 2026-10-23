@@ -9,8 +9,8 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.core.widget.NestedScrollView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.pythonnative.runtime.bridge.Op
-import com.pythonnative.runtime.bridge.TransactionApplier
+import com.pythonnative.runtime.mount.MountOp
+import com.pythonnative.runtime.mount.Mounter
 import com.pythonnative.runtime.components.ScrollViewManager
 import com.pythonnative.runtime.modules.BuiltinModules
 import com.pythonnative.runtime.views.PNHorizontalScrollView
@@ -35,16 +35,16 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class RoundTwoRobolectricTest {
     private lateinit var activity: Activity
-    private lateinit var applier: TransactionApplier
+    private lateinit var applier: Mounter
 
     @Before fun start() {
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         PNBridge.setContext(activity)
-        applier = TransactionApplier(PNBridge.registry)
+        applier = Mounter(PNBridge.registry)
     }
 
     @After fun stop() {
-        for (record in PNBridge.registry.all()) applier.applyOp(Op.Destroy(record.tag))
+        for (record in PNBridge.registry.all()) applier.applyOp(MountOp.Delete(record.tag))
         PNBridge.clearContext(activity)
         activity.finish()
     }
@@ -84,7 +84,7 @@ class RoundTwoRobolectricTest {
         val props = JSONObject().put("horizontal", false).put("scroll_event_throttle", 32)
             .put("content_inset", JSONObject().put("top", 10).put("bottom", 20)).put("deceleration_rate", "fast")
             .put("_pn_events", events("on_scroll"))
-        applier.applyOp(Op.Create(30, "ScrollView", props))
+        applier.applyOp(MountOp.Create(30, "ScrollView", props))
         val outer = PNBridge.registry.get(30)!!.view as SwipeRefreshLayout
         val sv = outer.getChildAt(0) as PNNestedScrollView
         val density = activity.resources.displayMetrics.density
@@ -96,16 +96,16 @@ class RoundTwoRobolectricTest {
         val manager = PNBridge.registry.get(30)!!.manager as ScrollViewManager
         val payload = com.pythonnative.generated.PNValues.encode(manager.scrollEvent(sv)) as JSONObject
         assertEquals(setOf("x", "y", "content_width", "content_height", "viewport_width", "viewport_height"), payload.keys().asSequence().toSet())
-        applier.applyOp(Op.Update(30, JSONObject().put("deceleration_rate", "normal").put("content_inset", JSONObject.NULL)))
+        applier.applyOp(MountOp.Update(30, JSONObject().put("deceleration_rate", "normal").put("content_inset", JSONObject.NULL)))
         assertEquals(1f, sv.flingScale, 0f)
         assertEquals(0, sv.paddingTop)
-        applier.applyOp(Op.Create(31, "ScrollView", JSONObject().put("horizontal", true)))
+        applier.applyOp(MountOp.Create(31, "ScrollView", JSONObject().put("horizontal", true)))
         assertTrue(PNBridge.registry.get(31)!!.view is PNHorizontalScrollView)
     }
 
     @Test fun textPressableSpansAndLabelPress() {
         val spans = JSONArray().put(JSONObject().put("text", "Read the ")).put(JSONObject().put("text", "terms").put("pressable", true))
-        applier.applyOp(Op.Create(32, "Text", JSONObject().put("spans", spans).put("_pn_events", events("on_span_press"))))
+        applier.applyOp(MountOp.Create(32, "Text", JSONObject().put("spans", spans).put("_pn_events", events("on_span_press"))))
         val tv = PNBridge.registry.get(32)!!.view as TextView
         assertTrue(tv.movementMethod is LinkMovementMethod)
         val spanned = tv.text as android.text.Spanned
@@ -114,13 +114,13 @@ class RoundTwoRobolectricTest {
         assertEquals(1, pressable[0].index)
         assertEquals(9, spanned.getSpanStart(pressable[0]))
         // The wire carries wired events only in `_pn_events`, never as an `on_press` prop.
-        applier.applyOp(Op.Create(33, "Text", JSONObject().put("text", "tap").put("_pn_events", events("on_press"))))
+        applier.applyOp(MountOp.Create(33, "Text", JSONObject().put("text", "tap").put("_pn_events", events("on_press"))))
         val label = PNBridge.registry.get(33)!!.view as TextView
         assertTrue(label.isClickable)
         assertTrue(label.hasOnClickListeners())
-        applier.applyOp(Op.Update(33, JSONObject().put("_pn_events", events())))
+        applier.applyOp(MountOp.Update(33, JSONObject().put("_pn_events", events())))
         assertFalse(label.isClickable)
-        applier.applyOp(Op.Create(34, "Text", JSONObject().put("text", "select me").put("selectable", true).put("ellipsize_mode", "middle").put("max_lines", 1)))
+        applier.applyOp(MountOp.Create(34, "Text", JSONObject().put("text", "select me").put("selectable", true).put("ellipsize_mode", "middle").put("max_lines", 1)))
         val selectable = PNBridge.registry.get(34)!!.view as TextView
         assertTrue(selectable.isTextSelectable)
         assertEquals(android.text.TextUtils.TruncateAt.MIDDLE, selectable.ellipsize)
@@ -128,7 +128,7 @@ class RoundTwoRobolectricTest {
 
     @Test fun spanTapsAreBoundedByTheGlyphs() {
         val spans = JSONArray().put(JSONObject().put("text", "Read the ")).put(JSONObject().put("text", "terms").put("pressable", true))
-        applier.applyOp(Op.Create(40, "Text", JSONObject().put("spans", spans).put("_pn_events", events("on_span_press"))))
+        applier.applyOp(MountOp.Create(40, "Text", JSONObject().put("spans", spans).put("_pn_events", events("on_span_press"))))
         val tv = PNBridge.registry.get(40)!!.view as TextView
         val method = com.pythonnative.runtime.components.PNSpanMovementMethod
         assertTrue(tv.movementMethod === method)
@@ -152,7 +152,7 @@ class RoundTwoRobolectricTest {
     }
 
     @Test fun textInputSelectionIsControlledAndKeyboardTypesApply() {
-        applier.applyOp(Op.Create(35, "TextInput", JSONObject().put("value", "hello world").put("selection", JSONObject().put("start", 1).put("end", 4)).put("keyboard_type", "web_search")))
+        applier.applyOp(MountOp.Create(35, "TextInput", JSONObject().put("value", "hello world").put("selection", JSONObject().put("start", 1).put("end", 4)).put("keyboard_type", "web_search")))
         val et = PNBridge.registry.get(35)!!.view as EditText
         assertEquals(1, et.selectionStart)
         assertEquals(4, et.selectionEnd)
@@ -160,35 +160,35 @@ class RoundTwoRobolectricTest {
         assertTrue(et.inputType and android.text.InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT != 0)
         // The same selection again does not touch the user's cursor; a new one does.
         et.setSelection(6, 6)
-        applier.applyOp(Op.Update(35, JSONObject().put("placeholder", "x")))
+        applier.applyOp(MountOp.Update(35, JSONObject().put("placeholder", "x")))
         assertEquals(6, et.selectionStart)
-        applier.applyOp(Op.Update(35, JSONObject().put("selection", JSONObject().put("start", 0).put("end", 11))))
+        applier.applyOp(MountOp.Update(35, JSONObject().put("selection", JSONObject().put("start", 0).put("end", 11))))
         assertEquals(0, et.selectionStart)
         assertEquals(11, et.selectionEnd)
-        applier.applyOp(Op.Update(35, JSONObject().put("keyboard_type", "visible_password")))
+        applier.applyOp(MountOp.Update(35, JSONObject().put("keyboard_type", "visible_password")))
         assertTrue(et.inputType and android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD != 0)
     }
 
     @Test fun pressableRippleForegroundAndBackgroundModes() {
         val ripple = JSONObject().put("color", "#33000000").put("borderless", false).put("foreground", true)
-        applier.applyOp(Op.Create(36, "Pressable", JSONObject().put("android_ripple", ripple).put("disabled", true).put("delay_long_press", 400)))
+        applier.applyOp(MountOp.Create(36, "Pressable", JSONObject().put("android_ripple", ripple).put("disabled", true).put("delay_long_press", 400)))
         val view = PNBridge.registry.get(36)!!.view
         assertTrue(view.foreground is RippleDrawable)
         assertFalse(view.isEnabled)
-        applier.applyOp(Op.Update(36, JSONObject().put("android_ripple", JSONObject().put("color", JSONObject().put("light", "#22000000").put("dark", "#22ffffff")).put("foreground", false)).put("background_color", "#ff0000").put("disabled", false)))
+        applier.applyOp(MountOp.Update(36, JSONObject().put("android_ripple", JSONObject().put("color", JSONObject().put("light", "#22000000").put("dark", "#22ffffff")).put("foreground", false)).put("background_color", "#ff0000").put("disabled", false)))
         assertNull(view.foreground)
         assertTrue(view.background is RippleDrawable)
         assertTrue(view.isEnabled)
         // A later border change re-bakes the background and keeps the ripple beneath the children.
-        applier.applyOp(Op.Update(36, JSONObject().put("border_radius", 8)))
+        applier.applyOp(MountOp.Update(36, JSONObject().put("border_radius", 8)))
         assertTrue(view.background is RippleDrawable)
-        applier.applyOp(Op.Update(36, JSONObject().put("android_ripple", JSONObject.NULL)))
+        applier.applyOp(MountOp.Update(36, JSONObject().put("android_ripple", JSONObject.NULL)))
         assertFalse(view.background is RippleDrawable)
         assertNull(view.foreground)
     }
 
     @Test fun modalBackAsksPythonInsteadOfDismissing() {
-        applier.applyOp(Op.Create(37, "Modal", JSONObject().put("visible", true).put("_pn_events", events("on_request_close"))))
+        applier.applyOp(MountOp.Create(37, "Modal", JSONObject().put("visible", true).put("_pn_events", events("on_request_close"))))
         val record = PNBridge.registry.get(37)!!
         val dialog = record.state["dialog"] as Dialog
         val down = android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK)
@@ -197,33 +197,33 @@ class RoundTwoRobolectricTest {
         dialog.onKeyUp(android.view.KeyEvent.KEYCODE_BACK, up)
         assertTrue(dialog.isShowing)
         assertSame(dialog, record.state["dialog"])
-        applier.applyOp(Op.Update(37, JSONObject().put("visible", false)))
+        applier.applyOp(MountOp.Update(37, JSONObject().put("visible", false)))
         assertNull(record.state["dialog"])
     }
 
     @Test fun modalKeepsItsChildrenAcrossPresentations() {
-        applier.applyOp(Op.Create(39, "Modal", JSONObject().put("visible", false)))
-        applier.applyOp(Op.Create(40, "View", JSONObject()))
-        applier.applyOp(Op.Insert(39, 40, 0))
+        applier.applyOp(MountOp.Create(39, "Modal", JSONObject().put("visible", false)))
+        applier.applyOp(MountOp.Create(40, "View", JSONObject()))
+        applier.applyOp(MountOp.Insert(39, 40, 0))
         val record = PNBridge.registry.get(39)!!
         val child = PNBridge.registry.get(40)!!.view
-        applier.applyOp(Op.Update(39, JSONObject().put("visible", true)))
+        applier.applyOp(MountOp.Update(39, JSONObject().put("visible", true)))
         assertSame(record.state["content_view"], child.parent)
-        applier.applyOp(Op.Update(39, JSONObject().put("visible", false)))
+        applier.applyOp(MountOp.Update(39, JSONObject().put("visible", false)))
         assertNull(record.state["dialog"])
-        applier.applyOp(Op.Update(39, JSONObject().put("visible", true)))
+        applier.applyOp(MountOp.Update(39, JSONObject().put("visible", true)))
         val content = record.state["content_view"] as android.widget.FrameLayout
         assertSame("a reopened modal shows its children again", content, child.parent)
         assertEquals(1, content.childCount)
-        applier.applyOp(Op.Update(39, JSONObject().put("visible", false)))
-        applier.applyOp(Op.Destroy(40))
+        applier.applyOp(MountOp.Update(39, JSONObject().put("visible", false)))
+        applier.applyOp(MountOp.Delete(40))
         assertNull("a destroyed child leaves the last dialog too", child.parent)
     }
 
     @Test fun overlayBackdropTapsNeverCloseTheModalNatively() {
-        applier.applyOp(Op.Create(41, "Modal", JSONObject().put("visible", true).put("presentation_style", "overlay")))
-        applier.applyOp(Op.Create(42, "View", JSONObject()))
-        applier.applyOp(Op.Insert(41, 42, 0))
+        applier.applyOp(MountOp.Create(41, "Modal", JSONObject().put("visible", true).put("presentation_style", "overlay")))
+        applier.applyOp(MountOp.Create(42, "View", JSONObject()))
+        applier.applyOp(MountOp.Insert(41, 42, 0))
         val record = PNBridge.registry.get(41)!!
         val dialog = record.state["dialog"] as Dialog
         val content = record.state["content_view"] as android.widget.FrameLayout
@@ -239,7 +239,7 @@ class RoundTwoRobolectricTest {
     }
 
     @Test fun virtualListScrollPayloadKeepsListWindowFields() {
-        applier.applyOp(Op.Create(38, "VirtualList", JSONObject("""{"dataset":{"base":0,"revision":1,"changes":[["reset",[["a",1,44,false],["b",1,44,false]]]]}}""")))
+        applier.applyOp(MountOp.Create(38, "VirtualList", JSONObject("""{"dataset":{"base":0,"revision":1,"changes":[["reset",[["a",1,44,false],["b",1,44,false]]]]}}""")))
         val list = PNBridge.registry.get(38)!!.view
         val method = list.javaClass.getDeclaredMethod("scrollPayload").apply { isAccessible = true }
         val payload = method.invoke(list) as JSONObject

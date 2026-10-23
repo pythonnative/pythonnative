@@ -38,9 +38,9 @@ DEV_ONLY_PATHS = (
     "refresh.py",
     "preview.py",
     "bridge/web.py",
+    "bridge/fake.py",
     "sdk/builtins.py",
     "sdk/codegen.py",
-    "sdk/contract_codegen.py",
     "sdk/module_codegen.py",
     "sdk/templates",
 )

@@ -102,7 +102,7 @@ def _plugin_names(requirements: Sequence[str], plugin_paths: Sequence[Any]) -> L
 
 def project_runtime(config: Any = None) -> ProjectRuntime:
     """Describe what the project at ``config`` (an ``AppConfig``, or ``None``) needs."""
-    from ..bridge.commits import PROTOCOL_VERSION
+    from ..bridge import PROTOCOL_VERSION
 
     requirements = list(getattr(config, "requirements", ()) or ())
     plugin_paths = [config.resolve_path(p) for p in getattr(config, "plugin_paths", ()) or ()] if config else []

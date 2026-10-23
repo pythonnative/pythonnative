@@ -499,8 +499,6 @@ def test_journal_captures_each_existing_node_once_per_pass() -> None:
             existing.element = Element("Text", {"text": "y"}, [])
             fresh.children = []
             layout_only.last_frame = (0.0, 0.0, 1.0, 1.0)
-            layout_only.layout_dirty = True
-            layout_only.measure_cache = None
     finally:
         journal.uninstall(token)
     assert len(recording.undo) == 1

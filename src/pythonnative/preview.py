@@ -1,9 +1,12 @@
 """Development server and browser preview.
 
-The browser is a protocol-4 renderer with Yoga WebAssembly layout. Python runs
-on the standard application asyncio loop; the transport's coordinator and
-network threads forward messages to their owners. The dev server watches app
-sources, synchronizes mobile clients, and applies compatible Fast Refresh.
+The page runs the renderer core as WebAssembly, the same core the iOS and
+Android apps link, and mounts DOM widgets from its transactions; Python
+commits to it through [`WebTransport`][pythonnative.bridge.web.WebTransport].
+Python runs on the standard application asyncio loop; the transport's
+coordinator and network threads forward messages to their owners. The dev
+server watches app sources, synchronizes mobile clients, and applies
+compatible Fast Refresh.
 
 PN_PLATFORM=web must be set before importing pythonnative; the CLI launches a
 child process with that environment when needed.

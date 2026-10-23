@@ -15,7 +15,7 @@ from .types import NativeField, decode_value, encode_value, type_schema, validat
 
 # Runtime metadata crosses the bridge for built-in and third-party views alike.
 RUNTIME_PROPS: dict[str, dict[str, Any]] = {
-    "_pn_layout": {"type": "boolean", "native": {"invalidates_layout": False}},
+    "_pn_layout": {"type": "boolean", "native": {"invalidates_layout": False, "flatten": True}},
     "_pn_events": {"type": "array", "items": {"type": "string"}},
     "_pn_animated_events": {"type": "object"},
     "_pn_list_key": {"type": "string"},
@@ -34,8 +34,22 @@ class ComponentSchema:
     required: tuple[str, ...] = ()
     defaults: dict[str, Any] = field(default_factory=dict)
     measurement: str = "intrinsic"
+    """How the renderer core sizes the component as a leaf: ``"container"``
+    (never measured), ``"intrinsic"`` (a widget measured on the UI thread),
+    ``"native"`` (a plugin's thread-safe measurement), or one the core
+    computes for built-ins (``"text"``, ``"image"``, ``"svg"``, ``"fill"``)."""
     commands: dict[str, Any] = field(default_factory=dict)
     platforms: tuple[str, ...] = ("ios", "android", "web")
+    flatten: bool = False
+    """Whether the core may leave the view unmounted when it only affects layout."""
+    adopt_flattened: bool = False
+    """Whether the view may receive the children of a flattened child."""
+    detach_children: bool = False
+    """Whether children lay out as independent roots (lists, modals, stacks)."""
+    clip: bool = False
+    """Whether layout clips overflow and lets the view shrink by default (scrolling containers)."""
+    portal: bool = False
+    """Whether the view lays out against its own container instead of its parent."""
 
     @classmethod
     def from_dataclass(
@@ -203,7 +217,7 @@ class ModuleSchema:
 COMPONENTS: dict[str, ComponentSchema] = {}
 MODULES: dict[str, ModuleSchema] = {}
 
-from ..bridge.commits import PROTOCOL_VERSION  # noqa: E402
+from ..bridge.core import PROTOCOL_VERSION  # noqa: E402
 
 YOGA_VERSION = "3.2.1"
 """The Yoga release every layout engine (native, WebAssembly, headless) embeds."""
@@ -212,6 +226,8 @@ BUILTIN_CONTRACTS = "_builtin_contracts.json"
 """Generated file, beside this module, holding the built-in contracts."""
 
 _fingerprint_cache: tuple[Any, str] | None = None
+_builtin_text: str | None = None
+_builtin_names: tuple[frozenset[str], frozenset[str]] = (frozenset(), frozenset())
 
 
 def register_schema(schema: ComponentSchema | ModuleSchema) -> None:
@@ -271,6 +287,11 @@ def _component(value: Mapping[str, Any], props: dict[str, dict[str, Any]] | None
         value.get("measurement", "intrinsic"),
         dict(value.get("commands", {})),
         tuple(value.get("platforms", ("ios", "android", "web"))),
+        bool(value.get("flatten", False)),
+        bool(value.get("adopt_flattened", False)),
+        bool(value.get("detach_children", False)),
+        bool(value.get("clip", False)),
+        bool(value.get("portal", False)),
     )
 
 
@@ -338,12 +359,13 @@ def load_builtin_contracts() -> bool:
     ``pythonnative.sdk.builtins``) and writes them beside this module, so an
     app's startup reads one JSON document instead of evaluating type hints.
     """
-    global _fingerprint_cache
+    global _fingerprint_cache, _builtin_text, _builtin_names
     path = Path(__file__).with_name(BUILTIN_CONTRACTS)
     try:
-        document = json.loads(path.read_bytes())
+        text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return False
+    document = json.loads(text)
     if document.get("protocol") != PROTOCOL_VERSION or document.get("yoga") != YOGA_VERSION:
         # A development checkout whose generated file predates a protocol
         # change; the caller derives the contracts instead.
@@ -354,7 +376,34 @@ def load_builtin_contracts() -> bool:
     for name, value in document["modules"].items():
         register_schema(ModuleSchema(**value))
     _fingerprint_cache = (_registry_identity(), document["fingerprint"])
+    _builtin_text = text
+    _builtin_names = (frozenset(document["components"]), frozenset(document["modules"]))
     return True
+
+
+def native_documents() -> list[str]:
+    """The contract documents the renderer core compiles, built-ins first.
+
+    The built-in contracts are the generated file the package ships, read
+    as text; contracts added since (plugins, ``define_component``) follow
+    as one small manifest. A development checkout whose generated file is
+    stale sends the whole registry instead.
+    """
+    components, modules = _builtin_names
+    if _builtin_text is None or any(COMPONENTS.get(name) is None for name in components):
+        return [encode_builtin_contracts(manifest())]
+    extra = {
+        "protocol": PROTOCOL_VERSION,
+        "yoga": YOGA_VERSION,
+        "components": {
+            name: dataclasses.asdict(value) for name, value in sorted(COMPONENTS.items()) if name not in components
+        },
+        "modules": {name: dataclasses.asdict(value) for name, value in sorted(MODULES.items()) if name not in modules},
+    }
+    documents = [_builtin_text]
+    if extra["components"] or extra["modules"]:
+        documents.append(json.dumps(extra, sort_keys=True, default=str))
+    return documents
 
 
 def load_bundled_contracts() -> None:

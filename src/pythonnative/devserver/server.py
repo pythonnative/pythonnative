@@ -8,7 +8,8 @@ loop. It exposes:
 - ``GET /``: the browser preview page. With a valid ``?token=``, the
   response instead sets the ``pn_token`` cookie and redirects to ``/``,
   so the token doesn't stay in the address bar.
-- ``GET /static/<name>``: preview assets (JS, CSS).
+- ``GET /static/<name>``: preview assets (JS, CSS, and the renderer core's
+  WebAssembly, served as ``application/wasm``).
 - ``GET /manifest``: ``{"version", "entry", "files": {path: sha256}}``.
 - ``GET /file/<path>``: raw bytes of one synced source file.
 - ``GET /assets/<path>``: a file under ``app/assets/``; ``/assets/pn_assets.json``
@@ -688,13 +689,6 @@ class DevServer:
             name = "devtools/index.html" if page == "/devtools" else "index.html"
             _respond_file(writer, os.path.join(self.static_dir, name))
             return
-        if path == "/static/schema.js":
-            from ..sdk.schema import manifest
-
-            _respond(
-                writer, 200, ("export default " + json.dumps(manifest(), default=str) + ";").encode(), "text/javascript"
-            )
-            return
         if path.startswith("/devtools/"):
             path = "/static/devtools/" + path[len("/devtools/") :]
         if path.startswith("/static/"):
@@ -1240,6 +1234,9 @@ def _respond_file(writer: asyncio.StreamWriter, path: str) -> None:
     content_type = mimetypes.guess_type(path)[0] or "application/octet-stream"
     if path.endswith(".js"):
         content_type = "text/javascript"
+    elif path.endswith(".wasm"):
+        # Browsers compile WebAssembly while it streams only with this type.
+        content_type = "application/wasm"
     if content_type.startswith("text/") and "charset" not in content_type:
         content_type += "; charset=utf-8"
     _respond(writer, 200, data, content_type)

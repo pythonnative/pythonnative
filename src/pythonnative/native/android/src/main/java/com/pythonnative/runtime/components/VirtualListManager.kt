@@ -10,18 +10,23 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.pythonnative.runtime.PNBridge
-import com.pythonnative.runtime.bridge.ViewRecord
+import com.pythonnative.runtime.core.PNCore
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
-/** Keyed native recycling; Python prepares logical children asynchronously. */
+/**
+ * Keyed native recycling over the core's list dataset; Python prepares
+ * logical children asynchronously. Row keys, extents, and sticky flags are
+ * read from the core (`PNCore.list*`), which validated and published the
+ * dataset patch this list applies when its `dataset` prop changes.
+ */
 class VirtualListManager : ComponentManager() {
     private class Holder(val container: FrameLayout) : RecyclerView.ViewHolder(container) { var key = "" }
-    private inner class ListView(context: Context) : SwipeRefreshLayout(context) {
+    private inner class ListView(context: Context, val tag: Long) : SwipeRefreshLayout(context) {
         val recycler = RecyclerView(context)
         val content = FrameLayout(context)
         val stickyContainer = FrameLayout(context)
-        val store = ListStore()
+        var revision = 0L
         private var pinnedKey: String? = null
         private var lastWindow = emptyList<Long>()
         val roots = HashMap<String, View>()
@@ -30,16 +35,16 @@ class VirtualListManager : ComponentManager() {
         var horizontal = false
         val manager = LinearLayoutManager(context)
         val rows = object : RecyclerView.Adapter<Holder>() {
-            override fun getItemCount() = store.keys.size
+            override fun getItemCount() = PNCore.listCount(tag)
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder = Holder(FrameLayout(context))
             override fun onBindViewHolder(holder: Holder, position: Int) {
                 holders.remove(holder.key)
-                val item = store.rows.getValue(store.keys[position])
-                holder.key = item.key
-                holders[item.key] = holder
-                attach(holder, item)
-                if (item.key !in roots && !item.sticky) fire(this@ListView, "on_bind_row", JSONObject().put("index", position).put("key", item.key)
-                    .put("revision", store.revision).put("extent", height / PNBridge.density()).put("width", width / PNBridge.density()).put("sticky", store.sticky(position)))
+                val key = PNCore.listKey(tag, position) ?: return
+                holder.key = key
+                holders[key] = holder
+                attach(holder, key, position)
+                if (key !in roots && !PNCore.listSticky(tag, position)) fire(this@ListView, "on_bind_row", JSONObject().put("index", position).put("key", key)
+                    .put("revision", revision).put("extent", height / PNBridge.density()).put("width", width / PNBridge.density()).put("sticky", PNCore.listStickyAt(tag, position)))
             }
             override fun onViewRecycled(holder: Holder) {
                 holders.remove(holder.key)
@@ -92,11 +97,11 @@ class VirtualListManager : ComponentManager() {
             val first = manager.findFirstVisibleItemPosition().coerceAtLeast(0)
             val last = manager.findLastVisibleItemPosition()
             val extent = (if (horizontal) width else height) / PNBridge.density()
-            val sticky = store.sticky(first)
-            val identity = listOf(first.toLong(), last.toLong(), extent.toLong(), sticky.toLong(), store.revision)
+            val sticky = PNCore.listStickyAt(tag, first)
+            val identity = listOf(first.toLong(), last.toLong(), extent.toLong(), sticky.toLong(), revision)
             if (identity == lastWindow) return
             lastWindow = identity
-            fire(this, "on_window", scrollPayload().put("revision", store.revision).put("sticky", sticky))
+            fire(this, "on_window", scrollPayload().put("revision", revision).put("sticky", sticky))
         }
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
             super.onLayout(changed, left, top, right, bottom)
@@ -104,15 +109,15 @@ class VirtualListManager : ComponentManager() {
         }
         fun updateSticky() {
             val first = manager.findFirstVisibleItemPosition()
-            val index = if (horizontal) -1 else store.sticky(first)
-            val key = store.keys.getOrNull(index)
+            val index = if (horizontal || first < 0) -1 else PNCore.listStickyAt(tag, first)
+            val key = if (index >= 0) PNCore.listKey(tag, index) else null
             val natural = if (index >= 0) manager.findViewByPosition(index)?.top else null
             val wanted = key?.takeIf { natural == null || natural < 0 }
             if (wanted != pinnedKey) {
                 val old = pinnedKey
                 pinnedKey = null
                 stickyContainer.removeAllViews()
-                if (old != null) holders[old]?.let { holder -> store.rows[old]?.let { attach(holder, it) } }
+                if (old != null) holders[old]?.let { holder -> reattach(holder, old) }
                 pinnedKey = wanted
             }
             val root = wanted?.let { roots[it] }
@@ -122,13 +127,18 @@ class VirtualListManager : ComponentManager() {
                 stickyContainer.addView(root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             }
             stickyContainer.visibility = View.VISIBLE
-            val extent = ((heights[wanted] ?: store.rows[wanted]?.extent ?: 44.0) * PNBridge.density()).roundToInt()
+            val extent = ((heights[wanted] ?: PNCore.listExtent(tag, index).takeIf { it > 0 } ?: 44.0) * PNBridge.density()).roundToInt()
             if (stickyContainer.layoutParams.height != extent) stickyContainer.layoutParams = stickyContainer.layoutParams.apply { height = extent }
-            val next = store.stickyIndices.firstOrNull { it > index }?.let { manager.findViewByPosition(it)?.top }
+            val next = PNCore.listNextSticky(tag, index).takeIf { it >= 0 }?.let { manager.findViewByPosition(it)?.top }
             stickyContainer.translationY = if (next == null) 0f else (next - extent).coerceAtMost(0).toFloat()
         }
-        fun attach(holder: Holder, item: ListStore.Row) {
-            val size = ((heights[item.key] ?: item.extent) * PNBridge.density()).roundToInt().coerceAtLeast(1)
+        /** Re-attach a bound row after its root or extent changed. */
+        fun reattach(holder: Holder, key: String) {
+            val index = PNCore.listIndex(tag, key)
+            if (index >= 0) attach(holder, key, index)
+        }
+        fun attach(holder: Holder, key: String, index: Int) {
+            val size = ((heights[key] ?: PNCore.listExtent(tag, index)) * PNBridge.density()).roundToInt().coerceAtLeast(1)
             // Preserve RecyclerView.LayoutParams, which retain the holder identity.
             val params = holder.container.layoutParams as? RecyclerView.LayoutParams
                 ?: RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, size)
@@ -136,14 +146,14 @@ class VirtualListManager : ComponentManager() {
             params.height = if (horizontal) ViewGroup.LayoutParams.MATCH_PARENT else size
             holder.container.layoutParams = params
             holder.container.removeAllViews()
-            if (item.key == pinnedKey) return
-            roots[item.key]?.let { root ->
+            if (key == pinnedKey) return
+            roots[key]?.let { root ->
                 (root.parent as? ViewGroup)?.removeView(root)
                 holder.container.addView(root, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
             }
         }
     }
-    override fun createView(context: Context, tag: Long, props: JSONObject): View = ListView(context)
+    override fun createView(context: Context, tag: Long, props: JSONObject): View = ListView(context, tag)
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
         ViewStyler.apply(view, props)
         val list = view as ListView
@@ -156,24 +166,44 @@ class VirtualListManager : ComponentManager() {
         list.isEnabled = refresh != null && !list.horizontal
         list.isRefreshing = refresh?.optBoolean("refreshing", false) == true
         refresh?.optString("tint_color")?.takeIf { it.isNotEmpty() }?.let { color -> PNColor.parse(color)?.let { list.setColorSchemeColors(it) } }
-        props.optJSONObject("dataset")?.let { packet ->
-            val patch = list.store.prepare(packet)
-            val first = list.manager.findFirstVisibleItemPosition()
-            val anchor = list.store.keys.getOrNull(first)
-            val anchorView = list.manager.findViewByPosition(first)
-            val offset = (if (list.horizontal) anchorView?.left else anchorView?.top) ?: 0
-            list.store.publish(patch)
-            if (patch.reset) list.heights.clear() else patch.deleted.forEach { list.heights.remove(it) }
-            if (patch.reset) list.rows.notifyDataSetChanged()
-            else for (edit in patch.edits) when (edit.code) {
-                "i" -> list.rows.notifyItemInserted(edit.to)
-                "d" -> list.rows.notifyItemRemoved(edit.from)
-                "m" -> list.rows.notifyItemMoved(edit.from, edit.to)
+        if (props.has("dataset")) publish(list)
+    }
+
+    /** Apply the dataset patch the core published with this mount, keeping the first visible row in place. */
+    private fun publish(list: ListView) {
+        val first = list.manager.findFirstVisibleItemPosition()
+        val anchor = if (first >= 0) PNCore.listKey(list.tag, first) else null
+        val anchorView = list.manager.findViewByPosition(first)
+        val offset = (if (list.horizontal) anchorView?.left else anchorView?.top) ?: 0
+        val patch = PNCore.listApply(list.tag)
+        if (patch == null) {
+            // A recreated list reads the dataset the core already holds.
+            list.revision = PNCore.listRevision(list.tag)
+            list.rows.notifyDataSetChanged()
+        } else {
+            list.revision = patch.optLong("revision", list.revision)
+            val edits = patch.optJSONArray("edits") ?: org.json.JSONArray()
+            if (patch.optBoolean("reset")) {
+                list.heights.clear()
+                list.rows.notifyDataSetChanged()
+            } else {
+                list.heights.keys.removeAll { PNCore.listIndex(list.tag, it) < 0 }
+                for (i in 0 until edits.length()) {
+                    val edit = edits.optJSONArray(i) ?: continue
+                    when (edit.optString(0)) {
+                        "i" -> list.rows.notifyItemInserted(edit.optInt(2))
+                        "d" -> list.rows.notifyItemRemoved(edit.optInt(1))
+                        "m" -> list.rows.notifyItemMoved(edit.optInt(1), edit.optInt(2))
+                    }
+                }
+                if (edits.length() > 0 && anchor != null) {
+                    PNCore.listIndex(list.tag, anchor).takeIf { it >= 0 }?.let { list.manager.scrollToPositionWithOffset(it, offset) }
+                }
             }
-            for ((key, item) in patch.changed) list.holders[key]?.let { list.attach(it, item) }
-            if (patch.order != null) list.store.indices[anchor]?.let { list.manager.scrollToPositionWithOffset(it, offset) }
-            list.post { list.updateSticky(); list.emitWindow() }
+            // Updated rows may have new extents.
+            for ((key, holder) in list.holders.toMap()) list.reattach(holder, key)
         }
+        list.post { list.updateSticky(); list.emitWindow() }
     }
 
     override fun insertChild(parent: View, child: View, index: Int) {
@@ -186,12 +216,12 @@ class VirtualListManager : ComponentManager() {
             if (extent > 0 && list.heights[key] != extent) {
                 list.heights[key] = extent
                 list.post {
-                    list.holders[key]?.let { holder -> list.store.rows[key]?.let { list.attach(holder, it) } }
+                    list.holders[key]?.let { holder -> list.reattach(holder, key) }
                     list.updateSticky()
                 }
             }
         }
-        list.holders[key]?.let { holder -> list.store.rows[key]?.let { list.attach(holder, it) } }
+        list.holders[key]?.let { holder -> list.reattach(holder, key) }
         list.updateSticky()
     }
     override fun removeChild(parent: View, child: View) {
@@ -209,8 +239,6 @@ class VirtualListManager : ComponentManager() {
         list.roots.clear()
         list.holders.clear()
     }
-    override fun measure(view: View, maxWidth: Double, maxHeight: Double): FloatArray =
-        floatArrayOf(if (maxWidth < 1e6) maxWidth.toFloat() else 0f, if (maxHeight < 1e6) maxHeight.toFloat() else 0f)
     override fun command(view: View, name: String, args: JSONObject): Any? {
         val list = view as ListView
         if (name == "get_scroll_offset") return mapOf(
@@ -234,13 +262,6 @@ class VirtualListManager : ComponentManager() {
         return null
     }
     companion object {
-        fun validateDataset(tag: Long, props: JSONObject, initial: Boolean): Boolean = try {
-            val packet = props.optJSONObject("dataset")
-            if (packet == null) !initial && !props.has("dataset") else {
-                val store = if (initial) ListStore() else (PNBridge.registry.get(tag)?.view as? ListView)?.store
-                store?.prepare(packet) != null
-            }
-        } catch (_: Exception) { false }
         private val rowOwners = HashMap<Long, (Double, Double) -> Unit>()
         fun measured(tag: Long, width: Double, height: Double) { rowOwners[tag]?.invoke(width, height) }
     }

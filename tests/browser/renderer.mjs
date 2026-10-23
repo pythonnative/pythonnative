@@ -1,33 +1,91 @@
-import {ListStore} from "../../src/pythonnative/devserver/static/list-store.js";
-import {Renderer, transformToCSS, easingFor, decayFinalValue, decayAt, snapTarget, scrollPayload, keyPressName, screenTransition} from '../../src/pythonnative/devserver/static/renderer.js';
+// The browser preview's mounting path, end to end in Chrome: commits go to
+// the WebAssembly renderer core in the page, which validates, lays out, and
+// flattens them, and the DOM renderer applies the mount transactions it
+// produces. The assertions read the DOM, the core's replies, and the
+// messages the core emits for Python.
+import {Renderer, transformToCSS, snapTarget, scrollPayload, keyPressName, screenTransition, stackHeaderHeight} from '../../src/pythonnative/devserver/static/renderer.js';
+import {RendererCore, CoreHost, PROTOCOL_VERSION, decodeTransaction, decodeWrites} from '../../src/pythonnative/devserver/static/core/mount.js';
 import {PreviewHost, Screen, localeRecord, scriptResult} from '../../src/pythonnative/devserver/static/host.js';
-import {matches} from '../../src/pythonnative/devserver/static/contracts.js';
 import {runDevToolsTests} from './devtools.mjs';
-import specification from '../../src/pythonnative/devserver/static/schema.js';
 const assert = (condition, message) => { if (!condition) throw Error(message); };
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-const fixtures = await (await fetch('../contracts/validation.json')).json();
-for (const item of fixtures) assert(matches(item.value, item.schema) === item.valid, item.name);
-const listTrace = await (await fetch('../contracts/list-trace.json')).json();
-const traceStore = new ListStore();
-for (const item of listTrace) {
-  let accepted = false;
-  try { traceStore.apply(item.packet); accepted = true; } catch (_) {}
-  assert(accepted === item.valid, item.name);
-  assert(JSON.stringify(traceStore.keys) === JSON.stringify(item.keys) && traceStore.revision === item.revision, `atomic ${item.name}`);
+const until = async (condition, ms = 3000) => { for (const end = performance.now() + ms; !condition(); await sleep(10)) if (performance.now() > end) throw Error(`timed out waiting for ${condition}`); };
+const frames = (n = 2) => new Promise(resolve => { const step = () => (n-- <= 0 ? resolve() : requestAnimationFrame(step)); step(); });
+const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
+  return value;
 }
-const events = [], gestures = [], overlay = document.createElement('div'); document.body.append(overlay);
-const renderer = new Renderer({emit: (...args) => events.push(args), gesture: (...args) => gestures.push(args), request() {},
-  animationFinished() {}, scheme: () => 'light', overlays: () => overlay, bottomInset: () => 0,
-  frameWidth: () => 390, pointInFrame: () => ({x:0, y:0}), statusBar() {}});
+const FIXTURES = '../../src/pythonnative/native/ios/Tests/PythonNativeKitTests/Fixtures';
+
+// ---------------------------------------------------------------------------
+// The WebAssembly core against the shared fixtures.
+// ---------------------------------------------------------------------------
+const core = await RendererCore.load();
+assert(core.protocolVersion() === PROTOCOL_VERSION, `the core speaks protocol ${core.protocolVersion()}`);
+const fixtures = await (await fetch('../contracts/validation.json')).json();
+for (const item of fixtures) assert(core.checkValue(item.schema, item.value) === item.valid, `contract fixture: ${item.name}`);
+// The JavaScript decoder reads the transactions the host core recorded the way Python does.
+const recorded = await (await fetch(`${FIXTURES}/mount.json`)).json();
+for (const item of recorded) {
+  const decoded = decodeTransaction(Uint8Array.from(atob(item.bytes), c => c.charCodeAt(0)));
+  assert(decoded.surface === item.surface && decoded.revision === item.revision && decoded.id === item.id, `transaction header: ${item.name}`);
+  assert(same(decoded.ops, item.ops), `decoded ops match Python's: ${item.name}: ${JSON.stringify(decoded.ops)}`);
+}
+const writes = new Uint8Array([2,0,0,0, 7,0,0,0,0,0,0,0, 7,0,0,0, ...new TextEncoder().encode('opacity'), 4, 0,0,0,0,0,0,224,63,
+  7,0,0,0,0,0,0,0, 16,0,0,0, ...new TextEncoder().encode('background_color'), 5, 4,0,0,0, ...new TextEncoder().encode('#fff')]);
+assert(same(decodeWrites(writes), [[7, 'opacity', 0.5], [7, 'background_color', '#fff']]), 'animated writes decode');
+const contracts = await (await fetch(`${FIXTURES}/contracts.json`)).text();
+assert(core.loadContracts(contracts) === null && core.fingerprint() !== '', 'the core compiles the contract document');
+
+const messages = [], events = [], overlay = document.createElement('div'); document.body.append(overlay);
+const renderer = new Renderer({scheme: () => 'light', overlays: () => overlay, bottomInset: () => 0, frameWidth: () => 390,
+  pointInFrame: (event) => { const r = event.currentTarget.getBoundingClientRect(); return {x: event.clientX - r.left, y: event.clientY - r.top}; },
+  pointInWindow: (event) => ({x: event.clientX, y: event.clientY}), statusBar() {}});
+const mount = new CoreHost(core, renderer, {send: (kind, tag, name, payload) => {
+  messages.push([kind, tag, name, payload]);
+  if (kind === 'event') events.push([tag, name, JSON.parse(payload)]);
+}});
+
+// The list trace through the core: patches validate in the commit and publish to the mount side.
+let traceRevision = 0, traceCreated = false;
+const traceCommit = (op) => JSON.parse(core.commit(JSON.stringify({version:PROTOCOL_VERSION, application:'list-trace', surface:3, revision:traceRevision + 1, ops:[op]})));
+for (const step of await (await fetch('../contracts/list-trace.json')).json()) {
+  const ack = traceCommit(traceCreated ? ['u', 1, {dataset: step.packet}, []] : ['c', 1, 'VirtualList', {dataset: step.packet}]);
+  assert(ack.ok === step.valid, `list trace ${step.name}: ${JSON.stringify(ack)}`);
+  if (ack.ok) { traceRevision++; traceCreated = true; }
+  mount.drain();
+  const keys = Array.from({length: core.listCount(3, 1)}, (_, i) => core.listKey(3, 1, i));
+  assert(same(keys, step.keys) && core.listRevision(3, 1) === step.revision, `atomic ${step.name}: ${JSON.stringify(keys)} r${core.listRevision(3, 1)}`);
+}
+traceCommit(['d', 1]); mount.drain();
+
 let revision = 0;
-const envelope = ops => ({version:specification.protocol, application:'browser-test', surface:1, revision:revision+1, ops});
-const commit = ops => { const result=renderer.apply(envelope(ops)); assert(result.ok, result.error); revision++; };
+const envelope = (ops, layout) => ({version:PROTOCOL_VERSION, application:'browser-test', surface:1, revision:revision+1, ops, ...(layout ? {layout} : {})});
+const submit = (ops, layout) => { const ack = JSON.parse(core.commit(JSON.stringify(envelope(ops, layout)))); if (ack.ok) revision++; mount.drain(); return ack; };
+const commit = (ops, layout) => { const ack = submit(ops, layout); assert(ack.ok, `${ack.error} in ${JSON.stringify(ops)}`); return ack; };
+const layout = (roots, width, height, selective = false) => {
+  const reply = JSON.parse(core.layout(JSON.stringify({surface:1, roots, width, height, selective})));
+  assert(reply.ok, JSON.stringify(reply)); mount.drain(); return reply.value;
+};
+const command = (tag, name, args = {}) => {
+  const callId = 1000 + messages.length;
+  const reply = JSON.parse(core.command(1, tag, name, JSON.stringify(args), callId));
+  assert(reply.ok, JSON.stringify(reply)); mount.drain();
+  const result = messages.filter(([kind]) => kind === 'command').map(([, , , payload]) => JSON.parse(payload)).find(body => body.call_id === callId);
+  assert(result, `command ${name} answered`); return result;
+};
+const emitted = (tag, name) => events.filter(([t, n]) => t === tag && n === name).map(([, , body]) => body.args);
+
 commit([['c',1,'Column',{width:300}], ['c',2,'TextInput',{value:'hello', multiline:false, font_size:20,
   _pn_events:['on_change','on_selection_change']}], ['i',1,2,0], ['c',3,'Text',{text:'Label',color:'#ff0000'}], ['i',1,3,1]]);
 document.body.append(renderer.views.get(1).el);
-const layout = renderer.computeLayout({roots:[1],width:300,height:500});
-assert(layout.application==='browser-test' && layout.revision===revision && layout.frames.length===3,'layout identity');
+const first = layout([1], 300, 500);
+assert(first.application==='browser-test' && first.revision===revision && first.frames.length===3, `layout identity: ${JSON.stringify(first)}`);
+const textFrame = first.frames.find(frame => frame[0] === 3);
+assert(textFrame[2] === 36 && textFrame[3] === 300 && textFrame[4] > 15 && textFrame[4] < 30, `the page measures text and inputs for the core: ${JSON.stringify(first.frames)}`);
+assert(renderer.views.get(3).el.style.top === '36px' && renderer.views.get(3).el.style.width === '300px', 'mounted frames come from the core');
 const original = renderer.views.get(2).el; original.focus(); original.setSelectionRange(1,3);
 commit([['u',2,{multiline:true},[]]]);
 let input = renderer.views.get(2).el;
@@ -36,18 +94,22 @@ assert(input.value==='hello' && input.selectionStart===1 && input.selectionEnd==
 assert(document.activeElement===input && input.parentElement===renderer.views.get(1).el,'replacement retains focus and parent');
 assert(input.style.width !== '', 'replacement retains layout');
 commit([['u',3,{},["color"]]]);
-assert(renderer.views.get(3).props.color === undefined,'removed color restores platform default');
+assert(renderer.views.get(3).props.color === undefined && renderer.views.get(3).el.style.color === '','removed color restores platform default');
 const before = renderer.views.get(3).el;
-const rejected = renderer.apply(envelope([['u',3,{text:'must not publish'},[]],['u',2,{typo:true},[]]]));
-assert(!rejected.ok && renderer.views.get(3).el===before && renderer.views.get(3).props.text==='Label','invalid transaction is atomic');
-assert(!renderer.apply({...envelope([]), surface:2}).ok,'foreign surface rejected');
+const rejected = submit([['u',3,{text:'must not publish'},[]],['u',2,{typo:true},[]]]);
+assert(!rejected.ok && rejected.failed === false && rejected.op === 1 && /typo/.test(rejected.error), `the core names the rejected op and prop: ${JSON.stringify(rejected)}`);
+assert(renderer.views.get(3).el===before && renderer.views.get(3).props.text==='Label' && before.textContent === 'Label','invalid transaction is atomic');
+const stale = JSON.parse(core.commit(JSON.stringify({...envelope([]), revision})));
+assert(!stale.ok, 'a stale revision is rejected');
 input.dispatchEvent(new CompositionEvent('compositionstart'));
 commit([['u',2,{value:'controlled',_pn_edit_revision:0},[]]]);
 assert(input.value==='hello','controlled update waits for composition');
 input.dispatchEvent(new CompositionEvent('compositionend'));
 assert(input.value==='controlled','controlled update publishes at composition end');
 input.value='typed'; input.dispatchEvent(new Event('input', {bubbles:true}));
-assert(events.some(([tag,name,body]) => tag===2 && name==='on_change' && body.edit_revision===1),'input emits monotonic edit revision');
+const change = events.find(([tag,name]) => tag===2 && name==='on_change')?.[2];
+assert(change && change.edit_revision===1 && change.application==='browser-test' && change.revision===revision && change.sequence > 0 && change.args[0]==='typed',
+  `the core stamps input with identity and a monotonic edit revision: ${JSON.stringify(change)}`);
 commit([['u',2,{value:'stale',_pn_edit_revision:0},[]]]);
 assert(input.value==='typed','stale controlled update rejected');
 const container = renderer.views.get(1).el;
@@ -55,6 +117,18 @@ commit([['u',1,{background_color:'#eeeeee'},[]]]); commit([['u',1,{},["backgroun
 assert(renderer.views.get(1).el===container && renderer.views.get(1).el.contains(input),'property reset retains container and children');
 commit([['d',2],['d',3],['d',1]]);
 assert(renderer.views.size===0,'teardown releases records');
+
+// View flattening: a layout-only wrapper isn't mounted; its children move into
+// the nearest mounted ancestor at the flattened offset, and a paint prop mounts it.
+commit([['c',30,'Column',{width:200, padding:10}], ['c',31,'View',{padding:5}], ['i',30,31,0], ['c',32,'Text',{text:'Flat'}], ['i',31,32,0]]);
+document.body.append(renderer.views.get(30).el);
+layout([30], 200, 300);
+assert(!renderer.views.has(31) && renderer.views.get(32).el.parentElement === renderer.views.get(30).el, 'a layout-only View is flattened');
+assert(renderer.views.get(32).frame.x === 15 && renderer.views.get(32).frame.y === 15, `children of a flattened view carry its offset: ${JSON.stringify(renderer.views.get(32).frame)}`);
+commit([['u',31,{background_color:'#00ff00'},[]]]);
+assert(renderer.views.get(31) && renderer.views.get(32).el.parentElement === renderer.views.get(31).el && renderer.views.get(32).frame.x === 5, 'a paint prop mounts the view and adopts its children');
+assert(JSON.parse(core.command(1, 999, 'focus', '{}', 1)).ok === false, 'commands to unknown views fail in the core');
+commit([['d',32], ['d',31], ['d',30]]);
 
 // ---------------------------------------------------------------------------
 // RFC 0002: props, events, and modules the preview implements, driven
@@ -64,7 +138,6 @@ const stage = document.createElement('div');
 stage.style.cssText = 'position:relative;width:390px;height:600px;overflow:hidden';
 document.body.append(stage);
 const place = (tag, x, y, w, h) => { const view = renderer.views.get(tag); view.frame = {x, y, w, h}; view.manager.frame(view, x, y, w, h); return view; };
-const emitted = (tag, name) => events.filter(([t, n]) => t === tag && n === name).map(([, , body]) => body.args);
 const pointer = (el, type, x, y, extra = {}) => el.dispatchEvent(new PointerEvent(type, {bubbles:true, button:0, pointerId:1, clientX:x, clientY:y, ...extra}));
 // Headless Chrome moves `document.activeElement` on `.focus()` but withholds
 // the focus events while the page itself isn't focused; when the real event
@@ -138,8 +211,9 @@ assert(snapTarget(130, 100, 'center', 300, 1000) === 100 && snapTarget(50, 100, 
 assert(snapTarget(950, 100, 'start', 300, 1000) === 700 && snapTarget(10, 0, 'start', 300, 1000) === null, 'snap clamps to the range and is off without an interval');
 commit([['c',12,'ScrollView',{width:200, height:100, _pn_events:['on_scroll','on_scroll_begin_drag','on_scroll_end_drag','on_momentum_scroll_end']}],
   ['c',13,'View',{height:600}], ['i',12,13,0], ['c',14,'TextInput',{value:'', multiline:false}], ['i',13,14,0]]);
-const scroller = renderer.views.get(12); stage.append(scroller.el); place(12, 0, 100, 200, 100); place(13, 0, 0, 200, 600); place(14, 0, 0, 100, 36);
-scroller.manager.childrenChanged(scroller);
+const scroller = renderer.views.get(12); stage.append(scroller.el); place(12, 0, 100, 200, 100);
+layout([12], 390, 600);
+assert(renderer.views.get(13).frame.h === 600 && scroller.content.style.height === '600px', `the content size follows the core's frames: ${scroller.content.style.height}`);
 commit([['u',12,{horizontal:false, scroll_enabled:false},[]]]);
 assert(scroller.el.style.overflowY === 'hidden', 'scroll_enabled=False hides overflow');
 commit([['u',12,{scroll_enabled:true, keyboard_dismiss_mode:'on_drag', scroll_event_throttle:0},[]]]);
@@ -173,6 +247,7 @@ await sleep(900);
 assert(Math.abs(scroller.el.scrollTop - 100) < 1, 'snap_to_interval settles on the interval');
 const momentumEnds = emitted(12, 'on_momentum_scroll_end');
 assert(momentumEnds.length === beforeSnap + 1 && Math.abs(momentumEnds.at(-1)[0].y - 100) < 1 && Math.abs(emitted(12, 'on_scroll').at(-1)[0].y - 100) < 1, 'momentum ends once, at the snapped offset');
+assert(Math.abs(command(12, 'get_scroll_offset').value.y - 100) < 1, 'a command result returns asynchronously through the core queue');
 inner.focus();
 commit([['u',12,{keyboard_should_persist_taps:'never'},['snap_to_interval']]]);
 pointer(scroller.el, 'pointerdown', 10, 190);
@@ -198,8 +273,8 @@ assert(text.el.textContent.startsWith('…') && text.el.textContent.endsWith('ag
 commit([['u',15,{ellipsize_mode:'middle'},[]]]);
 const middle = text.el.textContent;
 assert(middle.startsWith('The') && middle.endsWith('again') && middle.includes('…') && middle.length < text.props.text.length, 'middle truncation keeps both ends');
-const [measuredW] = text.manager.measure(text, 1e6, 1e6);
-assert(measuredW > 200 && text.el.textContent === middle, 'measure uses the full text and restores the truncation');
+const [measuredW] = renderer.measure({tag:15, component:'Text', mode:1, props:{...text.props}, width:0, widthMode:0, height:0, heightMode:0});
+assert(measuredW > 200 && text.el.textContent === middle, 'measurement uses a prototype with the full text and leaves the truncation alone');
 place(15, 0, 220, 900, 22); commit([['u',15,{ellipsize_mode:'head'},[]]]);
 assert(text.el.textContent === text.props.text && text.truncated === null, 'no truncation when the text fits');
 text.el.click();
@@ -251,8 +326,10 @@ commit([['u',16,{secure:true},[]]]);
 assert(field.el.type === 'password', 'secure wins over keyboard_type');
 // clear() is an edit: it reports the empty string so a controlled value follows.
 commit([['c',67,'TextInput',{value:'draft', multiline:false, _pn_events:['on_change']}]]);
-renderer.command(67, 'clear', '{}');
-assert(renderer.views.get(67).el.value === '' && JSON.stringify(emitted(67, 'on_change')) === '[[""]]', 'clear() empties the field and reports on_change');
+const cleared = command(67, 'clear');
+assert(cleared.ok && renderer.views.get(67).el.value === '' && JSON.stringify(emitted(67, 'on_change')) === '[[""]]', 'clear() empties the field and reports on_change');
+renderer.views.get(67).el.value = 'typed';
+assert(command(67, 'get_value').value === 'typed', 'get_value answers with what the field holds');
 commit([['d',67]]);
 commit([['c',17,'TextInput',{value:'one\ntwo\nthree\nfour', multiline:true, _pn_events:['on_content_size_change','on_submit']}]]);
 const area = renderer.views.get(17); stage.append(area.el); place(17, 0, 300, 200, 40);
@@ -264,26 +341,43 @@ area.el.focus(); const enter = new KeyboardEvent('keydown', {bubbles:true, cance
 assert(!enter.defaultPrevented && emitted(17, 'on_submit').length === 0, 'multiline Enter inserts a newline by default');
 commit([['u',17,{blur_on_submit:true},[]]]); const enter2 = new KeyboardEvent('keydown', {bubbles:true, cancelable:true, key:'Enter'}); area.el.dispatchEvent(enter2);
 assert(enter2.defaultPrevented && emitted(17, 'on_submit').length === 1 && document.activeElement !== area.el, 'multiline blur_on_submit submits and blurs on Enter');
+// A multiline input grows with its text: input invalidates its measurement in the core.
+commit([['c',40,'Column',{width:200}], ['c',41,'TextInput',{multiline:true}], ['i',40,41,0]]);
+document.body.append(renderer.views.get(40).el);
+layout([40], 200, 800);
+const grow = renderer.views.get(41), short = grow.frame.h;
+grow.el.value = 'one\ntwo\nthree\nfour\nfive\nsix\nseven'; grow.el.dispatchEvent(new Event('input', {bubbles:true}));
+mount.flush();
+assert(grow.frame.h > short, `an uncontrolled multiline input relayouts as it grows: ${short} -> ${grow.frame.h}`);
+assert(messages.some(([kind]) => kind === 'layout'), 'a native-initiated relayout reports observed frames to Python');
+commit([['d',41], ['d',40]]);
 
-// Image: load lifecycle and fade.
+// Image: load lifecycle, fade, and the loaded size the core lays out with.
 const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 // A view emitting while its create applies is born in that revision: the
 // event must carry it, or Python drops it as older than the view.
 commit([['c',19,'Image',{width:10, height:10, source:'data:image/gif;base64,R0lGODlhAQABAAAAACw=', _pn_events:['on_load_start']}]]);
 const startEnvelope = events.filter(([t, n]) => t === 19 && n === 'on_load_start').map(([, , body]) => body)[0];
-assert(startEnvelope && startEnvelope.revision === revision && startEnvelope.application === 'browser-test', 'events emitted during a commit carry its revision');
+assert(startEnvelope && startEnvelope.revision === revision && startEnvelope.application === 'browser-test', 'events emitted during a mount carry its revision');
 commit([['d',19]]);
 commit([['c',18,'Image',{width:10, height:10, _pn_events:['on_load_start','on_load_end','on_load']}]]);
 const image = renderer.views.get(18); stage.append(image.el);
 commit([['u',18,{fade_duration:200, source:PIXEL},[]]]);
 assert(emitted(18, 'on_load_start').length === 1 && image.img.style.opacity === '0', 'on_load_start fires when the source is set and fade starts transparent');
 await new Promise(resolve => image.img.complete && image.img.naturalWidth ? resolve() : image.img.addEventListener('load', resolve, {once:true}));
-await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+await frames(2);
 assert(emitted(18, 'on_load').length === 1 && emitted(18, 'on_load_end').length === 1 && image.img.style.opacity === '1' && image.img.style.transition.includes('200ms'), 'on_load_end follows on_load and the image fades in');
 commit([['u',18,{source:'data:image/png;base64,broken'},[]]]);
 await new Promise(resolve => image.img.addEventListener('error', resolve, {once:true}));
 await sleep(0);
 assert(emitted(18, 'on_load_start').length === 2 && emitted(18, 'on_load_end').length === 2, 'a failed load still ends the load');
+commit([['c',42,'Column',{width:300}], ['c',43,'Image',{source:PIXEL}], ['i',42,43,0]]);
+layout([42], 300, 400);
+const loaded = renderer.views.get(43);
+await until(() => emitted(43, 'on_load').length);
+mount.flush();
+assert(loaded.frame && loaded.frame.w === 300 && loaded.frame.h === 1, `an image without a height lays out at its loaded size: ${JSON.stringify(loaded.frame)}`);
+commit([['d',43], ['d',42]]);
 
 // Modal: Escape asks Python to close, only when wired.
 commit([['c',19,'Modal',{visible:true}]]);
@@ -298,13 +392,16 @@ commit([['u',19,{visible:false},[]]]);
 document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}));
 assert(emitted(19, 'on_request_close').length === 2 && emitted(19, 'on_dismiss').length === 1, 'a hidden modal ignores Escape');
 
-// Modal: children survive closing, and an overlay's empty area is its backdrop.
+// Modal: children survive closing, lay out against the sheet, and an overlay's empty area is its backdrop.
+overlay.style.cssText = 'position:relative;width:390px;height:800px';
 commit([['c',21,'Modal',{visible:false, presentation_style:'overlay', _pn_events:['on_request_close']}], ['c',22,'Text',{text:'Modal body'}], ['i',21,22,0]]);
 const reopened = renderer.views.get(21);
 commit([['u',21,{visible:true},[]]]);
 commit([['u',21,{visible:false},[]]]);
 commit([['u',21,{visible:true},[]]]);
 assert(reopened.backdrop.isConnected && reopened.sheet.contains(renderer.views.get(22).el), 'a reopened modal still shows its children');
+layout([21], 390, 600); mount.flush();
+assert(renderer.views.get(22).frame?.w === reopened.sheet.clientWidth, `modal content lays out against the sheet: ${JSON.stringify(renderer.views.get(22).frame)} ${reopened.sheet.clientWidth}`);
 renderer.views.get(22).el.click();
 assert(emitted(21, 'on_request_close').length === 0, 'a tap on overlay content is not a backdrop tap');
 reopened.sheet.click();
@@ -313,35 +410,54 @@ commit([['u',21,{dismiss_on_backdrop:false},[]]]);
 reopened.sheet.click();
 assert(emitted(21, 'on_request_close').length === 1, 'dismiss_on_backdrop=False ignores backdrop taps');
 commit([['d',22], ['d',21]]);
+overlay.style.cssText = '';
 
 // VirtualList: on_scroll only when wired.
-commit([['c',20,'VirtualList',{width:200, height:100, dataset:{base:0,revision:1,changes:[['reset',[['a',1,44,false],['b',1,44,false]]]]}, _pn_events:['on_bind_row']}]]);
-const list = renderer.views.get(20); stage.append(list.el);
+commit([['c',20,'VirtualList',{width:200, height:100, dataset:{base:0,revision:1,changes:[['reset',[['a',1,44,false],['b',1,44,false],['c',1,44,true],['d',1,44,false]]]]}, _pn_events:['on_bind_row']}]]);
+const list = renderer.views.get(20); stage.append(list.el); place(20, 0, 0, 200, 100);
 list.el.dispatchEvent(new Event('scroll'));
 assert(emitted(20, 'on_scroll').length === 0, 'unwired VirtualList on_scroll stays quiet');
 commit([['u',20,{_pn_events:['on_bind_row','on_scroll']},[]]]);
 list.el.dispatchEvent(new Event('scroll'));
 assert(emitted(20, 'on_scroll').length === 1 && 'viewport_height' in emitted(20, 'on_scroll')[0][0], 'wired VirtualList on_scroll carries typed geometry');
+const windows = emitted(20, 'on_window');
+assert(windows.length && windows.at(-1)[0].revision === 1 && windows.at(-1)[0].range === 176 && windows.at(-1)[0].first === 0, `the list reports its window from the core's dataset: ${JSON.stringify(windows.at(-1))}`);
 
-// One-row patches preserve order storage and native row identity.
-const order = list.listStore.keys;
+// One-row patches publish through the core; rows stack at measured extents.
 commit([['u',20,{dataset:{base:1,revision:2,changes:[['u',['a',2,55,false]]]}},[]]]);
-assert(list.listStore.keys === order && list.listStore.rows.get('a').extent === 55, 'one-row update keeps the order index');
+assert(list.rows.revision === 2 && list.rows.keys.join() === 'a,b,c,d' && core.listExtent(1, 20, 0) === 55 && list.rows.offsets[1] === 55, 'one-row update keeps the order and takes the new extent');
 const patch = {base:2,revision:3,changes:[['u',['a',3,60,false]]]};
-assert(!renderer.apply(envelope([['u',20,{dataset:patch},[]],['u',20,{dataset:patch},[]]])).ok, 'duplicate patch rejects atomically');
-assert(list.listStore.revision === 2, 'rejected patch does not publish');
+assert(!submit([['u',20,{dataset:patch},[]],['u',20,{dataset:patch},[]]]).ok, 'duplicate patch rejects atomically');
+assert(list.rows.revision === 2 && core.listRevision(1, 20) === 2, 'rejected patch does not publish');
+commit([['c',50,'View',{_pn_list_key:'a', height:30}], ['i',20,50,0], ['c',51,'View',{_pn_list_key:'b', height:20, background_color:'#ff0000'}], ['i',20,51,1]]);
+layout([20], 200, 100);
+assert(renderer.views.get(50).frame.w === 200 && renderer.views.get(50).frame.h === 30, `rows lay out as detached roots at the list's width: ${JSON.stringify(renderer.views.get(50).frame)}`);
+assert(renderer.views.get(51).el.style.top === '30px' && list.spacer.style.height === `${30 + 20 + 44 + 44}px`, `rows stack at their measured extents: ${renderer.views.get(51).el.style.top} ${list.spacer.style.height}`);
+commit([['u',20,{dataset:{base:2,revision:3,changes:[['m','b',0]]}},[]]]);
+assert(list.rows.keys.join() === 'b,a,c,d' && renderer.views.get(50).el.style.top === '20px', 'a move reorders the rows');
+assert(list.el.querySelector('[data-pn-tag="51"]').style.zIndex === '', 'only the sticky row floats');
+commit([['d',50], ['d',51], ['u',20,{horizontal:false},[]]]);
+// A recreated list (a creation-only prop) starts from the dataset the core already holds.
+const recreatedBefore = list.el;
+commit([['u',20,{horizontal:true},[]]]);
+assert(list.el !== recreatedBefore || list.rows.revision === 3, 'the list keeps its published dataset');
+assert(list.rows.keys.join() === 'b,a,c,d' && list.rows.revision === 3, `a recreated list reads the core's dataset: ${list.rows.keys} r${list.rows.revision}`);
 
 // Selective geometry and removal of an override retain the shorthand.
 commit([['c',980,'Column',{width:300,padding:20,padding_left:30}], ['c',981,'Text',{text:'Observed',_pn_layout:true}], ['i',980,981,0]]);
-let selective = renderer.computeLayout({roots:[980],width:300,height:400,selective:true});
-assert(selective.frames.length === 1 && selective.frames[0][0] === 981 && selective.frames[0][1] === 30, 'only observed geometry crosses');
+let selective = layout([980], 300, 400, true);
+assert(selective.frames.length === 1 && selective.frames[0][0] === 981 && selective.frames[0][1] === 30, `only observed geometry crosses: ${JSON.stringify(selective.frames)}`);
 commit([['u',980,{},['padding_left']]]);
-selective = renderer.computeLayout({roots:[980],width:300,height:400,selective:true});
-assert(selective.frames[0][1] === 20, 'shorthand survives removal of edge override');
+selective = layout([980], 300, 400, true);
+assert(selective.frames.length === 0 && renderer.views.get(981).frame.x === 20, 'shorthand survives removal of edge override (the commit laid it out)');
 commit([['u',981,{color:'#ff0000'},[]]]);
-assert(renderer.computeLayout({roots:[980],width:300,height:400,selective:true}).frames.length === 0, 'paint has no layout work');
-commit([['u',980,{_pn_layout:true},[]]]);
-assert(renderer.computeLayout({roots:[980],width:300,height:400,selective:true}).frames[0][0] === 980, 'new observer receives cached frame');
+assert(layout([980], 300, 400, true).frames.length === 0, 'paint has no layout work');
+const observing = commit([['u',980,{_pn_layout:true},[]]], {roots:[980], width:300, height:400, selective:true});
+assert(observing.layout.frames.length === 1 && observing.layout.frames[0][0] === 980, `a new observer receives the cached frame: ${JSON.stringify(observing.layout)}`);
+const ack = commit([['u',981,{text:'Observed\non two lines'},[]]], {roots:[980], width:300, height:400, selective:true});
+assert(ack.layout && ack.layout.frames.some(frame => frame[0] === 981) && ack.metrics.validate_ns >= 0, `a commit acknowledges with observed frames: ${JSON.stringify(ack.layout)}`);
+const measured = JSON.parse(core.measure(1, 981));
+assert(measured.frame[0] === 20 && measured.window.length === 4, `the core answers measure_in_window from the shadow tree: ${JSON.stringify(measured)}`);
 commit([['d',981],['d',980]]);
 
 // ScreenStack: presentation and animation.
@@ -349,6 +465,7 @@ assert(screenTransition({}) === 'pn-screen-right' && screenTransition({presentat
 assert(screenTransition({presentation:'form_sheet'}) === 'pn-screen-bottom' && screenTransition({presentation:'transparent_modal'}) === 'pn-screen-bottom', 'sheets slide from the bottom');
 assert(screenTransition({animation:'fade'}) === 'pn-screen-fade' && screenTransition({animation:'none'}) === null, 'explicit animations');
 assert(screenTransition({presentation:'modal', animation:'slide_from_right'}) === 'pn-screen-right' && screenTransition({animation:'slide_from_bottom'}) === 'pn-screen-bottom', 'animation wins over presentation');
+assert(stackHeaderHeight({}) === 44 && stackHeaderHeight({header_large_title:true}) === 96 && stackHeaderHeight({header_shown:false}) === 0, 'stack header heights');
 commit([['c',21,'ScreenStack',{}], ['c',22,'Screen',{presentation:'card', active:false}], ['i',21,22,0],
   ['c',23,'Screen',{presentation:'transparent_modal', active:true}], ['i',21,23,1]]);
 stage.append(renderer.views.get(21).el); place(21, 0, 0, 390, 600);
@@ -357,7 +474,7 @@ assert(card.el.style.display === '' && sheet.el.style.display === '' && sheet.el
 commit([['u',22,{active:false},[]], ['c',24,'Screen',{presentation:'card', active:true, animation:'fade'}], ['i',21,24,2]]);
 const third = renderer.views.get(24);
 assert(card.el.style.display === 'none' && sheet.el.style.display === '' && third.el.style.display === '' && third.el.classList.contains('pn-screen-fade'), 'a pushed card enters with its animation over the screen it covers');
-await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+await frames(3);
 assert(!third.el.classList.contains('pn-screen-fade') && !sheet.el.classList.contains('pn-under'), 'the enter class is released after a frame; a fade leaves the covered screen in place');
 await sleep(350);
 assert(sheet.el.style.display === 'none' && card.el.style.display === 'none', 'the covered screens leave the stage once the push lands');
@@ -366,6 +483,7 @@ const ghost = renderer.views.get(21).el.querySelector('.pn-screen-ghost');
 assert(ghost && card.el.style.display === '' && sheet.el.style.display === '' && renderer.views.get(21).children.length === 2, 'a pop leaves a snapshot to animate out and reveals the stack beneath');
 await sleep(350);
 assert(!renderer.views.get(21).el.querySelector('.pn-screen-ghost'), 'the snapshot is removed after the transition');
+commit([['d',23], ['d',22], ['d',21]]);
 
 // ScreenStack: the navigation bar follows the top screen's options.
 commit([['c',60,'ScreenStack',{_pn_events:['on_native_back']}],
@@ -386,7 +504,7 @@ commit([['u',61,{header_back_title:'Every message in the inbox'},[]], ['u',62,{t
 assert(navStack.back.textContent === 'Back' && navStack.back.getAttribute('aria-label') === 'Every message in the inbox', 'a back title that would hit the title shortens to "Back" and keeps its accessible name');
 navStack.el.style.width = '200px';
 commit([['u',62,{title:'A detail title that fills the narrow bar'},[]]]);
-assert(navStack.back.textContent === '' && navStack.back.classList.contains('pn-stack-back-chevron'), 'with no room for "Back" the chevron stands alone');
+assert(navStack.back.textContent === '' && navStack.back.classList.contains('pn-stack-back-chevron'), `with no room for "Back" the chevron stands alone: ${JSON.stringify([navStack.back.textContent, navStack.titleEl.offsetWidth, navStack.right.offsetWidth])}`);
 navStack.el.style.width = '390px';
 commit([['u',61,{},['header_back_title']]]);
 commit([['u',62,{title:'Detail'},[]]]);
@@ -394,9 +512,9 @@ commit([['u',62,{header_shown:false},[]]]);
 assert(navStack.header.style.display === 'none' && navStack.body.style.top === '0px', 'header_shown false hides the bar');
 commit([['u',62,{header_shown:true, header_large_title:true},[]]]);
 assert(navStack.header.classList.contains('pn-stack-large') && navStack.body.style.top === '96px', 'a large title grows the bar');
-renderer.computeLayout({roots:[60], width:390, height:600});
-assert(renderer.views.get(62).frame.h === 600 - 96 && renderer.views.get(61).frame.h === 600 - 44, 'each screen is laid out below its bar');
-assert(renderer.views.get(63).frame.h === 44, 'header slots are laid out at the bar height');
+layout([60], 390, 600); mount.flush();
+assert(renderer.views.get(62).frame.h === 600 - 96 && renderer.views.get(61).frame.h === 600 - 44, `each screen lays out in the container it reports, below its bar: ${renderer.views.get(62).frame.h} ${renderer.views.get(61).frame.h}`);
+assert(renderer.views.get(63).frame.h === 44 && renderer.views.get(63).frame.w < 60, `header slots are laid out at the bar height and their content's width: ${JSON.stringify(renderer.views.get(63).frame)}`);
 commit([['d',64], ['d',63], ['d',62], ['d',61], ['d',60]]);
 navStack.el.remove();
 
@@ -407,13 +525,13 @@ const listScreen = renderer.views.get(711);
 commit([['c',712,'Screen',{title:'Item'}], ['i',710,712,1]]);
 const itemScreen = renderer.views.get(712);
 assert(itemScreen.el.classList.contains('pn-screen-right') && listScreen.el.style.display === '', 'a push starts the new card off stage and keeps the covered screen up');
-await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+await frames(3);
 assert(!itemScreen.el.classList.contains('pn-screen-right') && listScreen.el.classList.contains('pn-under'), 'the card slides in while the covered screen moves aside');
 await sleep(350);
 assert(listScreen.el.style.display === 'none' && !listScreen.el.classList.contains('pn-under'), 'the covered screen leaves the stage once the push lands');
 commit([['d',712]]);
 assert(listScreen.el.style.display === '' && listScreen.el.classList.contains('pn-under') && !listScreen.el.classList.contains('pn-screen-right'), 'a pop reveals the screen beneath from its parallax position, not as a push');
-await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+await frames(2);
 assert(!listScreen.el.classList.contains('pn-under'), 'the revealed screen slides back into place');
 commit([['d',711], ['d',710]]);
 cardStack.el.remove();
@@ -427,6 +545,15 @@ assert(renderer.views.get(700).el.style.backgroundColor === 'rgb(0, 255, 0)', 'w
 assert(renderer.views.get(701).el.style.backgroundColor === 'rgb(0, 0, 255)' && renderer.views.get(701).el.style.zIndex === '3', 'leaf views paint background_color and z_index');
 assert(renderer.views.get(702).el.style.display === 'none', 'display none hides a leaf view');
 commit([['d',700], ['d',701], ['d',702]]);
+
+// Intrinsic leaves measure on a prototype built from their props.
+commit([['c',720,'Row',{width:390, flex_direction:'row', align_items:'flex_start'}], ['c',721,'Switch',{value:true}], ['i',720,721,0],
+  ['c',722,'Button',{title:'A wide button title'}], ['i',720,722,1], ['c',723,'ActivityIndicator',{size:'large'}], ['i',720,723,2]]);
+layout([720], 390, 200);
+assert(renderer.views.get(721).frame.w === 51 && renderer.views.get(721).frame.h === 31, `a Switch measures at the platform size: ${JSON.stringify(renderer.views.get(721).frame)}`);
+assert(renderer.views.get(722).frame.w > 100 && renderer.views.get(722).frame.x === 51, `a Button measures its title: ${JSON.stringify(renderer.views.get(722).frame)}`);
+assert(renderer.views.get(723).frame.w === 37, 'an ActivityIndicator measures by its size');
+commit([['d',721], ['d',722], ['d',723], ['d',720]]);
 
 // Switch keeps its intrinsic size; Slider paints its minimum track.
 commit([['c',703,'Switch',{value:true}], ['c',704,'Slider',{value:0.25, min_value:0, max_value:1, _pn_events:['on_change']}]]);
@@ -460,8 +587,9 @@ refresher.el.remove();
 
 // Portal content lays out against the whole overlay, so absolute insets pin it to the screen edges.
 overlay.style.cssText = 'position:relative;flex:none;width:390px;height:800px';
-commit([['c',707,'Portal',{}], ['c',708,'View',{position:'absolute', left:24, right:24, bottom:40, height:50}], ['i',707,708,0]]);
-renderer.computeLayout({roots:[707], width:390, height:600});
+commit([['c',707,'Portal',{}], ['c',708,'View',{position:'absolute', left:24, right:24, bottom:40, height:50, background_color:'#000000'}], ['i',707,708,0]]);
+mount.flush();
+layout([707], 390, 600);
 const banner = renderer.views.get(708).frame;
 assert(banner.x === 24 && banner.w === 342 && banner.y === 710 && banner.h === 50, `portal insets resolve against the overlay: ${JSON.stringify(banner)}`);
 commit([['d',708], ['d',707]]);
@@ -480,18 +608,26 @@ commit([['u',709,{visible:false},[]]]);
 assert(!sliding.backdrop.isConnected, 'animation_type none dismisses at once');
 commit([['d',709]]);
 
-// Animation: easing descriptors and the decay model.
-assert(easingFor({easing:'linear'})(0.3) === 0.3 && easingFor({easing:'quad'})(0.5) === 0.25 && easingFor({easing:'cubic'})(0.5) === 0.125, 'named easings');
-assert(Math.abs(easingFor({easing:[0, 0, 1, 1]})(0.25) - 0.25) < 1e-3 && easingFor({easing:{bezier:[0, 0, 1, 1]}}) === null && easingFor({easing:[0, 0, 1]}) === null, 'bezier easing is a bare four-number array');
-const ease = easingFor({easing:'ease'}), easeOut = easingFor({easing:'ease_out'}), easeInOut = easingFor({easing:'ease_in_out'});
-assert(ease(0.5) < 0.5 && ease(0.5) > 0.25 && Math.abs(ease(0.5) - easingFor({easing:'ease_in'})(0.5)) < 1e-9 && easeOut(0.5) > 0.5 && Math.abs(easeInOut(0.5) - 0.5) < 1e-3 && Math.abs(ease(1) - 1) < 1e-6,
-  'ease/ease_in are bezier(0.42, 0, 1, 1), ease_out and ease_in_out the CSS keywords');
-assert(Math.abs(easingFor({easing:'bounce'})(1) - 1) < 1e-9 && easingFor({}) === easingFor({easing:undefined}) && easingFor({})(0.5) > 0.49 && easingFor({easing:'nope'}) === null, 'bounce ends at 1, missing easing is ease_in_out, unknown names are declined');
-const declined = renderer.animate(10, JSON.stringify({op:'start', id:901, prop:'opacity', spec:{kind:'timing', to:0, duration_ms:100, easing:'nope'}}));
-assert(declined && declined.ok === false, 'a timing animation with an unknown easing is declined so Python ticks it');
-assert(Math.abs(decayFinalValue(10, 2, 0.998) - 1010) < 1e-6 && Math.abs(decayFinalValue(0, -1) - (-500)) < 1e-6, 'decay travels v0 / (1 - deceleration)');
-const [far, slow] = decayAt(0, 2, 0.998, 60000);
-assert(Math.abs(far - 1000) < 1e-6 && slow < 1e-9 && Math.abs(decayAt(0, 2, 0.998, 1)[0] - 2) < 1e-9, 'decay position and velocity follow v0 * d^t');
+// Animation: the core's drivers run on the page's frame clock and write to the views.
+const animation = (id) => messages.filter(([kind]) => kind === 'animation').map(([, , , payload]) => JSON.parse(payload)).filter(body => body.id === id);
+const declined = JSON.parse(core.animate(1, 10, JSON.stringify({op:'start', id:901, prop:'opacity', spec:{kind:'timing', to:0, duration_ms:100, easing:'nope'}})));
+assert(declined.ok === false && /easing/.test(declined.error), `a timing animation with an unknown easing is declined: ${JSON.stringify(declined)}`);
+assert(JSON.parse(core.animate(1, 10, JSON.stringify({op:'start', id:902, prop:'opacity', spec:{kind:'timing', from:1, to:0.25, duration_ms:80, easing:'linear'}}))).ok, 'the core queues an animation');
+mount.drain();
+await sleep(250); await frames(2);
+assert(renderer.views.get(10).el.style.opacity === '0.25' && animation(902).some(body => body.finished === true), `a timing animation finishes at its target: ${renderer.views.get(10).el.style.opacity} ${JSON.stringify(animation(902))}`);
+assert(JSON.parse(core.animate(1, 10, JSON.stringify({op:'start', id:903, prop:'translate_x', spec:{kind:'spring', to:40, stiffness:400, damping:30}}))).ok, 'a spring starts');
+mount.drain();
+await sleep(600); await frames(2);
+const springX = parseFloat(/translateX\(([-\d.]+)px\)/.exec(renderer.views.get(10).el.style.transform)?.[1]);
+assert(Math.abs(springX - 40) < 0.5, `a spring settles on its target: ${renderer.views.get(10).el.style.transform}`);
+JSON.parse(core.animate(1, 10, JSON.stringify({op:'set', prop:'background_color', value:'#00ff00'}))); mount.drain();
+assert(renderer.views.get(10).el.style.backgroundColor === 'rgb(0, 255, 0)', 'a set writes the value directly');
+JSON.parse(core.animate(1, 10, JSON.stringify({op:'start', id:904, prop:'opacity', spec:{kind:'timing', to:1, duration_ms:5000}}))); mount.drain();
+await frames(3);
+JSON.parse(core.animate(1, 10, JSON.stringify({op:'cancel', id:904}))); mount.drain();
+await frames(2);
+assert(animation(904).some(body => body.finished === false), 'a cancelled animation reports that it did not finish');
 
 // TabBar: the contract's styling props.
 commit([['c',26,'TabBar',{items:[{name:'home', title:'Home'}, {name:'inbox', title:'Inbox', badge:'3'}], active_tab:'inbox', tint_color:'#ff0000', inactive_tint_color:'#00ff00', translucent:false, shows_labels:false}]]);
@@ -502,15 +638,30 @@ assert(inboxTab.classList.contains('pn-active') && !homeTab.classList.contains('
 homeTab.click();
 assert(JSON.stringify(emitted(26, 'on_tab_select')) === '[["home"]]', 'tab presses report the tab name');
 
-// Gestures: the pointer stream carries window coordinates.
+// Gestures: pointer events go to the core's gesture engine in the page.
 commit([['c',25,'View',{width:100, height:100, gestures:[{kind:'tap'}]}]]);
 const target = renderer.views.get(25); stage.append(target.el); place(25, 50, 400, 100, 100);
-const stream = () => gestures.filter(([tag, phase]) => tag === 25 && phase !== 'clear');
-pointer(target.el, 'pointerdown', 70, 430);
-assert(stream().length === 1 && stream()[0][1] === 'down' && stream()[0][2].absolute_x === 70 && stream()[0][2].absolute_y === 430 && 'x' in stream()[0][2] && Array.isArray(stream()[0][2].specs),
-  `pointer payload includes absolute_x / absolute_y: ${JSON.stringify(stream())}`);
-pointer(target.el, 'pointerup', 70, 430);
-assert(stream().length === 2 && stream()[1][1] === 'up', 'pointer up follows');
+const box = target.el.getBoundingClientRect();
+assert(core.hasGestures(1, 25), 'the core holds the view gestures');
+pointer(target.el, 'pointerdown', box.left + 20, box.top + 30);
+pointer(target.el, 'pointerup', box.left + 20, box.top + 30);
+const taps = emitted(25, 'gesture:0').map(args => args[0]);
+const tap = taps.find(body => body.state === 'ended');
+assert(tap && tap.kind === 'tap' && Math.abs(tap.x - 20) < 0.01 && Math.abs(tap.y - 30) < 0.01 && Math.abs(tap.absolute_x - (box.left + 20)) < 0.01 && Math.abs(tap.absolute_y - (box.top + 30)) < 0.01,
+  `a tap is recognized with view and window coordinates: ${JSON.stringify(taps)}`);
+commit([['u',25,{gestures:[{kind:'long_press', min_duration_ms:60}]},[]]]);
+pointer(target.el, 'pointerdown', box.left + 10, box.top + 10);
+await sleep(150);
+const held = emitted(25, 'gesture:0').map(args => args[0]).filter(body => body.kind === 'long_press');
+assert(held.length > 0, `a long press fires from the gesture deadline timer: ${JSON.stringify(held)}`);
+pointer(target.el, 'pointerup', box.left + 10, box.top + 10);
+commit([['u',25,{gestures:[{kind:'pan'}]},[]]]);
+pointer(target.el, 'pointerdown', box.left + 10, box.top + 10);
+for (let step = 1; step <= 5; step++) pointer(target.el, 'pointermove', box.left + 10 + step * 8, box.top + 10);
+pointer(target.el, 'pointerup', box.left + 50, box.top + 10);
+const pans = emitted(25, 'gesture:0').map(args => args[0]).filter(body => body.kind === 'pan');
+assert(pans.some(body => body.state === 'changed' && body.translation_x > 0) && pans.at(-1).state === 'ended', `a pan reports its translation: ${JSON.stringify(pans.map(body => body.state))}`);
+commit([['d',25]]);
 
 // Host modules: Device, Keyboard, AccessibilityInfo, Localization, header options, viewport payload.
 const callbacks = [];
@@ -570,8 +721,26 @@ assert(screen.stackOwnsHeader && screen.header.style.display === 'none' && scree
 screen.detachRoot(renderer.views.get(65));
 assert(!screen.stackOwnsHeader && screen.header.style.display === '' && screen.contentTop() === topBefore, 'the host header returns with the stack gone');
 commit([['d',66], ['d',65]]);
+// A module call mounts what Python committed first: attach_root sees a view whose commit hasn't drained.
+host.stack.push(screen);
+core.commit(JSON.stringify(envelope([['c',69,'View',{}]]))); revision++;
+assert(!renderer.views.has(69), 'mounting waits for the UI turn');
+assert((await call('Host', 'attach_root', {screen:99, tag:69})).ok !== false && screen.root === renderer.views.get(69), 'Host.attach_root drains pending mounts');
+screen.detachRoot(renderer.views.get(69)); host.stack.pop();
+commit([['d',69]]);
+// A plugin component without a browser widget mounts as a labeled placeholder.
+assert(renderer.measure({tag:5000, component:'InboxBadge', mode:3, props:{}, width:300, widthMode:2, height:0, heightMode:0})[1] === 44, 'a native measurement without a browser widget measures the placeholder');
 
 // RFC 0006: DevSupport, the structured error screen, and DevTools helpers.
 await runDevToolsTests({renderer, host, commit, callbacks, call, stage, screensEl, overlaysEl});
+// A mount failure fails the surface and tells Python, which remounts.
+const failures = messages.length;
+renderer.applyOp = () => { throw new Error('boom'); };
+commit([['c',70,'View',{}]]);
+const failed = messages.slice(failures).find(([kind, , name]) => kind === 'host' && name === 'surface_failed');
+assert(failed && JSON.parse(failed[3]).error.includes('boom'), `a failed mount reports surface_failed: ${JSON.stringify(messages.slice(failures))}`);
+delete renderer.applyOp;
+mount.reset();
+assert(renderer.views.size === 0 && core.fingerprint() === '', 'a reset forgets the views, the surfaces, and the contracts');
 const result=document.getElementById('result'); result.dataset.status='passed';
-result.textContent=`${fixtures.length} shared fixtures and renderer acceptance assertions passed`;
+result.textContent=`${fixtures.length} contract fixtures, ${recorded.length} recorded transactions, and the renderer acceptance assertions passed`;

@@ -7,8 +7,8 @@ import android.content.Context
 import android.text.InputType
 import android.widget.EditText
 import android.widget.FrameLayout
-import com.pythonnative.runtime.bridge.Op
-import com.pythonnative.runtime.bridge.TransactionApplier
+import com.pythonnative.runtime.mount.MountOp
+import com.pythonnative.runtime.mount.Mounter
 import com.pythonnative.runtime.modules.NotificationScheduler
 import org.json.JSONObject
 import org.junit.After
@@ -40,46 +40,18 @@ class NativeLifecycleTest {
     }
 
     private lateinit var activity: Activity
-    private lateinit var applier: TransactionApplier
+    private lateinit var applier: Mounter
 
     @Before fun start() {
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         PNBridge.setContext(activity)
-        applier = TransactionApplier(PNBridge.registry)
+        applier = Mounter(PNBridge.registry)
     }
 
     @After fun stop() {
-        for (record in PNBridge.registry.all()) applier.applyOp(Op.Destroy(record.tag))
+        for (record in PNBridge.registry.all()) applier.applyOp(MountOp.Delete(record.tag))
         PNBridge.clearContext(activity)
         activity.finish()
-    }
-
-    private fun envelope(app: String, revision: Int, vararg ops: org.json.JSONArray) = JSONObject()
-        .put("version", com.pythonnative.generated.PNContracts.protocolVersion).put("application", app)
-        .put("surface", 1).put("revision", revision).put("ops", org.json.JSONArray(ops.toList()))
-
-    private fun op(vararg parts: Any) = org.json.JSONArray(parts.toList())
-
-    @Test fun rejectedCommitLeavesNoStructureBehind() {
-        // Unit tests can't load Yoga, so every commit here is rejected during
-        // validation, after it changed the live maps in place.
-        val state = com.pythonnative.runtime.bridge.CommitState()
-        val app = "undo-log"
-        val rejected = state.apply(envelope(app, 1, op("c", 9400, "View", JSONObject()),
-            op("c", 9402, "Text", JSONObject().put("text", "child")), op("i", 9400, 9402, 0),
-            op("c", 9403, "NotAComponent", JSONObject())), applier)
-        assertFalse(rejected.getBoolean("ok"))
-        assertNull(PNBridge.registry.get(9400))
-        // Neither tag survived the rollback.
-        assertEquals("unknown tag", state.apply(envelope(app, 1, op("d", 9402)), applier).getString("error"))
-        assertEquals("unknown tag", state.apply(envelope(app, 1, op("i", 9400, 9402, 0)), applier).getString("error"))
-    }
-
-    @Test fun frameOperationsAreNotPartOfTheProtocol() {
-        val state = com.pythonnative.runtime.bridge.CommitState()
-        val reply = state.apply(envelope("frames", 1, op("c", 9500, "View", JSONObject()), op("f", 9500, 0, 0, 10, 10)), applier)
-        assertFalse(reply.getBoolean("ok"))
-        assertNull(PNBridge.registry.get(9500))
     }
 
     @Test fun generatedStorageAdapterPreservesNullAndClipboardUsesText() {
@@ -111,26 +83,27 @@ class NativeLifecycleTest {
     }
 
     @Test fun sliderUpdatesRangeAndRestoresPlatformColors() {
-        applier.applyOp(Op.Create(70, "Slider", JSONObject().put("value", 0.5).put("min_value", 0).put("max_value", 1)
+        applier.applyOp(MountOp.Create(70, "Slider", JSONObject().put("value", 0.5).put("min_value", 0).put("max_value", 1)
             .put("minimum_track_color", "#ff0000").put("thumb_color", "#00ff00")))
         val slider = PNBridge.registry.get(70)?.view as android.widget.SeekBar
         assertNotNull(slider.progressTintList)
         assertEquals(500, slider.progress)
-        applier.applyOp(Op.Update(70, JSONObject().put("min_value", 0).put("max_value", 2), listOf("minimum_track_color", "thumb_color")))
+        applier.applyOp(MountOp.Update(70, JSONObject().put("min_value", 0).put("max_value", 2)
+            .put("minimum_track_color", JSONObject.NULL).put("thumb_color", JSONObject.NULL), listOf("minimum_track_color", "thumb_color")))
         assertEquals(250, slider.progress)
         assertNull(slider.progressTintList)
         assertNull(slider.thumbTintList)
     }
 
     @Test fun inputRecreationRetainsIdentityParentValueAndSelection() {
-        applier.applyOp(Op.Create(1, "TextInput", JSONObject().put("value", "hello").put("multiline", false).put("font_size", 24)))
+        applier.applyOp(MountOp.Create(1, "TextInput", JSONObject().put("value", "hello").put("multiline", false).put("font_size", 24)))
         val parent = FrameLayout(activity)
         activity.setContentView(parent)
         val original = PNBridge.registry.get(1)!!.view as EditText
         parent.addView(original)
         original.requestFocus()
         original.setSelection(1, 3)
-        applier.applyOp(Op.Update(1, JSONObject().put("multiline", true).put("font_size", JSONObject.NULL)))
+        applier.applyOp(MountOp.Update(1, JSONObject().put("multiline", true).put("font_size", JSONObject.NULL), recreate = true))
         val replacement = PNBridge.registry.get(1)!!.view as EditText
         assertNotSame(original, replacement)
         assertSame(parent, replacement.parent)
@@ -140,7 +113,7 @@ class NativeLifecycleTest {
         assertEquals(3, replacement.selectionEnd)
         assertTrue(replacement.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
         assertTrue(replacement.textSize < original.textSize)
-        applier.applyOp(Op.Destroy(1))
+        applier.applyOp(MountOp.Delete(1))
         assertEquals(0, parent.childCount)
         assertNull(PNBridge.registry.get(1))
     }
@@ -162,11 +135,11 @@ class NativeLifecycleTest {
     }
 
     @Test fun containerResetRetainsPhysicalIdentityAndInsertedChildren() {
-        applier.applyOp(Op.Create(10, "View", JSONObject().put("background_color", "#ff0000")))
-        applier.applyOp(Op.Create(11, "Text", JSONObject().put("text", "child")))
-        applier.applyOp(Op.Insert(10, 11, 0))
+        applier.applyOp(MountOp.Create(10, "View", JSONObject().put("background_color", "#ff0000")))
+        applier.applyOp(MountOp.Create(11, "Text", JSONObject().put("text", "child")))
+        applier.applyOp(MountOp.Insert(10, 11, 0))
         val original = PNBridge.registry.get(10)!!.view
-        applier.applyOp(Op.Update(10, JSONObject().put("background_color", JSONObject.NULL)))
+        applier.applyOp(MountOp.Update(10, JSONObject().put("background_color", JSONObject.NULL)))
         val replacement = PNBridge.registry.get(10)!!.view as android.view.ViewGroup
         assertSame(original, replacement)
         assertSame(replacement, PNBridge.registry.get(11)!!.view.parent)

@@ -2,32 +2,32 @@ package com.pythonnative.runtime
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.Configuration
 import android.util.Log
-import com.pythonnative.runtime.animation.PNAnimator
-import com.pythonnative.runtime.bridge.JsonUtil
 import com.pythonnative.runtime.bridge.MainThread
 import com.pythonnative.runtime.bridge.PNRegistry
-import com.pythonnative.runtime.bridge.TransactionApplier
 import com.pythonnative.runtime.bridge.ViewRegistry
+import com.pythonnative.runtime.core.PNCore
+import com.pythonnative.runtime.layout.Measurement
 import com.pythonnative.runtime.modules.BuiltinModules
 import com.pythonnative.runtime.modules.ModuleEnvelope
 import com.pythonnative.runtime.modules.Promise
+import com.pythonnative.runtime.screens.Viewport
 import org.json.JSONObject
 
 /**
  * The single Java class Python touches.
  *
- * Every entry point mirrors one C symbol of the iOS bridge. Python calls
- * them from its own application thread; each hops to the main thread for
- * the duration of the call. Native-to-Python messages go through a mailbox
- * drained on a dedicated thread, so the main thread never waits for Python.
+ * Python commits, lays out, animates, and runs view commands through the
+ * renderer core ([PNCore]), which it opens with ctypes; only native module
+ * calls come here ([call], mirroring `pn_bridge_call` on iOS). Each hops to
+ * the main thread for the duration of the call. Native-to-Python messages
+ * go through a mailbox drained on a dedicated thread, so the main thread
+ * never waits for Python.
  */
 object PNBridge {
     /** Logcat tag used by the whole runtime. */
     const val TAG = "PythonNative"
-
-    /** Protocol version compiled into this library. */
-    const val PROTOCOL_VERSION = com.pythonnative.generated.PNContracts.protocolVersion
 
     private val pythonQueue = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "PythonNative-events").apply { isDaemon = true }
@@ -37,7 +37,7 @@ object PNBridge {
     private val hostReadyListeners = ArrayList<Runnable>()
     private val modulePromises = java.util.concurrent.ConcurrentHashMap<Long, Promise>()
 
-    /** Tag to view bookkeeping shared by the applier and managers. */
+    /** Tag to view bookkeeping shared by the mounter and managers. */
     val registry = ViewRegistry()
 
     private val continuousEvents = setOf("on_scroll", "on_window", "on_selection_change", "on_gesture_update")
@@ -49,13 +49,6 @@ object PNBridge {
     }
     private val mailbox = java.util.ArrayDeque<Message>()
     private var draining = false
-
-    private val commits = com.pythonnative.runtime.bridge.CommitState()
-    private val applier by lazy { TransactionApplier(registry) }
-
-    /** The protocol version Python must match before starting. */
-    @JvmStatic
-    fun protocolVersion(): Int = PROTOCOL_VERSION
 
     /**
      * Install the Python callback target once Python has started. Delivers
@@ -89,12 +82,34 @@ object PNBridge {
         if (ready) runnable.run()
     }
 
-    /** Record the current activity; modules and managers derive their `Context` from it. */
+    /**
+     * Record the current activity; modules and managers derive their
+     * `Context` from it. The first call also loads the renderer core, so it
+     * must happen before Python starts.
+     */
     @JvmStatic
     fun setContext(activity: Activity) {
         this.activity = activity
         PNRegistry.ensureBuiltins()
+        PNCore.install(activity)
+        Measurement.prepare(activity)
         BuiltinModules.onContextAttached(activity)
+    }
+
+    /**
+     * Apply a configuration change the activity handled in place (the
+     * template declares `android:configChanges`, so rotation, dark mode,
+     * font scale, density, and locale changes don't recreate it). Screens
+     * publish their new `layout` themselves; this re-measures text and
+     * widgets, re-reads reduce motion, and tells Python about the new
+     * appearance and locale.
+     */
+    @JvmStatic
+    fun configurationChanged(activity: Activity, previous: Configuration?, current: Configuration) {
+        Measurement.configurationChanged(activity)
+        PNCore.updateReduceMotion(activity)
+        callPython("host", 0, "appearance", Viewport.describe(activity.window.decorView).toString())
+        if (previous == null || previous.locales != current.locales) BuiltinModules.localization.publish()
     }
 
     /** Forget `activity` if it is the current one (called from `Activity.onDestroy`). */
@@ -121,53 +136,15 @@ object PNBridge {
     // Python -> native
     // ------------------------------------------------------------------
 
-    /** Apply one serialized transaction (a JSON array of ops). */
-    @JvmStatic
-    fun apply(transactionJson: String): String {
-        val started = System.nanoTime()
-        val envelope = try { JSONObject(transactionJson) } catch (_: Exception) { return "{\"ok\":false,\"failed\":false,\"error\":\"Invalid JSON\"}" }
-        val decoded = System.nanoTime()
-        return MainThread.call {
-            val mounted = System.nanoTime()
-            val reply = commits.apply(envelope, applier)
-            val metrics = reply.optJSONObject("metrics") ?: JSONObject()
-            metrics.put("decode_ns", decoded - started).put("queue_ns", mounted - decoded)
-            reply.put("metrics", metrics).toString()
-        }
-    }
-
-    /** Run an imperative command on one view and return its JSON result. */
-    @JvmStatic
-    fun command(tag: Long, name: String, argsJson: String): String? {
-        if (!MainThread.isMain()) return MainThread.call { command(tag, name, argsJson) }
-        val record = registry.get(tag) ?: return null
-        return try {
-            val args = if (argsJson.isBlank()) JSONObject() else JSONObject(argsJson)
-            require(com.pythonnative.generated.PNContracts.validateCommand(record.typeName, name, args)) { "Invalid view command" }
-            JsonUtil.encode(record.manager.command(record.view, name, args))
-        } catch (e: Exception) {
-            Log.e(TAG, "command '$name' failed for ${record.typeName}#$tag", e)
-            null
-        }
-    }
-
-    /** Handle an animation request (`set`, `start`, or `cancel`) for one view. */
-    @JvmStatic
-    fun animate(tag: Long, requestJson: String): String? {
-        if (!MainThread.isMain()) return MainThread.call { animate(tag, requestJson) }
-        val record = registry.get(tag) ?: return null
-        return try {
-            PNAnimator.handle(record, JSONObject(requestJson))
-        } catch (e: Exception) {
-            Log.e(TAG, "animate failed for ${record.typeName}#$tag: $requestJson", e)
-            null
-        }
-    }
-
-    /** Call a native module method; `argsJson` is `{"call_id": n, "args": {...}}`. */
+    /**
+     * Call a native module method; `argsJson` is `{"call_id": n, "args": {...}}`.
+     * Pending mount transactions apply first, so a module sees every view
+     * Python committed before the call (`Host.attach_root`).
+     */
     @JvmStatic
     fun call(module: String, method: String, argsJson: String): String? {
         if (!MainThread.isMain()) return MainThread.call { call(module, method, argsJson) }
+        PNCore.drainMounts()
         val (callId, args) = try {
             ModuleEnvelope.decodeCall(argsJson)
         } catch (e: Exception) {
@@ -178,15 +155,8 @@ object PNBridge {
             return ModuleEnvelope.ok(null)
         }
         if (module == "Runtime") return JSONObject().put("ok", true).put("value", JSONObject()
-            .put("protocol", PROTOCOL_VERSION).put("yoga", com.pythonnative.generated.PNContracts.yogaVersion)
-            .put("schema", com.pythonnative.generated.PNContracts.fingerprint)
-            .put("animation_graph", true).put("logical_lists", true).put("native_layout", true)).toString()
-        if (module == "Layout") {
-            val started = System.nanoTime()
-            val frames = com.pythonnative.runtime.layout.NativeLayout.compute(args)
-            val value = commits.layout(frames).put("metrics", JSONObject().put("layout_ns", System.nanoTime() - started).put("views", registry.size))
-            return JSONObject().put("ok", true).put("value", value).toString()
-        }
+            .put("protocol", PNCore.protocolVersion()).put("yoga", com.pythonnative.generated.PNContracts.yogaVersion)
+            .put("schema", com.pythonnative.generated.PNContracts.fingerprint)).toString()
         val target = PNRegistry.module(module)
             ?: return ModuleEnvelope.error("unknown module '$module'", "unknown_module")
         if (!com.pythonnative.generated.PNContracts.validateModule(module, method, args))
@@ -213,18 +183,11 @@ object PNBridge {
      * Queue one callback for Python. Messages are delivered in order on the
      * events thread; consecutive continuous events for the same view
      * coalesce. Messages sent before Python has started wait for [setHost].
+     * View events reach this through the core (`PNCore.event`), which stamps
+     * them; any thread may call it.
      */
     fun callPython(kind: String, tag: Long, name: String, payloadJson: String) {
-        if (kind == "event") com.pythonnative.runtime.animation.AnimationGraph.event(tag, name, org.json.JSONArray(payloadJson))
-        var editRevision = 0L
-        if (kind == "event" && name == "on_change") registry.get(tag)?.let { record ->
-            if (record.typeName == "TextInput") {
-                editRevision = ((record.state["edit_revision"] as? Number)?.toLong() ?: 0L) + 1L
-                record.state["edit_revision"] = editRevision
-            }
-        }
-        val payload = if (kind == "event") commits.event(org.json.JSONArray(payloadJson), editRevision) else if (kind == "layout") commits.layout(org.json.JSONArray(payloadJson)).toString() else payloadJson
-        val message = Message(kind, tag, name, payload)
+        val message = Message(kind, tag, name, payloadJson)
         synchronized(mailbox) {
             val last = mailbox.peekLast()
             if (message.continuous && last?.continuous == true && last.tag == tag && last.name == name) mailbox.removeLast()

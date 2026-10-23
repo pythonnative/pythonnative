@@ -15,8 +15,8 @@ public final class PNViewRecord {
     }
 }
 
-/// Tag -> view table. Every view created through a transaction is
-/// registered here until its `d` op arrives.
+/// Tag -> view table. Every view a mount transaction creates is registered
+/// here until its delete op arrives.
 public final class PNViewRegistry {
     public static let shared = PNViewRegistry()
 
@@ -36,6 +36,11 @@ public final class PNViewRegistry {
 
     /// Number of live records (used by tests and diagnostics).
     public var count: Int { records.count }
+
+    /// Every live record.
+    public func allRecords() -> [PNViewRecord] {
+        Array(records.values)
+    }
 
     /// Every live record whose element type is `typeName`.
     public func records(ofType typeName: String) -> [PNViewRecord] {

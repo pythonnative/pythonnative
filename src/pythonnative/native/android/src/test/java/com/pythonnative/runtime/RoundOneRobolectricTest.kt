@@ -10,8 +10,8 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.pythonnative.runtime.bridge.Op
-import com.pythonnative.runtime.bridge.TransactionApplier
+import com.pythonnative.runtime.mount.MountOp
+import com.pythonnative.runtime.mount.Mounter
 import com.pythonnative.runtime.components.PNColor
 import com.pythonnative.runtime.components.PNTheme
 import com.pythonnative.runtime.components.TextManager
@@ -40,16 +40,16 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class RoundOneRobolectricTest {
     private lateinit var activity: Activity
-    private lateinit var applier: TransactionApplier
+    private lateinit var applier: Mounter
 
     @Before fun start() {
         activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         PNBridge.setContext(activity)
-        applier = TransactionApplier(PNBridge.registry)
+        applier = Mounter(PNBridge.registry)
     }
 
     @After fun stop() {
-        for (record in PNBridge.registry.all()) applier.applyOp(Op.Destroy(record.tag))
+        for (record in PNBridge.registry.all()) applier.applyOp(MountOp.Delete(record.tag))
         PNBridge.clearContext(activity)
         activity.finish()
     }
@@ -150,11 +150,11 @@ class RoundOneRobolectricTest {
     }
 
     @Test fun hintJoinsTheLabelInTheContentDescription() {
-        applier.applyOp(Op.Create(20, "View", JSONObject().put("accessibility_label", "Save").put("accessibility_hint", "Saves the draft")))
+        applier.applyOp(MountOp.Create(20, "View", JSONObject().put("accessibility_label", "Save").put("accessibility_hint", "Saves the draft")))
         val view = PNBridge.registry.get(20)!!.view
         assertEquals("Save, Saves the draft", view.contentDescription.toString())
         assertNull(if (android.os.Build.VERSION.SDK_INT >= 26) view.tooltipText else null)
-        applier.applyOp(Op.Update(20, JSONObject().put("accessibility_hint", JSONObject.NULL)))
+        applier.applyOp(MountOp.Update(20, JSONObject().put("accessibility_hint", JSONObject.NULL)))
         assertEquals("Save", view.contentDescription.toString())
     }
 
@@ -163,7 +163,7 @@ class RoundOneRobolectricTest {
             .put("important_for_accessibility", "no_hide_descendants")
             .put("accessibility_actions", JSONArray("""[{"name": "activate"}, {"name": "archive", "label": "Archive"}]"""))
             .put("accessibility_value", JSONObject().put("min", 0).put("max", 10).put("now", 4).put("text", "4 of 10"))
-        applier.applyOp(Op.Create(21, "View", props))
+        applier.applyOp(MountOp.Create(21, "View", props))
         val view = PNBridge.registry.get(21)!!.view
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS, view.importantForAccessibility)
         val delegate = PNBridge.registry.get(21)!!.state["a11y_delegate"] as PNAccessibilityDelegate
@@ -187,11 +187,11 @@ class RoundOneRobolectricTest {
         assertEquals(android.text.TextUtils.TruncateAt.MIDDLE, manager.ellipsizeMode("middle"))
         assertEquals(android.text.TextUtils.TruncateAt.END, manager.ellipsizeMode("tail"))
         assertEquals(android.text.TextUtils.TruncateAt.END, manager.ellipsizeMode(null))
-        applier.applyOp(Op.Create(22, "Text", JSONObject().put("text", "hello").put("max_lines", 2)))
+        applier.applyOp(MountOp.Create(22, "Text", JSONObject().put("text", "hello").put("max_lines", 2)))
         val tv = PNBridge.registry.get(22)!!.view as TextView
         assertEquals(2, tv.maxLines)
         assertEquals(android.text.TextUtils.TruncateAt.END, tv.ellipsize)
-        applier.applyOp(Op.Update(22, JSONObject().put("max_lines", JSONObject.NULL)))
+        applier.applyOp(MountOp.Update(22, JSONObject().put("max_lines", JSONObject.NULL)))
         assertEquals(Int.MAX_VALUE, tv.maxLines)
         assertNull(tv.ellipsize)
     }
@@ -199,13 +199,13 @@ class RoundOneRobolectricTest {
     @Test fun tabBarAndModalUseThemeColorsInsteadOfWhite() {
         // BottomNavigationView insists on a Material/AppCompat theme, as the app template provides.
         activity.setTheme(com.google.android.material.R.style.Theme_MaterialComponents_DayNight_NoActionBar)
-        applier.applyOp(Op.Create(23, "TabBar", JSONObject().put("items", JSONArray("""[{"name": "a", "title": "A"}]""")).put("active_tab", "a")))
+        applier.applyOp(MountOp.Create(23, "TabBar", JSONObject().put("items", JSONArray("""[{"name": "a", "title": "A"}]""")).put("active_tab", "a")))
         val bar = PNBridge.registry.get(23)!!.view as BottomNavigationView
         assertEquals(PNTheme.surface(activity), (bar.background as ColorDrawable).color)
-        applier.applyOp(Op.Update(23, JSONObject().put("background_color", "#123456")))
+        applier.applyOp(MountOp.Update(23, JSONObject().put("background_color", "#123456")))
         assertEquals(0xFF123456.toInt(), (bar.background as ColorDrawable).color)
 
-        applier.applyOp(Op.Create(24, "Modal", JSONObject().put("visible", true)))
+        applier.applyOp(MountOp.Create(24, "Modal", JSONObject().put("visible", true)))
         val record = PNBridge.registry.get(24)!!
         val content = record.state["content_view"] as FrameLayout
         assertEquals(PNTheme.background(activity), (content.background as ColorDrawable).color)
@@ -221,10 +221,10 @@ class RoundOneRobolectricTest {
     }
 
     @Test fun screensPaintTheThemeBackgroundUnlessTransparent() {
-        applier.applyOp(Op.Create(25, "Screen", JSONObject().put("route_key", "a").put("title", "A")))
+        applier.applyOp(MountOp.Create(25, "Screen", JSONObject().put("route_key", "a").put("title", "A")))
         val screen = PNBridge.registry.get(25)!!.view
         assertEquals(PNTheme.background(activity), (screen.background as ColorDrawable).color)
-        applier.applyOp(Op.Create(26, "Screen", JSONObject().put("route_key", "b").put("background_color", "#ff0000")))
+        applier.applyOp(MountOp.Create(26, "Screen", JSONObject().put("route_key", "b").put("background_color", "#ff0000")))
         assertNotEquals(PNTheme.background(activity), (PNBridge.registry.get(26)!!.view.background as? ColorDrawable)?.color)
     }
 }

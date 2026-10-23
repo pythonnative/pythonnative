@@ -14,7 +14,9 @@ after commit and clears it back to ``None`` on unmount:
 Every handle exposes the view's ``tag``, its ``type_name``, and
 ``frame`` (the last committed [`LayoutEvent`][pythonnative.LayoutEvent],
 written by the layout pass). Methods that act on the view are plain
-calls; methods that need an answer from the native view are ``async``.
+calls; they queue behind the pending mount, so they reach the view the
+last commit created. Methods that need an answer from the native view
+are ``async`` and await it without blocking the application loop.
 Composite components (``FlatList``, ``SectionList``) publish their own
 [`ListController`][pythonnative.ListController] instead.
 
@@ -30,6 +32,8 @@ Example:
     ```
 """
 
+import asyncio
+import inspect
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -73,14 +77,29 @@ class ViewHandle:
         self.frame: Optional[LayoutEvent] = None
         self._backend = backend
 
-    def command(self, name: str, **args: Any) -> Any:
-        """Run a native view command by name and return its result.
+    def command(self, name: str, **args: Any) -> "asyncio.Future[Any]":
+        """Queue a native view command by name; returns a future for its result.
 
         The typed methods on the subclasses are thin wrappers over this;
         it stays public for commands a custom native component declares
-        in its own contract.
+        in its own contract. Await the future for a command that answers.
         """
         return self._backend.command(self.tag, name, dict(args))
+
+    async def _ask(self, name: str, **args: Any) -> Any:
+        """Run a command that answers and await its result."""
+        result = self.command(name, **args)
+        return await result if inspect.isawaitable(result) else result
+
+    async def measure_in_window(self) -> Optional[LayoutEvent]:
+        """The view's frame relative to its screen, read from the renderer core.
+
+        Unlike ``frame``, which is relative to the parent and updated after
+        each layout, this answers for the latest layout immediately, and
+        works for views the core flattened out of the mounted tree.
+        """
+        frame = await self._backend.measure_in_window(self.tag)
+        return None if frame is None else LayoutEvent(*frame)
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.type_name} #{self.tag})"
@@ -113,7 +132,7 @@ class TextInputHandle(ViewHandle):
 
     async def get_value(self) -> str:
         """Return the field's current text as the native view holds it."""
-        result = self.command("get_value")
+        result = await self._ask("get_value")
         return "" if result is None else str(result)
 
 
@@ -141,7 +160,7 @@ class ScrollViewHandle(ViewHandle):
 
     async def get_scroll_offset(self) -> ScrollOffset:
         """Return the current content offset."""
-        result = self.command("get_scroll_offset") or {}
+        result = await self._ask("get_scroll_offset") or {}
         return ScrollOffset(x=float(result.get("x", 0.0)), y=float(result.get("y", 0.0)))
 
 
@@ -193,15 +212,15 @@ class WebViewHandle(ViewHandle):
 
     async def can_go_back(self) -> bool:
         """Whether the page history has an entry to go back to."""
-        return bool(self.command("can_go_back"))
+        return bool(await self._ask("can_go_back"))
 
     async def can_go_forward(self) -> bool:
         """Whether the page history has an entry to go forward to."""
-        return bool(self.command("can_go_forward"))
+        return bool(await self._ask("can_go_forward"))
 
     async def get_url(self) -> str:
         """Return the URL of the current page."""
-        result = self.command("get_url")
+        result = await self._ask("get_url")
         return "" if result is None else str(result)
 
 

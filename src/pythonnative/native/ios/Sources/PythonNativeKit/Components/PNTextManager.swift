@@ -1,13 +1,18 @@
 import UIKit
 
-/// `Text`: a `UILabel` with rich spans, text transforms, shadows, and the
-/// full font prop set.
+/// `Text`: a `UILabel` showing a `PNTextLayout`: rich spans, text
+/// transforms, shadows, and the full font prop set.
+///
+/// The renderer core measures text on its workers with the same
+/// `PNTextLayout` (see `PNMeasurement`), so the label and the measured size
+/// come from one attributed string, line count, and truncation mode.
 public final class PNTextManager: PNTypedComponentManager<TextProps> {
     public init() { super.init(TextProps.self) }
-    static let textShadowKeys = ["text_shadow_color", "text_shadow_offset", "text_shadow_radius"]
-    static let attributedKeys = ["letter_spacing", "line_height", "text_decoration"] + textShadowKeys
-    static let fontKeys = ["font_size", "font_weight", "font_family", "italic", "bold", "font_style"]
-    static let spanRebuildKeys = ["spans", "text", "text_transform", "color"] + fontKeys + attributedKeys
+    static let fontKeys = PNTextLayout.fontKeys
+    /// Props that change the label's content or line settings.
+    static let layoutKeys = ["text", "spans", "text_transform", "color", "letter_spacing", "line_height",
+                             "text_decoration", "text_align", "max_lines", "ellipsize_mode"]
+        + fontKeys + PNTextLayout.textShadowKeys
 
     public override func makeView(props: [String: Any]) -> UIView {
         let label = PNLabel(frame: .zero)
@@ -21,52 +26,30 @@ public final class PNTextManager: PNTypedComponentManager<TextProps> {
         let changed = raw
         guard let label = view as? UILabel else { return }
         let merged = mergedProps(label)
-        let hasSpans = !((PNProps.value(merged, "spans") as? [Any]) ?? []).isEmpty
-        let textChanged = props.has_text || PNProps.has(changed, "text_transform")
-        if textChanged, !hasSpans {
-            label.text = PNTextManager.transform(PNProps.string(PNProps.value(merged, "text")), mode: PNProps.string(PNProps.value(merged, "text_transform")))
+        let contentChanged = initial || PNTextManager.layoutKeys.contains(where: { PNProps.has(changed, $0) })
+        if contentChanged {
+            let layout = PNTextLayout(merged)
+            label.font = PNTextLayout.font(from: merged)
+            // An attributed string resets the label's line settings from its
+            // paragraph style, so they're applied after it.
+            label.attributedText = layout.attributed
+            label.textAlignment = layout.alignment
+            label.numberOfLines = layout.numberOfLines
+            label.lineBreakMode = layout.lineBreakMode
+            let state = PNViewState.existing(for: label)
+            state?.extras["span_ranges"] = layout.spanRanges
+            state?.extras["span_pressable"] = layout.spanPressable
         }
-        if initial || PNTextManager.fontKeys.contains(where: { PNProps.has(changed, $0) }) {
-            label.font = PNTextManager.font(from: merged, base: label.font)
-        }
-        if props.has_color { label.textColor = PNColor.parse(PNProps.value(changed, "color")) ?? .label }
         if props.has_background_color { label.backgroundColor = PNColor.parse(PNProps.value(changed, "background_color")) }
-        if props.has_max_lines {
-            let lines = props.max_lines.map(Int.init) ?? 0
-            label.numberOfLines = max(0, lines)
-        }
-        if PNProps.has(changed, "text_align") {
-            label.textAlignment = PNTextManager.alignment(props.text_align?.rawValue)
-        }
-        if props.has_ellipsize_mode {
-            label.lineBreakMode = PNTextManager.lineBreakMode(props.ellipsize_mode?.rawValue)
-        }
         if props.has_selectable, let selectable = label as? PNLabel {
             selectable.isSelectable = props.selectable ?? false
         }
         if props.has_allow_font_scaling {
             label.adjustsFontForContentSizeCategory = props.allow_font_scaling ?? true
         }
-        var contentChanged = textChanged
-        if hasSpans {
-            if PNTextManager.spanRebuildKeys.contains(where: { PNProps.has(changed, $0) }) {
-                applySpans(label, merged)
-                contentChanged = true
-            }
-        } else if props.has_spans {
-            label.text = PNTextManager.transform(PNProps.string(PNProps.value(merged, "text")), mode: PNProps.string(PNProps.value(merged, "text_transform")))
-            PNViewState.existing(for: label)?.extras.removeValue(forKey: "span_ranges")
-            contentChanged = true
-        } else if PNTextManager.attributedKeys.contains(where: { PNProps.has(changed, $0) })
-            || (textChanged && PNTextManager.attributedKeys.contains { PNProps.value(merged, $0) != nil })
-        {
-            applyAttributed(label, merged)
-        }
         if props.has_spans || initial || PNProps.has(changed, "_pn_events"), let pressable = label as? PNLabel {
             let state = PNViewState.existing(for: label)
-            let spanPressable = (PNProps.value(merged, "spans") as? [Any])?.contains {
-                PNProps.bool(($0 as? [String: Any])?["pressable"]) == true
-            } ?? false
+            let spanPressable = (state?.extras["span_pressable"] as? [Bool])?.contains(true) ?? false
             pressable.isPressable = (state?.hasEvent("on_press") ?? false) || spanPressable
         }
         PNViewStyler.applyDecoration(label, changed)
@@ -93,246 +76,31 @@ public final class PNTextManager: PNTypedComponentManager<TextProps> {
     /// Resolve a tap at `point` (label coordinates) to the span it landed
     /// on, or `nil` when it missed every span.
     static func spanIndex(at point: CGPoint, in label: UILabel) -> Int? {
-        guard let attributed = label.attributedText, attributed.length > 0,
-              let ranges = PNViewState.existing(for: label)?.extras["span_ranges"] as? [NSRange] else { return nil }
-        let storage = NSTextStorage(attributedString: attributed)
-        let layout = NSLayoutManager()
-        let container = NSTextContainer(size: label.bounds.size)
-        container.lineFragmentPadding = 0
-        container.maximumNumberOfLines = label.numberOfLines
-        container.lineBreakMode = label.lineBreakMode
-        layout.addTextContainer(container)
-        storage.addLayoutManager(layout)
-        let used = layout.usedRect(for: container)
-        // UILabel centers its text vertically; align the layout the same way.
-        let offset = CGPoint(x: 0, y: max(0, (label.bounds.height - used.height) / 2))
-        let local = CGPoint(x: point.x - offset.x, y: point.y - offset.y)
-        guard used.contains(local) || used.insetBy(dx: -4, dy: -4).contains(local) else { return nil }
-        let index = layout.characterIndex(for: local, in: container, fractionOfDistanceBetweenInsertionPoints: nil)
-        return ranges.firstIndex { NSLocationInRange(index, $0) }
+        guard let state = PNViewState.existing(for: label), state.extras["span_ranges"] as? [NSRange] != nil else { return nil }
+        return PNTextLayout(state.props).spanIndex(at: point, in: label.bounds.size)
     }
 
-    // MARK: - Fonts
+    // MARK: - Shared helpers
 
-    /// Resolve a `UIFont` from the element's font props.
+    /// Resolve a `UIFont` from font props (headers, buttons, inputs).
     static func font(from props: [String: Any], base: UIFont?) -> UIFont {
-        let currentSize: CGFloat = 17
-        let size = CGFloat(PNProps.double(PNProps.value(props, "font_size")) ?? Double(currentSize))
-        var weight: Any? = PNProps.value(props, "font_weight")
-        if weight == nil, PNProps.bool(PNProps.value(props, "bold")) == true { weight = "bold" }
-        let italic = PNProps.bool(PNProps.value(props, "italic")) == true
-            || PNProps.string(PNProps.value(props, "font_style")) == "italic"
-        return font(size: size, weight: weight, family: PNProps.string(PNProps.value(props, "font_family")), italic: italic)
+        PNTextLayout.font(from: props)
     }
 
-    static func font(size: CGFloat, weight: Any?, family: String?, italic: Bool) -> UIFont {
-        if let family = family, !family.isEmpty {
-            // Bundled fonts (app/assets/fonts) are matched by family, weight,
-            // and style from the manifest; the face already carries the
-            // weight and slant, so no synthetic bold or italic is applied.
-            if let name = PNAssets.shared.fontName(family: family, weight: numericWeight(weight), italic: italic),
-               let bundled = UIFont(name: name, size: size) {
-                return UIFontMetrics(forTextStyle: .body).scaledFont(for: bundled)
-            }
-            if let named = UIFont(name: family, size: size) {
-                return UIFontMetrics(forTextStyle: .body).scaledFont(for: italic ? italicized(named, size: size) : named)
-            }
-        }
-        let font = UIFont.systemFont(ofSize: size, weight: fontWeight(weight))
-        return UIFontMetrics(forTextStyle: .body).scaledFont(for: italic ? italicized(font, size: size) : font)
-    }
-
-    /// A CSS-style weight (100 to 900) from a `font_weight` value.
-    static func numericWeight(_ value: Any?) -> Int {
-        if let name = value as? String {
-            switch name.lowercased() {
-            case "ultralight", "thin": return name.lowercased() == "thin" ? 200 : 100
-            case "light": return 300
-            case "normal", "regular": return 400
-            case "medium": return 500
-            case "semibold": return 600
-            case "bold": return 700
-            case "heavy": return 800
-            case "black": return 900
-            default: return Int(Double(name) ?? 400)
-            }
-        }
-        return Int(PNProps.double(value) ?? 400)
-    }
-
-    static func italicized(_ font: UIFont, size: CGFloat) -> UIFont {
-        var traits = font.fontDescriptor.symbolicTraits
-        traits.insert(.traitItalic)
-        guard let descriptor = font.fontDescriptor.withSymbolicTraits(traits) else { return font }
-        return UIFont(descriptor: descriptor, size: size)
-    }
-
-    static func fontWeight(_ value: Any?) -> UIFont.Weight {
-        if let name = value as? String {
-            switch name.lowercased() {
-            case "ultralight": return .ultraLight
-            case "thin": return .thin
-            case "light": return .light
-            case "medium": return .medium
-            case "semibold": return .semibold
-            case "bold": return .bold
-            case "heavy": return .heavy
-            case "black": return .black
-            default:
-                if let numeric = Double(name) { return fontWeight(numeric) }
-                return .regular
-            }
-        }
-        guard let numeric = PNProps.double(value) else { return .regular }
-        let n = max(100, min(900, numeric))
-        switch n {
-        case ...100: return .ultraLight
-        case ...200: return .thin
-        case ...300: return .light
-        case ...400: return .regular
-        case ...500: return .medium
-        case ...600: return .semibold
-        case ...700: return .bold
-        case ...800: return .heavy
-        default: return .black
-        }
-    }
-
-    /// `ellipsize_mode` -> `NSLineBreakMode`. UIKit applies head and
-    /// middle truncation to the last visible line of a multi-line label;
-    /// `clip` cuts without an ellipsis.
     public static func lineBreakMode(_ value: String?) -> NSLineBreakMode {
-        switch value {
-        case "head": return .byTruncatingHead
-        case "middle": return .byTruncatingMiddle
-        case "clip": return .byClipping
-        default: return .byTruncatingTail
-        }
+        PNTextLayout.lineBreakMode(value)
     }
 
-    static func alignment(_ value: String?) -> NSTextAlignment {
-        switch value {
-        case "center": return .center
-        case "right": return .right
-        case "justify": return .justified
-        case "natural": return .natural
-        default: return .left
-        }
-    }
-
-    // MARK: - Transforms
-
-    /// Apply a `text_transform` mode (`uppercase`, `lowercase`, `capitalize`).
     public static func transform(_ text: String?, mode: String?) -> String {
-        let s = text ?? ""
-        switch mode {
-        case "uppercase": return s.uppercased()
-        case "lowercase": return s.lowercased()
-        case "capitalize":
-            var out = ""
-            var atWordStart = true
-            for ch in s {
-                if ch.isWhitespace {
-                    atWordStart = true
-                    out.append(ch)
-                } else if atWordStart {
-                    out.append(contentsOf: String(ch).uppercased())
-                    atWordStart = false
-                } else {
-                    out.append(ch)
-                }
-            }
-            return out
-        default: return s
-        }
-    }
-
-    // MARK: - Attributed rendering
-
-    static func baseAttributes(_ props: [String: Any], font: UIFont?) -> [NSAttributedString.Key: Any] {
-        var attrs: [NSAttributedString.Key: Any] = [:]
-        if let font = font { attrs[.font] = font }
-        if let kern = PNProps.double(PNProps.value(props, "letter_spacing")) { attrs[.kern] = kern }
-        if let lineHeight = PNProps.double(PNProps.value(props, "line_height")) {
-            let style = NSMutableParagraphStyle()
-            style.minimumLineHeight = CGFloat(lineHeight)
-            style.maximumLineHeight = CGFloat(lineHeight)
-            attrs[.paragraphStyle] = style
-        }
-        switch PNProps.string(PNProps.value(props, "text_decoration")) {
-        case "underline": attrs[.underlineStyle] = NSUnderlineStyle.single.rawValue
-        case "line_through": attrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
-        default: break
-        }
-        if let shadow = textShadow(props) { attrs[.shadow] = shadow }
-        return attrs
-    }
-
-    static func textShadow(_ props: [String: Any]) -> NSShadow? {
-        guard textShadowKeys.contains(where: { PNProps.value(props, $0) != nil }) else { return nil }
-        let shadow = NSShadow()
-        shadow.shadowColor = PNColor.parse(PNProps.value(props, "text_shadow_color")) ?? UIColor.black
-        let (dx, dy) = PNViewStyler.shadowOffset(PNProps.value(props, "text_shadow_offset"))
-        shadow.shadowOffset = CGSize(width: dx, height: dy)
-        shadow.shadowBlurRadius = CGFloat(PNProps.double(PNProps.value(props, "text_shadow_radius")) ?? 0)
-        return shadow
-    }
-
-    func applyAttributed(_ label: UILabel, _ props: [String: Any]) {
-        guard let text = label.text, !text.isEmpty else { return }
-        label.attributedText = NSAttributedString(string: text, attributes: PNTextManager.baseAttributes(props, font: label.font))
-    }
-
-    func applySpans(_ label: UILabel, _ merged: [String: Any]) {
-        let mode = PNProps.string(PNProps.value(merged, "text_transform"))
-        let spans = ((PNProps.value(merged, "spans") as? [Any]) ?? []).compactMap { $0 as? [String: Any] }
-        let texts = spans.map { PNTextManager.transform(PNProps.string($0["text"]), mode: mode) }
-        let full = NSMutableAttributedString(string: texts.joined(), attributes: PNTextManager.baseAttributes(merged, font: label.font))
-        let baseSize = CGFloat(PNProps.double(merged["font_size"]) ?? 17)
-        var location = 0
-        var ranges: [NSRange] = []
-        for (span, text) in zip(spans, texts) {
-            let length = (text as NSString).length
-            let range = NSRange(location: location, length: length)
-            ranges.append(range)
-            location += length
-            if length == 0 { continue }
-            if PNTextManager.fontKeys.contains(where: { PNProps.value(span, $0) != nil }) {
-                let size = CGFloat(PNProps.double(PNProps.value(span, "font_size")) ?? Double(baseSize))
-                var weight: Any? = PNProps.value(span, "font_weight")
-                if weight == nil, PNProps.bool(PNProps.value(span, "bold")) == true { weight = "bold" }
-                let font = PNTextManager.font(
-                    size: size, weight: weight, family: PNProps.string(PNProps.value(span, "font_family")),
-                    italic: PNProps.bool(PNProps.value(span, "italic")) == true
-                )
-                full.addAttribute(.font, value: font, range: range)
-            }
-            if let color = PNColor.parse(PNProps.value(span, "color")) {
-                full.addAttribute(.foregroundColor, value: color, range: range)
-            }
-            if let color = PNColor.parse(PNProps.value(span, "background_color")) {
-                full.addAttribute(.backgroundColor, value: color, range: range)
-            }
-            if let kern = PNProps.double(PNProps.value(span, "letter_spacing")) {
-                full.addAttribute(.kern, value: kern, range: range)
-            }
-            switch PNProps.string(PNProps.value(span, "text_decoration")) {
-            case "underline": full.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
-            case "line_through": full.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: range)
-            default: break
-            }
-        }
-        label.attributedText = full
-        PNViewState.existing(for: label)?.extras["span_ranges"] = ranges
-        PNViewState.existing(for: label)?.extras["span_pressable"] = spans.map { PNProps.bool($0["pressable"]) == true }
+        PNTextLayout.transform(text, mode: mode)
     }
 }
 
 /// The `Text` label. `selectable` is implemented as a long-press "Copy"
 /// edit menu (`UIEditMenuInteraction` on iOS 16, `UIMenuController`
 /// before) that copies the whole label text; the label stays a `UILabel`
-/// so measurement, spans, and Dynamic Type are unchanged and no
-/// drag-selection handles appear.
+/// so spans and Dynamic Type behave natively and no drag-selection
+/// handles appear.
 public final class PNLabel: UILabel {
     private var longPress: UILongPressGestureRecognizer?
     private var menuInteraction: NSObject?

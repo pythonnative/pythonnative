@@ -1,10 +1,11 @@
 # Mutation ops
 
-Five record types describe every change to the native view tree:
-create, update, insert, destroy, and set frame. The
+Four record types describe every change to the native view tree:
+create, update, insert, and destroy. The
 [`Reconciler`][pythonnative.reconciler.Reconciler] emits them; the
 view backend from [`get_backend`][pythonnative.native_views.get_backend]
-applies them in one `apply_mutations` call per commit.
+applies them in one `apply_mutations` call per commit. Geometry isn't an
+op: the renderer core lays out each commit.
 
 ::: pythonnative.mutations
     options:

@@ -47,11 +47,10 @@ Rendering records changes in an undo journal and stages native operations,
 callbacks, refs, and effects. A render that fails restores the committed tree
 without publishing those changes. At the end of the pass, staged mutations are
 applied through a single `apply_mutations` call on the view backend (see
-[Native views](../api/native_views.md)). The renderer validates the
-versioned transaction before applying it
-and acknowledges the committed revision. Layout then runs beside the native
-widgets and returns changed frames. Headless backends instead use the host
-Yoga binding and receive `SetFrameOp` mutations.
+[Native views](../api/native_views.md)). The renderer core validates the
+versioned transaction before applying it, lays it out with Yoga, and
+acknowledges the committed revision with the changed frames of observed
+views. Headless tests commit to the same core.
 
 `flush_dirty` combines work from several dirty components into a batch, and
 state setters schedule that flush rather than rendering inline, so every

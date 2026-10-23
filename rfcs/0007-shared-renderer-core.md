@@ -1,6 +1,6 @@
 # RFC 0007: Shared renderer core
 
-- Status: Accepted
+- Status: Implemented
 - Author(s): Owen Carey, with Claude (Claude Code)
 - Created: 2026-10-21
 - Implemented in: (pull request links, once shipped)
@@ -299,128 +299,135 @@ poisoned-surface path (`docs/concepts/bridge.md#commits`).
 
 ### The C ABI
 
-```c
-typedef struct pn_core pn_core;
-typedef struct { const uint8_t *data; size_t size; } pn_bytes;
-typedef struct { float width, height; } pn_size;
+`native/core/include/pn_core.h` is the whole interface. The platform
+installs one set of callbacks:
 
+```c
 typedef struct {
     void *context;
-    /* Post pn_core_mount_next draining to the UI thread. Never blocks. */
-    void (*schedule_mount)(void *context);
-    /* Measure a leaf; called on the commit or layout worker. */
-    pn_size (*measure)(void *context, int64_t surface, int64_t tag, uint16_t component,
-                       pn_bytes props, float width, int32_t width_mode,
-                       float height, int32_t height_mode);
+    void (*schedule_mount)(void *context);   /* drain pn_core_mount_next on the UI thread soon */
+    void (*schedule_work)(void *context);    /* call pn_core_work soon, off the UI thread */
+    void (*request_frames)(void *context);   /* start calling pn_core_animation_frame */
+    void (*measure)(void *context, const pn_measure_request *request, pn_size *size);
     float (*baseline)(void *context, int64_t surface, int64_t tag, float width, float height);
-    /* Queue a message for Python: kind, tag, name, JSON payload. */
-    void (*emit)(void *context, const char *kind, int64_t tag, const char *name, const char *payload);
+    void (*emit)(void *context, const char *kind, int64_t surface, int64_t tag,
+                 const char *name, const char *payload);
 } pn_platform;
-
-/* Setup, before the first commit. */
-pn_core *pn_core_shared(void);
-int32_t  pn_core_protocol_version(void);
-void     pn_core_set_platform(pn_core *core, const pn_platform *platform);
-char    *pn_core_load_contracts(pn_core *core, const char *document, const char *platform_fingerprint);
-void     pn_core_free(void *pointer);
-
-/* Python side. Results are JSON strings the caller frees. */
-char *pn_core_commit(pn_core *core, const char *envelope);
-char *pn_core_command(pn_core *core, int64_t surface, int64_t tag, const char *name,
-                      const char *arguments, int64_t call_id);
-char *pn_core_animate(pn_core *core, int64_t surface, const char *request);
-char *pn_core_measure(pn_core *core, int64_t surface, int64_t tag);
-char *pn_core_inspect(pn_core *core, int64_t surface, double x, double y);
-
-/* UI thread. */
-int   pn_core_mount_next(pn_core *core, pn_bytes *transaction);
-void  pn_core_mount_finished(pn_core *core, uint64_t transaction, const char *error);
-void  pn_core_report_surface(pn_core *core, int64_t surface, float width, float height);
-void  pn_core_report_container(pn_core *core, int64_t surface, int64_t tag, float width, float height);
-void  pn_core_report_intrinsic(pn_core *core, int64_t surface, int64_t tag, float width, float height);
-void  pn_core_invalidate_measurements(pn_core *core, const char *reason);
-int   pn_core_animation_frame(pn_core *core, double timestamp_ms, pn_bytes *writes);
-char *pn_core_event(pn_core *core, int64_t surface, int64_t tag, const char *name, const char *arguments);
-void  pn_core_pointer(pn_core *core, int64_t surface, int64_t tag, const void *events, size_t count);
-int64_t pn_core_list_count(pn_core *core, int64_t surface, int64_t tag, int32_t section);
-char *pn_core_list_key(pn_core *core, int64_t surface, int64_t tag, int32_t section, int64_t index);
 ```
 
-The final header may add or rename functions; the RFC is updated with
-what ships. The core supports several surfaces, but every host keeps one
-until multi-window support has its own RFC.
+`measure` writes through an out-parameter because ctypes callbacks can't
+return structs, and `pn_measure_request` carries the surface, tag,
+component name, measurement mode, the props as an encoded value object,
+and both Yoga constraints. The functions fall into three groups:
+
+- **Setup:** `pn_core_shared`, `pn_core_protocol_version`,
+  `pn_core_set_platform`, `pn_core_load_contracts` (the document and a
+  platform name: `ios`, `android`, `web`, or `host`),
+  `pn_core_contract_fingerprint`, `pn_core_set_flattening`,
+  `pn_core_reset`, and `pn_core_free`.
+- **Python:** `pn_core_commit`, `pn_core_layout` (a relayout without a
+  commit), `pn_core_command`, `pn_core_animate`, `pn_core_measure`,
+  `pn_core_inspect`, `pn_core_validate_module`, `pn_core_check_value`
+  (tooling and tests), and `pn_core_work` (deferred relayout, run by
+  whichever thread `schedule_work` picks).
+- **UI thread:** `pn_core_mount_next` and `pn_core_mount_finished`,
+  `pn_core_is_mounted`, `pn_core_report_container`,
+  `pn_core_report_intrinsic`, `pn_core_invalidate`,
+  `pn_core_invalidate_measurements`, `pn_core_event` (which emits the
+  stamped envelope rather than returning it), `pn_core_animation_frame`
+  and `pn_core_take_writes`, `pn_core_set_reduce_motion`, the gesture
+  calls (`pn_core_pointer`, `pn_core_gesture_deadline`,
+  `pn_core_gesture_poll`, `pn_core_has_gestures`), and the list data
+  source (`pn_core_list_apply`, `pn_core_list_revision`,
+  `pn_core_list_count`, `pn_core_list_key`, `pn_core_list_index`,
+  `pn_core_list_extent`, `pn_core_list_sticky`,
+  `pn_core_list_row_revision`, `pn_core_list_sticky_at`).
+
+None of the UI-thread functions takes the commit lock. Module validation
+reads an immutable snapshot of the contracts that each load publishes,
+so a module call on the UI thread never waits for a commit. The core
+supports several surfaces, but every host keeps one until multi-window
+support has its own RFC.
 
 ### Wire contract (protocol 7)
 
 `PROTOCOL_VERSION` becomes 7. Every dev client, including PythonNative
 Go, must be rebuilt.
 
-**Commit envelope (Python to core).** The v6 envelope minus geometry:
+**Commit envelope (Python to core).** The v6 envelope minus the `f`
+(frame) op and `SetFrameOp`:
 
 ```json
 {"version": 7, "application": "3f2a9c", "surface": 1, "revision": 42,
  "ops": [["c", 7, "Text", {"text": "Hi", "_pn_layout": true}],
          ["u", 3, {"background_color": "#fff"}, ["opacity"]],
          ["i", 3, 7, 0],
-         ["d", 5]]}
+         ["d", 5]],
+ "layout": {"roots": [1], "width": 390, "height": 844, "selective": true}}
 ```
 
-- The `layout` request (`roots`, `width`, `height`, `selective`) is gone.
-  The platform reports surface and container sizes to the core, and
-  `_pn_layout` still marks the tags whose frames Python observes.
-- The `f` (frame) op is gone, along with `SetFrameOp`.
-- The acknowledgement is
-  `{"ok": true, "application", "surface", "revision", "frames": [[tag, x,
-  y, w, h], ...], "metrics": {...}}`, with frames for observed tags only.
-  A rejection is `{"ok": false, "failed": false, "error", "op", "tag",
-  "component", "prop"}`, so development errors still name the component
-  and the property; Python maps the tag to the element and its component
-  stack.
+- The optional `layout` request stays: Python sends the viewport with the
+  commit that needs a layout, and `pn_core_layout` relays out without a
+  commit when only the viewport changed. Platforms report container and
+  intrinsic sizes to the core, which relays out on its own through
+  `schedule_work`. `_pn_layout` still marks the tags whose frames Python
+  observes.
+- The acknowledgement is `{"ok": true, "application", "surface",
+  "revision", "layout": {..., "frames": [[tag, x, y, w, h], ...]},
+  "metrics": {...}}`, with frames for observed tags only.
+- A rejection is `{"ok": false, "failed": false, "application",
+  "surface", "revision", "error", "op"}`, where `op` is the index of the
+  failing operation and `error` names the component and the property
+  ("invalid op 0: unknown Text prop colour"). Python maps the operation
+  to the element and its component stack.
 
-**Contracts.** At startup, Python passes the merged contract document
-(built-ins plus plugins, the same `_native_contracts.json` the builder
-already stages) to `pn_core_load_contracts`, which compiles it into
-indexed tables in a few milliseconds. The platform passes the fingerprint
-compiled into its generated `NativeProps`; a mismatch, or a component with
-no registered mounting manager, fails startup with "Native component
-contracts changed. Rebuild the app with 'pn run'." This replaces the
-`Runtime.capabilities` fingerprint handshake. Per-commit validation runs
-over the compiled tables (integer-indexed field descriptors, interned
-enumeration strings), not over schema JSON, so RFC 0003's reason for
-generated validators no longer applies: one table interpreter in C++
-replaces 11,000 generated Swift and Kotlin lines. Contract metadata gains
-two fields: `measure` per component (see
-[Measurement](#measurement)) and `flatten` per component and field (see
+**Contracts.** At startup, during the handshake, Python passes the merged
+contract document (built-ins plus plugins) to `pn_core_load_contracts`,
+which compiles it into indexed tables in a few milliseconds. Loading at
+the handshake rather than at the first commit matters because the core
+also validates native module calls. Per-commit validation runs over the
+compiled tables (integer-indexed field descriptors, interned enumeration
+strings), not over schema JSON, so RFC 0003's reason for generated
+validators no longer applies: one table interpreter in C++ replaces
+11,000 generated Swift and Kotlin lines. The `Runtime.capabilities`
+fingerprint handshake stays: the platform still answers it with the
+fingerprint compiled into its generated `NativeProps`, and a mismatch
+fails startup with "Native component contracts changed. Rebuild the app
+with 'pn run'." Contract metadata gains per-component measurement and
+flattening fields (see [Measurement](#measurement) and
 [View flattening](#view-flattening)).
 
 **Mount transaction (core to platform).** A little-endian binary buffer:
+a header (magic `PNMT`, format version, surface, revision, transaction
+id, op count), then ops:
 
-| Section | Encoding |
+| Op | Encoding |
 | --- | --- |
-| Header | magic `PNMT`, format version, surface, revision, transaction id, op count |
-| `create` | tag, component id, props |
-| `update` | tag, props, removed key ids |
-| `insert` / `remove` | parent tag, child tag, mounted index |
-| `delete` | tag |
-| `frame` | tag, x, y, width, height (float32, relative to the mounted parent) |
-| `list` | tag, validated dataset patch |
-| `command` | tag, command id, call id, arguments |
-| `animation` | tag, graph install, start, or cancel request |
+| 0 `reset` | (destroy every view of the surface) |
+| 1 `create` | tag, component name, props |
+| 2 `update` | tag, flags (1 = recreate the widget), changed props, removed names |
+| 3 `insert` | parent, child, index; move-aware, so there's no separate `remove` |
+| 5 `delete` | tag; also detaches the view from its parent |
+| 6 `frame` | tag, x, y, width, height (float64, relative to the mounted parent) |
+| 7 `command` | tag, name, arguments, call id |
 
-Props are a count followed by (key id, value) pairs. Values are tagged:
-null, bool, int64, double, string, array, object, `color` (packed ARGB,
-already parsed), `dynamic_color` (light and dark ARGB), and `path` (SVG
-path data already parsed into absolute move, line, cubic, and close
-commands). Key ids index the contract's field-name table, which platforms
-read once at startup. Swift reads the buffer through an
-`UnsafeRawBufferPointer`, Kotlin through a direct `ByteBuffer`
-(`NewDirectByteBuffer`, no copy), and JavaScript through a `DataView` on
-WASM memory. One set of fixtures in `tests/fixtures/core/` checks all three
-decoders.
+Props are a count followed by (name, value) pairs, and values are tagged
+null, false, true, int64, double, string, array, and object. Colors and
+SVG paths stay strings that each platform parses, as before. Lists and
+animation requests don't ride in the buffer: a `VirtualList` whose
+`dataset` prop changed pulls the validated patch with
+`pn_core_list_apply` while it mounts, and animation requests queue behind
+pending mounts and take effect in `pn_core_mount_finished`, with values
+reaching views through `pn_core_take_writes` (u32 count, then tag, prop
+name, and value per write). Swift reads the buffer through an
+`UnsafeRawBufferPointer`, Kotlin through a `ByteBuffer`, and JavaScript
+through a `DataView` on WASM memory. Transactions recorded from the host
+core (`scripts/generate-native-contracts.py`) check the Swift decoder,
+and the Kotlin tests decode transactions the host core produces.
 
 **Events (platform to Python).** The platform passes each event through
 `pn_core_event`, which stamps the mounted surface, revision, and sequence,
-feeds bound animation graphs, and returns the envelope that the existing
+feeds bound animation graphs, and emits the envelope that the existing
 mailbox delivers. Python's event acceptance rules don't change.
 
 **Commands and animation requests.** Both are queued behind pending
@@ -434,10 +441,10 @@ flattened views, and returns parent-relative and window frames.
 
 ### Layout
 
-- **Typed style mapping.** The codegen marks every layout field with its
-  Yoga setter and value kind, so the core applies styles through a switch
-  over field ids. `PNYogaSetStyle`'s string comparisons and `strtof`
-  parsing go away (`native/yoga/style.cpp`).
+- **Typed style mapping.** One static table in the core maps each layout
+  prop to its Yoga setter and edge, and values arrive already typed from
+  the commit's JSON, so `PNYogaSetStyle`'s chain of string comparisons and
+  `strtof` parsing go away (`native/yoga/style.cpp`).
 - **One rule set.** Which components clip, shrink, or are measured leaves
   comes from contract metadata, not lists hard-coded in each runtime.
 - **Surfaces and detached roots.** The surface root lays out against the
@@ -459,34 +466,33 @@ Leaves declare a measurement mode in their contract. Built-ins:
 
 | Mode | Components | How |
 | --- | --- | --- |
-| `none` | View, Row, Column, Spacer, ScrollView, SafeAreaView, KeyboardAvoidingView, Pressable, TouchableOpacity, Modal, Portal, Screen, ScreenStack, VirtualList, RefreshControl, LinearGradient, BlurView, ImageBackground, StatusBar, WebView | Style only |
+| `container` | Everything not listed below (View, Row, Column, ScrollView, Modal, Screen, ...) | Style and children only |
 | `text` | Text | Thread-safe platform text layout through the `measure` callback |
-| `core` | Image, Svg | Computed in the core: explicit style size, `view_box`, or an intrinsic size reported by the platform (an image after it loads) |
-| `intrinsic` | Button, TextInput, Switch, Slider, ProgressBar, ActivityIndicator, Checkbox, Picker, SegmentedControl, DatePicker, TabBar | A prototype widget measured on the UI thread, cached by the props that affect size |
+| `image`, `svg` | Image, Svg | Computed in the core: explicit style size, `view_box`, or an intrinsic size the platform reports (an image after it loads) |
+| `fill` | VirtualList | Fills the space its parent offers; rows lay out as detached roots |
+| `intrinsic` | Button, TextInput, Switch, Slider, ProgressBar, ActivityIndicator, Checkbox, Picker, SegmentedControl, DatePicker, TabBar | A prototype widget measured on the UI thread |
 
-- **Text measures and draws from one layout.** iOS adds `PNTextLayout`,
-  which builds a TextKit `NSTextStorage`, `NSLayoutManager`, and
-  `NSTextContainer` from text props on any thread, and `PNTextView`,
-  which draws the same layout; `UILabel` leaves the `Text` manager.
-  Android adds `PNTextLayout`, which builds a `StaticLayout` from a
-  `TextPaint` on any thread, and `PNTextView`, which draws it. Each caches
-  the layout it measured by props and width, so drawing never re-lays out
-  and never disagrees with the measured size. Span hit testing,
-  truncation modes, text transforms, shadows, and Dynamic Type or font
-  scale move onto these classes.
+- **Text measures off the main thread.** iOS adds `PNTextLayout`, which
+  lays out attributed text with TextKit on any thread, and Android adds
+  `PNTextLayout`, which builds a `StaticLayout` from theme defaults
+  captured once on the main thread. Both build the text from the same
+  attributes, line count, and truncation the `Text` manager applies, so
+  the measured size matches what's drawn. Drawing stays with `UILabel`
+  and `TextView`: a custom text view would have to rebuild their
+  accessibility, selection, and link behavior, which this RFC's open
+  question flagged as a risk, so it isn't part of this change.
 - **Intrinsic measurement** keeps today's fidelity, because it calls the
-  same `sizeThatFits` or `View.measure`, but runs once per distinct key
-  instead of on every layout. A cache miss on a worker makes one
-  synchronous hop to the UI thread, which the deadlock rule allows. Font
-  scale and content-size changes clear the cache
+  same `sizeThatFits` or `View.measure` on a prototype widget built from
+  the props. A worker makes one synchronous hop to the UI thread, which
+  the deadlock rule allows; Yoga's per-node cache keeps it from running
+  again until the node's size-affecting props change. Font scale and
+  content-size changes invalidate every measurement
   (`pn_core_invalidate_measurements`).
-- **Extensions** choose `none`, `intrinsic`, or `native` in
-  `define_component(measure=...)`. Leaves default to `intrinsic` and
-  containers to `none`, which preserves today's behavior for existing
-  plugins. A plugin that can measure on any thread declares `native` and
-  implements a static `measure(props:width:height:)` on its Swift and
-  Kotlin managers; the core calls it from its workers. The `text` and
-  `core` modes are reserved for built-ins.
+- **Extensions** choose `intrinsic` (the default), `native`, or
+  `container` in `define_component(measurement=...)`. A plugin that can
+  measure on any thread declares `native` and implements a static
+  measurement on its Swift and Kotlin managers, which the core calls from
+  its workers. The other modes are reserved for built-ins.
 
 ### View flattening
 
@@ -506,9 +512,11 @@ ancestors' positions. When an update adds a blocking prop, the core
 creates the view and moves its mounted descendants into it in the same
 transaction; removing the prop does the reverse. Commands addressed to a
 flattened view fail with "View #N isn't mounted (it only affects
-layout)", which no built-in command can trigger. `PN_FLATTEN=0` disables
-flattening for debugging, and the dev menu's element inspector uses
-`pn_core_inspect`, so flattened views stay selectable.
+layout)", which no built-in command can trigger. `PN_FLATTEN=0` in a
+host or test process disables flattening for debugging. `pn_core_inspect`
+answers hit tests from the shadow tree, so flattened views can stay
+selectable; moving the dev menu's element inspector onto it is follow-up
+work.
 
 ### Lists
 
@@ -549,8 +557,10 @@ path and bound animation graphs through `pn_core_event`.
 
 iOS keeps its UIKit recognizers (`PNGestureCoordinator.swift`), whose
 interplay with scroll views and system gestures a custom engine wouldn't
-match. Shared fixtures in `tests/fixtures/gestures/` check that the core
-engine and the iOS recognizers activate, fail, and compose the same way.
+match. The scripted pointer streams that used to pin the Python arbiter
+(`tests/test_gesture*.py`) now drive the core engine through
+`tests/gesture_harness.py`; the iOS recognizers keep their XCTest
+coverage, and a shared fixture set for both is follow-up work.
 
 ### Python
 
@@ -573,11 +583,16 @@ engine and the iOS recognizers activate, fail, and compose the same way.
   from acknowledgements and layout messages to handles and `on_layout`
   callbacks. `layout.py`, its `LayoutNode`, and the Python Yoga path are
   deleted.
-- **Headless testing.** `bridge/headless.py` replaces `bridge/fake.py`. It
-  runs the host core with a deterministic text measurer and a recording
-  mount sink, so `pythonnative.testing` renders, lays out, flattens, and
-  animates with the code that ships, and `dump()` can show the mounted
-  tree as well as the logical one.
+- **Headless testing.** `bridge/fake.py` is rewritten as the fake
+  platform for the host core: a deterministic measurer, a recording mount
+  sink that applies each transaction as the UI thread would, the frame
+  clock on the application loop, and helpers that play the native side
+  (`fire`, `pointer`, `report_container`, `report_intrinsic`). Each
+  `FakeBackend` commits to its own surface, so `pythonnative.testing`
+  renders, lays out, flattens, and animates with the code that ships.
+- **Animated values** remember the backend that owns their views, so a
+  headless render animates without a process-wide backend. A Python
+  callable easing crosses the bridge as 64 samples.
 
 Public API changes:
 
@@ -588,7 +603,7 @@ frame = await handle.current.measure_in_window()   # new: window-relative Frame
 text = await field.current.get_value()             # now truly asynchronous
 offset = await scroller.current.get_scroll_offset()
 
-Badge = pn.define_component("Badge", BadgeProps, measure="intrinsic")  # new parameter
+Badge = pn.define_component("Badge", BadgeProps, measurement="intrinsic")  # new parameter
 ```
 
 `ViewHandle.frame` keeps returning the last published parent-relative
@@ -600,55 +615,70 @@ instead of blocking (bug 4). `pn.Animated` factories forward a caller's
 
 **iOS** (`PythonNativeKit`) adds:
 
-- `Bridge/PNCoreBridge.swift`: the `pn_platform` callbacks and core
-  startup.
+- `Bridge/PNCoreBridge.swift`: the `pn_platform` callbacks, core startup,
+  the display link, and the text, intrinsic, and native measurement
+  callbacks.
 - `Mount/PNMountDecoder.swift` and `Mount/PNMounter.swift`: decode a
   transaction and apply it through the existing managers.
-- `Layout/PNMeasurement.swift`: measurement callbacks and the intrinsic
-  cache.
-- `Text/PNTextLayout.swift` and `Text/PNTextView.swift`: shared text
-  layout and drawing.
-- `Animation/PNFrameClock.swift`: the display link.
+- `Text/PNTextLayout.swift`: thread-safe TextKit measurement.
+- `native/core/Package.swift`: the `PNCore` SwiftPM target, built from
+  the same sources as every other host.
 
-`PNComponentManager.measure(view:maxW:maxH:)` becomes
-`measureIntrinsic(props:maxW:maxH:)`, called with a prototype view on
-the UI thread. `pn_bridge_apply` and `pn_bridge_animate` are removed;
+`PNComponentManager` gains `measureIntrinsic`, `preparePrototype`, and
+`measureNative`; intrinsic measurement uses a prototype view built from
+the props on the UI thread. `pn_bridge_apply`, `pn_bridge_command`,
+`pn_bridge_animate`, and `pn_bridge_protocol_version` are removed;
 `pn_bridge_call`, the event mailbox, and native modules stay.
 
 **Android** (`com.pythonnative.runtime`) adds `core/PNCore.kt` (JNI
 declarations), `mount/MountDecoder.kt`, `mount/Mounter.kt`,
-`layout/Measurement.kt`, `text/PNTextLayout.kt`, `text/PNTextView.kt`,
-`animation/FrameClock.kt`, and `gestures/TouchForwarder.kt`, plus
+`layout/Measurement.kt`, `text/PNTextLayout.kt`, `animation/FrameClock.kt`,
+and `gestures/TouchForwarder.kt`, plus
 `cpp/pncore_jni.cpp`, which caches method ids, attaches the calling
 thread when needed, and checks for exceptions after every call into
-Kotlin (bug 7). `PNBridge.apply` and `PNBridge.animate` are removed. The
+Kotlin (bug 7). Managers keep `measure(view, maxW, maxH)`, now called on
+a prototype view, and gain a `measureNative` hook. `PNBridge.apply`,
+`command`, `animate`, and `protocolVersion` are removed. The
 template's `MainActivity` declares
 `android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode|fontScale|locale|layoutDirection|keyboard|keyboardHidden|navigation"`
 and handles `onConfigurationChanged` by reporting the new surface size,
 appearance, and locale to the core and Python, without recreating the
 activity (bug 6).
 
-**Browser preview.** `devserver/static/core/` holds the WASM core, and
-`mount.js` decodes transactions for the existing DOM managers in
-`renderer.js`. DOM measurement backs the `text` and `intrinsic` modes.
-Pointer events go to the core's gesture engine in the page instead of a
-Python arbiter on the host.
+**Browser preview.** `devserver/static/core/` holds the WASM core and
+`mount.js`, which binds its C ABI, installs the page as the core's
+platform, and decodes transactions for the existing DOM managers in
+`renderer.js`. DOM measurement backs the `text` and `intrinsic` modes
+with prototype elements built from the props; a `native` leaf measures as
+the labeled placeholder the page draws for a plugin's view, since plugins
+have no browser widgets. Pointer events go to the core's gesture engine
+in the page instead of a Python arbiter on the host. The page is
+single-threaded, so the core's `measure` and `baseline` callbacks run
+inside the commit that asks, mounting runs in a microtask, deferred work
+on a timer, and the frame clock is `requestAnimationFrame`. Stack screens,
+modal sheets, and the portal layer report their sizes with
+`pn_core_report_container`. `WebTransport` forwards each core call over
+the existing WebSocket and returns the core's reply, so
+`pn_core_measure`, `pn_core_command`, and `pn_core_animate` cost the
+application loop one round trip to the page; the page doesn't validate
+module calls again, because Python validates them before they leave.
 
 ### SDK, codegen, and tooling
 
-- `pn codegen` and `scripts/generate-native-contracts.py` stop generating
-  `PNContracts.swift` and `PNContracts.kt`. Typed `NativeProps`,
-  `NativeValues`, and `NativeModules` stay generated per platform, and
-  each carries the contract fingerprint it was generated from. Plugin
-  contracts join the merged document the core loads; they no longer
-  generate validators.
-- The builder stages `native/core/` beside `native/yoga/` in both native
-  projects, and `pn doctor` reports the core's version and protocol.
+- `pn codegen` and `scripts/generate-native-contracts.py` no longer
+  generate validators. `PNContracts.swift` and `PNContracts.kt` shrink to
+  the fingerprint, protocol and Yoga versions, and a `validateModule`
+  that calls the core. Typed `NativeProps`, `NativeValues`, and
+  `NativeModules` stay generated per platform, and their initializers no
+  longer validate. Plugin contracts join the merged document the core
+  loads.
+- The builder stages `native/core/`, which vendors Yoga, in both native
+  projects; `native/yoga/` is gone.
 - PythonNative Go is rebuilt for protocol 7; its exact-version check
   doesn't change.
-- Profiling reports core phases (`parse`, `validate`, `layout`,
-  `flatten`, `diff`) and the platform's `mount` phase in the Chrome trace,
-  plus counters for mounted and flattened views.
+- Profiling reports the core's `validate`, `commit`, and `layout`
+  durations from acknowledgements and layout messages in the Chrome
+  trace.
 - CI builds the core for the host wheels, the iOS package tests, and the
   Android module tests, and rebuilds the WASM artifact to check for drift.
 
@@ -667,13 +697,12 @@ Python arbiter on the host.
 No compatibility paths or dual implementations are kept.
 
 - **Python:** `bridge/commits.py` (`CommitState`, `ViewOverlay`),
-  `bridge/list_store.py`, `bridge/fake.py`, `layout.py` and
+  `bridge/list_store.py`, the old JSON `FakeTransport`, `layout.py` and
   `docs/api/layout.md`, the Python Yoga path and `SetFrameOp` emission in
   `reconciler/layout_pass.py`, `SetFrameOp` and the `f` op in
   `mutations.py` and `bridge/codec.py`, `codec.encode_transaction`,
-  `BridgeBackend.measure_intrinsic` and `Transport.measure`,
-  `BridgeBackend.compute_layout` and `prepare_layout`, the native
-  `transport.apply` and `transport.animate` channels, the recognizers and
+  `BridgeBackend.measure_intrinsic`, the native `transport.apply`
+  channel, the recognizers and
   `GestureArbiter` in `gestures.py` (lines 773 to 1636), the `pn-animated`
   ticker and Python drivers in `animated.py`, the host-level render
   scheduling in `hosts/native.py` and `hosts/base.py`, and the
@@ -682,26 +711,32 @@ No compatibility paths or dual implementations are kept.
 - **iOS:** `Bridge/PNCommit.swift`, the decoding half of
   `Bridge/PNTransaction.swift`, `Layout/PNLayout.swift`,
   `Components/PNListStore.swift`, `Animation/PNAnimationGraph.swift`, the
-  driver and easing math in `Animation/PNAnimator.swift`,
-  `Generated/PNContracts.swift`, `PNLabel` and `UILabel` in the `Text`
-  manager, live-view `measure` overrides, and `pn_bridge_apply` and
-  `pn_bridge_animate`.
+  driver and easing math in `Animation/PNAnimator.swift`, the generated
+  validators in `Generated/PNContracts.swift`, live-view `measure`
+  overrides, and `pn_bridge_apply`, `pn_bridge_command`,
+  `pn_bridge_animate`, and `pn_bridge_protocol_version`.
 - **Android:** `bridge/CommitState.kt`, `bridge/PNTransaction.kt`,
   `bridge/TransactionApplier.kt`, `layout/NativeLayout.kt`,
   `layout/YogaNode.kt`, `cpp/yoga_jni.cpp`, `components/ListStore.kt`,
   `animation/AnimationGraph.kt`, `animation/AnimationSpecs.kt`, the driver
   math in `animation/PNAnimator.kt`, `gestures/GestureRecognizers.kt`,
-  `gestures/GestureArbiter.kt`, `generated/PNContracts.kt`, live-view
-  `measure` overrides, `PNBridge.apply`, and `PNBridge.animate`.
+  `gestures/GestureArbiter.kt`, `gestures/GestureCoordinator.kt`, the
+  generated validators in `generated/PNContracts.kt`, live-view `measure`
+  overrides on Image, Svg, VirtualList, and StatusBar, `PNBridge.apply`,
+  `command`, and `animate`, and the `androidx.dynamicanimation`
+  dependency.
 - **Browser:** `contracts.js`, `layout.js`, `list-store.js`,
   `animation_graph.js`, `Animator` and commit validation in `renderer.js`,
   and the vendored `yoga/` WASM build (the core includes Yoga).
 - **Codegen:** Swift and Kotlin validator generation in
-  `sdk/contract_codegen.py` and its tests; the `Runtime.capabilities`
-  handshake.
+  `sdk/contract_codegen.py` and its tests.
 - **Tests:** parity tests that compare the platform copies with each
   other (`PNContractParityTests.swift`, the Kotlin and browser
-  equivalents), replaced by core tests and shared fixtures.
+  equivalents), the Python layout engine's tests (`tests/test_layout.py`
+  now runs the same scenarios through the core), and the platform tests
+  of deleted code (`PNCommitTests`, `PNTransactionTests`,
+  `PNAnimationGraphTests`, `AnimationSpecsTest`, `GestureArbiterTest`,
+  `PNTransactionTest`, `ContractFixtureTest`).
 - **Protocol 6.**
 
 ## Alternatives considered
@@ -753,17 +788,18 @@ No compatibility paths or dual implementations are kept.
 
 ## Testing and rollout
 
-- **Core tests through Python.** `tests/core/` drives the host build
+- **Core tests through Python.** `tests/test_core.py` drives the host build
   through the same C ABI the platforms use: contract compilation and
   validation, rejection and rollback, layout fixtures, measurement modes
   and caching, flattening and unflattening, mount transaction encoding,
   list patches, animation drivers against reference curves, and gesture
   recognition from scripted pointer sequences.
-- **Shared fixtures.** `tests/fixtures/core/` pairs commits with expected
-  mount transactions and frames. The Swift, Kotlin, and JavaScript mount
-  decoders read the same transactions in XCTest, JUnit, and the browser
-  suite; `tests/fixtures/gestures/` checks iOS recognizers against the
-  core engine.
+- **Recorded transactions.** `scripts/generate-native-contracts.py`
+  records mount transactions from the host core, with Python's decoding of
+  each, for the Swift decoder tests, and `tests/test_codegen.py` fails
+  when the recording is stale. The Kotlin tests decode transactions the
+  host core produces, and the browser suite decodes the same recording
+  with the page's `DataView` decoder.
 - **Platform tests.** XCTest and JUnit or Robolectric cover the mounting
   layers, `PNTextLayout` measurement and drawing parity, the intrinsic
   cache, the JNI bridge (including an exception thrown during
@@ -802,18 +838,50 @@ No compatibility paths or dual implementations are kept.
   native components, native contracts, debugging, and browser preview)
   change in the same pull request.
 
+## Results
+
+Measured against "Done means" above:
+
+- **One implementation:** met. Commit validation, the shadow tree,
+  layout, flattening, list datasets, animation, and Android and browser
+  gestures run only in the core. Colors and SVG paths are still parsed by
+  each platform, so that item isn't met.
+- **No UI-thread waits on the commit path:** met. No UI-thread entry point
+  takes the commit lock, and module validation reads a published
+  snapshot of the contracts.
+- **Headless tests use the shipping core:** met. The Python suite,
+  including the 80 former Python-layout tests and the gesture suites,
+  runs on the host build.
+- **Line counts:** not met. Hand-written Swift shrank by about 800 lines
+  (11,024 to 10,222) and Kotlin by about 1,300 (12,404 to 11,108), short
+  of 2,500 each, because most of what remains is component managers and
+  modules. The generated validators are gone.
+- **Cold launch:** not measured. The simulator and emulator shared the
+  host with parallel builds, so device timings weren't reliable.
+- **End to end:** all 113 iOS Maestro flows pass on the simulator. The
+  Android build launches and renders the suite through the core, and its
+  81 unit tests pass, but its Maestro flows still need a run on a quieter
+  machine or in CI. The browser preview passes its headless Chrome suite
+  and a manual pass over the e2e app.
+- **Flattening:** across the e2e suite's 118 screens, the core mounts
+  7,576 views where the logical tree has 10,201, 26% fewer
+  (`rfcs/benchmarks/0007-shared-renderer-core.json`).
+
 ## Open questions
 
-- **Emscripten.** Which version to pin, and whether CI installs it with
-  `setup-emsdk` or a cached download. Neither this machine nor CI has it
-  today.
 - **Container sizes on first layout.** Whether laying out a new `Screen`
   or `Modal` against its parent's size until UIKit or Android reports
   real bounds causes a visible second layout, and whether the platform
   should report predicted header and tab bar insets up front.
-- **Intrinsic cache keys.** Which props affect size for each `intrinsic`
-  component. The contract metadata should state them, and a miss that
-  happens on every layout should be a diagnostic.
-- **Android text drawing.** Whether `PNTextView` can keep `TextView`'s
-  accessibility, selection, and link behavior, or whether `Text` keeps a
-  `TextView` that receives the precomputed layout.
+- **Point scale factor.** Yoga rounds to whole points, as the old layout
+  did. A per-platform scale factor would let layout round to device
+  pixels instead.
+
+Resolved during implementation:
+
+- **Emscripten:** 4.0.10, installed in CI with `setup-emsdk`.
+- **Android text drawing:** `Text` keeps `TextView` (and `UILabel` on
+  iOS); only measurement moved off the main thread.
+- **Intrinsic cache keys:** there's no separate cache. Yoga's per-node
+  measurement cache skips a prototype measurement until the node's props
+  or constraints change.

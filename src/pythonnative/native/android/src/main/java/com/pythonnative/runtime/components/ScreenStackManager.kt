@@ -24,7 +24,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.R
-import com.pythonnative.runtime.layout.NativeLayout
+import com.pythonnative.runtime.core.PNCore
 import org.json.JSONObject
 
 /**
@@ -41,16 +41,14 @@ class ScreenManager : ViewManager() {
     override fun createView(context: Context, tag: Long, props: JSONObject): View =
         super.createView(context, tag, props).apply {
             layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-                if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) NativeLayout.containerDidLayout()
-            }
+            PNCore.observeContainer(this, tag)
         }
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
         super.applyProps(view, props, initial)
         val merged = propsOf(view)
         if (initial || props.has("background_color") || props.has("presentation")) applyBackground(view, merged)
         val tag = PNBridge.registry.tagOf(view)
-        val parent = tag?.let { NativeLayout.parent(it) }?.let { PNBridge.registry.get(it) }
+        val parent = tag?.let { PNBridge.registry.get(it)?.parent }?.let { PNBridge.registry.get(it) }
         (parent?.manager as? ScreenStackManager)?.let { stack ->
             stack.noteScreen(parent.view, tag, merged)
             stack.refresh(parent.view)
@@ -75,7 +73,7 @@ class ScreenManager : ViewManager() {
         refreshParent(parent)
     }
     private fun refreshParent(view: View) {
-        PNBridge.registry.tagOf(view)?.let { NativeLayout.parent(it) }?.let { PNBridge.registry.get(it) }?.let {
+        PNBridge.registry.recordFor(view)?.parent?.let { PNBridge.registry.get(it) }?.let {
             (it.manager as? ScreenStackManager)?.refresh(it.view)
         }
     }
@@ -179,7 +177,6 @@ class ScreenStackManager : ComponentManager() {
                 if (manager.isStateSaved) return@post
                 commit(manager)
                 applyHeader()
-                NativeLayout.containerDidLayout()
             }
         }
 
@@ -287,7 +284,8 @@ class ScreenStackManager : ComponentManager() {
         if (ScreenTransitions.isTransparent(props)) stack.transparent.add(tag) else stack.transparent.remove(tag)
     }
 
-    override fun createView(context: Context, tag: Long, props: JSONObject): View = Stack(context)
+    override fun createView(context: Context, tag: Long, props: JSONObject): View =
+        Stack(context).also { PNCore.observeContainer(it.container, tag) }
     override fun insertChild(parent: View, child: View, index: Int) {
         val stack = parent as Stack
         val record = PNBridge.registry.recordFor(child) ?: return

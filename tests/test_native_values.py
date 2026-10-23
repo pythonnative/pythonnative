@@ -196,43 +196,38 @@ def test_media_event_shapes_match_real_native_payloads() -> None:
 
 
 def test_null_and_property_removal_have_distinct_wire_and_native_state() -> None:
-    from pythonnative.bridge import codec
-    from pythonnative.bridge.commits import PROTOCOL_VERSION, CommitError, CommitState
+    from pythonnative.bridge import PROTOCOL_VERSION, codec, contract_document
+    from pythonnative.bridge.fake import FakeTransport
     from pythonnative.mutations import UNSET, CreateOp, UpdateOp
 
-    operations, _ = codec.encode_transaction(
+    operations, _ = codec.build_transaction(
         [
             CreateOp(1, "Picker", {"value": "draft"}),
             UpdateOp(1, {"value": None}),
         ]
     )
-    state = (
-        CommitState()
-        .prepare(
-            {
-                "version": PROTOCOL_VERSION,
-                "application": "null-test",
-                "surface": 1,
-                "revision": 1,
-                "ops": json.loads(operations),
-            }
-        )
-        .publish()
-    )
-    assert state.views[1].props["value"] is None
-    operations, _ = codec.encode_transaction([UpdateOp(1, {"value": UNSET})])
-    assert json.loads(operations) == [["u", 1, {}, ["value"]]]
-    envelope = {
-        "version": PROTOCOL_VERSION,
-        "application": "null-test",
-        "surface": 1,
-        "revision": 2,
-        "ops": json.loads(operations),
-    }
-    state = state.prepare(envelope).publish()
-    assert "value" not in state.views[1].props
-    with pytest.raises(CommitError, match="both set and removed"):
-        state.prepare({**envelope, "revision": 3, "ops": [["u", 1, {"value": "conflict"}, ["value"]]]})
+    assert operations[1] == ["u", 1, {"value": None}, []]
+    transport = FakeTransport(surface=70)
+    transport.core.load_contracts(contract_document(), "host")
+
+    def commit(revision: int, ops: list[Any]) -> dict[str, Any]:
+        envelope = {
+            "version": PROTOCOL_VERSION,
+            "application": "null-test",
+            "surface": 70,
+            "revision": revision,
+            "ops": ops,
+        }
+        return json.loads(transport.commit(json.dumps(envelope)))
+
+    assert commit(1, operations)["ok"]
+    assert transport.views[1].props["value"] is None
+    operations, _ = codec.build_transaction([UpdateOp(1, {"value": UNSET})], {1: "Picker"})
+    assert operations == [["u", 1, {}, ["value"]]]
+    assert commit(2, operations)["ok"]
+    assert "value" not in transport.views[1].props
+    rejected = commit(3, [["u", 1, {"value": "conflict"}, ["value"]]])
+    assert not rejected["ok"] and "both set and removed" in rejected["error"]
 
 
 def test_unserializable_native_props_are_errors_unless_declared_python_only() -> None:

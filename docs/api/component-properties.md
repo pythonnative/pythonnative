@@ -2,9 +2,10 @@
 
 All visual and layout properties are passed via the `style` dict (or list of dicts) to element functions. Behavioural properties (callbacks, data, content) remain as keyword arguments.
 
-Layout properties are interpreted by Yoga beside the native widgets, with
+Layout properties are interpreted by Yoga in the renderer core, with
 platform measurements for text and controls. Visual properties are applied by
-component managers. The browser preview uses Yoga WebAssembly and DOM widgets.
+component managers. The browser preview runs the same core as WebAssembly and
+mounts DOM widgets.
 See [Layout engine](../concepts/layout.md) for the shared rules and platform
 differences.
 

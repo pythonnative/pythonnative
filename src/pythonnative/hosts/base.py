@@ -1,8 +1,9 @@
 """Platform-independent application surface host.
 
 A host mounts one logical application tree, publishes native lifecycle and
-viewport changes, schedules Python work on the application thread, and caches
-navigation restoration state. Logical screen containers present the tree's
+viewport changes, and caches navigation restoration state. Renders run in
+the reconciler's own flush on the application thread; the host adds no
+scheduling of its own. Logical screen containers present the tree's
 screen roots through native navigation controllers and fragments.
 """
 
@@ -104,7 +105,6 @@ class ScreenHost:
         self._focus_listeners: List[Callable[[bool], None]] = []
         self._is_rendering = False
         self._render_queued = False
-        self._render_scheduled = False
         self._redbox_visible = False
         self._refresh_task: asyncio.Task[Any] | None = None
 
@@ -121,10 +121,6 @@ class ScreenHost:
     def _initial_viewport_size(self) -> Optional[Tuple[float, float]]:
         """A plausible viewport size before the first layout (see ``_seed_viewport``)."""
         return None
-
-    def _schedule_render_async(self) -> bool:
-        """Defer a render to the platform's next UI turn; ``False`` renders inline."""
-        return False
 
     def _show_error(self, payload: Dict[str, Any]) -> None:
         """Show a host-owned diagnostic view (native hosts override)."""
@@ -336,24 +332,11 @@ class ScreenHost:
             self.reconciler.set_viewport_size(float(size[0]), float(size[1]))
 
     def request_render(self) -> None:
-        """Request a render pass (queued if one is in progress)."""
+        """Render now, from the reconciler's flush (queued if a pass is in progress)."""
         if self.reconciler is None:
             return
         if self._is_rendering:
             self._render_queued = True
-            return
-        if self._schedule_render_async():
-            return
-        self._re_render()
-
-    def flush_scheduled_render(self) -> None:
-        """Run a render deferred by ``_schedule_render_async`` (platform UI turn)."""
-        self._render_scheduled = False
-        if self.reconciler is None:
-            return
-        if self._is_rendering:
-            self._render_queued = True
-            self._schedule_render_async()
             return
         self._re_render()
 
@@ -573,9 +556,3 @@ class ScreenHost:
                     raise
 
         self._refresh_task = get_loop().create_task(remount())
-
-
-def flush_hosts(hosts: Sequence[ScreenHost]) -> None:
-    """Run deferred renders for ``hosts`` (platform UI-thread drains call this)."""
-    for host in hosts:
-        host.flush_scheduled_render()

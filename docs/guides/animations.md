@@ -29,7 +29,7 @@ without re-rendering the component tree on every frame.
 
 The animated component attaches the value to its native view's
 animation bindings after mount. From there, the **native driver**
-takes over whenever it can.
+takes over.
 
 ## The native driver
 
@@ -38,24 +38,25 @@ its connected values, arithmetic, interpolation, and style bindings into
 an animation graph. Starting or awaiting a timing, spring, or decay driver
 sends its specification to the renderer.
 
-On mobile, Swift and Kotlin evaluate the graph and apply its bindings on
-the UI thread. Derived values, color interpolation, and native scroll and
-gesture inputs can update without Python work on every frame. The browser
-implements graph evaluation in JavaScript. Completion is delivered back to
-Python to settle the value and resolve an awaiting task.
+The renderer core evaluates the graph and runs every driver on the
+platform's UI thread, at the display's refresh rate, on iOS, Android, and
+in the browser preview alike. Each frame it hands the platform the
+animated prop values to apply. Derived values, color interpolation, and
+native scroll and gesture inputs update without Python work on every
+frame. Completion is delivered back to Python to settle the value and
+resolve an awaiting task.
 
-The Python-ticked fallback (a ~60 Hz loop) is used automatically
-when:
+Animations that need Python still run in the core:
 
-- the value isn't attached to any mounted view (pure data animation),
-- a Python listener is registered via `add_listener` (listeners want
-  per-frame values, and only the ticker provides those),
-- a callable `easing` is supplied (custom curves can't cross the
-  bridge), or
-- the platform declines the animation.
+- A value that isn't attached to any mounted view (pure data animation),
+  or that has a Python listener registered via `add_listener`, asks the
+  core to report its value each frame, and Python updates the value and
+  runs the listeners.
+- A callable `easing` is sampled into a curve the core interpolates.
 
-Either way the API and the observable end state are identical, so you
-never have to opt in or out manually.
+Headless tests run the host build of the same core, driven by the
+virtual clock, so tests and devices share one implementation of the
+animation math. You never have to opt in or out manually.
 
 ## Fade in on mount
 
@@ -226,9 +227,8 @@ bind it into styles like any `AnimatedValue`, but drive the underlying
 source value.
 
 Derived nodes are part of the serialized animation graph. Arithmetic and
-interpolation can therefore run in the renderer alongside their source
-driver. A backend without graph support uses the Python ticker for
-derived bindings.
+interpolation therefore run in the renderer core alongside their source
+driver.
 
 ## Scroll-driven animation with `Animated.event`
 
@@ -289,12 +289,13 @@ pn.Animated.timing(y, to=0, easing="bounce")   # the names also work as strings
 ```
 
 Each curve is a serializable [`EasingSpec`][pythonnative.EasingSpec],
-so it crosses the bridge as data and the native drivers run it on the
+so it crosses the bridge as data and the core's drivers run it on the
 UI thread; bezier control points travel as numbers, not as a string.
 A misspelled easing name raises `ValueError` instead of falling back
 silently. `Easing.ease` follows React Native (the same curve as
 `ease_in`), not CSS `ease`. A plain callable `progress -> eased` is
-still accepted for custom curves, at the cost of ticking in Python.
+still accepted for custom curves; Python samples it once into a curve the
+core interpolates.
 
 ## Decay (fling)
 

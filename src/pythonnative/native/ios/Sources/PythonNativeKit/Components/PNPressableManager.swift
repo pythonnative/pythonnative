@@ -27,7 +27,7 @@ public final class PNPressableManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! PressableProps(props, validated: true)
+        let typed = PressableProps(props)
         PNViewStyler.applyCommon(view, props)
         if typed.has_disabled {
             let disabled = typed.disabled ?? false

@@ -4,8 +4,9 @@ Every commit pass produces an ordered list of small mutation ops
 referencing integer **tags** (stable per-view identifiers), and the
 whole list is applied in a single
 [`apply_mutations`][pythonnative.native_views.bridge_backend.BridgeBackend.apply_mutations]
-call. This mirrors React Native's Fabric mounting layer: the diff phase
-is pure, and the native side sees one coherent transaction per commit.
+call. The renderer core validates the batch, lays it out, and turns it
+into a mount transaction for the platform's UI thread (RFC 0007); frames
+never travel as ops.
 
 Why tags instead of view objects?
 
@@ -22,13 +23,11 @@ Op ordering rules (the reconciler guarantees these):
 2. `InsertOp` ops appear after both the parent and child exist.
 3. `DestroyOp` ops are emitted children-first; handlers detach the view
    from its parent as part of destruction.
-4. `SetFrameOp` ops are only emitted for frames that actually changed
-   since the last layout pass (frame diffing).
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Union
 
 __all__ = [
     "UNSET",
@@ -37,7 +36,6 @@ __all__ = [
     "UpdateOp",
     "InsertOp",
     "DestroyOp",
-    "SetFrameOp",
     "Mutation",
 ]
 
@@ -125,32 +123,5 @@ class DestroyOp:
     tag: int
 
 
-@dataclass(frozen=True)
-class SetFrameOp:
-    """Position and size the view registered under ``tag``.
-
-    Coordinates are points relative to the parent's content origin,
-    exactly as computed by the layout engine.
-
-    Attributes:
-        tag: Unique integer identity of the target view.
-        x: Horizontal origin offset in points relative to the parent.
-        y: Vertical origin offset in points relative to the parent.
-        width: View width in points.
-        height: View height in points.
-    """
-
-    tag: int
-    x: float
-    y: float
-    width: float
-    height: float
-
-    @property
-    def frame(self) -> Tuple[float, float, float, float]:
-        """Return ``(x, y, width, height)`` as a tuple."""
-        return (self.x, self.y, self.width, self.height)
-
-
-Mutation = Union[CreateOp, UpdateOp, InsertOp, DestroyOp, SetFrameOp]
+Mutation = Union[CreateOp, UpdateOp, InsertOp, DestroyOp]
 """Union of every op type carried by a commit transaction."""

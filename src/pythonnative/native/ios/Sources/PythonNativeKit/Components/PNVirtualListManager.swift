@@ -1,4 +1,72 @@
 import UIKit
+import PNCore
+
+/// A list's keyed rows as the renderer core's mount side holds them.
+///
+/// The core validated each dataset patch when it was committed; `apply`
+/// publishes the next one when the list's update reaches the main thread.
+/// Keys are cached until a structural edit; extents and sticky flags are
+/// read from the core.
+final class PNListData {
+    var tag: Int64 = 0
+    private(set) var keys: [String] = []
+    private(set) var indices: [String: Int] = [:]
+    private(set) var stickyIndices: [Int] = []
+    private(set) var revision = 0
+
+    /// Publish the next queued patch; returns whether it was a reset, or nil when none was queued.
+    /// A fresh store (a recreated list view) starts from the dataset the core already published.
+    @discardableResult
+    func apply() -> (reset: Bool, structural: Bool)? {
+        guard let raw = pn_core_list_apply(PNCore.handle, PNCore.surface, tag) else {
+            guard revision == 0 else { return nil }
+            let published = Int(pn_core_list_revision(PNCore.handle, PNCore.surface, tag))
+            guard published > 0 else { return nil }
+            revision = published
+            reloadKeys()
+            return (true, true)
+        }
+        let edits = PNJSON.decodeObject(String(cString: raw))
+        pn_core_free(raw)
+        revision = PNProps.int(edits["revision"]) ?? revision
+        let reset = edits["reset"] as? Bool ?? false
+        let structural = reset || !((edits["edits"] as? [Any]) ?? []).isEmpty
+        if structural {
+            reloadKeys()
+        } else {
+            reloadSticky()
+        }
+        return (reset, structural)
+    }
+
+    private func reloadKeys() {
+        let count = Int(pn_core_list_count(PNCore.handle, PNCore.surface, tag))
+        keys = (0..<count).map { index in
+            guard let key = pn_core_list_key(PNCore.handle, PNCore.surface, tag, Int64(index)) else { return "" }
+            defer { pn_core_free(key) }
+            return String(cString: key)
+        }
+        indices = Dictionary(keys.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { first, _ in first })
+        reloadSticky()
+    }
+
+    private func reloadSticky() {
+        stickyIndices = keys.indices.filter { pn_core_list_sticky(PNCore.handle, PNCore.surface, tag, Int64($0)) != 0 }
+    }
+
+    func extent(_ index: Int) -> Double { pn_core_list_extent(PNCore.handle, PNCore.surface, tag, Int64(index)) }
+    func isSticky(_ index: Int) -> Bool { stickyIndices.contains(index) }
+
+    /// The sticky row at or before `index`, or -1.
+    func sticky(at index: Int) -> Int {
+        var low = 0, high = stickyIndices.count
+        while low < high {
+            let mid = (low + high) / 2
+            if stickyIndices[mid] <= index { low = mid + 1 } else { high = mid }
+        }
+        return low > 0 ? stickyIndices[low - 1] : -1
+    }
+}
 
 private final class PNListCell: UICollectionViewCell {
     var rowKey = ""
@@ -44,7 +112,7 @@ private final class PNStickyListLayout: UICollectionViewFlowLayout {
 }
 
 private final class PNCollectionList: UICollectionView, UICollectionViewDelegateFlowLayout, UICollectionViewDataSource, UICollectionViewDataSourcePrefetching {
-    let store = PNListStore()
+    let store = PNListData()
     var keys: [String] { store.keys }
     private var measuring = false
     var heights: [String: CGFloat] = [:]
@@ -75,7 +143,7 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
         return cell
     }
     private func request(_ index: Int) {
-        guard keys.indices.contains(index), roots[keys[index]] == nil, store.rows[keys[index]]?.sticky != true else { return }
+        guard keys.indices.contains(index), roots[keys[index]] == nil, !store.isSticky(index) else { return }
         PNBridge.shared.emitEvent(tag: listTag, name: "on_bind_row", args: [[
             "index": index, "key": keys[index], "revision": store.revision, "width": bounds.width,
             "extent": horizontal ? bounds.width : bounds.height, "sticky": store.sticky(at: index),
@@ -92,7 +160,7 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
         }
     }
     func anchor() -> (String, CGFloat)? {
-        guard let path = indexPathsForVisibleItems.filter { keys.indices.contains($0.item) && store.rows[keys[$0.item]]?.sticky != true }.sorted().first,
+        guard let path = indexPathsForVisibleItems.filter({ keys.indices.contains($0.item) && !store.isSticky($0.item) }).sorted().first,
               keys.indices.contains(path.item),
               let frame = layoutAttributesForItem(at: path)?.frame else { return nil }
         return (keys[path.item], horizontal ? contentOffset.x - frame.minX : contentOffset.y - frame.minY)
@@ -119,22 +187,19 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
         }
     }
     func update(_ props: [String: Any], changed: Set<String>) {
-        if let packet = props["dataset"] as? [String: Any], changed.contains("dataset") {
-            // PNCommit preflights this exact packet before any widget mutation.
-            let patch = try! store.prepare(packet)
+        if changed.contains("dataset"), props["dataset"] is [String: Any] {
             let saved = anchor()
-            let geometryChanged = patch.order != nil || patch.changed.contains {
-                store.rows[$0.key]?.extent != $0.value.extent || store.rows[$0.key]?.sticky != $0.value.sticky
-            }
-            store.publish(patch)
-            if patch.reset { heights.removeAll() }
-            else { for key in patch.deleted { heights.removeValue(forKey: key) } }
-            if patch.order != nil {
-                // Multiple moves use sequential indices; a reload preserves the
-                // logical keyed roots and avoids UIKit's pre/post-index ambiguity.
-                reloadData()
-            }
-            if geometryChanged {
+            let before = Set(keys)
+            if let patch = store.apply() {
+                if patch.reset { heights.removeAll() }
+                else if patch.structural {
+                    for key in before.subtracting(keys) { heights.removeValue(forKey: key) }
+                }
+                if patch.structural {
+                    // Multiple moves use sequential indices; a reload preserves the
+                    // logical keyed roots and avoids UIKit's pre/post-index ambiguity.
+                    reloadData()
+                }
                 collectionViewLayout.invalidateLayout()
                 restore(saved)
             }
@@ -162,11 +227,11 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
     @objc private func refreshRequested() { PNBridge.shared.emitEvent(tag: listTag, name: "on_refresh", args: []) }
     func collectionView(_ collectionView: UICollectionView, layout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let key = keys[indexPath.item]
-        let extent = heights[key] ?? CGFloat(store.rows[key]?.extent ?? 44)
+        let extent = heights[key] ?? CGFloat(store.extent(indexPath.item) > 0 ? store.extent(indexPath.item) : 44)
         return horizontal ? CGSize(width: max(1, extent), height: bounds.height) : CGSize(width: bounds.width, height: max(1, extent))
     }
     func emitWindow() {
-        let visible = indexPathsForVisibleItems.map { $0.item }.filter { !(store.rows[store.keys[$0]]?.sticky ?? false) }.sorted()
+        let visible = indexPathsForVisibleItems.map { $0.item }.filter { store.keys.indices.contains($0) && !store.isSticky($0) }.sorted()
         let first = visible.first ?? 0, last = visible.last ?? -1
         let extent = horizontal ? bounds.width : bounds.height
         let sticky = store.sticky(at: first)
@@ -193,12 +258,6 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
 
 /// Native recycled containers display children of the application's logical tree.
 public final class PNVirtualListManager: PNComponentManager {
-    static func validateDataset(tag: Int64, props: [String: Any], initial: Bool) -> Bool {
-        guard let packet = props["dataset"] else { return !initial }
-        guard let data = packet as? [String: Any] else { return false }
-        let store = initial ? PNListStore() : (PNViewRegistry.shared.resolve(tag)?.view as? PNCollectionList)?.store
-        return store.flatMap { try? $0.prepare(data) } != nil
-    }
     private static var rowOwners: [Int64: (CGSize) -> Void] = [:]
     public override func makeView(props: [String: Any]) -> UIView { PNCollectionList() }
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
@@ -206,6 +265,7 @@ public final class PNVirtualListManager: PNComponentManager {
         guard let list = view as? PNCollectionList else { return }
         let state = PNViewState.existing(for: view)!
         list.listTag = state.tag
+        list.store.tag = state.tag
         list.showsVerticalScrollIndicator = state.props["shows_scroll_indicator"] as? Bool ?? true
         list.showsHorizontalScrollIndicator = list.showsVerticalScrollIndicator
         if initial || props.keys.contains(where: { ["dataset", "horizontal", "refresh_control"].contains($0) }) {
@@ -237,9 +297,6 @@ public final class PNVirtualListManager: PNComponentManager {
         list.delegate = nil
         list.prefetchDataSource = nil
         list.dataSource = nil
-    }
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
-        CGSize(width: maxW < 1e6 ? maxW : 0, height: maxH < 1e6 ? maxH : 0)
     }
     public override func command(view: UIView, name: String, args: [String: Any]) -> Any? {
         guard let list = view as? PNCollectionList else { return nil }

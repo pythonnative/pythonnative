@@ -9,12 +9,12 @@ second, with no simulator boot, no device deploy, and no native build.
 pn preview
 ```
 
-The browser renderer speaks the same bridge protocol as the Swift and
-Kotlin renderers. Your components, hooks, reconciliation, logical navigation,
-and async work run in the `pn preview` Python process. The page implements
-widgets with DOM elements, layout with Yoga WebAssembly, and animation
-graphs with JavaScript. Platform controls, fonts, and device APIs differ
-from those in a mobile app.
+The page runs the same renderer core as the iOS and Android apps,
+compiled to WebAssembly, so commits are validated, laid out, and flattened
+by the code that ships. Your components, hooks, reconciliation, logical
+navigation, and async work run in the `pn preview` Python process. The page
+mounts DOM elements in place of native widgets. Platform controls, fonts,
+and device APIs differ from those in a mobile app.
 
 ## Quick start
 
@@ -100,13 +100,14 @@ scheme, and console state are remembered per browser.
    background thread: HTTP for the page and its assets, WebSocket for
    the page and for dev clients.
 2. Installs a [`WebTransport`][pythonnative.bridge.web.WebTransport] as
-   the bridge transport. Transactions the reconciler commits become
-   `["apply", request_id, commit]` messages to the page; the page's events come back
-   as `["cb", ...]` callbacks. Commits acknowledge exact revisions, and native
-   Yoga WebAssembly layout returns a batch of changed frames.
+   the bridge transport. It forwards the calls a device transport makes
+   into the renderer core (commits, layout reads, commands, and animation
+   requests) over the WebSocket to the core in the page, and the core's
+   messages come back as callbacks. Commits acknowledge exact revisions
+   with the frames of observed views.
 3. Runs Python callbacks and tasks on the standard application asyncio loop.
-   The page owns DOM widgets and Yoga WebAssembly layout. Network I/O and Python
-   work execute independently of the browser's UI thread.
+   The page owns the core, DOM widgets, and the frame clock. Network I/O and
+   Python work execute independently of the browser's UI thread.
 4. When the page connects, tells it the entry module. The page asks
    the `Host` module to create a screen, exactly as
    `PNViewController` and `PNScreenFragment` do, and a
@@ -116,11 +117,16 @@ scheme, and console state are remembered per browser.
    [`apply_reload`][pythonnative.hot_reload.apply_reload], the same
    function the on-device dev client uses.
 
-Layout is owned by the engine, not the DOM: the
-[flex layout engine](../concepts/layout.md) computes an absolute frame
-for every element, and the page positions each element with that frame.
-Text is measured by the page with the same font it renders, so wrapping
-and intrinsic sizes match what you see.
+Layout is owned by the core, not the DOM: the
+[flex layout engine](../concepts/layout.md) computes a frame for every
+mounted element, and the page positions each element with that frame.
+Text and controls are measured by the page with the same fonts and
+elements it renders, so wrapping and intrinsic sizes match what you see.
+Views that only affect layout are flattened, as on device, so a plain
+`Row` or `Column` often has no element of its own; the element inspector
+then selects the nearest mounted view. See
+[The native bridge](../concepts/bridge.md#the-browser-preview) for how the
+page plays the core's platform.
 
 ### Navigation
 
@@ -198,12 +204,12 @@ Faithful:
 - Text wrapping and intrinsic sizing.
 - Colors (hex, rgb(a), named, `{"light", "dark"}`), border radius,
   borders, opacity, shadows, and overflow clipping.
-- `Animated` timing, spring, and decay, run through the same
-  `animate` protocol the native animators implement; transforms,
-  opacity, and colors update through the page's animation graph.
-- Gestures: the page streams raw pointer events to the Python
-  [gesture arbiter](gestures.md). Mobile renderers recognize gestures
-  in Swift and Kotlin.
+- `Animated` timing, spring, and decay, run by the core's animator in
+  the page, the same code the mobile apps use; transforms, opacity, and
+  colors update on the page's animation frames.
+- Gestures: the page forwards pointer events to the core's
+  [gesture engine](gestures.md), the one Android uses. iOS uses UIKit's
+  recognizers.
 - Scrolling, `FlatList` / `SectionList` windowing, pull to refresh
   (drag the content down at the top, or scroll up past it with a
   trackpad or mouse wheel), and scroll-driven `Animated.event` bindings.

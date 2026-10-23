@@ -132,7 +132,6 @@ nav:
     - Element: api/element.md
     - Hosts: api/hosts.md
     - Reconciler: api/reconciler.md
-    - Layout: api/layout.md
     - Style: api/style.md
     - Theme: api/theme.md
     - Store: api/store.md

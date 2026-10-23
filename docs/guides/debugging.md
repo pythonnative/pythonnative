@@ -66,7 +66,8 @@ input on a phone.
 ## While paused
 
 The paused thread is the app's Python thread. The native UI keeps
-running: scrolling, native animations, and gestures still move, but taps
+running: scrolling, animations, and gestures still move, and the UI thread
+finishes mounting any commit the renderer core already accepted, but taps
 that call Python wait until you continue, and Fast Refresh waits too.
 The dev client's network threads are excluded from the debugger, so the
 session stays connected while you inspect variables.
@@ -74,6 +75,23 @@ session stays connected while you inspect variables.
 Watch expressions and the debug console evaluate on the paused thread.
 To run code on the live application loop instead, with `await`, use the
 REPL in [DevTools' Console](devtools.md#console).
+
+## Native view debuggers
+
+Xcode's view hierarchy debugger and Android Studio's Layout Inspector show
+the views the platform mounted, which can differ from your component tree.
+The renderer core doesn't mount a `View`, `Row`, `Column`, or `Spacer` that
+only positions its children (see
+[View flattening](../concepts/layout.md#view-flattening)); its children
+sit in the nearest mounted ancestor, with frames offset accordingly. A
+`test_id`, an accessibility prop, a background, or any other prop that
+affects drawing or input keeps a view mounted, so add one to a wrapper you
+want to find in the inspector, or set `PN_FLATTEN=0` in the environment
+to mount every view while you debug.
+
+When the core rejects a commit, nothing is applied, and the `CommitError`
+names the operation, the component, and the property: "Native commit 1
+rejected: invalid op 0: unknown Text prop colour".
 
 ## Other editors
 

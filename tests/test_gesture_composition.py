@@ -5,10 +5,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
+from gesture_harness import GestureArbiter
+
 from pythonnative.gestures import (
     Exclusive,
     Fling,
-    GestureArbiter,
     LongPress,
     Pan,
     Pinch,

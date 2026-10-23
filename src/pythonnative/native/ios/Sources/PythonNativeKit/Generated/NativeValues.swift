@@ -114,9 +114,9 @@ public enum NativeDecodeError: Error, LocalizedError {
     }
 }
 
-/// A generated normalized props decoder. Wire validation precedes mutation.
+/// A generated props decoder. The renderer core validated the values before mounting.
 public protocol PNNativeProps {
-    init(_ values: [String: Any], partial: Bool, validated: Bool) throws
+    init(_ values: [String: Any], partial: Bool)
 }
 
 /// Encode generated Codable values directly into bridge values. This avoids a

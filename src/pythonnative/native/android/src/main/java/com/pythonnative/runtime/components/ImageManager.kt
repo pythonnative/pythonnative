@@ -14,7 +14,7 @@ import android.widget.ImageView
 import com.pythonnative.runtime.assets.PNAssets
 import com.pythonnative.runtime.bridge.PNLog
 import com.pythonnative.runtime.bridge.str
-import com.pythonnative.runtime.layout.NativeLayout
+import com.pythonnative.runtime.core.PNCore
 import org.json.JSONObject
 
 /**
@@ -28,7 +28,7 @@ import org.json.JSONObject
  * either. `fade_duration` (ms) fades a newly decoded source in;
  * `headers` are sent with network requests.
  */
-class ImageManager : TypedComponentManager<ImageProps>({ values, partial, validated -> ImageProps(values, partial, validated) }) {
+class ImageManager : TypedComponentManager<ImageProps>({ values, partial -> ImageProps(values, partial) }) {
     private val assetViews = java.util.Collections.newSetFromMap(java.util.WeakHashMap<ImageView, Boolean>())
     private var unsubscribe: (() -> Unit)? = null
 
@@ -124,7 +124,7 @@ class ImageManager : TypedComponentManager<ImageProps>({ values, partial, valida
             if (bitmap != null) {
                 onBitmap(bitmap)
                 if (report) emitLoaded(iv)
-                PNBridge.registry.tagOf(iv)?.let { NativeLayout.invalidate(it) }
+                reportIntrinsic(iv)
             } else if (report) {
                 PNComponentEvents.Image.on_error(iv, error ?: "load failed")
             }
@@ -162,6 +162,20 @@ class ImageManager : TypedComponentManager<ImageProps>({ values, partial, valida
         if (hasEvent(iv, "on_load_end")) PNComponentEvents.Image.on_load_end(iv)
     }
 
+    /**
+     * Tell the core the loaded image's size, which sizes an `Image` without
+     * an explicit width or height. Decoded bitmaps carry a density, so their
+     * intrinsic size is the source's logical size (see `ImageLoader.decodeStream`).
+     */
+    private fun reportIntrinsic(iv: ImageView) {
+        val tag = PNBridge.registry.tagOf(iv) ?: return
+        val drawable = iv.drawable ?: return
+        val density = iv.context.resources.displayMetrics.density
+        if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
+            PNCore.reportIntrinsic(tag, drawable.intrinsicWidth / density, drawable.intrinsicHeight / density)
+        }
+    }
+
     private fun emitLoaded(view: ImageView) {
         val drawable = view.drawable ?: return
         val density = view.context.resources.displayMetrics.density.toDouble()
@@ -192,27 +206,5 @@ class ImageManager : TypedComponentManager<ImageProps>({ values, partial, valida
         stateOf(view).remove("pending_uri")
         stateOf(view).remove("shown_source")
         (view as? ImageView)?.let { assetViews.remove(it) }
-    }
-
-    override fun measure(view: View, maxWidth: Double, maxHeight: Double): FloatArray {
-        val iv = view as ImageView
-        val drawable = iv.drawable ?: return floatArrayOf(0f, 0f)
-        val density = view.context.resources.displayMetrics.density
-        // Decoded bitmaps carry a density so their intrinsic size is the
-        // source's logical size (see ImageLoader.decodeStream).
-        var w = drawable.intrinsicWidth / density
-        var h = drawable.intrinsicHeight / density
-        if (w <= 0f || h <= 0f) return floatArrayOf(0f, 0f)
-        val maxW = if (maxWidth.isFinite() && maxWidth < 1e6) maxWidth.toFloat() else Float.MAX_VALUE
-        val maxH = if (maxHeight.isFinite() && maxHeight < 1e6) maxHeight.toFloat() else Float.MAX_VALUE
-        if (w > maxW) {
-            h *= maxW / w
-            w = maxW
-        }
-        if (h > maxH) {
-            w *= maxH / h
-            h = maxH
-        }
-        return floatArrayOf(w, h)
     }
 }

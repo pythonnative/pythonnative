@@ -2,13 +2,16 @@
 //
 // Python (`pythonnative.bridge.web.WebTransport`) sends JSON arrays over
 // one WebSocket. Fire-and-forget messages carry no id; requests carry an
-// id in slot 1 and are answered with ["res", id, result]. In the other
-// direction the page raises `callback(kind, tag, name, payload)` as
-// ["cb", ...]; as on device, Python never answers a callback.
+// id in slot 1 and are answered with ["res", id, result]. Requests are
+// the renderer core's C ABI (`load_contracts`, `commit`, `layout`,
+// `command`, `animate`, `measure`) and native module calls (`call`). In
+// the other direction the page raises `callback(kind, tag, name, payload)`
+// as ["cb", ...] for every message the core emits and every module
+// result; as on device, Python never answers a callback.
 //
 // Payloads that the native protocol carries as JSON *text* stay text
-// here too (`args`, `request`, `payload`, `result`), so the page and
-// Python reuse their existing codecs unchanged.
+// here too (envelopes, `args`, `request`, `payload`, `result`), so the
+// core parses them once and Python reuses its codecs unchanged.
 
 export class Bridge {
   constructor(url) {
@@ -99,7 +102,7 @@ export class Bridge {
     const handler = this.handlers[kind];
     if (!handler) {
       console.warn("[pn] unhandled message kind", kind);
-      if (kind !== "apply" && message.length > 1 && typeof message[1] === "number") {
+      if (message.length > 1 && typeof message[1] === "number") {
         this.send(["res", message[1], null]);
       }
       return;

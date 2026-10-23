@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, List, Optional, Sequence, TypeVar, Union, cast, overload
 
-from ..bridge.list_store import ListRow
 from ..component import builtin_component, component, memo
 from ..element import Element
 from ..hooks import (
@@ -29,6 +28,20 @@ T = TypeVar("T")
 
 ItemSeparator = Union[Callable[[], Element], Element, None]
 """``item_separator`` value: an element (reused for every gap) or a zero-argument factory."""
+
+
+@dataclass(frozen=True)
+class ListRow:
+    """Wire metadata for one logical row; application values stay in Python."""
+
+    key: str
+    revision: int
+    extent: float
+    sticky: bool = False
+
+    def wire(self) -> list[Any]:
+        """Return the compact row record the renderer core validates."""
+        return [self.key, self.revision, self.extent, self.sticky]
 
 
 def _separator_element(separator: ItemSeparator) -> Optional[Element]:

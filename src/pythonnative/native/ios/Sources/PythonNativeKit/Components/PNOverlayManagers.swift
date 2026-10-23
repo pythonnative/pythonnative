@@ -70,8 +70,6 @@ public final class PNModalManager: PNComponentManager {
 
     public override func setFrame(view: UIView, x: Double, y: Double, w: Double, h: Double) {}
 
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize { .zero }
-
     private func present(_ placeholder: UIView, _ state: PNViewState) {
         let props = state.props
         let controller = PNModalViewController()
@@ -85,7 +83,8 @@ public final class PNModalManager: PNComponentManager {
         }
         let style = PNProps.string(PNProps.value(props, "presentation_style")) ?? "page_sheet"
         let isOverlay = style == "overlay" || PNProps.bool(PNProps.value(props, "transparent")) == true
-        let content = UIView(frame: controller.view.bounds)
+        let content = PNContainerReportingView(frame: controller.view.bounds)
+        content.reportedTag = state.tag
         content.backgroundColor = isOverlay ? .clear : PNColor.parse(PNProps.value(props, "background_color")) ?? .systemBackground
         content.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         controller.view.addSubview(content)
@@ -195,8 +194,23 @@ final class PNModalViewController: UIViewController, UIAdaptivePresentationContr
     }
 }
 
+/// A view that reports its frame to the renderer core as the container a
+/// detached root lays out in (a modal's content, a portal).
+class PNContainerReportingView: UIView {
+    var reportedTag: Int64 = 0
+    private var lastFrame = CGRect.null
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard reportedTag != 0 else { return }
+        let frame = window.map { convert(bounds, to: $0) } ?? bounds
+        guard frame != lastFrame else { return }
+        lastFrame = frame
+        PNCoreBridge.reportContainer(tag: reportedTag, view: self)
+    }
+}
+
 /// Overlay view that only claims touches landing on one of its subviews.
-final class PNPortalView: UIView {
+final class PNPortalView: PNContainerReportingView {
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         for sub in subviews where !sub.isHidden && sub.alpha > 0.01 && sub.isUserInteractionEnabled {
             if sub.frame.contains(point) { return true }
@@ -214,6 +228,10 @@ public final class PNPortalManager: PNComponentManager {
         return overlay
     }
 
+    public override func didCreate(view: UIView, tag: Int64, props: [String: Any]) {
+        (view as? PNPortalView)?.reportedTag = tag
+    }
+
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
         PNViewStyler.applyCommon(view, props)
         if !initial { ensureAttached(view) }
@@ -225,8 +243,6 @@ public final class PNPortalManager: PNComponentManager {
     }
 
     public override func setFrame(view: UIView, x: Double, y: Double, w: Double, h: Double) {}
-
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize { .zero }
 
     private func ensureAttached(_ overlay: UIView) {
         guard let host = PNWindow.topViewController()?.view else { return }
@@ -278,7 +294,7 @@ public final class PNStatusBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        let typed = try! StatusBarProps(props, validated: true)
+        let typed = StatusBarProps(props)
 
         if let hidden = typed.hidden {
             PNStatusBarState.hidden = hidden
@@ -307,6 +323,4 @@ public final class PNStatusBarManager: PNComponentManager {
     }
 
     public override func setFrame(view: UIView, x: Double, y: Double, w: Double, h: Double) {}
-
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize { .zero }
 }

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 import pytest
@@ -159,20 +158,18 @@ def test_timing_serializes_named_and_bezier_easings(backend: _RecordingBackend) 
     assert wire == ["ease_out", "bounce", [0.2, 0.8, 0.2, 1.0], "ease_in_out"]
 
 
-def test_callable_easing_disables_the_native_driver(backend: _RecordingBackend) -> None:
+def test_callable_easing_is_sampled_for_the_core(backend: _RecordingBackend) -> None:
     v = AnimatedValue(0.0)
     v.attach(7, "opacity")
-    handle = Animated.timing(v, to=1.0, duration=30, easing=lambda t: t * t)
-    handle.start()
-    assert backend.native_started == []
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline and v.value < 0.99:
-        time.sleep(0.01)
-    assert abs(v.value - 1.0) < 0.05
+    Animated.timing(v, to=1.0, duration=30, easing=lambda t: t * t).start()
+    _tag, _id, _prop, spec = backend.native_started[0]
+    samples = spec["easing"]["samples"]
+    assert len(samples) == 64 and samples[0] == 0.0 and samples[-1] == 1.0
+    assert abs(samples[32] - (32 / 63) ** 2) < 1e-9
 
 
 @pytest.mark.asyncio
-async def test_timing_with_bezier_easing_runs_on_python_ticker() -> None:
+async def test_timing_with_bezier_easing_runs_headless() -> None:
     v = AnimatedValue(0.0)
     seen: list = []
     v.add_listener("x", seen.append)

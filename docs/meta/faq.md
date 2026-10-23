@@ -13,8 +13,9 @@ accessibility labels, roles, and testing on each deployment target.
 
 The component model is React-style (functions plus hooks plus a
 reconciler) so you get a familiar declarative API on top of those
-native widgets. Python runs on its own application thread and communicates
-with the native UI through a versioned bridge.
+native widgets. Python runs on its own application thread and commits through a
+versioned bridge to a shared C++ renderer core, which validates and lays out
+each commit before the platform's UI thread mounts it.
 
 ## Can I write Android-only or iOS-only code?
 
@@ -60,10 +61,10 @@ extra Python code. Step-by-step instructions live in
 For **previewing**, yes. `pn preview` renders your app in a browser tab
 inside a phone frame, with Fast Refresh on every save. It's the fastest
 inner loop: see your real UI and iterate in seconds without booting a
-simulator or deploying to a device. The page speaks the same bridge
-protocol as the Swift and Kotlin runtimes. It shares Python components,
-hooks, reconciliation, and logical navigation with mobile apps; the page
-implements widgets in the DOM and layout with Yoga WebAssembly. See the
+simulator or deploying to a device. The page runs the same renderer core as
+the mobile apps, compiled to WebAssembly, and shares Python components,
+hooks, reconciliation, and logical navigation with them; it implements
+widgets in the DOM. See the
 [Browser preview guide](../guides/browser-preview.md).
 
 The browser preview is a **development tool**, not a production target:
@@ -114,13 +115,13 @@ bundles the installed copy directly.
 
 ## Where do `flex`, `padding`, and `position: "absolute"` actually run?
 
-In the Yoga C++ engine compiled into each mobile runtime. Python sends
-styles through the bridge; native widgets supply intrinsic measurements,
-and the renderer returns changed frames to Python. The browser uses Yoga
-WebAssembly, while headless tests use the Python host binding in
-`pythonnative.layout`. The layout rules are shared, but platform fonts
-and controls can have different intrinsic sizes. See
-[Layout engine](../concepts/layout.md).
+In the renderer core, a C++ library with Yoga built in that every target
+links: the iOS and Android apps, the browser preview (as WebAssembly), and
+the `pythonnative._core` extension headless tests use. Python sends styles
+in each commit; the core lays out off the UI thread, asks the platform to
+measure text and controls, and returns changed frames to Python. The
+layout rules are shared, but platform fonts and controls can have
+different intrinsic sizes. See [Layout engine](../concepts/layout.md).
 
 ## How is state shared across screens?
 

@@ -7,12 +7,14 @@ private final class PNLogicalScreen: UIView {
         controller?.navigationItem.leftBarButtonItem = headerSlots["left"].map { UIBarButtonItem(customView: $0) }
         controller?.navigationItem.rightBarButtonItem = headerSlots["right"].map { UIBarButtonItem(customView: $0) }
     }
-    private var lastSize = CGSize.zero
+    private var lastFrame = CGRect.null
     override func layoutSubviews() {
         super.layoutSubviews()
-        if bounds.size != lastSize {
-            lastSize = bounds.size
-            PNLayout.containerDidLayout()
+        // A stack screen is a detached root: it lays out in the bounds UIKit gives it.
+        let frame = window.map { convert(bounds, to: $0) } ?? bounds
+        if frame != lastFrame, let state = PNViewState.existing(for: self) {
+            lastFrame = frame
+            PNCoreBridge.reportContainer(tag: state.tag, view: self)
         }
     }
 }
@@ -356,7 +358,6 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
             presenter.present(nav, animated: nav.dismissAnimated && !restoring) { [weak self] in
                 self?.transitioning = false
                 self?.schedule()
-                PNLayout.containerDidLayout()
             }
             nav.presentationController?.delegate = self
         }
