@@ -95,7 +95,7 @@ def check_distributions(directory: Path, expected_version: str) -> None:
                 prefix = f"pythonnative-{version}/"
                 names = set(archive.getnames())
                 required = {prefix + "src/" + name for name in PACKAGE_FILES}
-                required |= {prefix + "setup.py", prefix + "tests/test_core.py"}
+                required |= {prefix + "setup.py", prefix + "tests/test_core.py", prefix + "tests/contracts/validation.json"}
                 if missing := required - names:
                     raise ValueError(f"Incomplete source distribution: {sorted(missing)}")
                 metadata_file = archive.extractfile(prefix + "PKG-INFO")

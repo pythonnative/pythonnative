@@ -89,7 +89,7 @@ std::string hex_color(const Array& from, const Array& to, double t) {
     for (size_t i = 0; i < count; ++i) {
         double a = from[i].as_double(), b = to[i].as_double();
         double channel = std::round(a + (b - a) * std::min(1.0, std::max(0.0, t)));
-        char buffer[4];
+        char buffer[16];  // two digits; sized for any int so compilers can't warn about truncation
         std::snprintf(buffer, sizeof(buffer), "%02X", static_cast<int>(std::min(255.0, std::max(0.0, channel))));
         out += buffer;
     }

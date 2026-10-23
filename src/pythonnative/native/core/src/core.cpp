@@ -48,8 +48,18 @@ std::string Core::load_contracts(const char* document, const char* platform) {
     if (document == nullptr || !parse_json(document, parsed, error)) return "invalid contract JSON: " + error;
     std::lock_guard<std::mutex> lock(commit_mutex_);
     if (!contracts_.load(parsed, platform != nullptr ? platform : "host", error)) return error;
-    std::atomic_store(&published_contracts_, std::make_shared<const Contracts>(contracts_));
+    publish_contracts(std::make_shared<const Contracts>(contracts_));
     return std::string();
+}
+
+void Core::publish_contracts(std::shared_ptr<const Contracts> contracts) {
+    std::lock_guard<std::mutex> lock(published_mutex_);
+    published_contracts_ = std::move(contracts);
+}
+
+std::shared_ptr<const Contracts> Core::published_contracts() const {
+    std::lock_guard<std::mutex> lock(published_mutex_);
+    return published_contracts_;
 }
 
 std::string Core::fingerprint() {
@@ -62,7 +72,7 @@ void Core::reset() {
         std::lock_guard<std::mutex> lock(commit_mutex_);
         surfaces_.clear();
         contracts_.clear();
-        std::atomic_store(&published_contracts_, std::make_shared<const Contracts>());
+        publish_contracts(std::make_shared<const Contracts>());
     }
     {
         std::lock_guard<std::mutex> lock(queue_mutex_);
@@ -234,7 +244,7 @@ bool Core::validate_module(const char* module, const char* method, const char* a
     Value parsed = Value::object({});
     std::string error;
     if (arguments != nullptr && *arguments && !parse_json(arguments, parsed, error)) return false;
-    std::shared_ptr<const Contracts> contracts = std::atomic_load(&published_contracts_);
+    std::shared_ptr<const Contracts> contracts = published_contracts();
     return contracts->validate_module(module != nullptr ? module : "", method != nullptr ? method : "", parsed);
 }
 

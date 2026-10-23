@@ -69,8 +69,12 @@ private:
     std::mutex commit_mutex_;
     Contracts contracts_;
     // An immutable copy for module calls, which arrive on the UI thread
-    // and may not take the commit lock. Replaced atomically on each load.
+    // and may not take the commit lock. Its mutex only guards swapping the
+    // pointer, never compilation or validation.
     std::shared_ptr<const Contracts> published_contracts_ = std::make_shared<const Contracts>();
+    mutable std::mutex published_mutex_;
+    void publish_contracts(std::shared_ptr<const Contracts> contracts);
+    std::shared_ptr<const Contracts> published_contracts() const;
     std::map<int64_t, std::unique_ptr<Surface>> surfaces_;
     std::atomic<bool> flattening_{true};
 

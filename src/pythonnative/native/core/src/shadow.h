@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <memory>

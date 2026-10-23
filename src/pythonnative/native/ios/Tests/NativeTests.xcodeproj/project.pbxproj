@@ -21,27 +21,25 @@
 		A0000000000000000000000D = {isa = PBXBuildFile; fileRef = B0000000000000000000000E; };
 		A0000000000000000000000E = {isa = PBXBuildFile; fileRef = B0000000000000000000000F; };
 		A0000000000000000000000F = {isa = PBXBuildFile; fileRef = B00000000000000000000010; };
-		A00000000000000000000010 = {isa = PBXBuildFile; fileRef = B00000000000000000000011; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		B00000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHost/main.swift; sourceTree = "<group>"; };
-		B00000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNAnimationGraphTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNCoreHarness.swift; sourceTree = "<group>"; };
 		B00000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNColorTests.swift; sourceTree = "<group>"; };
-		B00000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNCommitTests.swift; sourceTree = "<group>"; };
+		B00000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNMountTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000005 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNContractFixtureTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000006 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNGestureTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000007 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNLifecycleTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000008 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNManagerTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000009 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNModuleTests.swift; sourceTree = "<group>"; };
-		B0000000000000000000000A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNTransactionTests.swift; sourceTree = "<group>"; };
+		B0000000000000000000000A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNTextLayoutTests.swift; sourceTree = "<group>"; };
 		B0000000000000000000000B = {isa = PBXFileReference; lastKnownFileType = folder; path = Fixtures; sourceTree = "<group>"; };
 		B0000000000000000000000C = {isa = PBXFileReference; explicitFileType = wrapper.application; path = TestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B0000000000000000000000D = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = PythonNativeKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B0000000000000000000000E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNRecordFixtures.swift; sourceTree = "<group>"; };
 		B0000000000000000000000F = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNAssetTests.swift; sourceTree = "<group>"; };
 		B00000000000000000000010 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNParityTests.swift; sourceTree = "<group>"; };
-		B00000000000000000000011 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PNContractParityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -52,7 +50,7 @@
 		};
 		D00000000000000000000002 = {
 			isa = PBXGroup;
-			children = (B00000000000000000000002, B00000000000000000000003, B00000000000000000000004, B00000000000000000000005, B00000000000000000000006, B00000000000000000000007, B00000000000000000000008, B00000000000000000000009, B0000000000000000000000A, B0000000000000000000000B, B0000000000000000000000E, B0000000000000000000000F, B00000000000000000000010, B00000000000000000000011);
+			children = (B00000000000000000000002, B00000000000000000000003, B00000000000000000000004, B00000000000000000000005, B00000000000000000000006, B00000000000000000000007, B00000000000000000000008, B00000000000000000000009, B0000000000000000000000A, B0000000000000000000000B, B0000000000000000000000E, B0000000000000000000000F, B00000000000000000000010);
 			path = PythonNativeKitTests;
 			sourceTree = "<group>";
 		};
@@ -105,7 +103,7 @@
 
 /* Begin build phases and target dependency */
 		A10000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001); runOnlyForDeploymentPostprocessing = 0; };
-		A10000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, A00000000000000000000006, A00000000000000000000007, A00000000000000000000008, A00000000000000000000009, A0000000000000000000000A, A0000000000000000000000D, A0000000000000000000000E, A0000000000000000000000F, A00000000000000000000010); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005, A00000000000000000000006, A00000000000000000000007, A00000000000000000000008, A00000000000000000000009, A0000000000000000000000A, A0000000000000000000000D, A0000000000000000000000E, A0000000000000000000000F); runOnlyForDeploymentPostprocessing = 0; };
 		A10000000000000000000003 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A0000000000000000000000C); runOnlyForDeploymentPostprocessing = 0; };
 		A10000000000000000000004 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A0000000000000000000000B); runOnlyForDeploymentPostprocessing = 0; };
 		E10000000000000000000001 = {isa = PBXTargetDependency; target = E00000000000000000000001; targetProxy = E10000000000000000000002; };

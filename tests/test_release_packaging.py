@@ -69,6 +69,7 @@ def distributions(tmp_path: Path) -> Path:
         **dict.fromkeys(("src/" + name for name in checker.PACKAGE_FILES), b"source"),
         "setup.py": b"build configuration",
         "tests/test_core.py": b"renderer core tests",
+        "tests/contracts/validation.json": b"[]",
         "PKG-INFO": METADATA.encode(),
         "pyproject.toml": f'[project]\nversion = "{VERSION}"\n'.encode(),
     }
