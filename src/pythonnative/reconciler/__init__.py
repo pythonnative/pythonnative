@@ -7,8 +7,8 @@ implementation detail:
 - ``core``: render, diff, commit.
 - ``boundaries``: ``ErrorBoundary``
   and ``Suspense``.
-- ``layout_pass``: the flexbox
-  pass and frame diffing.
+- ``layout_pass``: publishing the
+  frames the renderer core lays out.
 - ``children``: minimal move
   planning for keyed child lists.
 - ``vnode``: the mounted-tree node and
