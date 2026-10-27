@@ -932,10 +932,14 @@ void Surface::write_mount(Transaction& transaction, bool reset, const std::vecto
         if (!parent.mounted) continue;
         std::vector<int64_t> desired;
         desired_children(parent, desired);
-        std::unordered_set<int64_t> wanted(desired.begin(), desired.end());
+        // Plan against what the platform holds right now, not the final list:
+        // views that flatten away are deleted only after every insert, and a
+        // child leaving for a parent processed later is still here. Indices
+        // that ignored them would land moved views beside the wrong sibling.
         std::vector<int64_t> before;
         for (int64_t child : parent.mounted_children) {
-            if (wanted.count(child) != 0 && is_mounted(child)) before.push_back(child);
+            const ShadowNode* held = node(child);
+            if (held != nullptr && held->mounted && held->mounted_in == tag) before.push_back(child);
         }
         for (const auto& [child, index] : plan_moves(before, desired)) {
             out.u8(kMountInsert);
@@ -945,6 +949,7 @@ void Surface::write_mount(Transaction& transaction, bool reset, const std::vecto
             ++count;
             moved.push_back(child);
         }
+        for (int64_t child : desired) nodes_.at(child)->mounted_in = tag;
         parent.mounted_children = std::move(desired);
     }
     for (int64_t tag : vanished) {

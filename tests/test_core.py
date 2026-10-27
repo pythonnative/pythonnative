@@ -220,6 +220,24 @@ def test_detached_roots_lay_out_in_reported_containers() -> None:
     assert window[1] == 64.0
 
 
+def test_loading_more_contracts_keeps_mounted_components_valid() -> None:
+    # Plugins register components after the first render, so contracts load
+    # again while views exist. Existing nodes must keep pointing at their
+    # components however many new ones the load adds.
+    surface = Surface()
+    surface.commit(["c", 1, "Column", {}], ["c", 2, "Text", {"text": "hi"}], ["i", 1, 2, 0])
+    document = json.loads(contract_document())
+    text = document["components"]["Text"]
+    document["components"] = {f"PluginLabel{index}": dict(text) for index in range(200)}
+    surface.core.load_contracts(json.dumps(document), "host")
+    surface.commit(["u", 2, {"text": "bye"}, []])
+    assert surface.view(2).props["text"] == "bye"
+    ack = surface.commit(["u", 2, {"colour": "#fff"}, []], ok=False)
+    assert "unknown Text prop colour" in ack["error"]
+    surface.commit(["c", 3, "PluginLabel7", {"text": "plugin"}], ["i", 1, 3, 1])
+    assert surface.view(3).type_name == "PluginLabel7"
+
+
 # ----------------------------------------------------------------------
 # Flattening and the mount diff
 # ----------------------------------------------------------------------
@@ -281,6 +299,95 @@ def test_children_of_special_containers_never_flatten() -> None:
     surface = Surface()
     surface.commit(["c", 1, "ScrollView", {}], ["c", 2, "Column", {"padding": 4}], ["i", 1, 2, 0])
     assert 2 in surface.transport.views
+
+
+@pytest.mark.parametrize(
+    "painted, change, mounted",
+    [
+        (True, ["u", 3, {}, ["background_color"]], [2, 5, 4]),  # flattens away while it moves
+        (False, ["u", 3, {"background_color": "#0f0"}, []], [2, 5, 3]),  # mounts while it moves
+    ],
+)
+def test_moving_a_wrapper_while_it_flattens_keeps_sibling_order(
+    painted: bool, change: List[Any], mounted: List[int]
+) -> None:
+    # Within one transaction a wrapper that flattens away is deleted only after
+    # the inserts, and its children leave only when their new parent is
+    # processed, so insert indices must count the views still in place.
+    surface = Surface()
+    surface.commit(
+        ["c", 1, "Column", {}],
+        ["c", 2, "Text", {"text": "a"}],
+        ["c", 3, "View", {"background_color": "#f00"} if painted else {}],
+        ["c", 4, "Text", {"text": "b"}],
+        ["c", 5, "Text", {"text": "c"}],
+        ["i", 3, 4, 0],
+        ["i", 1, 2, 0],
+        ["i", 1, 3, 1],
+        ["i", 1, 5, 2],
+    )
+    surface.commit(["i", 1, 3, 2], change)
+    assert [child.tag for child in surface.view(1).children] == mounted
+
+
+@pytest.mark.parametrize("seed", range(60))
+def test_flattening_matches_the_logical_tree_under_random_edits(seed: int) -> None:
+    import random
+
+    rng = random.Random(seed)
+    surface = Surface(surface=1000 + seed)
+    children: Dict[int, List[int]] = {1: []}
+    painted: Dict[int, bool] = {1: True}
+    next_tag = 2
+    surface.commit(["c", 1, "Column", {}])
+
+    def flat(tag: int) -> List[int]:
+        out: List[int] = []
+        for child in children.get(tag, []):
+            out += flat(child) if child in children and not painted[child] else [child]
+        return out
+
+    for _ in range(20):
+        ops: List[List[Any]] = []
+        for _ in range(rng.randint(1, 3)):
+            containers = list(children)
+            roll = rng.random()
+            if roll < 0.45:
+                tag, next_tag = next_tag, next_tag + 1
+                parent = rng.choice(containers)
+                index = rng.randint(0, len(children[parent]))
+                if rng.random() < 0.5:
+                    ops.append(["c", tag, "Text", {"text": str(tag)}])
+                else:
+                    painted[tag] = rng.random() < 0.5
+                    children[tag] = []
+                    ops.append(["c", tag, "View", {"background_color": "#f00"} if painted[tag] else {}])
+                ops.append(["i", parent, tag, index])
+                children[parent].insert(index, tag)
+            elif roll < 0.75:
+                views = [tag for tag in children if tag != 1]
+                if views:
+                    tag = rng.choice(views)
+                    painted[tag] = not painted[tag]
+                    ops.append(
+                        ["u", tag, {"background_color": "#0f0"}, []]
+                        if painted[tag]
+                        else ["u", tag, {}, ["background_color"]]
+                    )
+            else:
+                parent = rng.choice(containers)
+                if len(children[parent]) > 1:
+                    tag = rng.choice(children[parent])
+                    children[parent].remove(tag)
+                    index = rng.randint(0, len(children[parent]))
+                    children[parent].insert(index, tag)
+                    ops.append(["i", parent, tag, index])
+        if not ops:
+            continue
+        surface.commit(*ops)
+        for tag in children:
+            if painted[tag]:
+                assert [child.tag for child in surface.view(tag).children] == flat(tag), (seed, ops)
 
 
 def test_mount_order_and_update_normalization() -> None:

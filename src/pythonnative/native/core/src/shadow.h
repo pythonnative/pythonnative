@@ -83,6 +83,7 @@ struct ShadowNode {
     bool flattened = false;
     bool mounted = false;
     std::vector<int64_t> mounted_children;
+    int64_t mounted_in = 0;  // the mounted view the platform holds this one in
     bool has_mounted_frame = false;
     Frame mounted_frame{};
 };

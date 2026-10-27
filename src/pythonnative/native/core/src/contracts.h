@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -107,9 +108,12 @@ private:
 
     std::vector<SchemaNode> schemas_;
     std::unordered_map<std::string, int> schema_index_;
-    std::vector<Field> fields_;
+    // Shadow nodes keep pointers to components (and code holds field
+    // references across loads), so later loads must never move them: a
+    // deque keeps existing elements in place as it grows.
+    std::deque<Field> fields_;
     std::unordered_map<std::string, int> field_index_;
-    std::vector<Component> components_;
+    std::deque<Component> components_;
     std::unordered_map<std::string, uint16_t> component_index_;
     std::unordered_map<std::string, int> modules_;  // "Module.method" -> object schema
     std::string platform_;
