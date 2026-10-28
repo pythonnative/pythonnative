@@ -16,7 +16,7 @@ open class PNComponentManager {
         let view = makeView(props: props)
         view.translatesAutoresizingMaskIntoConstraints = true
         let state = PNViewState.attach(view, tag: tag, typeName: String(describing: type(of: self)))
-        state.props = PNComponentManager.stripNulls(props)
+        state.props = props
         apply(view: view, props: props, initial: true)
         if let gestures = PNProps.value(props, "gestures") {
             PNGestureCoordinator.shared.wire(view: view, specs: gestures)
@@ -36,11 +36,7 @@ open class PNComponentManager {
     open func update(view: UIView, changed: [String: Any]) {
         if let state = PNViewState.existing(for: view) {
             for (key, value) in changed {
-                if value is NSNull {
-                    state.props.removeValue(forKey: key)
-                } else {
-                    state.props[key] = value
-                }
+                state.props[key] = value
             }
         }
         apply(view: view, props: changed, initial: false)
@@ -93,7 +89,6 @@ open class PNComponentManager {
     open func destroy(view: UIView) {
         teardown(view: view)
         PNGestureCoordinator.shared.unwire(view: view)
-        PNAnimator.shared.forget(view: view)
         view.layer.removeAllAnimations()
         if detachesOnDestroy && view.superview != nil {
             view.removeFromSuperview()
@@ -134,6 +129,28 @@ open class PNComponentManager {
         }
     }
 
+    /// The size of a widget built from `props`, for the renderer core's
+    /// `intrinsic` measurement. Runs on the main thread. The default
+    /// configures a fresh prototype widget with the props (so the size
+    /// never lags a pending mount) and asks `measure(view:maxW:maxH:)`.
+    open func measureIntrinsic(props: [String: Any], tag: Int64, maxW: CGFloat, maxH: CGFloat) -> CGSize {
+        var clean = props
+        clean.removeValue(forKey: "gestures")
+        clean.removeValue(forKey: "_pn_events")
+        let prototype = createView(tag: 0, props: clean)
+        if let live = PNViewRegistry.shared.view(for: tag) { preparePrototype(prototype, live: live) }
+        return measure(view: prototype, maxW: maxW.isFinite ? maxW : 1e6, maxH: maxH.isFinite ? maxH : 1e6)
+    }
+
+    /// Copy native-owned content (a text input's typed text) from the live widget into a measurement prototype.
+    open func preparePrototype(_ prototype: UIView, live: UIView) {}
+
+    /// A plugin's thread-safe measurement for components declared with
+    /// `measurement="native"`. Runs on the core's worker, never on main.
+    open func measureNative(props: [String: Any], maxW: CGFloat, maxH: CGFloat) -> CGSize {
+        .zero
+    }
+
     /// Natural size under the constraints (either may be `1e6` / infinite).
     open func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize {
         let mw = PNComponentManager.clampConstraint(maxW)
@@ -152,19 +169,9 @@ open class PNComponentManager {
         nil
     }
 
-    /// Apply one Python-driven animation frame immediately.
+    /// Apply one animated value the core's animator wrote.
     open func setAnimatedProperty(view: UIView, prop: String, value: Any?) {
         PNAnimator.shared.applyValue(view: view, prop: prop, value: value)
-    }
-
-    /// Start a natively driven animation. Returns `false` to fall back to Python.
-    open func startAnimation(view: UIView, id: Int64, prop: String, spec: [String: Any]) -> Bool {
-        PNAnimator.shared.start(view: view, id: id, prop: prop, spec: spec)
-    }
-
-    /// Cancel a native animation, returning the presentation value when known.
-    open func cancelAnimation(view: UIView, id: Int64) -> Any? {
-        PNAnimator.shared.cancel(id: id)
     }
 
     // MARK: - Helpers
@@ -182,5 +189,27 @@ open class PNComponentManager {
 
     static func stripNulls(_ props: [String: Any]) -> [String: Any] {
         props.filter { !($0.value is NSNull) }
+    }
+}
+
+/// Typed native implementations consume generated props rather than decoding
+/// wire dictionaries themselves. Shared styling still operates on resolved keys.
+open class PNTypedComponentManager<Props: PNViewProps>: PNComponentManager where Props: PNNativeProps {
+    public init(_ props: Props.Type) { super.init() }
+
+    public final override func apply(view: UIView, props: [String: Any], initial: Bool) {
+        // The renderer core validated the transaction before it was mounted.
+        let decoded = Props(props, partial: true)
+        applyTyped(view: view, props: decoded, raw: props, initial: initial)
+    }
+
+    /// Typed props plus the raw changed dictionary they were decoded from.
+    /// The default forwards to the typed-only overload.
+    open func applyTyped(view: UIView, props: Props, raw: [String: Any], initial: Bool) {
+        applyTyped(view: view, props: props, initial: initial)
+    }
+
+    open func applyTyped(view: UIView, props: Props, initial: Bool) {
+        PNViewStyler.applyCommon(view, props.values)
     }
 }

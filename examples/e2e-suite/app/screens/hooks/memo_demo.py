@@ -9,21 +9,21 @@ unless their own props change.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _render_counts = {"a": 0, "b": 0}
 
 
 @pn.memo
 @pn.component
-def _MemoA() -> pn.Element:
+def _MemoA() -> pn.Node:
     _render_counts["a"] += 1
     return pn.Text(f"MemoA render count: {_render_counts['a']}", style=pn.style(font_weight="600"))
 
 
 @pn.memo
 @pn.component
-def _MemoB(label: str = "x") -> pn.Element:
+def _MemoB(label: str = "x") -> pn.Node:
     _render_counts["b"] += 1
     return pn.Text(
         f"MemoB label={label} render count: {_render_counts['b']}",
@@ -32,7 +32,7 @@ def _MemoB(label: str = "x") -> pn.Element:
 
 
 @pn.component
-def MemoDemo() -> pn.Element:
+def MemoDemo() -> pn.Node:
     """Render two memoized children and a parent counter that should not re-render them."""
     parent_count, set_parent_count = pn.use_state(0)
     b_label, set_b_label = pn.use_state("x")
@@ -47,21 +47,21 @@ def MemoDemo() -> pn.Element:
         _render_counts["a"] = 0
         _render_counts["b"] = 0
 
-    return demo_screen(
+    return DemoScreen(
         "memo",
         "Memoized children stay still when parent state changes.",
-        section(
+        DemoSection(
             "Memo identity",
-            result_text("Parent renders", parent_count),
+            ResultText("Parent renders", parent_count),
             _MemoA(),
             _MemoB(label=b_label),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Bump parent", on_press=lambda: set_parent_count(parent_count + 1)),
                 pn.Button(
                     "Toggle B label",
                     on_press=lambda: set_b_label("y" if b_label == "x" else "x"),
                 ),
             ),
-            hint("Bumping parent should NOT bump MemoA's count. Toggling B label DOES bump MemoB's count."),
+            Hint("Bumping parent should NOT bump MemoA's count. Toggling B label DOES bump MemoB's count."),
         ),
     )

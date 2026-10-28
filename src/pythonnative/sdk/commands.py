@@ -40,7 +40,6 @@ def commands(name: str) -> dict[str, Any]:
             "can_go_back": _command(result=boolean),
             "can_go_forward": _command(result=boolean),
             "get_url": _command(result=string),
-            "eval_js": _command(required=("script",), script=string),
             "inject_javascript": _command(required=("script",), script=string),
             "load_url": _command(required=("url",), url=string),
         }

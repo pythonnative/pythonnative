@@ -21,6 +21,7 @@ from pythonnative.hooks import (
 )
 from pythonnative.reconciler import Reconciler
 from pythonnative.testing import FakeBackend as MockBackend
+from pythonnative.testing import settle
 
 
 @pytest.fixture(autouse=True)
@@ -36,6 +37,7 @@ def _reset_metrics() -> Generator[None, None, None]:
 
 def test_use_window_dimensions_returns_current_value() -> None:
     pm.set_window_dimensions(390.0, 844.0)
+    settle()
     rendered: List[Any] = []
 
     @component
@@ -45,8 +47,9 @@ def test_use_window_dimensions_returns_current_value() -> None:
 
     backend = MockBackend()
     Reconciler(backend).mount(comp())
-    assert rendered[0] == (390.0, 844.0)
+    assert rendered[0] == (390.0, 844.0, 1.0, 1.0)
     assert rendered[0].width == 390.0 and rendered[0].height == 844.0
+    assert rendered[0].scale == 1.0 and rendered[0].font_scale == 1.0
 
 
 def test_use_window_dimensions_re_renders_on_change() -> None:
@@ -64,13 +67,19 @@ def test_use_window_dimensions_re_renders_on_change() -> None:
     initial_render_count = len(rendered)
 
     pm.set_window_dimensions(800.0, 600.0)
+    settle()
 
     assert len(rendered) > initial_render_count
-    assert rendered[-1] == (800.0, 600.0)
+    assert (rendered[-1].width, rendered[-1].height) == (800.0, 600.0)
+
+    pm.set_window_dimensions(800.0, 600.0, scale=2.0)
+    settle()
+    assert rendered[-1].scale == 2.0, "a density change alone re-renders"
 
 
 def test_use_safe_area_insets_returns_current_value() -> None:
     pm.set_safe_area_insets(top=44.0, left=0.0, bottom=34.0, right=0.0)
+    settle()
     rendered: List[Any] = []
 
     @component
@@ -99,12 +108,14 @@ def test_use_safe_area_insets_re_renders_on_change() -> None:
     before = len(rendered)
 
     pm.set_safe_area_insets(top=20.0, left=0.0, bottom=10.0, right=0.0)
+    settle()
     assert len(rendered) > before
     assert rendered[-1].top == 20.0
 
 
 def test_use_keyboard_height_returns_current_value() -> None:
     pm.set_keyboard_height(280.0)
+    settle()
     rendered: List[float] = []
 
     @component
@@ -132,6 +143,7 @@ def test_use_keyboard_height_re_renders_on_change() -> None:
     before = len(rendered)
 
     pm.set_keyboard_height(300.0)
+    settle()
     assert len(rendered) > before
     assert rendered[-1] == 300.0
 
@@ -150,6 +162,7 @@ def test_safe_area_view_pads_all_edges_by_default() -> None:
     from pythonnative.components import SafeAreaView, Text
 
     pm.set_safe_area_insets(top=44.0, left=2.0, bottom=34.0, right=3.0)
+    settle()
     backend = MockBackend()
     Reconciler(backend).mount(SafeAreaView(Text("safe")))
     props = _safe_area_props(backend)
@@ -163,6 +176,7 @@ def test_safe_area_view_edges_subset_and_user_padding_added() -> None:
     from pythonnative.components import SafeAreaView, Text
 
     pm.set_safe_area_insets(top=44.0, left=0.0, bottom=34.0, right=0.0)
+    settle()
     backend = MockBackend()
     Reconciler(backend).mount(SafeAreaView(Text("safe"), edges=("top",), style={"padding": 16}))
     props = _safe_area_props(backend)
@@ -181,5 +195,6 @@ def test_safe_area_view_updates_when_insets_change() -> None:
     assert "padding_top" not in _safe_area_props(backend)
 
     pm.set_safe_area_insets(top=20.0, left=0.0, bottom=0.0, right=0.0)
+    settle()
     rec.flush_dirty()
     assert _safe_area_props(backend).get("padding_top") == 20.0

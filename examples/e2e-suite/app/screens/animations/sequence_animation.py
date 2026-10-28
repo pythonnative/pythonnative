@@ -8,11 +8,11 @@ after both complete.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def SequenceAnimationDemo() -> pn.Element:
+def SequenceAnimationDemo() -> pn.Node:
     """Render a box with sequence (fade in, fade out) animations."""
     opacity = pn.use_animated_value(0.0)
     status, set_status = pn.use_state("idle")
@@ -27,22 +27,22 @@ def SequenceAnimationDemo() -> pn.Element:
         )
         set_status("done")
 
-    return demo_screen(
+    return DemoScreen(
         "Animated.sequence",
         "Chain two timings; status flips once the chain finishes.",
-        section(
+        DemoSection(
             "Sequence demo",
-            result_text("Status", status),
+            ResultText("Status", status),
             pn.Animated.View(
                 pn.Text("sequence-box label", style=pn.style(color="#FFFFFF", font_weight="700")),
-                style=pn.style(
-                    opacity=opacity,
-                    padding=20,
-                    background_color="#7C3AED",
-                    border_radius=12,
-                ),
+                style={
+                    "opacity": opacity,
+                    "padding": 20,
+                    "background_color": "#7C3AED",
+                    "border_radius": 12,
+                },
             ),
-            buttons_row(pn.Button("Run sequence", on_press=lambda: pn.run_async(run()))),
-            hint("Maestro taps 'Run sequence' and asserts 'Status: done'."),
+            ButtonsRow(pn.Button("Run sequence", on_press=run)),
+            Hint("Maestro taps 'Run sequence' and asserts 'Status: done'."),
         ),
     )

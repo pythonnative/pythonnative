@@ -26,7 +26,7 @@ tree:
 
 - If their `type` matches, **update**: emit an
   [`UpdateOp`][pythonnative.mutations.UpdateOp] carrying only the
-  props that changed (removed props arrive as `None`).
+  props that changed (removed props arrive as `UNSET`; `None` is explicit null).
 - If their `type` differs, **replace**: emit destroy ops for the old
   subtree, create ops for the new one, and recurse into its children.
 - For container elements, match children by `key` first and by
@@ -46,15 +46,19 @@ Native scrolling and supported animation drivers run independently; see
 Rendering records changes in an undo journal and stages native operations,
 callbacks, refs, and effects. A render that fails restores the committed tree
 without publishing those changes. At the end of the pass, staged mutations are
-applied through a single
-[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
-call. The renderer validates the versioned transaction before applying it
-and acknowledges the committed revision. Layout then runs beside the native
-widgets and returns changed frames. Headless backends instead use the host
-Yoga binding and receive `SetFrameOp` mutations.
+applied through a single `apply_mutations` call on the view backend (see
+[Native views](../api/native_views.md)). The renderer core validates the
+versioned transaction before applying it, lays it out with Yoga, and
+acknowledges the committed revision with the changed frames of observed
+views. Headless tests commit to the same core.
 
-`flush_dirty` combines work from several dirty components into a batch.
-See [Commits](bridge.md#commits) for validation and failure handling.
+`flush_dirty` combines work from several dirty components into a batch, and
+state setters schedule that flush rather than rendering inline, so every
+setter call in one callback lands in one pass. Layout and passive effects
+that raise are routed to the nearest error boundary, and a flush that
+re-schedules itself more than fifty times raises
+`RuntimeError("Too many re-renders")` through the same path. See
+[Commits](bridge.md#commits) for validation and failure handling.
 
 Callable props never enter the transaction at all. They're registered
 in the [`EventRegistry`][pythonnative.events.EventRegistry] keyed by
@@ -68,7 +72,7 @@ lists but breaks down when items are inserted or reordered:
 
 ```python
 @pn.component
-def Inbox():
+def Inbox() -> pn.Node:
     msgs, set_msgs = pn.use_state([("a", "Hi"), ("b", "Hello")])
     return pn.Column(
         *[pn.Text(text, key=mid) for mid, text in msgs],
@@ -85,6 +89,12 @@ the others without re-rendering them.
     `key=i` for `i in range(len(items))` is no better than no key at
     all. Use a stable identifier (database id, file path, etc.).
 
+Built-in factories take `key=` directly. To key one of your own
+components, call [`.with_key()`][pythonnative.element.Element.with_key]
+on its element: `MessageRow(message).with_key(message.id)`. A user
+component doesn't accept `key=`, because a key identifies the element
+rather than being a prop.
+
 ## Function components
 
 A `@pn.component` function is treated as an element type just like
@@ -93,16 +103,55 @@ A `@pn.component` function is treated as an element type just like
 1. It looks up the function's hook state (or creates a fresh slot).
 2. It calls the function with the current props inside an active hook
    context.
-3. It recursively reconciles whatever the function returned: a single
-   [`Element`][pythonnative.Element], a `list` of elements (which
-   mount as siblings at the component's position), or `None` (which
-   mounts nothing).
+3. It recursively reconciles whatever the function returned, a
+   [`Node`][pythonnative.element.Node]: a single
+   [`Element`][pythonnative.Element], a `list` or other iterable of
+   nodes (which mount as siblings at the component's position), or
+   `None` (which mounts nothing).
 
 Hook slots are matched by their position in the function body, which is
 why hooks must be called at the top level (not inside `if`/`for`). In
 dev mode the reconciler verifies the hook call sequence on every
 render and raises
 [`HookOrderError`][pythonnative.HookOrderError] on a mismatch.
+
+## Skipping unchanged subtrees
+
+A component re-renders when its own state changes, when its parent
+re-renders it with new props, or when a context it reads changes. Two
+checks let the reconciler skip work when a parent re-renders:
+
+- **Identity bailout.** When a child element is the *identical* object
+  the node rendered last time, and the node has no pending work of its
+  own, the reconciler reuses the node and its whole subtree without
+  calling any component functions. Element objects are immutable, so
+  identity proves nothing changed. Descendants that do have pending
+  state updates are already in the dirty queue and render in their own
+  pass, and context consumers are marked through the provider's
+  registry (below), so skipping a subtree never hides an update.
+- **Memo.** A [`@pn.memo`][pythonnative.memo] component whose new props
+  equal its previous props (shallowly, by default) is skipped even when
+  the parent built a new element for it.
+
+The identity bailout needs no API. It applies whenever a component
+passes through elements it didn't build, which is the common case for
+containers:
+
+```python
+@pn.component
+def Card(*children: pn.Node, title: str) -> pn.Node:
+    expanded, set_expanded = pn.use_state(True)
+    return pn.Column(
+        pn.Button(title, on_press=lambda: set_expanded(lambda e: not e)),
+        pn.View(*children, style={"display": "flex" if expanded else "none"}),
+    )
+```
+
+Toggling `expanded` re-renders `Card`, but `children` are the same
+element objects its parent passed in, so the reconciler doesn't
+re-render them. Navigators rely on the same rule: each route's screen
+element is cached, so a navigator re-render (a title change, a focus
+change) doesn't re-render the screens.
 
 ## Fragments and multi-child rendering
 
@@ -128,22 +177,30 @@ the native views live elsewhere.
 whose type is the context itself. When the reconciler mounts one, it
 pushes a value onto a per-context stack;
 descendants reading via [`use_context`][pythonnative.use_context]
-observe the topmost value. Context is reactive: when a re-render
-changes a Provider's value, the reconciler marks every recorded
-consumer of that context dirty, so consumers re-render even when a
-memoized ancestor in between skips its subtree.
+observe the topmost value.
+
+Context is reactive, and propagation is targeted. `use_context` records
+which provider node supplied the value, and each provider keeps a
+registry of its consumer nodes, updated as consumers render and
+unmount. When a re-render changes a provider's value, the reconciler
+marks exactly the registered consumers dirty. It doesn't walk the
+provider's subtree looking for them, so the cost is proportional to the
+number of consumers. Consumers re-render even when a memoized ancestor
+or an identity bailout skips the subtree between them and the provider.
 
 ```python
-ThemeContext = pn.create_context({"primary": "#000"})
+Accent = pn.create_context("#000000", name="Accent")
+
 
 @pn.component
-def Screen():
-    return ThemeContext.Provider({"primary": "#222"}, Header())
+def Page() -> pn.Node:
+    return Accent.Provider(Header(), value="#222222")
+
 
 @pn.component
-def Header():
-    theme = pn.use_context(ThemeContext)
-    return pn.Text("Hi", style={"color": theme["primary"]})
+def Header() -> pn.Node:
+    accent = pn.use_context(Accent)
+    return pn.Text("Hi", style={"color": accent})
 ```
 
 ## Error boundaries
@@ -175,8 +232,10 @@ through `set_state` is wasteful. Two ways to bypass:
   when the platform can run the animation natively, no Python code
   runs per frame at all. See the
   [Animations guide](../guides/animations.md).
-- Use [`use_ref`][pythonnative.use_ref] to hold a reference to a
-  native view and mutate it directly from inside an effect callback.
+- Use [`use_ref`][pythonnative.use_ref] to receive a typed
+  [handle](../api/handles.md) for a mounted view and drive it
+  imperatively (`scroll_to`, `focus`, a custom component's `command`)
+  from inside an effect callback.
 
 Reach for these only when profiling tells you that re-rendering is the
 bottleneck.
@@ -184,7 +243,7 @@ bottleneck.
 ## Next steps
 
 - Browse the algorithm in code: [Reconciler API](../api/reconciler.md).
-- Understand handlers underneath the diff: [Native views](native-views.md).
+- Understand the backend underneath the diff: [Native views](native-views.md).
 - See how mounting interacts with hooks: [Lifecycle](lifecycle.md).
 
 ## Elements and update priority

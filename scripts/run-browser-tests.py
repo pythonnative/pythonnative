@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Run the actual preview renderer in headless Chrome, with local Yoga assets."""
+"""Run the browser preview's mounting path in headless Chrome.
+
+``tests/browser/renderer.html`` loads the renderer core's checked-in
+WebAssembly build (``devserver/static/core/pn_core.wasm``), compiles the
+recorded contract document into it, commits envelopes to it, and asserts
+on the DOM the page's renderer mounts. It also checks the core against the
+shared contract and list fixtures and decodes the mount transactions the
+host core recorded. The repository root is served over HTTP, so the page
+loads the same files the dev server ships.
+"""
 
 import functools
 import json
@@ -17,25 +26,13 @@ from pathlib import Path
 from websockets.exceptions import WebSocketException
 from websockets.sync.client import connect
 
-from pythonnative.sdk.schema import manifest
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class Handler(SimpleHTTPRequestHandler):
-    """Serve the checked-in renderer and the current Python contract."""
+    """Serve the checked-in page, core, and fixtures (``.wasm`` as ``application/wasm``)."""
 
-    def do_GET(self) -> None:
-        """Generate the schema route used by the production preview server."""
-        if self.path == "/src/pythonnative/devserver/static/schema.js":
-            payload = ("export default " + json.dumps(manifest()) + ";").encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/javascript")
-            self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload)
-        else:
-            super().do_GET()
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm", ".mjs": "text/javascript"}
 
     def log_message(self, *_args: object) -> None:
         """Keep successful asset requests out of test output."""
@@ -109,8 +106,21 @@ def main() -> None:
                         log.seek(0)
                         raise RuntimeError("Chrome didn't start: " + log.read()[-5000:])
                     port = int(port_file.read_text().splitlines()[0])
-                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=5) as response:
-                        target = next(item for item in json.load(response) if item.get("type") == "page")
+                    # Chrome writes the port file before DevTools reliably answers on slow CI runners.
+                    target = None
+                    deadline = time.monotonic() + 30
+                    while target is None:
+                        try:
+                            with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=5) as response:
+                                targets = json.load(response)
+                            target = next((item for item in targets if item.get("type") == "page"), None)
+                        except OSError:
+                            if process.poll() is not None or time.monotonic() >= deadline:
+                                raise
+                        if target is None:
+                            if time.monotonic() >= deadline:
+                                raise RuntimeError("Chrome DevTools didn't list a page target")
+                            time.sleep(0.5)
                     with connect(target["webSocketDebuggerUrl"], open_timeout=5) as socket:
                         request_id = 0
 
@@ -155,7 +165,7 @@ def main() -> None:
                             )
                 finally:
                     stop_browser(process, port_file)
-        print("Browser renderer acceptance tests passed (Chrome + Yoga WASM)")
+        print("Browser renderer acceptance tests passed (Chrome + the WebAssembly renderer core)")
     finally:
         server.shutdown()
         server.server_close()

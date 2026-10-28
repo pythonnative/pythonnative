@@ -135,7 +135,7 @@ def test_flush_dirty_skips_descendant_already_covered_by_ancestor() -> None:
         render_counts["outer"] += 1
         value, set_outer = use_state(0)
         setters["outer"] = set_outer
-        return Element("Column", {"text": str(value)}, [inner()])
+        return Element("Column", {"test_id": str(value)}, [inner()])
 
     rec, _backend = _make_reconciler()
     rec.mount(outer())
@@ -166,7 +166,7 @@ def test_flush_dirty_preserves_provider_context() -> None:
 
     @component
     def app() -> Element:
-        return theme.Provider("dark", consumer())
+        return theme.Provider(consumer(), value="dark")
 
     rec, _backend = _make_reconciler()
     rec.mount(app())
@@ -237,6 +237,7 @@ def test_local_rerender_error_is_caught_by_ancestor_boundary() -> None:
     # ErrorBoundary must catch it and mount the fallback.
     setters["risky"](1)
     rec.flush_dirty()
+    assert rec.root is not None
     assert rec.root.native_view.props["text"].startswith("caught:")
 
 
@@ -306,6 +307,7 @@ def test_measurement_cache_invalidated_only_for_rerendered_leaf() -> None:
     rec.mount(parent())
     rec.set_viewport_size(300.0, 600.0)
 
+    assert rec.root is not None
     a_view = rec.root.native_view.children[0]
     b_view = rec.root.native_view.children[1]
     assert sorted(backend.measure_calls) == sorted([a_view.id, b_view.id])

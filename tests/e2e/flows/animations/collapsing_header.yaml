@@ -20,10 +20,12 @@ appId: ${APP_ID}
       CATEGORY: Animations
       DEMO_TITLE: Collapsing header
 - assertVisible: "Header state: expanded"
+# Reaching row 60 takes several slow swipes, and each visibility check
+# snapshots the whole hierarchy; allow a slow device the time.
 - scrollUntilVisible:
     element: "HeaderRow 60"
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     visibilityPercentage: 100
     centerElement: false
 - extendedWaitUntil:

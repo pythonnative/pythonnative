@@ -8,13 +8,13 @@ package com.pythonnative.runtime
  * library itself never touches Chaquopy, which keeps it unit-testable
  * with plain JUnit.
  *
- * `kind` is one of `event`, `module`, `host`, `animation`, or `pump`;
+ * `kind` is one of `event`, `module`, `host`, `animation`, or `layout`;
  * see the bridge protocol documentation for the payload of each.
  */
 interface PythonHost {
     /**
-     * Deliver one callback to Python and return its (JSON-encoded)
-     * result, or `null` when the handler produced nothing.
+     * Deliver one callback to Python. Python handles every message
+     * asynchronously on its application thread and returns nothing.
      */
-    fun callback(kind: String, tag: Long, name: String, payloadJson: String): String?
+    fun callback(kind: String, tag: Long, name: String, payloadJson: String)
 }

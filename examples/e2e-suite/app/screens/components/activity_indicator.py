@@ -8,25 +8,25 @@ can confirm that the ``animating`` prop wires to the underlying
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def ActivityIndicatorDemo() -> pn.Element:
+def ActivityIndicatorDemo() -> pn.Node:
     """Render an ActivityIndicator with a toggle button and state readout."""
     spinning, set_spinning = pn.use_state(True)
 
-    return demo_screen(
+    return DemoScreen(
         "ActivityIndicator",
         "Spinning indicator with a stop/start toggle.",
-        section(
+        DemoSection(
             "Indicator",
-            result_text("Animating", "yes" if spinning else "no"),
+            ResultText("Animating", "yes" if spinning else "no"),
             pn.ActivityIndicator(animating=spinning),
             pn.Button(
                 "Stop" if spinning else "Start",
                 on_press=lambda: set_spinning(not spinning),
             ),
-            hint("Tapping the toggle flips Animating between 'yes' and 'no'."),
+            Hint("Tapping the toggle flips Animating between 'yes' and 'no'."),
         ),
     )

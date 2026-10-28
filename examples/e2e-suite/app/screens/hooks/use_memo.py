@@ -9,11 +9,11 @@ the dep.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseMemoDemo() -> pn.Element:
+def UseMemoDemo() -> pn.Node:
     """Render a memo whose factory bumps a counter only on dep change."""
     runs = pn.use_ref(0)
     dep, set_dep = pn.use_state(0)
@@ -25,18 +25,18 @@ def UseMemoDemo() -> pn.Element:
 
     memoized = pn.use_memo(_expensive, [dep])
 
-    return demo_screen(
+    return DemoScreen(
         "use_memo",
         "Factory only re-runs when its dep array changes.",
-        section(
+        DemoSection(
             "Memo",
-            result_text("Factory runs", runs.current),
-            result_text("Memo value", memoized),
-            result_text("Other state", other),
-            buttons_row(
+            ResultText("Factory runs", runs.current),
+            ResultText("Memo value", memoized),
+            ResultText("Other state", other),
+            ButtonsRow(
                 pn.Button("Change dep", on_press=lambda: set_dep(dep + 1)),
                 pn.Button("Change other", on_press=lambda: set_other(other + 1)),
             ),
-            hint("Tap 'Change other': factory runs stays the same. Tap 'Change dep': factory runs goes up."),
+            Hint("Tap 'Change other': factory runs stays the same. Tap 'Change dep': factory runs goes up."),
         ),
     )

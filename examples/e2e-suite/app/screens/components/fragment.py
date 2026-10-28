@@ -8,7 +8,7 @@ texts appear inside the same card, with no extra wrapper element.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 
 def _twin_lines() -> pn.Element:
@@ -25,14 +25,14 @@ def _twin_lines() -> pn.Element:
 
 
 @pn.component
-def FragmentDemo() -> pn.Element:
+def FragmentDemo() -> pn.Node:
     """Render a card containing the two lines from ``_twin_lines``."""
-    return demo_screen(
+    return DemoScreen(
         "Fragment",
         "Fragment merges multiple children into the parent without a wrapper view.",
-        section(
+        DemoSection(
             "Fragment inside a card",
             _twin_lines(),
-            hint("Both lines should appear inside the single card above."),
+            Hint("Both lines should appear inside the single card above."),
         ),
     )

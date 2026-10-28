@@ -14,13 +14,22 @@ without re-rendering the component tree on every frame.
    `Animated.Text`, or `Animated.Image`.
 3. Drive the value with `Animated.timing`, `Animated.spring`, or
    `Animated.decay`. Each driver returns a handle with two faces:
-   - `handle.start()` is fire-and-forget (returns `self`).
-   - `await handle` runs the animation and suspends until it
-     completes. Cancelling the awaiting task stops the animation.
+   - `handle.start(callback=None)` is fire-and-forget (returns `self`);
+     the optional callback receives an
+     [`AnimationResult`][pythonnative.AnimationResult].
+   - `await handle` runs the animation, suspends until it settles, and
+     returns the same `AnimationResult`. Cancelling the awaiting task
+     stops the animation.
+
+   `AnimationResult.finished` is `True` when the animation ran to
+   completion and `False` when it was stopped, superseded by another
+   animation on the same value, or interrupted by the platform.
+   Composites (`sequence`, `parallel`, `stagger`, `loop`) are finished
+   only if every child finished.
 
 The animated component attaches the value to its native view's
 animation bindings after mount. From there, the **native driver**
-takes over whenever it can.
+takes over.
 
 ## The native driver
 
@@ -29,24 +38,25 @@ its connected values, arithmetic, interpolation, and style bindings into
 an animation graph. Starting or awaiting a timing, spring, or decay driver
 sends its specification to the renderer.
 
-On mobile, Swift and Kotlin evaluate the graph and apply its bindings on
-the UI thread. Derived values, color interpolation, and native scroll and
-gesture inputs can update without Python work on every frame. The browser
-implements graph evaluation in JavaScript. Completion is delivered back to
-Python to settle the value and resolve an awaiting task.
+The renderer core evaluates the graph and runs every driver on the
+platform's UI thread, at the display's refresh rate, on iOS, Android, and
+in the browser preview alike. Each frame it hands the platform the
+animated prop values to apply. Derived values, color interpolation, and
+native scroll and gesture inputs update without Python work on every
+frame. Completion is delivered back to Python to settle the value and
+resolve an awaiting task.
 
-The Python-ticked fallback (a ~60 Hz loop) is used automatically
-when:
+Animations that need Python still run in the core:
 
-- the value isn't attached to any mounted view (pure data animation),
-- a Python listener is registered via `add_listener` (listeners want
-  per-frame values, and only the ticker provides those),
-- a callable `easing` is supplied (custom curves can't cross the
-  bridge), or
-- the platform declines the animation.
+- A value that isn't attached to any mounted view (pure data animation),
+  or that has a Python listener registered via `add_listener`, asks the
+  core to report its value each frame, and Python updates the value and
+  runs the listeners.
+- A callable `easing` is sampled into a curve the core interpolates.
 
-Either way the API and the observable end state are identical, so you
-never have to opt in or out manually.
+Headless tests run the host build of the same core, driven by the
+virtual clock, so tests and devices share one implementation of the
+animation math. You never have to opt in or out manually.
 
 ## Fade in on mount
 
@@ -55,7 +65,7 @@ import pythonnative as pn
 
 
 @pn.component
-def FadeInBox():
+def FadeInBox() -> pn.Node:
     opacity = pn.use_animated_value(0.0)
 
     async def _fade_in():
@@ -91,7 +101,7 @@ def _press():
 
 ```python
 @pn.component
-def Bouncy():
+def Bouncy() -> pn.Node:
     scale = pn.use_animated_value(1.0)
 
     def _press():
@@ -107,9 +117,20 @@ def Bouncy():
 ```
 
 Available transform shortcuts inside `style`: `scale`, `scale_x`,
-`scale_y`, `translate_x`, `translate_y`, `rotate`. Each accepts an
-`AnimatedValue` and the runtime maps them to the underlying native
-animation property.
+`scale_y`, `translate_x`, `translate_y`, `rotate`, `rotate_x`, and
+`rotate_y`. Each accepts an `AnimatedValue` and the runtime maps them
+to the underlying native animation property; iOS keeps each animated
+channel separately and composes them with the static `transform` prop,
+so binding `translate_x` and `translate_y` together works.
+
+The full set of style keys an animated node may drive is
+[`ANIMATABLE_PROPS`][pythonnative.ANIMATABLE_PROPS]: `opacity`,
+`background_color`, `color`, and the eight transform channels above.
+These are the properties every renderer can animate on its UI thread
+without a layout pass. Binding a node to any other key (`width`,
+`margin`, `padding`, `top`, `skew_x`, ...) raises `ValueError` naming
+the animatable set when the element is constructed, so an animation
+never silently degrades to a re-render per frame.
 
 ## Sequencing and parallel composition
 
@@ -206,9 +227,8 @@ bind it into styles like any `AnimatedValue`, but drive the underlying
 source value.
 
 Derived nodes are part of the serialized animation graph. Arithmetic and
-interpolation can therefore run in the renderer alongside their source
-driver. A backend without graph support uses the Python ticker for
-derived bindings.
+interpolation therefore run in the renderer core alongside their source
+driver.
 
 ## Scroll-driven animation with `Animated.event`
 
@@ -255,17 +275,44 @@ demo under Animations.
 
 ## Easing
 
-`Animated.timing` accepts an `easing` argument: `"linear"`,
-`"ease_in"`, `"ease_out"`, `"ease_in_out"`, or `"bounce"`.
+`Animated.timing(easing=...)` takes a curve from the
+[`Easing`][pythonnative.Easing] namespace, which mirrors React
+Native's: `Easing.linear`, `Easing.ease`, `Easing.ease_in`,
+`Easing.ease_out`, `Easing.ease_in_out` (the default), `Easing.quad`,
+`Easing.cubic`, `Easing.bounce`, and `Easing.bezier(x1, y1, x2, y2)`
+for a CSS-style cubic bezier:
+
+```python
+pn.Animated.timing(opacity, to=1.0, easing=pn.Easing.ease_out)
+pn.Animated.timing(x, to=200, easing=pn.Easing.bezier(0.2, 0.8, 0.2, 1.0))
+pn.Animated.timing(y, to=0, easing="bounce")   # the names also work as strings
+```
+
+Each curve is a serializable [`EasingSpec`][pythonnative.EasingSpec],
+so it crosses the bridge as data and the core's drivers run it on the
+UI thread; bezier control points travel as numbers, not as a string.
+A misspelled easing name raises `ValueError` instead of falling back
+silently. `Easing.ease` follows React Native (the same curve as
+`ease_in`), not CSS `ease`. A plain callable `progress -> eased` is
+still accepted for custom curves; Python samples it once into a curve the
+core interpolates.
 
 ## Decay (fling)
 
-`Animated.decay` decelerates a value from an initial velocity,
-the standard ending for a pan gesture:
+`Animated.decay` decelerates a value from an initial velocity, the
+standard ending for a pan gesture. It uses React Native's model on
+every platform: with `t` in milliseconds, the velocity decays as
+`v0 * deceleration ** t`, and the value comes to rest at
+`start + v0 / (1 - deceleration)`. `velocity` is in points per
+millisecond; gesture events report points per second, so divide by
+1000. `deceleration` defaults to `0.998`; `0.99` stops quickly, and a
+value outside `(0, 1)` raises `ValueError`:
 
 ```python
 def on_pan_end(event):
     pn.Animated.decay(tx, velocity=event.velocity_x / 1000.0).start()
+
+pn.Animated.decay(offset, velocity=2.0, deceleration=0.99).start()
 ```
 
 See the [Gestures guide](gestures.md) for the full drag-and-release
@@ -275,8 +322,10 @@ pattern.
 
 `start()` returns the handle you started with, and the handle exposes
 `.stop()`. A common pattern is to keep the handle in a `use_ref` so
-you can cancel a long-running animation when the user interrupts. If
-you're awaiting the animation instead, cancelling the awaiting task
+you can cancel a long-running animation when the user interrupts. A
+stopped animation resolves with `AnimationResult(finished=False)`;
+a `sequence` whose step is stopped stops too, with `finished=False`.
+If you're awaiting the animation instead, cancelling the awaiting task
 stops the animation:
 
 ```python

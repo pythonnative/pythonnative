@@ -17,12 +17,12 @@ tap, double-tap, long-press, and swipe to verify arbitration.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 from pythonnative.gestures import Exclusive, Fling, LongPress, Pan, Race, Tap
 
 
 @pn.component
-def GestureCompositionDemo() -> pn.Element:
+def GestureCompositionDemo() -> pn.Node:
     """Render exclusive-tap, race, and fling targets."""
     last_tap, set_last_tap = pn.use_state("none")
     race_winner, set_race_winner = pn.use_state("none")
@@ -69,7 +69,7 @@ def GestureCompositionDemo() -> pn.Element:
     fling_target = pn.View(
         pn.Text("Fling target", style=pn.style(color="#FFFFFF", font_weight="700")),
         gestures=[
-            Fling(on_fling=lambda e: set_fling_result(e.direction)),
+            Fling(on_fling=lambda e: set_fling_result(e.direction or "none")),
         ],
         style=pn.style(
             background_color="#F59E0B",
@@ -79,23 +79,23 @@ def GestureCompositionDemo() -> pn.Element:
         ),
     )
 
-    return demo_screen(
+    return DemoScreen(
         "Gesture composition",
         "Exclusive taps, a long-press/pan race, and fling detection.",
-        section(
+        DemoSection(
             "Exclusive: double tap beats single",
-            result_text("Last tap", last_tap),
+            ResultText("Last tap", last_tap),
             tap_target,
         ),
-        section(
+        DemoSection(
             "Race: long press vs pan",
-            result_text("Race winner", race_winner),
+            ResultText("Race winner", race_winner),
             race_target,
         ),
-        section(
+        DemoSection(
             "Fling",
-            result_text("Fling", fling_result),
+            ResultText("Fling", fling_result),
             fling_target,
-            hint("Maestro taps, double-taps, long-presses, and swipes."),
+            Hint("Maestro taps, double-taps, long-presses, and swipes."),
         ),
     )

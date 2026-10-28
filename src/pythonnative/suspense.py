@@ -1,10 +1,18 @@
-"""Suspense resources backed by standard asyncio tasks."""
+"""Suspense resources backed by standard asyncio tasks.
+
+Also home to [`run_eagerly`][pythonnative.suspense.run_eagerly], the
+driver behind ``async def`` components: it steps a coroutine once
+synchronously and only hands the remainder to a task when the first
+``await`` is really pending, so bodies whose awaits are already resolved
+render inline without a fallback flash.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import inspect
-from typing import Any, Callable, Generic, Optional, Tuple, TypeVar
+from typing import Any, Callable, Coroutine, Generic, Optional, Tuple, TypeVar
 
 T = TypeVar("T")
 
@@ -124,6 +132,103 @@ def start_resource(fetcher: Callable[[], Any]) -> Resource[Any]:
     return Resource(future)
 
 
+def run_eagerly(coro: Coroutine[Any, Any, T], scope: Any) -> asyncio.Future:
+    """Start ``coro`` now and return a future for its result.
+
+    The first step of the coroutine runs synchronously, in a copy of the
+    caller's context (so provider values and the installed hook state
+    survive later ``await`` boundaries, exactly as in an
+    :class:`asyncio.Task`). If the body finishes in that step, the
+    returned future is already done; if it suspends, the rest of the
+    body is driven by a task owned by ``scope`` and the returned object
+    is that task.
+
+    Args:
+        coro: The coroutine to drive.
+        scope: The [`TaskScope`][pythonnative.runtime.TaskScope] that
+            owns the remaining work; cancelling the returned future
+            cancels the body.
+
+    Raises:
+        RuntimeError: When ``scope`` is already closed.
+    """
+    from .runtime import _scope, get_loop
+
+    if scope.closed:
+        coro.close()
+        raise RuntimeError(f"Task scope {scope.name!r} is closed")
+    loop = get_loop()
+    token = _scope.set(scope)
+    try:
+        context = contextvars.copy_context()
+    finally:
+        _scope.reset(token)
+    # Headless renders start outside a running loop. Mark the application
+    # loop as running for the eager step, the way asyncio's own runner
+    # does, so ``asyncio.sleep`` and loop-bound primitives inside the body
+    # bind to it instead of failing with "no running event loop".
+    running = asyncio._get_running_loop()
+    if running is None:
+        asyncio._set_running_loop(loop)
+    try:
+        yielded = context.run(coro.send, None)
+    except StopIteration as stop:
+        done = loop.create_future()
+        done.set_result(stop.value)
+        return done
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException as exc:
+        failed = loop.create_future()
+        failed.set_exception(exc)
+        return failed
+    finally:
+        if running is None:
+            asyncio._set_running_loop(None)
+    task = loop.create_task(_drive(coro, yielded), context=context)
+
+    def _finish_abandoned(done: Any) -> None:
+        # A task cancelled before its first step never resumes the body,
+        # which would otherwise be closed by garbage collection in some
+        # unrelated context. Unwind it here, in its own context, so its
+        # ``finally`` blocks (hook-state restore) run where they were set.
+        if inspect.getcoroutinestate(coro) != inspect.CORO_SUSPENDED:
+            return
+        if yielded is not None and hasattr(yielded, "cancel"):
+            yielded.cancel()
+        try:
+            context.run(coro.throw, asyncio.CancelledError())
+        except BaseException:
+            pass
+
+    task.add_done_callback(_finish_abandoned)
+    scope.create_task(task)
+    return task
+
+
+async def _drive(coro: Coroutine[Any, Any, T], yielded: Any) -> T:
+    """Finish a coroutine whose first step already ran, honoring task cancellation."""
+    while True:
+        throw: Optional[BaseException] = None
+        try:
+            if yielded is None:
+                await asyncio.sleep(0)
+            elif getattr(yielded, "_asyncio_future_blocking", None) is not None:
+                yielded._asyncio_future_blocking = False
+                if not yielded.done():
+                    await asyncio.wait({yielded})
+            else:
+                throw = RuntimeError(f"Task got bad yield: {yielded!r}")
+        except asyncio.CancelledError as cancel:
+            if yielded is not None and hasattr(yielded, "cancel"):
+                yielded.cancel()
+            throw = cancel
+        try:
+            yielded = coro.send(None) if throw is None else coro.throw(throw)
+        except StopIteration as stop:
+            return stop.value
+
+
 def lazy(loader: Callable[[], Any]) -> Callable[..., Any]:
     """Define a component that loads its implementation on first render.
 
@@ -179,5 +284,6 @@ __all__ = [
     "Resource",
     "Suspend",
     "lazy",
+    "run_eagerly",
     "start_resource",
 ]

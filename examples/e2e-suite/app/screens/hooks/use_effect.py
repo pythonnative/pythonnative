@@ -14,11 +14,11 @@ Two effects:
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseEffectDemo() -> pn.Element:
+def UseEffectDemo() -> pn.Node:
     """Render effect run counters driven by dependency-array changes."""
     dep, set_dep = pn.use_state(0)
     mount_runs, set_mount_runs = pn.use_state(0)
@@ -26,26 +26,26 @@ def UseEffectDemo() -> pn.Element:
 
     def _on_mount() -> None:
         # ``[]`` dep list -> only runs on mount.
-        set_mount_runs(mount_runs + 1)
+        set_mount_runs(lambda runs: runs + 1)
 
     pn.use_effect(_on_mount, [])
 
     def _on_dep_change() -> None:
-        set_dep_runs(dep_runs + 1)
+        set_dep_runs(lambda runs: runs + 1)
 
     pn.use_effect(_on_dep_change, [dep])
 
-    return demo_screen(
+    return DemoScreen(
         "use_effect",
         "Two effects: one runs once on mount, one runs on each dep change.",
-        section(
+        DemoSection(
             "Effect run counters",
-            result_text("Mount runs", mount_runs),
-            result_text("Dep runs", dep_runs),
-            result_text("Dep value", dep),
-            buttons_row(
+            ResultText("Mount runs", mount_runs),
+            ResultText("Dep runs", dep_runs),
+            ResultText("Dep value", dep),
+            ButtonsRow(
                 pn.Button("Bump dep", on_press=lambda: set_dep(dep + 1)),
             ),
-            hint("Tapping 'Bump dep' twice should set 'Dep runs: 3' (1 on mount + 2 bumps)."),
+            Hint("Tapping 'Bump dep' twice should set 'Dep runs: 3' (1 on mount + 2 bumps)."),
         ),
     )

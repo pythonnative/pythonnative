@@ -1,56 +1,133 @@
-"""StyleSheet, typed `Style`, style resolution, and theming.
+"""The typed [`Style`][pythonnative.Style], style resolution, and style sheets.
 
-PythonNative ships a single, fully-typed [`Style`][pythonnative.Style]
-TypedDict that enumerates every supported style property and constrains
-enum-shaped values via [`typing.Literal`][typing.Literal]. The TypedDict
-gives editors and type-checkers (mypy, pyright) full autocomplete and
-validation: a typo such as ``flex_direction="collumn"`` is now a static
-error, not a silent runtime no-op.
+PythonNative ships a single, fully typed [`Style`][pythonnative.Style]
+``TypedDict`` that enumerates every supported style property and
+constrains enum-shaped values with [`typing.Literal`][typing.Literal].
+Editors and type checkers (mypy, pyright) autocomplete and validate
+every key: ``flex_direction="collumn"`` is a static error, not a silent
+runtime no-op.
 
-Style values remain plain dicts at runtime so they are trivial to
-compose, diff, and store. Properties unrecognized by a platform handler
-are still ignored, so third-party handlers may extend the palette
-without modifying core types.
+Style values are plain dicts at runtime, so they're trivial to compose,
+diff, and store. Pass one dict or a list of them (later entries win,
+``None`` entries are skipped); [`resolve_style`][pythonnative.style.resolve_style]
+flattens the list and resolves the ``inset*`` shorthands.
 
-The runtime helpers ([`resolve_style`][pythonnative.style.resolve_style],
-[`StyleSheet`][pythonnative.StyleSheet]) accept either a ``Style``
-TypedDict, a regular ``Dict[str, Any]`` (for forward-compat or
-unrestricted use), or a list of either kind of dict, and always
-return a fresh, flat dict.
+Group related styles in a [`StyleSheet`][pythonnative.StyleSheet]
+namespace, and derive theme-dependent styles with
+[`use_styles`][pythonnative.use_styles]:
 
-Example:
-    ```python
-    import pythonnative as pn
+```python
+import pythonnative as pn
 
-    styles = pn.StyleSheet.create(
-        title=pn.style(font_size=24, bold=True, color="#333"),
-        container=pn.style(padding=16, spacing=12),
-    )
 
-    pn.Column(
-        pn.Text("Hello", style=styles["title"]),
-        style=styles["container"],
-    )
-    ```
+class Styles(pn.StyleSheet):
+    container = pn.style(padding=16, gap=12)
+    title = pn.style(font_size=24, font_weight="700")
+
+
+pn.Column(pn.Text("Hello", style=Styles.title), style=Styles.container)
+```
 """
 
-import dataclasses
 import difflib
-from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union, get_args
+from typing import (
+    Any,
+    Dict,
+    List,
+    Literal,
+    NotRequired,
+    Optional,
+    Sequence,
+    Tuple,
+    TypedDict,
+    Union,
+    Unpack,
+    get_args,
+)
 
 from . import diagnostics
-from .hooks import Context, create_context, use_color_scheme, use_context
+
+LAYOUT_STYLE_KEYS = frozenset(
+    {
+        "width",
+        "height",
+        "min_width",
+        "max_width",
+        "min_height",
+        "max_height",
+        "flex",
+        "flex_grow",
+        "flex_shrink",
+        "flex_basis",
+        "flex_wrap",
+        "align_self",
+        "align_content",
+        "position",
+        "top",
+        "right",
+        "bottom",
+        "left",
+        "start",
+        "end",
+        "margin",
+        "margin_top",
+        "margin_bottom",
+        "margin_left",
+        "margin_right",
+        "margin_start",
+        "margin_end",
+        "margin_horizontal",
+        "margin_vertical",
+        "padding",
+        "padding_top",
+        "padding_bottom",
+        "padding_left",
+        "padding_right",
+        "padding_start",
+        "padding_end",
+        "padding_horizontal",
+        "padding_vertical",
+        "border_width",
+        "border_top_width",
+        "border_right_width",
+        "border_bottom_width",
+        "border_left_width",
+        "flex_direction",
+        "justify_content",
+        "align_items",
+        "gap",
+        "row_gap",
+        "column_gap",
+        "aspect_ratio",
+        "direction",
+        "display",
+    }
+)
+"""Style keys that affect layout (the renderer core hands them to Yoga)."""
 
 # ======================================================================
 # Atomic value types
 # ======================================================================
 
-Color = str
-"""Color value: ``"#RRGGBB"``, ``"#AARRGGBB"``, or any string a platform
-handler recognizes (e.g., ``"red"``). Stored verbatim and parsed by the
-handler at apply-time, so palettes from third-party libraries pass through
-unchanged."""
+
+class DynamicColor(TypedDict):
+    """A color pair resolved against the current color scheme.
+
+    Every renderer (iOS, Android, and the browser preview) picks
+    ``light`` or ``dark`` when the style is applied and switches when
+    the appearance changes.
+    """
+
+    light: str
+    dark: str
+
+
+Color = Union[str, DynamicColor]
+"""Color value: ``"#RRGGBB"``, ``"#AARRGGBB"``, any string a platform
+handler recognizes (e.g., ``"red"``), or a
+[`DynamicColor`][pythonnative.DynamicColor] ``{"light": ..., "dark": ...}``
+pair. Strings are stored verbatim and parsed by the handler at apply-time,
+so palettes from third-party libraries pass through unchanged."""
 
 Dimension = Union[int, float, str]
 """A length value. Numbers are points/dp; strings ending in ``"%"`` are
@@ -102,6 +179,52 @@ class AccessibilityState(TypedDict, total=False):
     expanded: bool
 
 
+class AccessibilityValue(TypedDict, total=False):
+    """The current value of a range-like or text-valued widget, for assistive technology.
+
+    Passed via ``accessibility_value=`` (a plain string is also
+    accepted and equivalent to ``{"text": ...}``). Use ``min``, ``max``,
+    and ``now`` for sliders and progress indicators, ``text`` for
+    everything else.
+
+    Attributes:
+        min: Lower bound of the range.
+        max: Upper bound of the range.
+        now: Current value within the range.
+        text: Spoken description of the current value.
+    """
+
+    min: float
+    max: float
+    now: float
+    text: str
+
+
+class AccessibilityAction(TypedDict):
+    """One custom action a screen reader may invoke on a view.
+
+    Passed via ``accessibility_actions=[...]``; the view's
+    ``on_accessibility_action`` callback receives the action ``name``.
+    The standard names ``"activate"``, ``"increment"``, ``"decrement"``,
+    ``"longpress"``, ``"magicTap"``, and ``"escape"`` map to the
+    platform's built-in actions; any other name is a custom action
+    announced with ``label``.
+
+    Attributes:
+        name: Identifier reported to ``on_accessibility_action``.
+        label: Spoken description of a custom action.
+    """
+
+    name: str
+    label: NotRequired[str]
+
+
+ImportantForAccessibility = Literal["auto", "yes", "no", "no_hide_descendants"]
+"""``important_for_accessibility`` value: whether assistive technology
+sees the view (``"yes"``), skips it (``"no"``), skips it and its subtree
+(``"no_hide_descendants"``), or decides itself (``"auto"``)."""
+
+
 class ShadowOffset(TypedDict):
     """Shadow displacement in points."""
 
@@ -120,9 +243,27 @@ ShadowOffsetValue = Union[ShadowOffset, Tuple[float, float], List[float]]
 
 
 class TransformRotate(TypedDict):
-    """Rotation transform in degrees (numeric) or with explicit unit suffix."""
+    """Rotation around the z axis in degrees (numeric) or with an explicit unit suffix."""
 
     rotate: Union[float, str]
+
+
+class TransformRotateX(TypedDict):
+    """Rotation around the x axis (a 3D tilt) in degrees or with a unit suffix."""
+
+    rotate_x: Union[float, str]
+
+
+class TransformRotateY(TypedDict):
+    """Rotation around the y axis (a 3D flip) in degrees or with a unit suffix."""
+
+    rotate_y: Union[float, str]
+
+
+class TransformRotateZ(TypedDict):
+    """Rotation around the z axis; an explicit spelling of ``rotate``."""
+
+    rotate_z: Union[float, str]
 
 
 class TransformScale(TypedDict):
@@ -150,15 +291,40 @@ class TransformTranslate(TypedDict, total=False):
     translate_y: float
 
 
+class TransformSkewX(TypedDict):
+    """Horizontal skew in degrees or with a unit suffix."""
+
+    skew_x: Union[float, str]
+
+
+class TransformSkewY(TypedDict):
+    """Vertical skew in degrees or with a unit suffix."""
+
+    skew_y: Union[float, str]
+
+
+class TransformPerspective(TypedDict):
+    """Perspective distance for the 3D rotations that follow it in the list."""
+
+    perspective: float
+
+
 TransformEntry = Union[
     TransformRotate,
+    TransformRotateX,
+    TransformRotateY,
+    TransformRotateZ,
     TransformScale,
     TransformScaleX,
     TransformScaleY,
     TransformTranslate,
+    TransformSkewX,
+    TransformSkewY,
+    TransformPerspective,
     Dict[str, Any],
 ]
-"""A single transform operation."""
+"""A single transform operation. Every renderer supports the whole set;
+iOS composes them into a ``CATransform3D``."""
 
 TransformSpec = Union[TransformEntry, List[TransformEntry]]
 """``transform`` style value: a single operation or an ordered list."""
@@ -237,6 +403,8 @@ FontWeight = Literal[
     "900",
 ]
 ScaleType = Literal["cover", "contain", "stretch", "center"]
+BorderStyle = Literal["solid", "dashed", "dotted"]
+"""``border_style`` style value, drawn the same way on every renderer."""
 KeyboardType = Literal[
     "default",
     "email_address",
@@ -244,7 +412,15 @@ KeyboardType = Literal[
     "decimal_pad",
     "phone_pad",
     "url",
+    "ascii",
+    "numbers_and_punctuation",
+    "web_search",
+    "visible_password",
 ]
+"""``keyboard_type`` value. ``"ascii"``, ``"numbers_and_punctuation"``,
+and ``"web_search"`` are iOS keyboards (Android and the browser fall back
+to the closest input type); ``"visible_password"`` is Android's
+unmasked password keyboard."""
 AutoCapitalize = Literal["none", "sentences", "words", "characters"]
 ReturnKeyType = Literal["default", "done", "go", "next", "send", "search"]
 PointerEvents = Literal["auto", "none", "box_none", "box_only"]
@@ -321,6 +497,11 @@ class Style(TypedDict, total=False):
     left: Dimension
     start: Dimension
     end: Dimension
+    # Shorthands resolved by ``resolve_style`` into the four edges above;
+    # explicit ``top`` / ``right`` / ``bottom`` / ``left`` keys win.
+    inset: Dimension
+    inset_horizontal: Dimension
+    inset_vertical: Dimension
 
     # --- Layout: spacing ---
     padding: EdgeValue
@@ -341,7 +522,6 @@ class Style(TypedDict, total=False):
     margin_end: MarginValue
     margin_horizontal: MarginValue
     margin_vertical: MarginValue
-    spacing: float
     gap: float
     row_gap: float
     column_gap: float
@@ -358,6 +538,7 @@ class Style(TypedDict, total=False):
 
     # --- Visual: borders ---
     border_width: float
+    border_style: BorderStyle
     border_radius: float
     border_top_left_radius: float
     border_top_right_radius: float
@@ -389,6 +570,9 @@ class Style(TypedDict, total=False):
     text_shadow_radius: float
 
     # --- Visual: shadows / effects ---
+    # Shadows follow React Native's platform split: the ``shadow_*``
+    # keys draw on iOS and in the browser preview, ``elevation`` draws
+    # Android's material shadow. Each platform ignores the other's keys.
     shadow_color: Color
     shadow_offset: ShadowOffsetValue
     shadow_opacity: float
@@ -402,12 +586,13 @@ class Style(TypedDict, total=False):
     pointer_events: PointerEvents
 
 
-StyleProp = Union[Style, Dict[str, Any], List[Optional[Union[Style, Dict[str, Any]]]], None]
+StyleProp = Union[Style, Sequence[Optional[Style]], None]
 """Public type for the ``style`` parameter on every component factory.
 
-Accepts a [`Style`][pythonnative.Style] TypedDict (recommended), a
-plain ``Dict[str, Any]`` (forward-compat / unrestricted), a list of
-either with ``None`` entries skipped, or ``None``."""
+Accepts a [`Style`][pythonnative.Style] TypedDict, a sequence of them
+with ``None`` entries skipped, or ``None``. ``Style`` is a ``TypedDict``,
+so a plain dict literal type-checks against it and still works at
+runtime."""
 
 
 # ======================================================================
@@ -415,21 +600,20 @@ either with ``None`` entries skipped, or ``None``."""
 # ======================================================================
 
 
-def style(**properties: Any) -> Style:
+def style(**properties: Unpack[Style]) -> Style:
     """Construct a [`Style`][pythonnative.Style] from keyword arguments.
 
-    Equivalent to ``Style(...)`` but works with any Python version
-    (``TypedDict.__init__`` is fragile prior to 3.11) and reads more
-    naturally inside expressions:
+    Equivalent to ``Style(...)`` but reads more naturally inside
+    expressions, and typed with ``Unpack[Style]`` so a type checker
+    rejects a misspelled key such as ``pn.style(colour="red")``:
 
     ```python
     pn.View(child, style=pn.style(padding=16, background_color="#fff"))
     ```
 
-    Unknown keys are accepted at runtime to keep the door open for
-    third-party styling extensions; static type checkers will still
-    reject them when this helper's return type is annotated as
-    ``Style``.
+    At runtime the keys aren't checked here; the factories warn once
+    per unknown key in dev mode through
+    [`validate_style_keys`][pythonnative.style.validate_style_keys].
 
     Args:
         **properties: Style key/value pairs.
@@ -437,15 +621,45 @@ def style(**properties: Any) -> Style:
     Returns:
         A fresh ``Style`` dict containing the supplied entries.
     """
-    return properties  # type: ignore[return-value]
+    return properties
+
+
+_INSET_SHORTHANDS: Dict[str, Tuple[str, ...]] = {
+    "inset": ("top", "right", "bottom", "left"),
+    "inset_horizontal": ("left", "right"),
+    "inset_vertical": ("top", "bottom"),
+}
+"""Position shorthands and the edges each one fills, least specific first."""
+
+
+def _expand_insets(result: Dict[str, Any]) -> None:
+    """Replace ``inset*`` shorthands with the four edge keys, in place.
+
+    Mirrors the padding vocabulary: ``inset`` fills every edge, the axis
+    shorthands override it, and an explicit ``top`` / ``right`` /
+    ``bottom`` / ``left`` wins over both, regardless of key order. The
+    wire only ever carries the four edges.
+    """
+    explicit: Dict[str, Any] = {edge: result[edge] for edge in ("top", "right", "bottom", "left") if edge in result}
+    for shorthand, edges in _INSET_SHORTHANDS.items():
+        if shorthand not in result:
+            continue
+        value = result.pop(shorthand)
+        if value is None:
+            continue
+        for edge in edges:
+            result[edge] = value
+    result.update(explicit)
 
 
 def resolve_style(value: StyleProp) -> Dict[str, Any]:
     """Flatten a `style` prop into a single dict.
 
-    Accepts ``None``, a single dict (``Style`` or untyped), or a list of
-    dicts (later entries override earlier ones, mirroring React Native's
-    array-style pattern). Used by every built-in element factory in
+    Accepts ``None``, a single dict, or a sequence of dicts (later
+    entries override earlier ones, mirroring React Native's array-style
+    pattern), then resolves the ``inset``, ``inset_horizontal``, and
+    ``inset_vertical`` shorthands into ``top`` / ``right`` / ``bottom``
+    / ``left``. Used by every built-in element factory in
     `pythonnative.components`.
 
     Args:
@@ -458,11 +672,14 @@ def resolve_style(value: StyleProp) -> Dict[str, Any]:
     if value is None:
         return {}
     if isinstance(value, dict):
-        return dict(value)
-    result: Dict[str, Any] = {}
-    for entry in value:
-        if entry:
-            result.update(entry)
+        result: Dict[str, Any] = dict(value)
+    else:
+        result = {}
+        for entry in value:
+            if entry:
+                result.update(entry)
+    if result.keys() & _INSET_SHORTHANDS.keys():
+        _expand_insets(result)
     return result
 
 
@@ -476,6 +693,7 @@ _STYLE_VALUE_CHOICES: Dict[str, frozenset] = {
     "text_decoration": frozenset(get_args(TextDecoration)),
     "text_transform": frozenset(get_args(TextTransform)),
     "pointer_events": frozenset(get_args(PointerEvents)),
+    "border_style": frozenset(get_args(BorderStyle)),
 }
 """Keys whose string values are checked against their ``Literal`` choices
 in dev mode. Only keys whose handlers accept exactly the declared
@@ -524,7 +742,7 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
 
     A small set of enum-shaped keys (``display``, ``position``,
     ``direction``, ``text_decoration``, ``text_transform``,
-    ``pointer_events``) and the ``text_shadow_*`` keys also have their
+    ``pointer_events``, ``border_style``) and the ``text_shadow_*`` keys also have their
     values checked; a bad value warns once per key/value pair and is
     otherwise passed through (the engine and handlers ignore values
     they don't recognize).
@@ -564,250 +782,61 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
 
 
 class StyleSheet:
-    """Utility for creating, composing, and flattening style dictionaries.
+    """Base class for a namespace of named styles.
 
-    All methods are stateless and return fresh dicts, so the values can
-    be reused safely across components.
-    """
-
-    @staticmethod
-    def create(**named_styles: Style) -> Dict[str, Style]:
-        """Create a set of named styles from keyword arguments.
-
-        Args:
-            **named_styles: Each keyword argument is a style name
-                mapping to a [`Style`][pythonnative.Style] dict.
-
-        Returns:
-            A dict mapping each name to a copy of the supplied style,
-            so the caller can mutate the result without affecting the
-            originals.
-
-        Example:
-            ```python
-            from pythonnative import StyleSheet, style
-
-            styles = StyleSheet.create(
-                heading=style(font_size=28, bold=True),
-                body=style(font_size=16),
-            )
-            ```
-        """
-        return {name: dict(props) for name, props in named_styles.items()}  # type: ignore[misc]
-
-    @staticmethod
-    def compose(*styles: StyleProp) -> Style:
-        """Merge multiple style dicts.
-
-        Args:
-            *styles: Style dicts to merge. Later dicts override keys
-                from earlier ones. Falsy entries (``None``) are skipped.
-                List entries are flattened in turn.
-
-        Returns:
-            A new ``Style`` dict containing the merged result.
-        """
-        merged: Dict[str, Any] = {}
-        for entry in styles:
-            if entry is None:
-                continue
-            if isinstance(entry, dict):
-                merged.update(entry)
-                continue
-            for nested in entry:
-                if nested:
-                    merged.update(nested)
-        return merged  # type: ignore[return-value]
-
-    @staticmethod
-    def flatten(styles: StyleProp) -> Style:
-        """Flatten a style value or list of styles into a single dict.
-
-        Equivalent to
-        [`resolve_style`][pythonnative.style.resolve_style] but exposed
-        on `StyleSheet` for parity with React Native's API and typed
-        as returning a ``Style``.
-
-        Args:
-            styles: A single dict, a list of dicts, or `None`.
-
-        Returns:
-            A flat ``Style`` dict combining the inputs.
-        """
-        return resolve_style(styles)  # type: ignore[return-value]
-
-    @staticmethod
-    def absolute_fill() -> Style:
-        """Return a style that absolutely fills the parent.
-
-        Convenience preset matching React Native's
-        ``StyleSheet.absoluteFill``: ``position: "absolute"`` with
-        every inset pinned to ``0``.
-        """
-        return {"position": "absolute", "top": 0, "right": 0, "bottom": 0, "left": 0}
-
-
-# ======================================================================
-# Theming
-# ======================================================================
-
-
-@dataclass(frozen=True)
-class Theme:
-    """Design tokens read through [`use_theme`][pythonnative.use_theme].
-
-    A ``Theme`` is an immutable, fully typed record, so
-    ``theme.text_color`` autocompletes and a typo is a static error
-    rather than a runtime ``KeyError``. Derive a custom theme from a
-    built-in one with [`replace`][pythonnative.style.Theme.replace]:
+    Subclass it and assign [`Style`][pythonnative.Style] dicts as class
+    attributes. Attribute access is typed, so a misspelled style name is
+    a static error, and every style is checked for unknown keys once in
+    dev mode:
 
     ```python
-    brand = pn.DEFAULT_LIGHT_THEME.replace(primary_color="#FF2D55")
+    class Styles(pn.StyleSheet):
+        card = pn.style(padding=16, border_radius=12)
+        title = pn.style(font_size=17, font_weight="600")
+
+
+    pn.View(pn.Text("Hello", style=Styles.title), style=Styles.card)
     ```
 
-    Attributes:
-        primary_color: Main accent color.
-        secondary_color: Secondary accent color.
-        background_color: Screen background.
-        surface_color: Raised surfaces such as cards and sheets.
-        text_color: Primary text.
-        text_secondary_color: De-emphasized text.
-        error_color: Destructive and error states.
-        success_color: Success states.
-        warning_color: Warning states.
-        font_size: Body text size, in points.
-        font_size_small: Caption size, in points.
-        font_size_large: Subtitle size, in points.
-        font_size_title: Title size, in points.
-        spacing: Base spacing unit, in points.
-        spacing_large: Large spacing unit, in points.
-        border_radius: Default corner radius, in points.
+    Compose styles with a list (``style=[Styles.card, {"opacity": 0.5}]``).
+    For styles derived from the theme, see
+    [`use_styles`][pythonnative.use_styles]. A style sheet is a
+    namespace, not an object: instantiating one raises ``TypeError``.
     """
 
-    primary_color: Color
-    secondary_color: Color
-    background_color: Color
-    surface_color: Color
-    text_color: Color
-    text_secondary_color: Color
-    error_color: Color
-    success_color: Color
-    warning_color: Color
-    font_size: float = 16
-    font_size_small: float = 13
-    font_size_large: float = 20
-    font_size_title: float = 28
-    spacing: float = 8
-    spacing_large: float = 16
-    border_radius: float = 8
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        for name, value in vars(cls).items():
+            if not name.startswith("_") and isinstance(value, dict):
+                validate_style_keys(value, owner=f"{cls.__name__}.{name}")
 
-    def replace(self, **changes: Any) -> "Theme":
-        """Return a copy of this theme with the given fields replaced.
-
-        Raises:
-            TypeError: If ``changes`` names a field that doesn't exist.
-        """
-        return dataclasses.replace(self, **changes)
+    def __new__(cls, *args: Any, **kwargs: Any) -> "StyleSheet":
+        """Refuse instantiation: a style sheet is a namespace, not an object."""
+        raise TypeError(f"{cls.__name__} is a namespace of styles; use {cls.__name__}.<name> instead of calling it")
 
 
-DEFAULT_LIGHT_THEME = Theme(
-    primary_color="#007AFF",
-    secondary_color="#5856D6",
-    background_color="#FFFFFF",
-    surface_color="#F2F2F7",
-    text_color="#000000",
-    text_secondary_color="#8E8E93",
-    error_color="#FF3B30",
-    success_color="#34C759",
-    warning_color="#FF9500",
-)
-"""Built-in light theme selected by [`use_theme`][pythonnative.use_theme]."""
-
-DEFAULT_DARK_THEME = Theme(
-    primary_color="#0A84FF",
-    secondary_color="#5E5CE6",
-    background_color="#000000",
-    surface_color="#1C1C1E",
-    text_color="#FFFFFF",
-    text_secondary_color="#8E8E93",
-    error_color="#FF453A",
-    success_color="#30D158",
-    warning_color="#FF9F0A",
-)
-"""Built-in dark theme selected by [`use_theme`][pythonnative.use_theme]."""
-
-_FOLLOW_SYSTEM_THEME = object()
-"""Sentinel default for `ThemeContext`: resolve from the color scheme."""
-
-ThemeContext: Context = create_context(_FOLLOW_SYSTEM_THEME)
-"""Theme context that follows the system color scheme by default.
-
-Without a provider, [`use_theme`][pythonnative.use_theme] resolves to
-[`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
-[`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] based on
-the current appearance. Wrap a subtree in
-[`ThemeContext.Provider(my_theme, ...)`][pythonnative.hooks.Context.Provider] to
-pin an explicit theme for that subtree, then read it inside
-descendants via [`use_theme`][pythonnative.use_theme] (or
-[`use_context(ThemeContext)`][pythonnative.use_context]).
-"""
-
-
-def default_theme(scheme: str) -> Theme:
-    """Return the built-in [`Theme`][pythonnative.Theme] for ``scheme`` (``"light"`` / ``"dark"``)."""
-    return DEFAULT_DARK_THEME if scheme == "dark" else DEFAULT_LIGHT_THEME
-
-
-def use_theme() -> Theme:
-    """Return the active [`Theme`][pythonnative.Theme], following the system appearance by default.
-
-    If an ancestor mounted a ``ThemeContext.Provider(...)``, that
-    theme is returned as-is. Otherwise the built-in light or dark
-    theme is selected from the effective color scheme (via
-    [`use_color_scheme`][pythonnative.use_color_scheme], so the
-    component re-renders when the system appearance flips).
-
-    Returns:
-        The active theme.
-
-    Raises:
-        RuntimeError: If called outside a `@component` function.
-
-    Example:
-        ```python
-        import pythonnative as pn
-
-        @pn.component
-        def Card():
-            theme = pn.use_theme()
-            return pn.View(
-                pn.Text("Hello", style=pn.style(color=theme.text_color)),
-                style=pn.style(background_color=theme.surface_color),
-            )
-        ```
-    """
-    scheme = use_color_scheme()
-    theme = use_context(ThemeContext)
-    if theme is _FOLLOW_SYSTEM_THEME:
-        return default_theme(scheme)
-    if not isinstance(theme, Theme):
-        raise TypeError(f"ThemeContext.Provider expects a pn.Theme, got {type(theme).__name__}: {theme!r}")
-    return theme
+ABSOLUTE_FILL: Style = {"position": "absolute", "top": 0, "right": 0, "bottom": 0, "left": 0}
+"""A style that absolutely fills the parent, like React Native's ``StyleSheet.absoluteFill``."""
 
 
 __all__ = [
+    "ABSOLUTE_FILL",
+    "AccessibilityAction",
+    "AccessibilityState",
+    "AccessibilityValue",
     "AlignItems",
     "AlignSelf",
     "AutoCapitalize",
+    "BorderStyle",
     "Color",
-    "DEFAULT_DARK_THEME",
-    "DEFAULT_LIGHT_THEME",
     "Dimension",
     "Display",
+    "DynamicColor",
     "EdgeInsets",
     "EdgeValue",
     "FlexDirection",
     "FontWeight",
+    "ImportantForAccessibility",
     "JustifyContent",
     "KeyboardType",
     "MarginValue",
@@ -824,18 +853,20 @@ __all__ = [
     "TextAlign",
     "TextDecoration",
     "TextTransform",
-    "Theme",
-    "ThemeContext",
     "TransformEntry",
+    "TransformPerspective",
     "TransformRotate",
+    "TransformRotateX",
+    "TransformRotateY",
+    "TransformRotateZ",
     "TransformScale",
     "TransformScaleX",
     "TransformScaleY",
+    "TransformSkewX",
+    "TransformSkewY",
     "TransformSpec",
     "TransformTranslate",
-    "default_theme",
     "resolve_style",
     "style",
-    "use_theme",
     "validate_style_keys",
 ]

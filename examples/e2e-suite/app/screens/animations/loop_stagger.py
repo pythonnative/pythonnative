@@ -9,11 +9,11 @@ starts and reports "stagger done".
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def LoopStaggerDemo() -> pn.Element:
+def LoopStaggerDemo() -> pn.Node:
     """Render loop and stagger runners with awaitable completion."""
     scale = pn.use_animated_value(1.0)
     chip_a = pn.use_animated_value(0.2)
@@ -51,20 +51,20 @@ def LoopStaggerDemo() -> pn.Element:
     def chip(label: str, opacity: pn.AnimatedValue) -> pn.Element:
         return pn.Animated.View(
             pn.Text(label, style=pn.style(color="#FFFFFF", font_weight="700")),
-            style=pn.style(
-                opacity=opacity,
-                background_color="#F59E0B",
-                padding=12,
-                border_radius=8,
-            ),
+            style={
+                "opacity": opacity,
+                "background_color": "#F59E0B",
+                "padding": 12,
+                "border_radius": 8,
+            },
         )
 
-    return demo_screen(
+    return DemoScreen(
         "Animated.loop & stagger",
         "Loop a pulse three times, then stagger three chips in.",
-        section(
+        DemoSection(
             "Loop & stagger demo",
-            result_text("Status", status),
+            ResultText("Status", status),
             pn.Animated.View(
                 pn.Text("pulse-box", style=pn.style(color="#FFFFFF", font_weight="700")),
                 style=pn.style(
@@ -79,12 +79,12 @@ def LoopStaggerDemo() -> pn.Element:
                 chip("A", chip_a),
                 chip("B", chip_b),
                 chip("C", chip_c),
-                style=pn.style(spacing=8),
+                style=pn.style(gap=8),
             ),
-            buttons_row(
-                pn.Button("Run loop", on_press=lambda: pn.run_async(run_loop())),
-                pn.Button("Run stagger", on_press=lambda: pn.run_async(run_stagger())),
+            ButtonsRow(
+                pn.Button("Run loop", on_press=run_loop),
+                pn.Button("Run stagger", on_press=run_stagger),
             ),
-            hint("Maestro runs both and asserts the status lines."),
+            Hint("Maestro runs both and asserts the status lines."),
         ),
     )

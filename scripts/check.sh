@@ -38,6 +38,15 @@ uv run black --check src examples tests
 step "Type check (MyPy)"
 uv run mypy
 
+step "Type check the Inbox example (strict)"
+(cd examples/inbox && MYPYPATH=../inbox-extension/src uv run --project ../.. mypy --strict app)
+
+step "Type check the e2e suite (strict)"
+(cd examples/e2e-suite && env -u MYPYPATH uv run --project ../.. mypy --strict app)
+
+step "Rules of hooks (pn lint)"
+uv run pn lint src/pythonnative examples
+
 step "Build package (sdist + wheel)"
 uv build
 

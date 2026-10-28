@@ -1,7 +1,7 @@
-# Tests use_theme resolves the built-in theme from the color scheme.
+# Tests use_theme resolves the provided theme from the color scheme.
 #
 # Demo screen: examples/e2e-suite/app/screens/hooks/use_theme.py
-# Source under test: src/pythonnative/style.py :: use_theme
+# Source under test: src/pythonnative/theme.py :: use_theme, use_styles
 appId: ${APP_ID}
 ---
 - runFlow:

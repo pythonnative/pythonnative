@@ -14,11 +14,11 @@ Covers four additions in one screen:
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def InteractionPropsDemo() -> pn.Element:
+def InteractionPropsDemo() -> pn.Node:
     """Render pointer_events, hit_slop, corner-radius, and z_index demos."""
     through_taps, set_through_taps = pn.use_state(0)
     slop_taps, set_slop_taps = pn.use_state(0)
@@ -96,26 +96,26 @@ def InteractionPropsDemo() -> pn.Element:
         style=pn.style(height=100),
     )
 
-    return demo_screen(
+    return DemoScreen(
         "Interaction props",
         "pointer_events, hit_slop, per-corner radius, and z_index.",
-        section(
+        DemoSection(
             "pointer_events='none' overlay",
-            result_text("Through taps", through_taps),
+            ResultText("Through taps", through_taps),
             pass_through,
         ),
-        section(
+        DemoSection(
             "hit_slop",
-            result_text("Slop taps", slop_taps),
+            ResultText("Slop taps", slop_taps),
             slop_target,
         ),
-        section(
+        DemoSection(
             "Per-corner border radius",
             corner_box,
         ),
-        section(
+        DemoSection(
             "z_index",
             z_stack,
-            hint("The purple box renders above despite equal stacking context."),
+            Hint("The purple box renders above despite equal stacking context."),
         ),
     )

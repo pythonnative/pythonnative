@@ -17,11 +17,11 @@ Children
 --------
 
 Children are positional. A component that accepts children declares a
-``*children`` parameter, exactly like the built-in containers:
+``*children: pn.Node`` parameter, exactly like the built-in containers:
 
 ```python
 @pn.component
-def Card(*children: pn.Element, title: str = "") -> pn.Element:
+def Card(*children: pn.Node, title: str = "") -> pn.Node:
     return pn.Column(pn.Text(title, style=pn.style(bold=True)), *children)
 
 Card(pn.Text("body"), title="Hello")
@@ -34,12 +34,17 @@ positional parameters, so ``Greeting("World")`` works for
 Keys
 ----
 
-Every component accepts ``key=`` at the call site for keyed
-reconciliation. ``key`` is consumed by the framework and is not passed
-to the function unless the function declares a ``key`` parameter
-itself. Declaring it (``key: str | None = None``) is the way to keep
-strict type checkers happy when a component is rendered in a list;
-otherwise use [`Element.with_key`][pythonnative.element.Element.with_key].
+``key`` identifies an element, not a prop, so a component's signature
+can't declare it. Key a component's element with
+[`Element.with_key`][pythonnative.element.Element.with_key], which type-checks
+at every call site:
+
+```python
+pn.Column(*(Row(item).with_key(item.id) for item in items))
+```
+
+Passing ``key=`` to a user component raises ``TypeError``; built-in
+factories accept ``key=`` directly.
 """
 
 from __future__ import annotations
@@ -48,6 +53,7 @@ import functools
 import inspect
 from typing import Any, Awaitable, Callable, Dict, Generic, Mapping, Optional, ParamSpec, Union, overload
 
+from . import diagnostics
 from .element import Element, Node
 
 __all__ = ["Component", "RenderFn", "component", "memo", "is_component"]
@@ -56,6 +62,107 @@ P = ParamSpec("P")
 
 RenderFn = Callable[P, Union[Node, Awaitable[Node]]]
 """A component body: returns a [`Node`][pythonnative.element.Node], or awaits one when ``async def``."""
+
+
+def _hook_signature(fn: Callable[..., Any]) -> Optional[tuple[str, ...]]:
+    """Fast Refresh's hook fingerprint of ``fn``, or ``None`` without the refresh module.
+
+    Release bundles omit ``pythonnative.refresh`` (and ship bytecode, which
+    has no source to fingerprint), so the import is lazy, optional, and
+    attempted once.
+    """
+    global _refresh_signature
+    if getattr(fn, "__module__", "").startswith("pythonnative."):
+        # Framework components never change under Fast Refresh.
+        return None
+    if _refresh_signature is None:
+        try:
+            from .refresh import hook_signature
+        except ImportError:
+            _refresh_signature = False
+        else:
+            _refresh_signature = hook_signature
+    return _refresh_signature(fn) if callable(_refresh_signature) else None
+
+
+_refresh_signature: Union[None, bool, Callable[[Callable[..., Any]], Optional[tuple[str, ...]]]] = None
+
+
+class _Unplanned(Exception):
+    """A call the plan doesn't cover; ``inspect.Signature.bind`` decides it."""
+
+
+class _CallPlan:
+    """A precompiled binding of calls to one component signature.
+
+    ``Signature.bind`` is general and slow. Component signatures are almost
+    always plain parameters, an optional ``*children``, and keyword-only
+    props, so the plan binds those directly. Anything else, including
+    every call that would raise, is left to ``Signature.bind``, so error
+    messages are Python's own.
+    """
+
+    __slots__ = ("positional", "keyword_only", "names", "accepted", "defaults", "children")
+
+    def __init__(self, signature: inspect.Signature) -> None:
+        self.positional: tuple[str, ...] = ()
+        self.keyword_only: tuple[str, ...] = ()
+        self.children: Optional[str] = None
+        self.defaults: Dict[str, Any] = {}
+        names = []
+        for name, parameter in signature.parameters.items():
+            kind = parameter.kind
+            if kind is inspect.Parameter.VAR_POSITIONAL:
+                self.children = name
+                continue
+            if kind is inspect.Parameter.POSITIONAL_OR_KEYWORD:
+                self.positional += (name,)
+            elif kind is inspect.Parameter.KEYWORD_ONLY:
+                self.keyword_only += (name,)
+            else:
+                raise _Unplanned(name)
+            if parameter.default is not inspect.Parameter.empty:
+                self.defaults[name] = parameter.default
+            names.append(name)
+        self.names: tuple[str, ...] = tuple(names)
+        self.accepted = frozenset(names)
+
+    def bind(self, args: tuple[Any, ...], kwargs: Dict[str, Any]) -> tuple[Dict[str, Any], tuple[Any, ...]]:
+        """Return ``(props, children)`` in parameter order, with defaults applied."""
+        positional = self.positional
+        count = len(positional)
+        if len(args) > count and self.children is None:
+            raise _Unplanned
+        given = dict(zip(positional, args))
+        accepted = self.accepted
+        for name, value in kwargs.items():
+            if name in given or name not in accepted:
+                raise _Unplanned
+            given[name] = value
+        if len(given) == len(self.names):
+            props = given
+        else:
+            defaults = self.defaults
+            props = {}
+            for name in self.names:
+                if name in given:
+                    props[name] = given[name]
+                elif name in defaults:
+                    props[name] = defaults[name]
+                else:
+                    raise _Unplanned
+        return props, args[count:]
+
+    def arguments(self, props: Mapping[str, Any], children: tuple[Any, ...]) -> tuple[list[Any], Mapping[str, Any]]:
+        """Arrange an element's stored props and children for the call.
+
+        Raises:
+            KeyError: When ``props`` lacks a positional parameter.
+        """
+        if self.children is None:
+            return [], props
+        keywords = {name: props[name] for name in self.keyword_only if name in props}
+        return [*[props[name] for name in self.positional], *children], keywords
 
 
 class Component(Generic[P]):
@@ -83,34 +190,44 @@ class Component(Generic[P]):
         "props_equal",
         "accepts_children",
         "_signature",
-        "_declares_key",
+        "_plan",
+        "_keyed_builtin",
         "_is_async",
         "refresh_signature",
         "__wrapped__",
+        # ``functools.update_wrapper`` copies ``__module__`` and
+        # ``__qualname__`` from the render function so Fast Refresh can
+        # find a component's replacement by module and name; those two
+        # names can't be slots (they conflict with the class attributes),
+        # so instances keep a ``__dict__`` for them.
         "__dict__",
     )
 
-    def __init__(self, fn: RenderFn[P], *, display_name: Optional[str] = None) -> None:
+    def __init__(self, fn: RenderFn[P], *, display_name: Optional[str] = None, _keyed_builtin: bool = False) -> None:
         if isinstance(fn, Component):
             raise TypeError(f"{fn!r} is already a component; remove the duplicate @component")
         sig = inspect.signature(fn)
         accepts_children = False
-        declares_key = False
         for name, param in sig.parameters.items():
             if param.kind is inspect.Parameter.VAR_POSITIONAL:
                 accepts_children = True
-            if name == "key":
-                declares_key = True
-        from .refresh import hook_signature
-
-        self.refresh_signature = hook_signature(fn)
+            if name == "key" and not _keyed_builtin:
+                raise TypeError(
+                    f"{getattr(fn, '__qualname__', fn)!r} declares a 'key' parameter, but 'key' names an element's "
+                    "identity, not a prop. Rename the parameter; key a rendered element with .with_key(...)."
+                )
+        self.refresh_signature = _hook_signature(fn)
         self.fn = fn
-        self.display_name = display_name or getattr(fn, "__name__", "Component")
+        self.display_name: str = display_name or str(getattr(fn, "__name__", "Component"))
         self.memoized = False
         self.props_equal: Optional[Callable[[Mapping[str, Any], Mapping[str, Any]], bool]] = None
         self.accepts_children = accepts_children
         self._signature = sig
-        self._declares_key = declares_key
+        try:
+            self._plan: Optional[_CallPlan] = _CallPlan(sig)
+        except _Unplanned:
+            self._plan = None
+        self._keyed_builtin = _keyed_builtin
         self._is_async = inspect.iscoroutinefunction(fn)
         self.__wrapped__ = fn
         functools.update_wrapper(self, fn, updated=())
@@ -121,19 +238,42 @@ class Component(Generic[P]):
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Element:
         """Describe a render of this component with the given props."""
-        props: Dict[str, Any] = dict(kwargs)
-        key = props.pop("key", None) if not self._declares_key else props.get("key")
-        bound = self._signature.bind(*args, **props)
+        key: Optional[str] = None
+        if "key" in kwargs:
+            if not self._keyed_builtin:
+                raise TypeError(
+                    f"{self.display_name}() got key=...; components don't take a key prop. "
+                    f"Use {self.display_name}(...).with_key(key) instead."
+                )
+            raw = kwargs.pop("key")
+            key = None if raw is None else str(raw)
+        props: Dict[str, Any]
+        children: tuple[Any, ...]
+        try:
+            if self._plan is None:
+                raise _Unplanned
+            props, children = self._plan.bind(args, kwargs)
+        except _Unplanned:
+            props, children = self._bind(args, kwargs)
+        props.pop("key", None)
+        if diagnostics.is_dev() and not self._keyed_builtin:
+            from .prop_checks import check_props
+
+            check_props(self, props)
+        return Element(self, props, children, key=key)
+
+    def _bind(self, args: tuple[Any, ...], kwargs: Dict[str, Any]) -> tuple[Dict[str, Any], tuple[Any, ...]]:
+        """Bind a call the plan doesn't cover, raising Python's own errors."""
+        bound = self._signature.bind(*args, **kwargs)
         bound.apply_defaults()
-        children = ()
-        props = {}
+        children: tuple[Any, ...] = ()
+        props: Dict[str, Any] = {}
         for name, value in bound.arguments.items():
-            kind = self._signature.parameters[name].kind
-            if kind is inspect.Parameter.VAR_POSITIONAL:
+            if self._signature.parameters[name].kind is inspect.Parameter.VAR_POSITIONAL:
                 children = value
             else:
                 props[name] = value
-        return Element(self, props, children, key=key if isinstance(key, str) or key is None else str(key))
+        return props, children
 
     # ------------------------------------------------------------------
     # Rendering (used by the reconciler)
@@ -147,6 +287,13 @@ class Component(Generic[P]):
         (an element, a list, ``None``, or a coroutine for ``async def``
         bodies).
         """
+        if self._plan is not None:
+            try:
+                positional, keywords = self._plan.arguments(element.props, element.children)
+            except KeyError:
+                pass
+            else:
+                return self.fn(*positional, **keywords)
         arguments = dict(element.props)
         for name, param in self._signature.parameters.items():
             if param.kind is inspect.Parameter.VAR_POSITIONAL:
@@ -182,8 +329,7 @@ def component(fn: RenderFn[P]) -> Component[P]:
             [`Suspense`][pythonnative.Suspense]).
 
     Returns:
-        A ``Component`` whose call signature mirrors ``fn`` (plus the
-        framework ``key=`` keyword).
+        A ``Component`` whose call signature mirrors ``fn``.
 
     Example:
         ```python
@@ -259,6 +405,17 @@ def memo(
     if target is None:
         return apply
     return apply(target)
+
+
+def builtin_component(fn: RenderFn[P]) -> Component[P]:
+    """Framework-internal ``@component`` whose signature may declare ``key``.
+
+    Built-in factories implemented as components (``FlatList``,
+    ``SectionList``) keep a typed ``key=`` parameter like every other
+    built-in factory. The key becomes the element's identity and never
+    reaches the render function.
+    """
+    return Component(fn, _keyed_builtin=True)
 
 
 def is_component(obj: Any) -> bool:

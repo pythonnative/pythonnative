@@ -42,43 +42,49 @@ public final class PNModalManager: PNComponentManager {
         return modal.content
     }
 
+    /// The children stay mounted while the modal is hidden (Python keeps
+    /// them in the tree), so the manager keeps their order and moves all
+    /// of them into every presentation's content view.
     public override func insertChild(parent: UIView, child: UIView, index: Int) {
-        if let state = PNViewState.existing(for: parent), !(state.extras["modal"] is Presentation) {
-            var pending = (state.extras["pending_children"] as? [UIView]) ?? []
-            pending.removeAll { $0 === child }
-            pending.insert(child, at: max(0, min(index, pending.count)))
-            state.extras["pending_children"] = pending
+        guard let state = PNViewState.existing(for: parent) else {
+            super.insertChild(parent: parent, child: child, index: index)
             return
         }
-        super.insertChild(parent: parent, child: child, index: index)
+        var children = (state.extras["modal_children"] as? [UIView]) ?? []
+        children.removeAll { $0 === child }
+        children.insert(child, at: max(0, min(index, children.count)))
+        state.extras["modal_children"] = children
+        if state.extras["modal"] is Presentation {
+            super.insertChild(parent: parent, child: child, index: index)
+        }
     }
 
     public override func removeChild(parent: UIView, child: UIView) {
+        // A hidden modal's children still sit in the last presentation's content view.
         super.removeChild(parent: parent, child: child)
-        if let state = PNViewState.existing(for: parent), var pending = state.extras["pending_children"] as? [UIView] {
-            pending.removeAll { $0 === child }
-            state.extras["pending_children"] = pending
+        if let state = PNViewState.existing(for: parent), var children = state.extras["modal_children"] as? [UIView] {
+            children.removeAll { $0 === child }
+            state.extras["modal_children"] = children
         }
     }
 
     public override func setFrame(view: UIView, x: Double, y: Double, w: Double, h: Double) {}
 
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize { .zero }
-
     private func present(_ placeholder: UIView, _ state: PNViewState) {
         let props = state.props
         let controller = PNModalViewController()
+        controller.placeholder = placeholder
         controller.onDismissed = { [weak placeholder] in
             guard let placeholder = placeholder, let state = PNViewState.existing(for: placeholder),
                   state.extras["modal"] is Presentation
             else { return }
             state.extras.removeValue(forKey: "modal")
             PNEvents.emit(placeholder, "on_dismiss")
-            PNEvents.emitIfWired(placeholder, "on_request_close")
         }
         let style = PNProps.string(PNProps.value(props, "presentation_style")) ?? "page_sheet"
         let isOverlay = style == "overlay" || PNProps.bool(PNProps.value(props, "transparent")) == true
-        let content = UIView(frame: controller.view.bounds)
+        let content = PNContainerReportingView(frame: controller.view.bounds)
+        content.reportedTag = state.tag
         content.backgroundColor = isOverlay ? .clear : PNColor.parse(PNProps.value(props, "background_color")) ?? .systemBackground
         content.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         controller.view.addSubview(content)
@@ -94,12 +100,25 @@ public final class PNModalManager: PNComponentManager {
         case "flip": controller.modalTransitionStyle = .flipHorizontal
         default: controller.modalTransitionStyle = .coverVertical
         }
-        if !isOverlay, PNProps.bool(PNProps.value(props, "dismiss_on_backdrop")) == false {
+        let backdropCloses = PNProps.bool(PNProps.value(props, "dismiss_on_backdrop")) != false
+        if !isOverlay, !backdropCloses {
             controller.isModalInPresentation = true
         }
+        if isOverlay, backdropCloses {
+            // A tap on the dimmed backdrop, outside every child, asks to close.
+            let tap = UITapGestureRecognizer(target: controller, action: #selector(PNModalViewController.backdropTapped))
+            tap.cancelsTouchesInView = false
+            tap.delegate = controller
+            content.addGestureRecognizer(tap)
+            controller.backdrop = content
+        }
+        // `status_bar_translucent` is Android-only and ignored here.
+        controller.presentationController?.delegate = controller
         let presentation = Presentation(controller: controller, content: content)
         state.extras["modal"] = presentation
-        for child in (state.extras.removeValue(forKey: "pending_children") as? [UIView]) ?? [] {
+        // Each presentation builds a new content view; move every child into
+        // it, including children the previous presentation showed.
+        for child in (state.extras["modal_children"] as? [UIView]) ?? [] {
             child.translatesAutoresizingMaskIntoConstraints = true
             content.addSubview(child)
         }
@@ -122,9 +141,16 @@ public final class PNModalManager: PNComponentManager {
     }
 }
 
-/// Reports interactive dismissal (sheet swipe) back to the manager.
-final class PNModalViewController: UIViewController {
+/// Owns the sheet's interactive dismissal. A pull-down never dismisses
+/// the modal by itself: `visible` is Python's. When `on_request_close`
+/// is wired the pull-down reports it (Python then sets `visible=False`);
+/// when it isn't, the sheet bounces back and stays presented. An overlay's
+/// backdrop tap reports the same way.
+final class PNModalViewController: UIViewController, UIAdaptivePresentationControllerDelegate, UIGestureRecognizerDelegate {
     var onDismissed: (() -> Void)?
+    weak var placeholder: UIView?
+    /// The overlay content view whose empty area counts as the backdrop.
+    weak var backdrop: UIView?
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
@@ -132,10 +158,59 @@ final class PNModalViewController: UIViewController {
             onDismissed?()
         }
     }
+
+    func presentationControllerShouldDismiss(_ presentationController: UIPresentationController) -> Bool {
+        // UIKit follows a refusal with `presentationControllerDidAttemptToDismiss`,
+        // which reports the request; reporting here too would send it twice.
+        false
+    }
+
+    func presentationControllerDidAttemptToDismiss(_ presentationController: UIPresentationController) {
+        // `dismiss_on_backdrop=False` locks the sheet; its pull-down isn't a request.
+        if !isModalInPresentation { requestClose() }
+    }
+
+    @objc func backdropTapped() {
+        requestClose()
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard let backdrop = backdrop else { return false }
+        return isBackdrop(touch.location(in: backdrop))
+    }
+
+    /// Whether `point`, in the backdrop's coordinates, misses every visible child.
+    func isBackdrop(_ point: CGPoint) -> Bool {
+        guard let backdrop = backdrop else { return false }
+        return !backdrop.subviews.contains { !$0.isHidden && $0.frame.contains(point) }
+    }
+
+    /// Ask Python to close (`on_request_close`), if the app listens.
+    @discardableResult
+    func requestClose() -> Bool {
+        guard let placeholder = placeholder, PNViewState.existing(for: placeholder)?.hasEvent("on_request_close") == true else { return false }
+        PNComponentEvents.Modal.on_request_close(placeholder)
+        return true
+    }
+}
+
+/// A view that reports its frame to the renderer core as the container a
+/// detached root lays out in (a modal's content, a portal).
+class PNContainerReportingView: UIView {
+    var reportedTag: Int64 = 0
+    private var lastFrame = CGRect.null
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard reportedTag != 0 else { return }
+        let frame = window.map { convert(bounds, to: $0) } ?? bounds
+        guard frame != lastFrame else { return }
+        lastFrame = frame
+        PNCoreBridge.reportContainer(tag: reportedTag, view: self)
+    }
 }
 
 /// Overlay view that only claims touches landing on one of its subviews.
-final class PNPortalView: UIView {
+final class PNPortalView: PNContainerReportingView {
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         for sub in subviews where !sub.isHidden && sub.alpha > 0.01 && sub.isUserInteractionEnabled {
             if sub.frame.contains(point) { return true }
@@ -153,6 +228,10 @@ public final class PNPortalManager: PNComponentManager {
         return overlay
     }
 
+    public override func didCreate(view: UIView, tag: Int64, props: [String: Any]) {
+        (view as? PNPortalView)?.reportedTag = tag
+    }
+
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
         PNViewStyler.applyCommon(view, props)
         if !initial { ensureAttached(view) }
@@ -164,8 +243,6 @@ public final class PNPortalManager: PNComponentManager {
     }
 
     public override func setFrame(view: UIView, x: Double, y: Double, w: Double, h: Double) {}
-
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize { .zero }
 
     private func ensureAttached(_ overlay: UIView) {
         guard let host = PNWindow.topViewController()?.view else { return }
@@ -217,10 +294,12 @@ public final class PNStatusBarManager: PNComponentManager {
     }
 
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
-        if let hidden = PNProps.bool(PNProps.value(props, "hidden")) {
+        let typed = StatusBarProps(props)
+
+        if let hidden = typed.hidden {
             PNStatusBarState.hidden = hidden
         }
-        if let style = PNProps.string(PNProps.value(props, "bar_style")) {
+        if let style = typed.bar_style?.rawValue {
             switch style {
             case "light", "light_content": PNStatusBarState.style = .lightContent
             case "dark", "dark_content": PNStatusBarState.style = .darkContent
@@ -234,10 +313,14 @@ public final class PNStatusBarManager: PNComponentManager {
             default: PNStatusBarState.animation = .fade
             }
         }
-        PNStatusBarState.refresh()
+        // `translucent` is Android-only and ignored here.
+        let animated = PNProps.bool(PNProps.value(PNViewState.existing(for: view)?.props ?? props, "animated")) ?? false
+        if animated {
+            UIView.animate(withDuration: 0.3) { PNStatusBarState.refresh() }
+        } else {
+            PNStatusBarState.refresh()
+        }
     }
 
     public override func setFrame(view: UIView, x: Double, y: Double, w: Double, h: Double) {}
-
-    public override func measure(view: UIView, maxW: CGFloat, maxH: CGFloat) -> CGSize { .zero }
 }

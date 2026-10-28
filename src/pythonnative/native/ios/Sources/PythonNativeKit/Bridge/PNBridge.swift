@@ -1,17 +1,13 @@
 import Foundation
 import UIKit
+import PNCore
 
-/// The version of the wire protocol compiled into this library. Python
-/// refuses to start when `pythonnative.bridge.PROTOCOL_VERSION` differs.
-public let PNProtocolVersion: Int32 = 2
-
-/// The C signature Python registers through `pn_bridge_set_callback`.
-///
-/// `(kind, tag, name, payload_json) -> optional JSON string owned by
-/// Python and valid until the next callback returns`.
+/// The C signature Python registers through `pn_bridge_set_callback`:
+/// `(kind, tag, name, payload_json)`. Python handles every message
+/// asynchronously and returns nothing.
 public typealias PNCallbackFn = @convention(c) (
     UnsafePointer<CChar>?, Int64, UnsafePointer<CChar>?, UnsafePointer<CChar>?
-) -> UnsafePointer<CChar>?
+) -> Void
 
 /// Swift-side entry point for the reverse direction (native -> Python) and
 /// the owner of the registered C callback.
@@ -19,15 +15,23 @@ public final class PNBridge {
     public static let shared = PNBridge()
 
     private let pythonQueue = DispatchQueue(label: "dev.pythonnative.events")
+    private static let continuousEvents: Set<String> = ["on_scroll", "on_window", "on_selection_change", "on_gesture_update"]
     private struct Message {
         let kind: String; let tag: Int64; let name: String; let payload: String
-        var continuous: Bool {
-            guard kind == "event" else { return false }
-            if ["on_scroll", "on_selection_change", "on_gesture_update"].contains(name) { return true }
-            if name.hasPrefix("gesture:"), let args = PNJSON.decodeObject(payload)["args"] as? [[String: Any]] {
-                return args.first?["state"] as? String == "changed"
+        /// Whether a newer message for the same view and event replaces this
+        /// one. Computed once, before the mailbox lock is taken.
+        let continuous: Bool
+        init(kind: String, tag: Int64, name: String, payload: String) {
+            self.kind = kind; self.tag = tag; self.name = name; self.payload = payload
+            if kind != "event" {
+                continuous = false
+            } else if PNBridge.continuousEvents.contains(name) {
+                continuous = true
+            } else if name.hasPrefix("gesture:"), let args = PNJSON.decodeObject(payload)["args"] as? [[String: Any]] {
+                continuous = args.first?["state"] as? String == "changed"
+            } else {
+                continuous = false
             }
-            return false
         }
     }
     private let mailboxLock = NSLock()
@@ -41,16 +45,21 @@ public final class PNBridge {
         // dead-strips them out of the host executable; Python resolves
         // them through `dlsym` at runtime.
         _ = PNBridge.exportedSymbols
+        PNCoreBridge.install()
     }
 
     /// Whether Python has registered its callback yet.
     public var hasCallback: Bool { callback != nil }
 
-    /// Install (or clear) the Python callback. Runs any pending
-    /// `whenCallbackRegistered` blocks when a callback becomes available.
+    /// Install (or clear) the Python callback. Delivers the messages queued
+    /// before it existed, then runs any pending `whenCallbackRegistered`
+    /// blocks.
     public func setCallback(_ fn: PNCallbackFn?) {
+        mailboxLock.lock()
         callback = fn
+        mailboxLock.unlock()
         guard fn != nil else { return }
+        scheduleDrain()
         let waiters = registrationWaiters
         registrationWaiters = []
         for waiter in waiters { waiter() }
@@ -66,36 +75,43 @@ public final class PNBridge {
         }
     }
 
-    /// Invoke the Python callback. Returns the JSON string Python returned
-    /// (copied immediately), or `nil` when Python returned NULL or no
-    /// callback is registered.
-    @discardableResult
-    public func callPython(kind: String, tag: Int64, name: String, payload: String) -> String? {
-        let encoded = kind == "layout" ? PNJSON.encode(PNCommit.layout(PNJSON.decode(payload) ?? [])) : payload
-        let message = Message(kind: kind, tag: tag, name: name, payload: encoded)
+    /// Queue one message for Python. Messages are delivered in order on the
+    /// events queue; consecutive continuous events for the same view
+    /// coalesce. Messages sent before Python registers its callback wait
+    /// for it. Python never answers.
+    public func callPython(kind: String, tag: Int64, name: String, payload: String) {
+        let message = Message(kind: kind, tag: tag, name: name, payload: payload)
         mailboxLock.lock()
         if message.continuous, let last = mailbox.last, last.continuous,
            last.tag == tag, last.name == name {
             mailbox[mailbox.count - 1] = message
         } else { mailbox.append(message) }
-        let schedule = !draining
-        draining = true
+        mailboxLock.unlock()
+        scheduleDrain()
+    }
+
+    private func scheduleDrain() {
+        mailboxLock.lock()
+        let schedule = !draining && callback != nil && !mailbox.isEmpty
+        if schedule { draining = true }
         mailboxLock.unlock()
         if schedule { pythonQueue.async { [self] in drainMailbox() } }
-        return nil
     }
 
     private func drainMailbox() {
         while true {
             mailboxLock.lock()
-            if mailbox.isEmpty { draining = false; mailboxLock.unlock(); return }
+            guard let callback = callback, !mailbox.isEmpty else {
+                draining = false
+                mailboxLock.unlock()
+                return
+            }
             let message = mailbox.removeFirst()
             mailboxLock.unlock()
-            guard let callback = callback else { continue }
             message.kind.withCString { kind in
                 message.name.withCString { name in
                     message.payload.withCString { payload in
-                        _ = callback(kind, message.tag, name, payload)
+                        callback(kind, message.tag, name, payload)
                     }
                 }
             }
@@ -107,25 +123,21 @@ public final class PNBridge {
         return DispatchQueue.main.sync(execute: body)
     }
 
-    /// Emit a view event: `callback("event", tag, name, args_array_json)`.
-    @discardableResult
-    public func emitEvent(tag: Int64, name: String, args: [Any?]) -> String? {
-        PNAnimationGraph.event(tag, name, args)
+    /// Emit a view event through the renderer core, which stamps its
+    /// identity, feeds animated bindings, and queues it for Python.
+    public func emitEvent(tag: Int64, name: String, args: [Any?]) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { self.emitEvent(tag: tag, name: name, args: args) }
+            return
+        }
         var editRevision = 0
         if name == "on_change", let view = PNViewRegistry.shared.view(for: tag),
            view is UITextInput, let state = PNViewState.existing(for: view) {
             editRevision = (state.extras["edit_revision"] as? Int ?? 0) + 1
             state.extras["edit_revision"] = editRevision
         }
-        return callPython(kind: "event", tag: tag, name: name, payload: PNCommit.event(args, editRevision: editRevision))
-    }
-
-    /// Log when an entry point is reached off the main thread. Python
-    /// always calls from the main thread, so this only guards misuse.
-    static func ensureMainThread(_ context: String) {
-        if !Thread.isMainThread {
-            PNLog.rateLimited(PNLog.bridge, key: "off-main:\(context)", "\(context) called off the main thread; running inline")
-        }
+        pn_core_event(PNCore.handle, PNCore.surface, tag, name, PNJSON.encode(args.map { $0 ?? NSNull() }), Int64(editRevision))
+        PNMounter.applyWrites()
     }
 
     /// Copy a Swift string into a `strdup`'d buffer Python frees via `pn_bridge_free`.
@@ -135,98 +147,32 @@ public final class PNBridge {
     }
 
     private static let exportedSymbols: [Any] = [
-        pn_bridge_apply as Any,
-        pn_bridge_measure as Any,
-        pn_bridge_command as Any,
-        pn_bridge_animate as Any,
         pn_bridge_call as Any,
         pn_bridge_free as Any,
         pn_bridge_set_callback as Any,
-        pn_bridge_protocol_version as Any,
     ]
 }
 
 // MARK: - C exports
 
-/// Apply one serialized transaction (a JSON array of ops).
-@_cdecl("pn_bridge_apply")
-public func pn_bridge_apply(_ transactionJSON: UnsafePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
-    guard let transactionJSON = transactionJSON else { return nil }
-    let json = String(cString: transactionJSON)
-    return PNBridge.onUI { PNBridge.duplicate(PNCommit.apply(json)) }
-}
-
-/// Measure the view with `tag` under the given constraints (`1e6` means unconstrained).
-@_cdecl("pn_bridge_measure")
-public func pn_bridge_measure(
-    _ tag: Int64, _ maxW: Double, _ maxH: Double,
-    _ outW: UnsafeMutablePointer<Double>?, _ outH: UnsafeMutablePointer<Double>?
-) {
-    PNBridge.onUI {
-
-    PNBridge.ensureMainThread("pn_bridge_measure")
-    var size = CGSize.zero
-    if let record = PNViewRegistry.shared.resolve(tag) {
-        size = record.manager.measure(view: record.view, maxW: CGFloat(maxW), maxH: CGFloat(maxH))
-    }
-    outW?.pointee = size.width.isFinite ? Double(size.width) : 0
-    outH?.pointee = size.height.isFinite ? Double(size.height) : 0
-    }
-}
-
-/// Run an imperative command on one view; returns an optional JSON result.
-@_cdecl("pn_bridge_command")
-public func pn_bridge_command(
-    _ tag: Int64, _ name: UnsafePointer<CChar>?, _ argsJSON: UnsafePointer<CChar>?
-) -> UnsafeMutablePointer<CChar>? {
-    return PNBridge.onUI {
-
-    PNBridge.ensureMainThread("pn_bridge_command")
-    guard let name = name, let record = PNViewRegistry.shared.resolve(tag) else { return nil }
-    let args = PNJSON.decodeObject(argsJSON.map { String(cString: $0) })
-    guard PNContracts.validateCommand(record.typeName, String(cString: name), args) else {
-        return PNBridge.duplicate(PNJSON.encode(["error": "Invalid view command"]))
-    }
-    let result = record.manager.command(view: record.view, name: String(cString: name), args: args)
-    guard let result = result else { return nil }
-    return PNBridge.duplicate(PNJSON.encode(result))
-    }
-}
-
-/// Drive a view's animatable properties (`set` / `start` / `cancel`).
-@_cdecl("pn_bridge_animate")
-public func pn_bridge_animate(
-    _ tag: Int64, _ requestJSON: UnsafePointer<CChar>?
-) -> UnsafeMutablePointer<CChar>? {
-    return PNBridge.onUI {
-
-    PNBridge.ensureMainThread("pn_bridge_animate")
-    let request = PNJSON.decodeObject(requestJSON.map { String(cString: $0) })
-    let result = PNAnimator.shared.handle(tag: tag, request: request)
-    guard let result = result else { return nil }
-    return PNBridge.duplicate(PNJSON.encode(result))
-    }
-}
-
 /// Call a native module method. The result is `{"ok":..}`, `{"pending":true}`, or an error envelope.
+///
+/// Pending mount transactions are applied first, so a call that follows a
+/// commit (`Host.attach_root`) sees the views that commit created.
 @_cdecl("pn_bridge_call")
 public func pn_bridge_call(
     _ module: UnsafePointer<CChar>?, _ method: UnsafePointer<CChar>?, _ argsJSON: UnsafePointer<CChar>?
 ) -> UnsafeMutablePointer<CChar>? {
     return PNBridge.onUI {
+    PNMounter.drain()
 
-    PNBridge.ensureMainThread("pn_bridge_call")
     guard let module = module, let method = method else {
         return PNBridge.duplicate(PNJSON.encode(["ok": false, "error": "missing module or method"]))
     }
     let envelope = PNJSON.decodeObject(argsJSON.map { String(cString: $0) })
     if String(cString: module) == "Runtime" {
         return PNBridge.duplicate(PNJSON.encode(["ok": true, "value": [
-            "protocol": 2, "yoga": "3.2.1", "schema": PNContracts.fingerprint,
-            "animation_graph": true, "logical_lists": true, "native_layout": true]]))
-    }
-    if String(cString: module) == "Layout" {
-        return PNBridge.duplicate(PNJSON.encode(["ok": true, "value": PNCommit.layout(PNLayout.compute(envelope["args"] as? [String: Any] ?? [:]))]))
+            "protocol": Int(pn_core_protocol_version()), "yoga": PNContracts.yogaVersion, "schema": PNContracts.fingerprint]]))
     }
     let result = PNModuleDispatcher.shared.call(
         module: String(cString: module), method: String(cString: method), envelope: envelope
@@ -246,14 +192,7 @@ public func pn_bridge_free(_ ptr: UnsafeMutablePointer<CChar>?) {
 public func pn_bridge_set_callback(_ fn: PNCallbackFn?) {
     PNBridge.onUI {
 
-    PNBridge.ensureMainThread("pn_bridge_set_callback")
     PNRegistry.shared.ensureBuiltins()
     PNBridge.shared.setCallback(fn)
     }
-}
-
-/// The protocol version this library speaks.
-@_cdecl("pn_bridge_protocol_version")
-public func pn_bridge_protocol_version() -> Int32 {
-    PNProtocolVersion
 }

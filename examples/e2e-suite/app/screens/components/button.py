@@ -8,35 +8,35 @@ variant whose ``on_press`` should never fire.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def ButtonDemo() -> pn.Element:
+def ButtonDemo() -> pn.Node:
     """Render an enabled counter button and a disabled button."""
     count, set_count = pn.use_state(0)
     disabled_count, set_disabled_count = pn.use_state(0)
 
-    return demo_screen(
+    return DemoScreen(
         "Button",
         "Tap-driven counter plus a disabled button whose handler must not fire.",
-        section(
+        DemoSection(
             "Enabled button",
-            result_text("Counter", count),
-            buttons_row(
+            ResultText("Counter", count),
+            ButtonsRow(
                 pn.Button("Increment", on_press=lambda: set_count(count + 1)),
                 pn.Button("Reset", on_press=lambda: set_count(0)),
             ),
-            hint("Tap 'Increment' to increase the counter."),
+            Hint("Tap 'Increment' to increase the counter."),
         ),
-        section(
+        DemoSection(
             "Disabled button",
-            result_text("Disabled taps", disabled_count),
+            ResultText("Disabled taps", disabled_count),
             pn.Button(
                 "Should not fire",
                 on_press=lambda: set_disabled_count(disabled_count + 1),
                 disabled=True,
             ),
-            hint("Tapping this button must keep 'Disabled taps' at 0."),
+            Hint("Tapping this button must keep 'Disabled taps' at 0."),
         ),
     )

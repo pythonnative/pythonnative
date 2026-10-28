@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 async def _fetch_item(item_id: int) -> str:
@@ -20,26 +20,26 @@ async def _fetch_item(item_id: int) -> str:
 
 
 @pn.component
-def _ItemCard(item_id: int = 1) -> pn.Element:
+def _ItemCard(item_id: int = 1) -> pn.Node:
     resource = pn.use_resource(lambda: _fetch_item(item_id), [item_id])
-    return result_text("Item", resource.read())
+    return ResultText("Item", resource.read())
 
 
 @pn.component
-def UseResourceDemo() -> pn.Element:
+def UseResourceDemo() -> pn.Node:
     """Fetch-on-render with caching; deps changes refetch."""
     item_id, set_item_id = pn.use_state(1)
 
-    return demo_screen(
+    return DemoScreen(
         "use_resource",
         "use_resource starts a fetch during render and caches it; read() suspends until the data is ready.",
-        section(
+        DemoSection(
             "Resource",
             pn.Suspense(
                 _ItemCard(item_id=item_id),
-                fallback=result_text("Item", "loading"),
+                fallback=ResultText("Item", "loading"),
             ),
             pn.Button("Next item", on_press=lambda: set_item_id(item_id + 1)),
-            hint("Maestro waits for 'Item: item-1', taps Next item, then waits for 'Item: item-2'."),
+            Hint("Maestro waits for 'Item: item-1', taps Next item, then waits for 'Item: item-2'."),
         ),
     )

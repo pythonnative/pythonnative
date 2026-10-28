@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.content.Context
 import android.view.View
 import android.widget.AdapterView
@@ -41,11 +43,13 @@ class PickerManager : ComponentManager() {
     }
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = PickerProps(props)
+
         val spinner = view as Spinner
         val state = stateOf(spinner)
         val merged = propsOf(spinner)
         val items = merged.value("items") as? JSONArray ?: JSONArray()
-        if (props.has("items") || initial) {
+        if (typed.has_items || initial) {
             val labels = (0 until items.length()).map { itemLabel(items.opt(it)) }
             val adapter = ArrayAdapter(spinner.context, android.R.layout.simple_spinner_item, labels)
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -56,7 +60,7 @@ class PickerManager : ComponentManager() {
                 state["suppress"] = false
             }
         }
-        if (props.has("value") || props.has("selected_value") || initial) {
+        if (typed.has_value || props.has("selected_value") || initial) {
             val value = merged.value("value") ?: merged.value("selected_value")
             var target = -1
             for (i in 0 until items.length()) {
@@ -74,7 +78,7 @@ class PickerManager : ComponentManager() {
                 }
             }
         }
-        if (props.has("disabled")) spinner.isEnabled = !JsonUtil.truthy(props.value("disabled"))
+        if (typed.has_disabled) spinner.isEnabled = !(typed.disabled ?: false)
         ViewStyler.apply(spinner, props)
     }
 

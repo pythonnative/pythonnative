@@ -1,5 +1,7 @@
 # Tests TextInput: native focus and typing mirror into the echo line,
-# selection events and creation-only changes preserve the controlled value.
+# selection events (SelectionEvent) and on_key_press (KeyPressEvent) reach
+# Python, a controlled selection selects the text, and creation-only
+# changes preserve the controlled value.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/text_input.py
 # Source under test: src/pythonnative/components/text.py :: TextInput
@@ -12,6 +14,7 @@ appId: ${APP_ID}
       DEMO_TITLE: TextInput
 - assertVisible: "Echo: (empty)"
 - assertVisible: "Focused: OFF"
+- assertVisible: "Last key: (none)"
 - tapOn: "Type your name here"
 # on_focus fires when the field becomes first responder / gains focus.
 - assertVisible: "Focused: ON"
@@ -20,7 +23,8 @@ appId: ${APP_ID}
 # UI dismiss button that doesn't exist for a standard text keyboard).
 # ``pressKey: Enter`` works because the iOS handler installs a
 # ``UITextFieldDelegate.textFieldShouldReturn:`` that resigns first
-# responder, which is also the behavior most users expect.
+# responder, which is also the behavior most users expect
+# (blur_on_submit=True asks for the same thing explicitly).
 - pressKey: Enter
 - scrollUntilVisible:
     element:
@@ -29,6 +33,17 @@ appId: ${APP_ID}
     timeout: 20000
 - assertVisible: "Echo: Maestro"
 - assertVisible: "Selection: 7:7"
+# on_key_press reports the last typed character. Both input pipelines
+# deliver single characters for Maestro's typing, but "Enter" may or may
+# not arrive as a key afterwards, so accept either.
+- assertVisible:
+    text: "Last key: (o|Enter)"
+# Controlled selection: the button sets selection=(0, 7) and the native
+# widget reports it back through on_selection_change.
+- tapOn: "Select all"
+- extendedWaitUntil:
+    visible: "Selection: 0:7"
+    timeout: 5000
 - tapOn: "Use multiline name"
 - assertVisible: "Use single line"
 - assertVisible: "Echo: Maestro"

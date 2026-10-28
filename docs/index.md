@@ -13,19 +13,19 @@ import pythonnative as pn
 
 
 @pn.component
-def Counter(initial: int = 0):
+def Counter(initial: int = 0) -> pn.Node:
     count, set_count = pn.use_state(initial)
     return pn.Column(
         pn.Text(f"Count: {count}", style=pn.style(font_size=24, bold=True)),
         pn.Button("+", on_press=lambda: set_count(count + 1)),
-        style=pn.style(spacing=12, padding=16),
+        style=pn.style(gap=12, padding=16),
     )
 ```
 
 That same `Counter` mounts as a `UILabel` plus a `UIButton` inside a
 `UIView` on iOS, and as a `TextView` plus a `Button` inside a
-`FrameLayout` on Android. The shared Yoga layout engine interprets
-`flex`, `padding`, and `position` beside the native widgets.
+`FrameLayout` on Android. A shared C++ renderer core interprets
+`flex`, `padding`, and `position` with Yoga, off the UI thread.
 Platform controls and fonts supply their own intrinsic sizes.
 
 ## Why PythonNative?
@@ -42,26 +42,47 @@ Platform controls and fonts supply their own intrinsic sizes.
   the body, with [`Suspense`][pythonnative.Suspense] providing the
   loading state declaratively. See the
   [Async + data guide](guides/async.md).
-- **Typed styling.** [`pn.Style`][pythonnative.style.Style] is a
-  `TypedDict` with `Literal` enums for every fixed-value field, so
-  mypy and your editor catch typos in `align_items` or
-  `font_weight` before the app ever runs. The
-  [`pn.style(...)`][pythonnative.style.style] helper makes the
-  call sites tidy.
-- **Native-backed navigation.** The root `Stack.Navigator` drives
-  the platform's real navigation controller (Android Navigation
-  Component fragments on Android, `UINavigationController` on iOS),
-  so transitions, back gestures, and state preservation are exactly
-  what users expect from a first-class native app.
-- **A Metro-style dev loop.** `pn start` runs one dev server for the
-  browser preview and every connected debug build. Save a file and
-  each client Fast Refreshes in place, preserving component state;
-  their logs stream back into the same terminal. See the
-  [Development workflow](guides/dev-workflow.md).
-- **Dev-mode diagnostics.** Uncaught errors show a full-screen RedBox
-  with the traceback instead of crashing; typos in style keys and
-  duplicate list keys print "did you mean" warnings; conditional
-  hooks raise at the source. Every check is skipped in production.
+- **Typed from end to end.** A component's signature is its prop
+  list and it returns a [`pn.Node`][pythonnative.element.Node], so a
+  strict type checker verifies element trees, props, and conditional
+  children. [`pn.Style`][pythonnative.style.Style] is a `TypedDict`
+  with `Literal` enums for every fixed-value field, so mypy and your
+  editor catch typos in `align_items` or `font_weight` before the app
+  ever runs.
+- **Screens are components.** A screen's parameters are its route
+  params, so `nav.push(ItemScreen(id=42))` is a checked call.
+  Navigators are module-level values, and deep links come from each
+  screen's `path`. See [Navigation](guides/navigation.md).
+- **Native-backed navigation.** Every stack drives the platform's real
+  navigation controller (fragments on Android, `UINavigationController`
+  on iOS), so transitions, back gestures, and state preservation are
+  exactly what users expect from a first-class native app.
+- **One theme, typed style sheets, and stores.** A
+  [`Theme`][pythonnative.Theme] dataclass styles the app and its
+  navigators and follows dark mode;
+  [`StyleSheet`][pythonnative.StyleSheet] namespaces give styles typed
+  names; and a [`Store`][pythonnative.Store] holds app state with
+  targeted re-renders. See [Styling](guides/styling.md) and
+  [Managing state](guides/state.md).
+- **A Metro-style dev loop with PythonNative Go.** `pn start` runs one
+  dev server for the browser preview and every connected app, and prints
+  a QR code. PythonNative Go, a prebuilt dev client, runs any project
+  without native code on a simulator, emulator, or phone without
+  compiling the project. Save a file and each client Fast Refreshes in place, preserving
+  component state. See the [Development workflow](guides/dev-workflow.md)
+  and [PythonNative Go and DevTools](guides/devtools.md).
+- **DevTools and breakpoints.** A DevTools page shows the component tree
+  with props and hooks, a REPL inside the running app, problems,
+  network requests, and performance. VS Code attaches `debugpy`
+  breakpoints to the Python running on a phone. See
+  [Debugging](guides/debugging.md).
+- **Dev-mode diagnostics.** Uncaught errors show a full-screen error
+  screen with the component stack and your source instead of crashing; typos in style keys and
+  duplicate list keys print "did you mean" warnings; props that don't
+  match a component's annotations warn; conditional hooks raise at the
+  source. Every check is skipped in production, and
+  [`pn lint`](guides/linting.md) catches hook mistakes before you run
+  the app.
 - **Browser preview.** `pn preview` renders your app in a browser tab
   inside a phone frame, through the same bridge protocol the Swift and
   Kotlin runtimes speak, so you can iterate on UI, state, and
@@ -69,10 +90,13 @@ Platform controls and fonts supply their own intrinsic sizes.
   [Browser preview guide](guides/browser-preview.md).
 - **An extension SDK.** [`pythonnative.sdk`](api/sdk.md) lets you
   wrap any platform widget as a first-class element with
-  type-checked props, and PyPI plugins auto-register through the
-  `pythonnative.handlers` entry-point group.
+  type-checked props through
+  [`define_component`][pythonnative.sdk.define_component], generates
+  the Swift and Kotlin contract from the same declaration, and PyPI
+  plugins auto-register through the `pythonnative.handlers` entry-point
+  group.
 - **A small surface.** A handful of element factories, a handful of
-  hooks, and one navigation primitive.
+  hooks, and three navigators.
 
 ## Quick links
 

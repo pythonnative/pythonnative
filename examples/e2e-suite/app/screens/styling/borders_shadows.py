@@ -1,23 +1,38 @@
-"""Demo screen for borders, border_radius, and shadows.
+"""Demo screen for borders, border_radius, border_style, and shadows.
 
-A rounded card with a 1px border and a soft shadow. The exact pixel
-output is platform-specific but the demo asserts the element renders
-with its label.
+A rounded card with a 1px border and a soft shadow, plus dashed and
+dotted boxes for the ``border_style`` values added in RFC 0002. The
+exact pixel output is platform-specific but the demo asserts each
+element renders with its label.
 """
 
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
+
+
+def _styled_box(label: str, border_style: pn.BorderStyle) -> pn.Element:
+    return pn.View(
+        pn.Text(label, style=pn.style(font_size=13, font_weight="600")),
+        style=pn.style(
+            padding=12,
+            border_width=2,
+            border_style=border_style,
+            border_color="#0EA5E9",
+            border_radius=6,
+            background_color="#FFFFFF",
+        ),
+    )
 
 
 @pn.component
-def BordersShadowsDemo() -> pn.Element:
+def BordersShadowsDemo() -> pn.Node:
     """Render a card with borders, radius, and shadow styling."""
-    return demo_screen(
+    return DemoScreen(
         "Borders & shadows",
         "Card with border, radius, and shadow / elevation.",
-        section(
+        DemoSection(
             "Card",
             pn.View(
                 pn.Text("border-shadow-card", style=pn.style(font_weight="600", font_size=16)),
@@ -36,9 +51,19 @@ def BordersShadowsDemo() -> pn.Element:
                     shadow_opacity=0.08,
                     shadow_radius=10,
                     elevation=4,
-                    spacing=6,
+                    gap=6,
                 ),
             ),
-            hint("Maestro asserts the 'border-shadow-card' label."),
+            Hint("Maestro asserts the 'border-shadow-card' label."),
+        ),
+        DemoSection(
+            "border_style",
+            pn.Row(
+                _styled_box("solid-border", "solid"),
+                _styled_box("dashed-border", "dashed"),
+                _styled_box("dotted-border", "dotted"),
+                style=pn.style(gap=8, flex_wrap="wrap"),
+            ),
+            Hint("Solid, dashed, and dotted borders drawn by every renderer."),
         ),
     )

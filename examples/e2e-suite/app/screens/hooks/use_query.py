@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 async def _fake_fetch() -> str:
@@ -19,7 +19,7 @@ async def _fake_fetch() -> str:
 
 
 @pn.component
-def UseQueryDemo() -> pn.Element:
+def UseQueryDemo() -> pn.Node:
     """Render the result of a use_query call plus a refetch button."""
     q = pn.use_query(_fake_fetch, [])
 
@@ -30,14 +30,14 @@ def UseQueryDemo() -> pn.Element:
     else:
         status = "ready"
 
-    return demo_screen(
+    return DemoScreen(
         "use_query",
         "use_query manages loading, success, and refetch state.",
-        section(
+        DemoSection(
             "Query",
-            result_text("Status", status),
-            result_text("Data", q.data or "(none)"),
+            ResultText("Status", status),
+            ResultText("Data", q.data or "(none)"),
             pn.Button("Refetch", on_press=q.refetch),
-            hint("Maestro waits for 'Data: fetched-value' after the fetch resolves."),
+            Hint("Maestro waits for 'Data: fetched-value' after the fetch resolves."),
         ),
     )

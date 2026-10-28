@@ -23,7 +23,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Android launcher icon sizes (px) per density bucket.
 ANDROID_LAUNCHER_DENSITIES: Dict[str, int] = {
@@ -48,20 +48,20 @@ def pillow_available() -> bool:
     return True
 
 
-def _open_rgba(source: Path) -> "object":
+def _open_rgba(source: Path) -> Any:
     from PIL import Image
 
     img = Image.open(source).convert("RGBA")
     return img
 
 
-def _resized(img: "object", size: int) -> "object":
+def _resized(img: Any, size: int) -> Any:
     from PIL import Image
 
-    return img.resize((size, size), Image.LANCZOS)
+    return img.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def _circular(img: "object") -> "object":
+def _circular(img: Any) -> Any:
     """Return a copy of a square image masked to a circle."""
     from PIL import Image, ImageDraw
 
@@ -70,7 +70,7 @@ def _circular(img: "object") -> "object":
     draw = ImageDraw.Draw(mask)
     draw.ellipse((0, 0, size, size), fill=255)
     out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    out.paste(img, (0, 0), mask)  # type: ignore[arg-type]
+    out.paste(img, (0, 0), mask)
     return out
 
 
@@ -97,7 +97,7 @@ def generate_ios_icons(source: Path, appiconset_dir: Path) -> bool:
     img = _open_rgba(source)
     icon = _resized(img, 1024)
     flattened = Image.new("RGB", (1024, 1024), (255, 255, 255))
-    flattened.paste(icon, (0, 0), icon)  # type: ignore[arg-type]
+    flattened.paste(icon, (0, 0), icon)
     flattened.save(appiconset_dir / "icon-1024.png", format="PNG")
 
     contents = {

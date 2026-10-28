@@ -24,7 +24,7 @@ from typing import Any, Dict, Optional
 from ..component import component
 from ..element import Element, Node
 from ..hooks import Context, create_context, use_effect, use_state
-from .handle import FocusContext, HostNavigator
+from .handle import FocusContext, HostNavigator, provide
 
 __all__ = ["HostContext", "HostRoot", "NAV_STATE_ARG"]
 
@@ -45,7 +45,7 @@ def HostRoot(*children: Node, host: HostNavigator) -> Element:
         return host.add_focus_listener(lambda value: set_focused(bool(value)))
 
     use_effect(subscribe, [host])
-    return HostContext.Provider(host, FocusContext.Provider(focused, *children))
+    return provide(HostContext, host, provide(FocusContext, focused, *children))
 
 
 def initial_state_from_args(args: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:

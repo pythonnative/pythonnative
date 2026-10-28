@@ -20,7 +20,7 @@ Example:
     pn.Column(
         pn.Text("Hello", style=pn.style(font_size=18)),
         pn.Button("Tap", on_press=lambda: print("tapped")),
-        style=pn.style(spacing=12, padding=16),
+        style=pn.style(gap=12, padding=16),
     )
     ```
 """
@@ -38,6 +38,16 @@ from .controls import (
     StatusBar,
     Switch,
 )
+from .events import (
+    ContentSizeEvent,
+    ImageLoadEvent,
+    KeyPressEvent,
+    LayoutEvent,
+    ScrollEvent,
+    SelectionEvent,
+    WebNavigationEvent,
+)
+from .graphics import BlurType, BlurView, LinearGradient, PreserveAspectRatio, Svg
 from .layout import (  # noqa: F401
     _SAFE_AREA_EDGES,
     Column,
@@ -59,50 +69,82 @@ from .lists import (  # noqa: F401
     _NativeList,
     _RowSpec,
 )
-from .media import Image, ImageBackground, WebView
+from .media import Image, ImageBackground, ImageSource, WebView
 from .overlays import Modal, Portal
-from .pressable import Pressable, TouchableOpacity, _StatefulPressable  # noqa: F401
+from .pressable import Pressable, PressState, Ripple, TouchableOpacity, _StatefulPressable  # noqa: F401
 from .structural import ErrorBoundary, Fragment, Suspense
-from .text import Button, Text, TextInput
+from .text import Button, EllipsizeMode, KeyboardAppearance, Text, TextInput
 
 __all__ = [
     "ActivityIndicator",
+    "BlurType",
+    "BlurView",
     "Button",
     "Checkbox",
     "Column",
+    "ContentSizeEvent",
     "DatePicker",
+    "EllipsizeMode",
     "ErrorBoundary",
     "FlatList",
     "Fragment",
     "Image",
     "ImageBackground",
+    "ImageLoadEvent",
+    "ImageSource",
+    "KeyPressEvent",
+    "KeyboardAppearance",
     "KeyboardAvoidingView",
+    "LayoutEvent",
+    "LinearGradient",
     "ListController",
     "Modal",
     "Picker",
     "Portal",
+    "PreserveAspectRatio",
+    "PressState",
     "Pressable",
     "ProgressBar",
     "RefreshControl",
+    "Ripple",
     "Row",
     "SafeAreaView",
+    "ScrollEvent",
     "ScrollView",
     "SectionList",
     "SegmentedControl",
+    "SelectionEvent",
     "Slider",
     "Spacer",
     "StatusBar",
     "Suspense",
+    "Svg",
     "Switch",
     "Text",
     "TextInput",
     "TouchableOpacity",
     "View",
+    "WebNavigationEvent",
     "WebView",
 ]
 
-# Factories are the single source for Python signatures and native contracts.
-from ..sdk.builtins import install as _install_native_contracts
 
-_install_native_contracts(globals())
-del _install_native_contracts
+def _install_contracts() -> None:
+    """Register the built-in native contracts.
+
+    Factories are the single source for Python signatures and native
+    contracts. Code generation derives the contracts from them once
+    (``sdk.builtins``, which release bundles omit); importing reads the
+    generated document. A development checkout whose document predates a
+    protocol change derives them instead.
+    """
+    from ..sdk import schema
+
+    if not schema.load_builtin_contracts():
+        from ..sdk.builtins import install
+
+        install(globals())
+
+
+_install_contracts()
+del _install_contracts

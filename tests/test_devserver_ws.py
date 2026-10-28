@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import pytest
 
-from pythonnative.devserver import ws
+from pythonnative.devserver import auth, ws
 
 
 def _decode_all(data: bytes) -> list:
@@ -102,3 +102,48 @@ def test_websocket_client_rejects_non_ws_schemes() -> None:
         ws.WebSocketClient("ws:///nohost")
     client = ws.WebSocketClient("ws://localhost:1234/ws?role=client")
     assert (client.host, client.port, client.path) == ("localhost", 1234, "/ws?role=client")
+
+
+def test_websocket_client_keeps_the_token_in_the_request_path() -> None:
+    client = ws.WebSocketClient("ws://localhost:1234/ws?role=client&token=abc")
+    assert client.path == "/ws?role=client&token=abc"
+
+
+# ----------------------------------------------------------------------
+# Upgrade authorization helpers
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "headers, allowed",
+    [
+        ({"host": "localhost:8765"}, True),  # native dev clients send no Origin
+        ({"host": "localhost:8765", "origin": "http://localhost:8765"}, True),
+        ({"host": "LOCALHOST:8765", "origin": "http://localhost:8765"}, True),
+        ({"host": "192.168.1.5:8765", "origin": "http://192.168.1.5:8765"}, True),
+        ({"host": "localhost:8765", "origin": "http://localhost:3000"}, False),
+        ({"host": "localhost:8765", "origin": "https://evil.example"}, False),
+        ({"host": "localhost:8765", "origin": "null"}, False),
+        ({"origin": "http://localhost:8765"}, False),  # no Host to compare against
+    ],
+)
+def test_websocket_origin_must_match_host(headers: Dict[str, str], allowed: bool) -> None:
+    from pythonnative.devserver.server import _same_origin
+
+    assert _same_origin(headers) is allowed
+
+
+def test_request_token_reads_query_header_then_cookie() -> None:
+    assert auth.request_token({}, {"token": "q"}) == "q"
+    assert auth.request_token({"x-pn-token": "h"}, {}) == "h"
+    assert auth.request_token({"cookie": 'a=1; pn_token="c"; b=2'}, {}) == "c"
+    assert auth.request_token({"cookie": "pn_token_other=x"}, {}) is None
+    assert auth.request_token({}, {}) is None
+    assert auth.token_matches("secret", "secret")
+    assert not auth.token_matches("secreT", "secret")
+    assert not auth.token_matches(None, "secret")
+
+
+def test_with_token_replaces_an_existing_token() -> None:
+    assert auth.with_token("ws://h:1/ws?role=client", "t") == "ws://h:1/ws?role=client&token=t"
+    assert auth.with_token("ws://h:1/ws?token=old&role=client", "new") == "ws://h:1/ws?role=client&token=new"

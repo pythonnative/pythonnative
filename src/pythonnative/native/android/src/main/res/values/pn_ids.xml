@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stable ids for custom `accessibility_actions`. Custom
+     AccessibilityAction ids must be resource ids that never collide with
+     the framework's standard actions; each view draws from this pool. -->
+<resources>
+    <item type="id" name="pn_accessibility_action_0" />
+    <item type="id" name="pn_accessibility_action_1" />
+    <item type="id" name="pn_accessibility_action_2" />
+    <item type="id" name="pn_accessibility_action_3" />
+    <item type="id" name="pn_accessibility_action_4" />
+    <item type="id" name="pn_accessibility_action_5" />
+    <item type="id" name="pn_accessibility_action_6" />
+    <item type="id" name="pn_accessibility_action_7" />
+    <item type="id" name="pn_accessibility_action_8" />
+    <item type="id" name="pn_accessibility_action_9" />
+    <item type="id" name="pn_accessibility_action_10" />
+    <item type="id" name="pn_accessibility_action_11" />
+    <item type="id" name="pn_accessibility_action_12" />
+    <item type="id" name="pn_accessibility_action_13" />
+    <item type="id" name="pn_accessibility_action_14" />
+    <item type="id" name="pn_accessibility_action_15" />
+    <item name="pn_span_tap" type="id" />
+</resources>

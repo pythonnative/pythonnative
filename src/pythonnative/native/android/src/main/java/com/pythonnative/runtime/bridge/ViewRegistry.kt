@@ -16,7 +16,7 @@ class ViewRecord(
     val view: View,
     val manager: ComponentManager,
 ) {
-    /** Every prop applied so far (removed props stay as JSON null). */
+    /** Current logical props; explicit null is retained and removed keys are absent. */
     val props = JSONObject()
 
     /** Manager-private state (suppress flags, wrapped widgets, etc.). */

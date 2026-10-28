@@ -1,0 +1,25 @@
+# Tests Dimensions.get("window") / get("screen") report positive sizes and
+# a screen at least as tall as the window.
+#
+# Demo screen: examples/e2e-suite/app/screens/device/dimensions.py
+# Source under test: src/pythonnative/native_modules/dimensions.py :: Dimensions
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Device
+      DEMO_TITLE: Dimensions
+- assertVisible:
+    text: "Window: [0-9]+ x [0-9]+"
+- assertVisible:
+    text: "Screen: [0-9]+ x [0-9]+"
+- assertVisible: "Window positive: yes"
+- assertVisible: "Screen covers window: yes"
+- assertVisible:
+    text: "Scale: .*"
+- assertVisible: "Dimension changes: 0"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Device

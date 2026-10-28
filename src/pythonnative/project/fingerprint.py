@@ -134,6 +134,13 @@ def compute(
     hasher.update(b"\0lib\0")
     hash_tree(lib_root, into=hasher)
     hash_tree(config.project_root / "pn.lock", into=hasher)
+    for requirement in config.requirements:
+        candidate = config.resolve_path(requirement)
+        if candidate.is_file():
+            hasher.update(b"\0wheel\0")
+            hash_tree(candidate, into=hasher)
+    if config.ios.privacy_manifest:
+        hash_tree(config.resolve_path(config.ios.privacy_manifest), into=hasher)
     for plugin_path in _plugin_paths(config):
         hasher.update(b"\0plugin:" + str(plugin_path).encode("utf-8") + b"\0")
         hash_tree(plugin_path, into=hasher)

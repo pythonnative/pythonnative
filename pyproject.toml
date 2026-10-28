@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pythonnative"
-version = "0.43.1"
+version = "0.52.0"
 description = "Cross-platform native UI toolkit for Android and iOS"
 authors = [
   { name = "Owen Carey" }
@@ -26,8 +26,10 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: User Interfaces",
 ]
+# debugpy is development tooling: `pn start` syncs its sources to dev
+# clients for breakpoint debugging (RFC 0006). App bundles never include it.
 dependencies = [
-  "requests>=2.31.0",
+  "debugpy>=1.8",
 ]
 
 [project.optional-dependencies]
@@ -64,6 +66,9 @@ docs = [
 [project.scripts]
 pn = "pythonnative.cli.pn:main"
 
+[project.entry-points.pytest11]
+pythonnative = "pythonnative.testing.pytest_plugin"
+
 [project.urls]
 Homepage = "https://github.com/pythonnative/pythonnative"
 Repository = "https://github.com/pythonnative/pythonnative"
@@ -97,6 +102,8 @@ pythonnative = [
   "py.typed",
   "templates/**", "native/**", "sdk/templates/**",
   "devserver/static/**",
+  "icons/_lucide.json", "icons/LICENSE-lucide.txt",
+  "sdk/_builtin_contracts.json",
 ]
 
 [tool.setuptools.exclude-package-data]

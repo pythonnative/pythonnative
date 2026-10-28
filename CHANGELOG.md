@@ -1,6 +1,109 @@
 # CHANGELOG
 
 
+## v0.52.0 (2026-10-28)
+
+### Features
+
+- Render through one shared C++ renderer core
+  ([#115](https://github.com/pythonnative/pythonnative/pull/115),
+  [`c66f136`](https://github.com/pythonnative/pythonnative/commit/c66f1367dd7a687fe4082732cb91aff2cc9713b3))
+
+
+## v0.51.0 (2026-10-20)
+
+### Features
+
+- **preview**: Polish device frames and fix browser rendering bugs
+  ([#114](https://github.com/pythonnative/pythonnative/pull/114),
+  [`35daf4e`](https://github.com/pythonnative/pythonnative/commit/35daf4e4718e9ae7d737cc3bd47966cf0362629e))
+
+
+## v0.50.0 (2026-10-19)
+
+### Chores
+
+- **examples**: Remove the hello-world example app
+  ([#112](https://github.com/pythonnative/pythonnative/pull/112),
+  [`44a5edf`](https://github.com/pythonnative/pythonnative/commit/44a5edf6540dd512300473f718e8a10e6a8df199))
+
+### Features
+
+- Add PythonNative Go, DevTools, and breakpoint debugging
+  ([#113](https://github.com/pythonnative/pythonnative/pull/113),
+  [`2205bc0`](https://github.com/pythonnative/pythonnative/commit/2205bc06d06c53b63a4ebbf8b7958e64b16f0695))
+
+
+## v0.49.0 (2026-10-08)
+
+### Performance Improvements
+
+- Make startup, bundles, and rendering fast and small
+  ([#111](https://github.com/pythonnative/pythonnative/pull/111),
+  [`8613d4b`](https://github.com/pythonnative/pythonnative/commit/8613d4bfdb622dc6f3fc796ebc2079b077135c7c))
+
+### Testing
+
+- Stabilize tar extraction and iOS lifecycle tests
+  ([#110](https://github.com/pythonnative/pythonnative/pull/110),
+  [`444637a`](https://github.com/pythonnative/pythonnative/commit/444637a2a13dcafac6fa44a449a3abaf44790732))
+
+
+## v0.48.0 (2026-10-02)
+
+### Features
+
+- Add typed navigation, themes, stores, and hook linting
+  ([#109](https://github.com/pythonnative/pythonnative/pull/109),
+  [`109008e`](https://github.com/pythonnative/pythonnative/commit/109008ef6ff479d61894e4c69dd4f6ed7cca3478))
+
+### Testing
+
+- **project**: Cover deterministic native fingerprint hashing
+  ([#98](https://github.com/pythonnative/pythonnative/pull/98),
+  [`9f4e907`](https://github.com/pythonnative/pythonnative/commit/9f4e907875f44ae786d381e609b920fab3461ca7))
+
+Refs: #91
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+
+## v0.47.0 (2026-09-29)
+
+### Features
+
+- **reconciler**: Add async commits and incremental lists
+  ([#107](https://github.com/pythonnative/pythonnative/pull/107),
+  [`9869499`](https://github.com/pythonnative/pythonnative/commit/9869499ca9bb83c6e900e9573189d373ecbbed60))
+
+
+## v0.46.0 (2026-09-21)
+
+### Features
+
+- Close React Native parity gaps, and fix correctness bugs
+  ([#104](https://github.com/pythonnative/pythonnative/pull/104),
+  [`66f486e`](https://github.com/pythonnative/pythonnative/commit/66f486e560c7a71787e92ce8f6b463a77e45fc5a))
+
+
+## v0.45.0 (2026-09-18)
+
+### Features
+
+- Add asset pipeline, fonts, icons, svg, and effects
+  ([#103](https://github.com/pythonnative/pythonnative/pull/103),
+  [`ef02cac`](https://github.com/pythonnative/pythonnative/commit/ef02cac218b314a466b31b60b88ffbe89bc54093))
+
+
+## v0.44.0 (2026-09-14)
+
+### Features
+
+- Overhaul native contracts, rendering, and extension builds
+  ([#101](https://github.com/pythonnative/pythonnative/pull/101),
+  [`9cb4ebb`](https://github.com/pythonnative/pythonnative/commit/9cb4ebb165bd66f15a5a4deaf7c9d49460c7e78d))
+
+
 ## v0.43.1 (2026-09-12)
 
 ### Bug Fixes

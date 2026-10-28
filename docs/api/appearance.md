@@ -11,12 +11,12 @@ import pythonnative as pn
 
 
 @pn.component
-def SchemeAwareBadge():
+def SchemeAwareBadge() -> pn.Node:
     scheme = pn.use_color_scheme()  # "light" or "dark"
-    theme = pn.use_theme()  # built-in theme for the scheme
+    theme = pn.use_theme()  # the theme for the scheme
     return pn.Text(
         f"Currently {scheme}",
-        style={"color": theme.text_color},
+        style={"color": theme.colors.text},
     )
 ```
 
@@ -38,5 +38,5 @@ pn.appearance.set_color_scheme(None)  # follow the system again
 ## Next steps
 
 - Theming with [`use_theme`][pythonnative.use_theme] and
-  [`ThemeContext`][pythonnative.ThemeContext]: see
-  [Style](style.md) and the [Styling guide](../guides/styling.md).
+  [`ThemeProvider`][pythonnative.ThemeProvider]: see
+  [Theme](theme.md) and the [Styling guide](../guides/styling.md#themes).

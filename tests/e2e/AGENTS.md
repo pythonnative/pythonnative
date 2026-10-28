@@ -22,17 +22,19 @@ examples/e2e-suite/
 │   └── screens/
 │       ├── home.py            # Lists categories (anchor: "E2E Suite home")
 │       ├── category.py        # Lists demos in a category (anchor: "Demos in <Cat>")
-│       ├── scaffold.py        # demo_screen(...) helper used by every demo
+│       ├── scaffold.py        # DemoScreen(...) and friends, used by every demo
 │       ├── components/        # One file per Component demo
 │       ├── hooks/             # One file per Hook demo
 │       ├── navigation/        # One file per Navigation demo
 │       ├── layout/            # Layout demos
 │       ├── styling/           # Styling demos
 │       ├── animations/        # Animated.* demos
+│       ├── assets/            # Bundled image, font, and Images module demos
 │       ├── alerts/            # Alert.show / Alert.confirm demos
 │       ├── storage/           # AsyncStorage demos
 │       ├── runtime/           # run_async demo
 │       ├── platform/          # Platform info demo
+│       ├── device/            # Keyboard, Dimensions, PixelRatio, Device, Localization, AccessibilityInfo demos
 │       ├── packages/          # PyPI packages demo ([requirements].packages on device)
 │       └── sdk/               # SDK surface demo
 └── pythonnative.toml
@@ -72,7 +74,7 @@ scripts/
 ./scripts/run-e2e.sh ios components
 ```
 
-Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `misc`. The components category also has `components-a` / `components-b` halves: CI's Android shards use them because a GitHub-hosted emulator session degrades and drops offline before all 28 component flows finish in one run (`components.yaml` just chains the two halves).
+Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `assets`, `misc`. The `Device` category's flows (`flows/device/`) run as part of `misc` alongside alerts, storage, runtime, platform, packages, and SDK. The components category also has `components-a` / `components-b` / `components-c` parts, and the hooks category has `hooks-a` / `hooks-b` parts: CI's Android shards use them because a GitHub-hosted emulator session degrades and drops offline after roughly ten minutes of driving, before either category finishes in one run (`components.yaml` and `hooks.yaml` just chain their parts).
 
 You can also run a single flow directly. Useful when iterating on one demo:
 
@@ -184,19 +186,19 @@ When you add a new public symbol to `pythonnative`, follow this exact recipe:
 
    ```python
    import pythonnative as pn
-   from app.screens.scaffold import demo_screen, hint, result_text, section
+   from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
    @pn.component
-   def MyFeatureDemo() -> pn.Element:
-       return demo_screen(
+   def MyFeatureDemo() -> pn.Node:
+       return DemoScreen(
            "My feature",
            "Short summary visible on the demo screen.",
-           section(
+           DemoSection(
                "Try it",
-               result_text("State", "..."),
+               ResultText("State", "..."),
                pn.Button("Trigger", on_press=lambda: None),
-               hint("Maestro asserts the State line."),
+               Hint("Maestro asserts the State line."),
            ),
        )
    ```
@@ -264,7 +266,7 @@ Avoid emoji and platform-specific glyphs in labels; Maestro's text matching is m
 It happens. The fix is to update the flow + demo together so the test reflects intended behavior. Do NOT:
 
 - mark a flow as `flaky` or wrap it in retries without first finding the root cause,
-- change a `result_text` value to silence the test if the library returns something genuinely incorrect,
+- change a `ResultText` value to silence the test if the library returns something genuinely incorrect,
 - delete a flow because it's hard to fix on one platform; gate it with `runFlow` from one of the platform-specific suites instead (we don't have these yet, but `flows/<category>/<feature>_android.yaml` is the established naming if needed).
 
 When you do change a demo or flow, update its header comment so it still accurately documents what's being tested.

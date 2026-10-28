@@ -1,4 +1,5 @@
 import UIKit
+import CoreFoundation
 
 /// Color parsing shared by every manager.
 ///
@@ -14,10 +15,9 @@ public enum PNColor {
             return nil
         case let dict as [String: Any]:
             return dynamic(dict)
-        case let number as NSNumber where !(value is Bool):
+        case let number as NSNumber:
+            guard CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
             return fromARGB(number.int64Value)
-        case let int as Int:
-            return fromARGB(Int64(int))
         case let string as String:
             return parse(string: string)
         default:

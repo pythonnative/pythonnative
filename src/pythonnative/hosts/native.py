@@ -15,13 +15,11 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 from .. import appearance, diagnostics, platform_metrics
 from ..bridge import codec
 from ..native_modules.registry import native_module
-from .base import ScreenHost, flush_hosts, log_pn
+from .base import ScreenHost
 
 __all__ = ["NativeScreenHost", "dispatch_host_event", "host_for_screen", "live_hosts"]
 
 _HOSTS: Dict[int, "NativeScreenHost"] = {}
-_SCHEDULED: Dict[int, ScreenHost] = {}
-_flush_pending = False
 
 
 def host_for_screen(screen_id: int) -> Optional["NativeScreenHost"]:
@@ -39,38 +37,25 @@ def _host_module() -> Any:
 
 
 # ======================================================================
-# Deferred renders
-# ======================================================================
-
-
-def _flush_scheduled() -> None:
-    global _flush_pending
-    _flush_pending = False
-    hosts = list(_SCHEDULED.values())
-    _SCHEDULED.clear()
-    if hosts:
-        log_pn(f"render_scheduler: flushing {len(hosts)} host(s)")
-    flush_hosts(hosts)
-
-
-def _request_flush() -> None:
-    """Queue one application-thread flush of every scheduled host."""
-    global _flush_pending
-    if _flush_pending:
-        return
-    _flush_pending = True
-    from ..runtime import call_threadsafe
-
-    call_threadsafe(_flush_scheduled)
-
-
-# ======================================================================
 # Payload helpers
 # ======================================================================
 
 
+def _optional_float(payload: Dict[str, Any], key: str) -> Optional[float]:
+    """Return ``payload[key]`` as a float, or ``None`` when absent or not a number."""
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
 def _publish_metrics(payload: Any) -> Tuple[float, float]:
-    """Publish viewport, insets, keyboard, and color scheme from a host payload.
+    """Publish viewport, insets, keyboard, density, and color scheme from a host payload.
+
+    The payload carries ``width`` and ``height`` (the window, in layout
+    units) and may carry ``scale``, ``font_scale``, ``screen_width``, and
+    ``screen_height``. A missing density keeps the last published value
+    (``1.0`` initially); a missing screen size falls back to the window.
 
     Returns the ``(width, height)`` it found (``0, 0`` when absent).
     """
@@ -78,6 +63,8 @@ def _publish_metrics(payload: Any) -> Tuple[float, float]:
         return (0.0, 0.0)
     width = float(payload.get("width") or 0.0)
     height = float(payload.get("height") or 0.0)
+    scale = _optional_float(payload, "scale")
+    font_scale = _optional_float(payload, "font_scale")
     insets = payload.get("insets")
     if isinstance(insets, dict):
         platform_metrics.set_safe_area_insets(
@@ -92,7 +79,10 @@ def _publish_metrics(payload: Any) -> Tuple[float, float]:
     if scheme in ("light", "dark"):
         appearance.set_system_color_scheme(str(scheme))
     if width > 0 and height > 0:
-        platform_metrics.set_window_dimensions(width, height)
+        platform_metrics.set_window_dimensions(width, height, scale=scale, font_scale=font_scale)
+        screen_width = _optional_float(payload, "screen_width") or width
+        screen_height = _optional_float(payload, "screen_height") or height
+        platform_metrics.set_screen_dimensions(screen_width, screen_height, scale=scale, font_scale=font_scale)
     return (width, height)
 
 
@@ -115,7 +105,6 @@ class NativeScreenHost(ScreenHost):
     def on_destroy(self) -> None:
         """Forget the screen id, then tear down the tree."""
         _HOSTS.pop(self.screen_id, None)
-        _SCHEDULED.pop(id(self), None)
         super().on_destroy()
 
     def apply_metrics(self, payload: Any) -> None:
@@ -127,6 +116,16 @@ class NativeScreenHost(ScreenHost):
 
     # -- platform primitives -------------------------------------------
 
+    def _show_error(self, payload: Dict[str, Any]) -> None:
+        from ..bridge import get_transport
+
+        get_transport().call("Host", "show_error", codec.dumps({"call_id": 0, "args": payload}))
+
+    def _dismiss_error(self) -> None:
+        from ..bridge import get_transport
+
+        get_transport().call("Host", "dismiss_error", codec.dumps({"call_id": 0, "args": {}}))
+
     def _initial_viewport_size(self) -> Optional[Tuple[float, float]]:
         if self._pending_viewport is not None:
             return self._pending_viewport
@@ -134,20 +133,6 @@ class NativeScreenHost(ScreenHost):
         if dims.width > 0 and dims.height > 0:
             return (dims.width, dims.height)
         return None
-
-    def _schedule_render_async(self) -> bool:
-        if self._render_scheduled:
-            return True
-        self._render_scheduled = True
-        _SCHEDULED[id(self)] = self
-        try:
-            _request_flush()
-        except Exception as exc:
-            self._render_scheduled = False
-            _SCHEDULED.pop(id(self), None)
-            log_pn(f"request_render: bridge defer failed ({exc!r}); rendering synchronously")
-            return False
-        return True
 
     def _attach_root(self, native_view: Any) -> None:
         tag = getattr(native_view, "tag", None)
@@ -196,53 +181,53 @@ def dispatch_host_event(screen_id: int, event: str, payload: Any) -> Optional[st
       ``args`` a JSON string. Returns ``{"root": tag}``.
     - ``start`` / ``resume`` / ``pause`` / ``stop`` / ``destroy``:
       lifecycle. ``resume`` and ``layout`` carry metrics.
-    - ``layout`` ``{width, height, insets, keyboard_height, color_scheme}``.
+    - ``layout`` ``{width, height, insets, keyboard_height, color_scheme,
+      scale, font_scale, screen_width, screen_height}``.
     - ``appearance`` ``{"color_scheme"}``.
-    - ``back_pressed``: returns ``"true"`` when a handler consumed it.
-    - ``save_state`` / ``restore_state``: instance-state hooks.
-    - ``flush``: run deferred renders now.
+    - ``back_pressed``: pops a handled screen, otherwise asks native to
+      finish it (``Host.finish``).
+    - ``reload``: remount after the development error overlay.
 
-    Returns a JSON string for request-style events, else ``None``.
+    Native delivers every event asynchronously and ignores the return
+    value; only tests read ``create``'s ``{"root": tag}``.
     """
     screen_id = int(screen_id)
     if event == "create":
         return _create(screen_id, payload if isinstance(payload, dict) else {})
-    if event == "flush":
-        _flush_scheduled()
-        return None
     if event == "appearance":
         _publish_metrics(payload)
         return None
+    if event == "open_in_editor":
+        _open_in_editor(payload)
+        return None
     host = _HOSTS.get(screen_id)
     if host is None:
-        log_pn(f"dispatch_host_event: no host for screen={screen_id} event={event!r}")
+        diagnostics.log(f"dispatch_host_event: no host for screen={screen_id} event={event!r}")
+        return None
+    if event == "reload":
+        host.reload()
         return None
     if event == "layout":
         host.apply_metrics(payload)
-        host.on_layout()
         return None
     if event == "resume":
         host.apply_metrics(payload)
         host.on_resume()
         return None
+    if event == "pause":
+        host.on_pause()
+        return None
     if event == "back_pressed":
         if not host.on_back_pressed():
             _host_module().call("finish", screen=host.screen_id)
         return None
-    if event == "save_state":
-        host.on_save_instance_state()
-        return None
-    if event == "restore_state":
-        host.on_restore_instance_state()
-        return None
     if event == "destroy":
         host.on_destroy()
         return None
-    handler = getattr(host, f"on_{event}", None)
-    if handler is None:
-        log_pn(f"dispatch_host_event: unknown event {event!r}")
+    if event in ("start", "stop"):
+        # Visibility without focus; ``resume`` and ``pause`` carry what Python needs.
         return None
-    handler()
+    diagnostics.log(f"dispatch_host_event: unknown event {event!r}")
     return None
 
 
@@ -284,6 +269,17 @@ def _create(screen_id: int, payload: Dict[str, Any]) -> Optional[str]:
     return _root_json(host)
 
 
+def _open_in_editor(payload: Any) -> None:
+    """Ask the dev server to open a frame from the error screen in the developer's editor."""
+    if not diagnostics.is_dev() or not isinstance(payload, dict):
+        return
+    from ..devtools import current
+
+    agent = current()
+    if agent is not None:
+        agent.publish("open_editor", {"file": str(payload.get("file") or ""), "line": int(payload.get("line") or 1)})
+
+
 def _entry_module() -> str:
     import os
 
@@ -296,7 +292,4 @@ def _root_json(host: ScreenHost) -> str:
 
 
 def _reset_for_tests() -> None:
-    global _flush_pending
     _HOSTS.clear()
-    _SCHEDULED.clear()
-    _flush_pending = False

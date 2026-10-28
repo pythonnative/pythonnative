@@ -1,5 +1,6 @@
 """Native plugin discovery and staging (``pn build`` side of the plugin system)."""
 
+import hashlib
 import json
 import zipfile
 from pathlib import Path
@@ -63,6 +64,31 @@ def test_removed_android_plugins_leave_no_sources_or_resources(tmp_path: Path) -
     assert not (project / "pythonnative/src/main/java/com/example/blur/BlurPlugin.kt").exists()
 
 
+def test_ios_resources_preserve_plugin_namespaces_and_are_removed(tmp_path: Path) -> None:
+    import pythonnative
+
+    plugins = []
+    for name in ("first", "second"):
+        root = _write_plugin(tmp_path / name)
+        (root / "ios/labels.json").write_text(json.dumps({"source": name}))
+        manifest = json.loads((root / "pn_plugin.json").read_text())
+        manifest["ios"]["resources"] = ["ios/*.json"]
+        (root / "pn_plugin.json").write_text(json.dumps(manifest))
+        plugins.append(load_plugin(root, name=name))
+    project = tmp_path / "project"
+    package = project / "PythonNativeKit/Package.swift"
+    package.parent.mkdir(parents=True)
+    package.write_text((Path(pythonnative.__file__).parent / "native/ios/Package.swift").read_text())
+    stage_ios_plugins(project, plugins)
+    resources = package.parent / "Sources/PythonNativeKit/PluginResources"
+    assert '.copy("PluginResources")' in package.read_text()
+    for name in ("first", "second"):
+        assert json.loads((resources / name / "ios/labels.json").read_text()) == {"source": name}
+    stage_ios_plugins(project, [])
+    assert not resources.exists()
+    assert "PluginResources" not in package.read_text()
+
+
 def test_target_wheel_plugins_are_read_without_importing_target_code(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -90,7 +116,15 @@ def test_target_wheel_plugins_are_read_without_importing_target_code(
         "resolve",
         lambda *args, **kwargs: deps.Resolution(
             target=target,
-            packages=[deps.ResolvedPackage("example", "1.0", wheel.name, "https://example.test/" + wheel.name)],
+            packages=[
+                deps.ResolvedPackage(
+                    "example",
+                    "1.0",
+                    wheel.name,
+                    "https://example.test/" + wheel.name,
+                    sha256=hashlib.sha256(wheel.read_bytes()).hexdigest(),
+                )
+            ],
         ),
     )
 
@@ -311,3 +345,58 @@ def test_builder_reports_invalid_local_plugin(tmp_path: Path, monkeypatch: pytes
     cfg = AppConfig.load(root)
     with pytest.raises(BuildError, match="Invalid native plugin"):
         Builder(cfg, log=lambda _m: None).prepare("android")
+
+
+def test_exact_native_dependencies_stage_and_conflicts_fail(tmp_path: Path) -> None:
+    import dataclasses
+
+    import pythonnative
+
+    root = _write_plugin(tmp_path / "plugin")
+    manifest = json.loads((root / "pn_plugin.json").read_text())
+    manifest["ios"]["dependencies"] = [
+        {
+            "url": "https://github.com/apple/swift-collections.git",
+            "version": "1.1.4",
+            "products": ["DequeModule"],
+        }
+    ]
+    manifest["android"]["dependencies"] = ["androidx.collection:collection-ktx:1.4.5"]
+    (root / "pn_plugin.json").write_text(json.dumps(manifest))
+    plugin = load_plugin(root)
+    project = tmp_path / "project"
+    swift = project / "PythonNativeKit/Package.swift"
+    gradle = project / "pythonnative/build.gradle"
+    swift.parent.mkdir(parents=True)
+    gradle.parent.mkdir(parents=True)
+    native = Path(pythonnative.__file__).parent / "native"
+    swift.write_text((native / "ios/Package.swift").read_text())
+    gradle.write_text((native / "android/build.gradle").read_text())
+    stage_ios_plugins(project, [plugin])
+    stage_android_plugins(project, [plugin])
+    assert '.package(url: "https://github.com/apple/swift-collections.git", exact: "1.1.4")' in swift.read_text()
+    assert '.product(name: "DequeModule", package: "swift-collections")' in swift.read_text()
+    assert "implementation 'androidx.collection:collection-ktx:1.4.5'" in gradle.read_text()
+    before = swift.read_text(), gradle.read_text()
+    stage_ios_plugins(project, [plugin])
+    stage_android_plugins(project, [plugin])
+    assert before == (swift.read_text(), gradle.read_text())
+    conflicting = dataclasses.replace(
+        plugin, name="second", maven_dependencies=("androidx.collection:collection-ktx:1.5.0",)
+    )
+    with pytest.raises(PluginError, match="Conflicting Android dependency"):
+        stage_android_plugins(project, [plugin, conflicting])
+    stage_ios_plugins(project, [])
+    stage_android_plugins(project, [])
+    assert "swift-collections.git" not in swift.read_text()
+    assert "androidx.collection:collection-ktx" not in gradle.read_text()
+
+
+@pytest.mark.parametrize("coordinate", ["g:a:+", "g:a:1.0-SNAPSHOT", "g:a:[1,2)", "g:a:1'; malicious()"])
+def test_dynamic_or_malformed_native_dependencies_are_rejected(tmp_path: Path, coordinate: str) -> None:
+    root = _write_plugin(tmp_path / "plugin")
+    manifest = json.loads((root / "pn_plugin.json").read_text())
+    manifest["android"]["dependencies"] = [coordinate]
+    (root / "pn_plugin.json").write_text(json.dumps(manifest))
+    with pytest.raises(PluginError, match="exact"):
+        load_plugin(root)

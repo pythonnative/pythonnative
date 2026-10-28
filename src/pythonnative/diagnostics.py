@@ -33,8 +33,10 @@ from typing import Any, Callable, Deque, List, Optional, Set, Tuple
 
 __all__ = [
     "HookOrderError",
+    "reset_dev_mode",
     "set_dev_mode",
     "is_dev",
+    "log",
     "warn",
     "warn_once",
     "swallowed",
@@ -42,6 +44,7 @@ __all__ = [
     "clear_warnings",
     "set_error_reporter",
     "report_error",
+    "add_listener",
 ]
 
 
@@ -60,8 +63,14 @@ class HookOrderError(RuntimeError):
 # Dev mode
 # ======================================================================
 
-# Tri-state: ``None`` means "not explicitly set, consult the environment".
-_dev_mode: Optional[bool] = None
+
+def _environment_dev_mode() -> bool:
+    return os.environ.get("PN_DEV", "").lower() in {"1", "true", "yes", "on"}
+
+
+# Read on every render path, so it's a plain module global: the ``PN_DEV``
+# environment variable seeds it at import and ``set_dev_mode`` overrides it.
+_dev_mode: bool = _environment_dev_mode()
 
 
 def set_dev_mode(enabled: bool) -> None:
@@ -79,16 +88,43 @@ def set_dev_mode(enabled: bool) -> None:
     _dev_mode = bool(enabled)
 
 
+def reset_dev_mode() -> None:
+    """Return to the mode the ``PN_DEV`` environment variable selects."""
+    global _dev_mode
+    _dev_mode = _environment_dev_mode()
+
+
 def is_dev() -> bool:
     """Return whether dev diagnostics are active.
 
-    Resolution order: an explicit
-    [`set_dev_mode`][pythonnative.diagnostics.set_dev_mode] call, then
-    the ``PN_DEV`` environment variable, then ``False``.
+    An explicit [`set_dev_mode`][pythonnative.diagnostics.set_dev_mode]
+    call wins; otherwise the ``PN_DEV`` environment variable, read when
+    this module is imported, decides (default ``False``).
     """
-    if _dev_mode is not None:
-        return _dev_mode
-    return os.environ.get("PN_DEV", "").lower() in {"1", "true", "yes", "on"}
+    return _dev_mode
+
+
+# ======================================================================
+# Trace logging
+# ======================================================================
+
+
+def log(message: str) -> None:
+    """Print a framework trace line (``[PN] message``) in dev mode.
+
+    The reconciler and screen hosts call this at phase boundaries
+    (mount, re-render, RedBox) so a dev console shows what the runtime
+    is doing. No-op in production.
+
+    Args:
+        message: The trace text.
+    """
+    if not is_dev():
+        return
+    try:
+        print(f"[PN] {message}", flush=True)
+    except Exception:
+        pass
 
 
 # ======================================================================
@@ -121,6 +157,8 @@ def warn(message: str) -> None:
         print(f"[PN] WARN: {message}", file=sys.stderr, flush=True)
     except Exception:
         pass
+    if _listeners:
+        _notify_warning(message)
 
 
 def warn_once(message: str, key: Optional[str] = None) -> None:
@@ -212,6 +250,70 @@ def set_error_reporter(owner: Any, reporter: Optional[Callable[[BaseException, s
         _reporters[:] = [(k, r) for (k, r) in _reporters if k != key]
         if reporter is not None:
             _reporters.append((key, reporter))
+
+
+# ======================================================================
+# Listeners (DevTools)
+# ======================================================================
+
+_listeners: List[Callable[[Any], None]] = []
+
+
+def add_listener(callback: Callable[[Any], None]) -> Callable[[], None]:
+    """Receive every warning and reported error as an ``ErrorReport``.
+
+    The devtools agent subscribes so warnings and errors reach the
+    DevTools Problems panel with their component stacks. Reports are only
+    built while a listener is registered, and only in dev mode.
+
+    Args:
+        callback: Called with an
+            [`ErrorReport`][pythonnative.errors.ErrorReport], on whichever
+            thread raised the warning or error.
+
+    Returns:
+        A callable that removes the listener.
+    """
+    _listeners.append(callback)
+
+    def remove() -> None:
+        try:
+            _listeners.remove(callback)
+        except ValueError:
+            pass
+
+    return remove
+
+
+def _notify(report: Any) -> None:
+    for callback in list(_listeners):
+        try:
+            callback(report)
+        except Exception:
+            pass
+
+
+def _notify_warning(message: str) -> None:
+    try:
+        from .errors import warning_report
+        from .hooks import current_hook_state
+
+        state = current_hook_state()
+        _notify(warning_report(message, getattr(state, "_component_name", None) or None))
+    except Exception:
+        pass
+
+
+def notify_error(exc: BaseException, phase: str) -> None:
+    """Tell listeners about an error shown in the error screen or terminal."""
+    if not _listeners or not is_dev():
+        return
+    try:
+        from .errors import report
+
+        _notify(report(exc, phase))
+    except Exception:
+        pass
 
 
 def report_error(exc: BaseException, phase: str = "runtime") -> bool:

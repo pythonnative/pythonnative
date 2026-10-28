@@ -90,10 +90,8 @@ def test_start_is_fire_and_forget() -> None:
     handle.start()
     # The call returns well before the animation completes.
     assert (time.monotonic() - started) < 0.02
-    # Wait for completion by polling.
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline and v.value < 9.9:
-        time.sleep(0.02)
+    # The core's display frames run on the framework loop; drain it while waiting.
+    _wait_until(lambda: v.value >= 9.9)
     assert abs(v.value - 10.0) < 0.1
 
 
@@ -162,10 +160,10 @@ def test_stop_freezes_value() -> None:
     v = AnimatedValue(0.0)
     handle = Animated.timing(v, to=10.0, duration=400, easing="linear")
     handle.start()
-    time.sleep(0.05)
+    _wait_until(lambda: v.value > 0.0)
     handle.stop()
     snapshot = v.value
-    time.sleep(0.2)
+    _drain_for(0.2)
     # After stop, value should not advance further toward 10.
     assert abs(v.value - snapshot) < 0.1
     assert v.value < 9.0
@@ -203,7 +201,7 @@ def test_use_animated_value_returns_animated_value() -> None:
     def view() -> Element:
         v = use_animated_value(0.5)
         captured.append(v)
-        return Element("View", {"opacity": v}, [])
+        return Element("View", {}, [])
 
     rec = Reconciler(_StubBackend())
     rec.mount(view())
@@ -218,7 +216,7 @@ def test_use_animated_value_stable_across_renders() -> None:
     def view() -> Element:
         v = use_animated_value(0.0)
         captured.append(v)
-        return Element("View", {"opacity": v}, [])
+        return Element("View", {}, [])
 
     rec = Reconciler(_StubBackend())
     rec.mount(view())
@@ -234,7 +232,7 @@ def test_use_animated_value_default_initial_zero() -> None:
     def view() -> Element:
         v = use_animated_value()
         captured.append(v)
-        return Element("View", {"opacity": v}, [])
+        return Element("View", {}, [])
 
     rec = Reconciler(_StubBackend())
     rec.mount(view())
@@ -247,10 +245,10 @@ def test_animated_components_mount_through_reconciler() -> None:
     forwarding it to ``View()`` (pre-fix this raised ``TypeError:
     View() got an unexpected keyword argument 'children'``)."""
     from pythonnative.components import Column, Text
-    from pythonnative.native_views import set_registry
+    from pythonnative.native_views import set_backend
 
     backend = _StubBackend()
-    set_registry(backend)
+    set_backend(backend)
     try:
 
         @component
@@ -272,7 +270,7 @@ def test_animated_components_mount_through_reconciler() -> None:
         assert len(opacity_pushes) == 3
         assert all(val == 0.25 for _tag, val in opacity_pushes)
     finally:
-        set_registry(None)
+        set_backend(None)
 
 
 # ======================================================================
@@ -281,14 +279,17 @@ def test_animated_components_mount_through_reconciler() -> None:
 
 
 class _NativeBackend(_StubBackend):
-    """FakeBackend that accepts native animations for chosen tags."""
+    """FakeBackend recording the requests the animation layer sends to the core."""
 
     def __init__(self, accept_tags: Any = None) -> None:
         super().__init__()
         self.accept_tags = accept_tags  # None => accept everything
         self.native_started: list = []  # (tag, anim_id, prop, spec)
         self.native_cancelled: list = []  # (tag, anim_id)
-        self.presentation_value: Any = None
+        self.pushed: list = []  # (tag, prop, value) written without animating
+
+    def set_animated_property(self, tag: int, prop_name: str, value: Any) -> None:
+        self.pushed.append((tag, prop_name, value))
 
     def start_animation(self, tag: int, anim_id: int, prop_name: str, spec: dict) -> bool:
         if self.accept_tags is not None and tag not in self.accept_tags:
@@ -296,136 +297,124 @@ class _NativeBackend(_StubBackend):
         self.native_started.append((tag, anim_id, prop_name, dict(spec)))
         return True
 
-    def cancel_animation(self, tag: int, anim_id: int) -> Any:
+    def cancel_animation(self, tag: int, anim_id: int) -> None:
         self.native_cancelled.append((tag, anim_id))
-        return self.presentation_value
 
 
 @pytest.fixture
 def native_backend():  # type: ignore[no-untyped-def]
-    from pythonnative.native_views import set_registry
+    from pythonnative.native_views import set_backend
 
     backend = _NativeBackend()
-    set_registry(backend)
+    set_backend(backend)
     try:
         yield backend
     finally:
-        set_registry(None)
+        set_backend(None)
+
+
+def _complete(anim_id: int, finished: bool = True, value: Any = None) -> None:
+    """Deliver the core's completion message for one driver."""
+    from pythonnative.animated import native_animation_message
+
+    native_animation_message({"id": anim_id, "finished": finished, "value": value})
 
 
 def test_attach_pushes_current_value_natively(native_backend: _NativeBackend) -> None:
     v = AnimatedValue(0.25)
     v.attach(7, "opacity")
-    assert native_backend.animated[-1] == (7, "opacity", 0.25)
+    assert (7, "opacity", 0.25) in native_backend.pushed
 
     v.set_value(0.75)
-    assert native_backend.animated[-1] == (7, "opacity", 0.75)
+    # Both the direct binding and the value's graph node receive the write.
+    assert (7, "opacity", 0.75) in native_backend.pushed
+    assert native_backend.pushed[-1] == (7, f"_pn_graph:{id(v)}", 0.75)
 
 
-def test_native_driver_offloads_attached_animation(native_backend: _NativeBackend) -> None:
-    from pythonnative.animated import native_animation_completed
-
+def test_core_drives_attached_animation(native_backend: _NativeBackend) -> None:
     v = AnimatedValue(0.0)
     v.attach(7, "opacity")
     Animated.timing(v, to=1.0, duration=5000, easing="linear").start()
 
+    # One driver on the value's graph node; the graph applies its bindings.
     assert len(native_backend.native_started) == 1
     tag, anim_id, prop, spec = native_backend.native_started[0]
-    assert (tag, prop) == (7, "opacity")
-    assert spec["kind"] == "timing" and spec["to"] == 1.0 and spec["from"] == 0.0
+    assert (tag, prop) == (7, f"_pn_graph:{id(v)}")
+    assert spec["kind"] == "timing" and spec["to"] == 1.0 and spec["from"] == 0.0 and spec["report"] is False
 
-    # No Python ticker is driving the value while the platform animates.
-    time.sleep(0.05)
+    # Nothing in Python drives the value while the core animates it.
+    _drain_for(0.05)
     assert v.value == 0.0
 
-    # The platform's completion callback settles the Python cell.
-    native_animation_completed(anim_id, finished=True)
+    # The core's completion message settles the Python cell.
+    _complete(anim_id, value=1.0)
     assert v.value == 1.0
 
 
-def test_native_driver_fans_out_to_every_binding(native_backend: _NativeBackend) -> None:
-    from pythonnative.animated import native_animation_completed
-
+def test_one_graph_driver_covers_every_binding(native_backend: _NativeBackend) -> None:
     v = AnimatedValue(0.0)
     v.attach(1, "opacity")
     v.attach(2, "opacity")
     Animated.timing(v, to=1.0, duration=5000).start()
 
-    assert len(native_backend.native_started) == 2
-    ids = [entry[1] for entry in native_backend.native_started]
-
-    # The group settles only after *all* targets complete.
-    native_animation_completed(ids[0])
-    assert v.value == 0.0
-    native_animation_completed(ids[1])
+    assert [(tag, prop) for tag, _id, prop, _spec in native_backend.native_started] == [(1, f"_pn_graph:{id(v)}")]
+    _complete(native_backend.native_started[0][1])
     assert v.value == 1.0
 
 
-def test_python_listeners_force_python_driver(native_backend: _NativeBackend) -> None:
+def test_python_listeners_receive_reported_frames(native_backend: _NativeBackend) -> None:
+    from pythonnative.animated import native_animation_message
+
     v = AnimatedValue(0.0)
     v.attach(7, "opacity")
-    v.add_listener("opacity", lambda _x: None)
+    seen: list = []
+    v.add_listener("opacity", seen.append)
 
-    handle = Animated.timing(v, to=1.0, duration=30, easing="linear")
-    handle.start()
-    assert native_backend.native_started == []
+    Animated.timing(v, to=1.0, duration=30, easing="linear").start()
+    _tag, anim_id, _prop, spec = native_backend.native_started[0]
+    assert spec["report"] is True
+    native_animation_message({"id": anim_id, "value": 0.5})
+    assert v.value == 0.5 and seen == [0.5]
+    _complete(anim_id, value=1.0)
+    assert seen[-1] == 1.0
 
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline and v.value < 0.99:
-        time.sleep(0.01)
-    assert abs(v.value - 1.0) < 0.05
 
-
-def test_unattached_value_uses_python_driver(native_backend: _NativeBackend) -> None:
+def test_unattached_value_runs_on_a_standalone_core_node(native_backend: _NativeBackend) -> None:
     v = AnimatedValue(0.0)
-    handle = Animated.timing(v, to=1.0, duration=30, easing="linear")
-    handle.start()
-    assert native_backend.native_started == []
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline and v.value < 0.99:
-        time.sleep(0.01)
-    assert abs(v.value - 1.0) < 0.05
+    Animated.timing(v, to=1.0, duration=30, easing="linear").start()
+    tag, _anim_id, prop, spec = native_backend.native_started[0]
+    assert tag == 0 and prop == f"_pn_value:{id(v)}" and spec["report"] is True
 
 
-def test_partial_native_acceptance_rolls_back_and_falls_back() -> None:
-    from pythonnative.native_views import set_registry
+def test_refused_animation_rolls_back_accepted_drivers() -> None:
+    from pythonnative.native_views import set_backend
 
-    backend = _NativeBackend(accept_tags={1})
-    set_registry(backend)
+    backend = _NativeBackend(accept_tags=set())
+    set_backend(backend)
     try:
         v = AnimatedValue(0.0)
         v.attach(1, "opacity")
-        v.attach(2, "opacity")  # the backend rejects tag 2
-        Animated.timing(v, to=1.0, duration=30, easing="linear").start()
-
-        # The accepted target was cancelled so views can't drift apart.
-        assert len(backend.native_started) == 1
-        assert backend.native_cancelled == [(1, backend.native_started[0][1])]
-
-        # And the Python ticker still finishes the job.
-        deadline = time.monotonic() + 2.0
-        while time.monotonic() < deadline and v.value < 0.99:
-            time.sleep(0.01)
-        assert abs(v.value - 1.0) < 0.05
+        with pytest.raises(RuntimeError, match="refused"):
+            Animated.timing(v, to=1.0, duration=30, easing="linear").start()
+        assert backend.native_started == [] and v._native_group is None
     finally:
-        set_registry(None)
+        set_backend(None)
 
 
-def test_native_stop_syncs_to_presentation_value(native_backend: _NativeBackend) -> None:
-    native_backend.presentation_value = 0.42
-
+def test_stop_lands_where_the_core_stopped(native_backend: _NativeBackend) -> None:
     v = AnimatedValue(0.0)
     v.attach(7, "opacity")
     handle = Animated.timing(v, to=1.0, duration=5000).start()
-    assert len(native_backend.native_started) == 1
+    _tag, anim_id, _prop, _spec = native_backend.native_started[0]
 
     handle.stop()
-    assert len(native_backend.native_cancelled) == 1
-    # The value lands wherever the view visually was mid-flight.
+    assert native_backend.native_cancelled == [(7, anim_id)]
+    # The cancellation reports the value the view showed mid-flight.
+    _complete(anim_id, finished=False, value=0.42)
     assert v.value == 0.42
 
 
-def test_set_value_cancels_inflight_native_animation(native_backend: _NativeBackend) -> None:
+def test_set_value_cancels_inflight_animation(native_backend: _NativeBackend) -> None:
     v = AnimatedValue(0.0)
     v.attach(7, "opacity")
     Animated.timing(v, to=1.0, duration=5000).start()
@@ -436,33 +425,289 @@ def test_set_value_cancels_inflight_native_animation(native_backend: _NativeBack
 
 
 def test_decay_settles_at_projected_final_value(native_backend: _NativeBackend) -> None:
-    from pythonnative.animated import native_animation_completed
-
     v = AnimatedValue(10.0)
     v.attach(7, "translate_x")
-    Animated.decay(v, velocity=500.0, deceleration=0.997).start()
+    Animated.decay(v, velocity=0.5, deceleration=0.998).start()
 
     assert len(native_backend.native_started) == 1
     _tag, anim_id, _prop, spec = native_backend.native_started[0]
-    assert spec["kind"] == "decay"
+    # The spec the core's decay driver integrates: velocity in points per
+    # millisecond, deceleration per millisecond.
+    assert spec == {"kind": "decay", "from": 10.0, "velocity": 0.5, "deceleration": 0.998, "report": False}
 
-    native_animation_completed(anim_id)
-    # x_final = from + v0 / (k * 1000)
-    assert abs(v.value - (10.0 + 500.0 / (0.997 * 1000.0))) < 1e-6
+    _complete(anim_id)
+    # React Native's closed form: x_final = from + v0 / (1 - deceleration)
+    assert abs(v.value - (10.0 + 0.5 / (1.0 - 0.998))) < 1e-9
+    assert abs(v.value - 260.0) < 1e-9
 
 
-def test_unfinished_native_completion_keeps_python_value(native_backend: _NativeBackend) -> None:
-    from pythonnative.animated import native_animation_completed
+def test_decay_defaults_to_react_native_deceleration() -> None:
+    from pythonnative.animated import DEFAULT_DECAY_DECELERATION
+
+    assert DEFAULT_DECAY_DECELERATION == 0.998
+    handle = Animated.decay(AnimatedValue(0.0), velocity=1.0)
+    assert handle._spec_factory()["deceleration"] == 0.998
+
+
+def test_decay_rejects_deceleration_outside_unit_interval() -> None:
+    v = AnimatedValue(0.0)
+    with pytest.raises(ValueError):
+        Animated.decay(v, velocity=1.0, deceleration=1.0)
+    with pytest.raises(ValueError):
+        Animated.decay(v, velocity=1.0, deceleration=0.0)
+    with pytest.raises(ValueError):
+        Animated.decay(v, velocity=1.0, deceleration=1.5)
+
+
+@pytest.mark.asyncio
+async def test_headless_decay_settles_on_projected_value() -> None:
+    v = AnimatedValue(0.0)
+    seen: list = []
+    v.add_listener("x", seen.append)
+    # v0 = 0.5 pt/ms with deceleration 0.9 rests within about 60 ms.
+    result = await Animated.decay(v, velocity=0.5, deceleration=0.9)
+    assert result.finished is True
+    assert abs(v.value - 0.5 / (1.0 - 0.9)) < 1e-9
+    # Motion is monotonic toward the projection and never overshoots it.
+    assert seen == sorted(seen)
+    assert seen[-1] == v.value and all(x <= v.value + 1e-9 for x in seen)
+
+
+def test_unfinished_completion_keeps_python_value(native_backend: _NativeBackend) -> None:
+    from pythonnative.animated import AnimationResult
 
     v = AnimatedValue(0.0)
     v.attach(7, "opacity")
-    Animated.timing(v, to=1.0, duration=5000).start()
+    results: list = []
+    Animated.timing(v, to=1.0, duration=5000).start(results.append)
     _tag, anim_id, _prop, _spec = native_backend.native_started[0]
 
-    # finished=False means the platform interrupted the animation; the
-    # value must not jump to the target.
-    native_animation_completed(anim_id, finished=False)
+    # finished=False means the driver was interrupted; the value must not
+    # jump to the target.
+    _complete(anim_id, finished=False)
     assert v.value == 0.0
+    _wait_until(lambda: bool(results))
+    assert results == [AnimationResult(finished=False)]
+
+
+# ======================================================================
+# AnimationResult
+# ======================================================================
+
+
+def _wait_until(predicate: Any, timeout: float = 2.0) -> None:
+    """Poll ``predicate``, draining the headless loop that runs the core's frames and completion callbacks."""
+    from pythonnative import runtime
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and not predicate():
+        runtime.drain(timeout=0.02)
+        time.sleep(0.005)
+    assert predicate(), "condition not met in time"
+
+
+def _drain_for(seconds: float) -> None:
+    """Keep the headless loop running for ``seconds`` of real time."""
+    from pythonnative import runtime
+
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        runtime.drain(timeout=0.02)
+
+
+@pytest.mark.asyncio
+async def test_await_returns_finished_result() -> None:
+    from pythonnative.animated import AnimationResult
+
+    v = AnimatedValue(0.0)
+    result = await Animated.timing(v, to=1.0, duration=30, easing="linear")
+    assert result == AnimationResult(finished=True)
+    assert result.finished is True
+    assert (await Animated.delay(10)).finished is True
+    assert (await Animated.spring(v, to=0.0, stiffness=300, damping=30)).finished is True
+
+
+@pytest.mark.asyncio
+async def test_stopped_animation_reports_unfinished() -> None:
+    v = AnimatedValue(0.0)
+    handle = Animated.timing(v, to=10.0, duration=1000, easing="linear")
+    task = asyncio.create_task(_await(handle))
+    await asyncio.sleep(0.05)
+    handle.stop()
+    result = await task
+    assert result.finished is False
+    assert v.value < 10.0
+
+
+async def _await(handle: Any) -> Any:
+    return await handle
+
+
+@pytest.mark.asyncio
+async def test_superseding_animation_reports_unfinished() -> None:
+    v = AnimatedValue(0.0)
+    first = Animated.timing(v, to=10.0, duration=1000, easing="linear")
+    task = asyncio.create_task(_await(first))
+    await asyncio.sleep(0.03)
+    # Starting another animation on the same value interrupts the first.
+    v.stop_animation()
+    assert (await task).finished is False
+
+
+def test_start_callback_receives_result() -> None:
+    from pythonnative.animated import AnimationResult
+
+    v = AnimatedValue(0.0)
+    results: list = []
+    Animated.timing(v, to=1.0, duration=30, easing="linear").start(results.append)
+    _wait_until(lambda: bool(results))
+    assert results == [AnimationResult(finished=True)]
+
+    stopped: list = []
+    handle = Animated.timing(v, to=5.0, duration=2000, easing="linear").start(stopped.append)
+    handle.stop()
+    _wait_until(lambda: bool(stopped))
+    assert stopped == [AnimationResult(finished=False)]
+
+
+def test_core_start_callback_receives_result(native_backend: _NativeBackend) -> None:
+    from pythonnative.animated import AnimationResult
+
+    v = AnimatedValue(0.0)
+    v.attach(7, "opacity")
+    results: list = []
+    Animated.timing(v, to=1.0, duration=5000).start(results.append)
+    _tag, anim_id, _prop, _spec = native_backend.native_started[0]
+    _complete(anim_id)
+    _wait_until(lambda: bool(results))
+    assert results == [AnimationResult(finished=True)]
+
+    cancelled: list = []
+    handle = Animated.timing(v, to=0.0, duration=5000).start(cancelled.append)
+    handle.stop()
+    _wait_until(lambda: bool(cancelled))
+    assert cancelled == [AnimationResult(finished=False)]
+
+
+@pytest.mark.asyncio
+async def test_sequence_stops_early_and_reports_unfinished() -> None:
+    v1 = AnimatedValue(0.0)
+    v2 = AnimatedValue(0.0)
+    first = Animated.timing(v1, to=1.0, duration=1000, easing="linear")
+    second = Animated.timing(v2, to=1.0, duration=30, easing="linear")
+    sequence = Animated.sequence([first, second])
+    task = asyncio.create_task(_await(sequence))
+    await asyncio.sleep(0.05)
+    sequence.stop()
+    result = await task
+    assert result.finished is False
+    # The interrupted step ends the sequence; the second step never ran.
+    await asyncio.sleep(0.1)
+    assert v2.value == 0.0
+
+
+@pytest.mark.asyncio
+async def test_parallel_and_stagger_finish_only_when_every_child_finishes() -> None:
+    v1 = AnimatedValue(0.0)
+    v2 = AnimatedValue(0.0)
+    result = await Animated.parallel(
+        [
+            Animated.timing(v1, to=1.0, duration=30, easing="linear"),
+            Animated.timing(v2, to=1.0, duration=30, easing="linear"),
+        ]
+    )
+    assert result.finished is True
+
+    slow = Animated.timing(v1, to=5.0, duration=1000, easing="linear")
+    fast = Animated.timing(v2, to=5.0, duration=20, easing="linear")
+    parallel = Animated.parallel([slow, fast])
+    task = asyncio.create_task(_await(parallel))
+    await asyncio.sleep(0.08)
+    slow.stop()
+    assert (await task).finished is False
+
+    stagger = await Animated.stagger(10, [Animated.timing(v1, to=0.0, duration=20), Animated.delay(5)])
+    assert stagger.finished is True
+
+
+@pytest.mark.asyncio
+async def test_loop_reports_finished_or_stopped() -> None:
+    v = AnimatedValue(0.0)
+    result = await Animated.loop(Animated.timing(v, to=1.0, duration=20, easing="linear"), iterations=2)
+    assert result.finished is True
+
+    loop = Animated.loop(Animated.timing(v, to=1.0, duration=20, easing="linear"))
+    task = asyncio.create_task(_await(loop))
+    await asyncio.sleep(0.06)
+    loop.stop()
+    assert (await task).finished is False
+
+
+@pytest.mark.asyncio
+async def test_composite_start_callback_receives_result() -> None:
+    from pythonnative.animated import AnimationResult
+
+    v = AnimatedValue(0.0)
+    results: list = []
+    Animated.sequence([Animated.timing(v, to=1.0, duration=20, easing="linear"), Animated.delay(5)]).start(
+        results.append
+    )
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not results:
+        await asyncio.sleep(0.01)
+    assert results == [AnimationResult(finished=True)]
+
+    stopped: list = []
+    loop = Animated.loop(Animated.timing(v, to=1.0, duration=20, easing="linear")).start(stopped.append)
+    await asyncio.sleep(0.05)
+    loop.stop()
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not stopped:
+        await asyncio.sleep(0.01)
+    assert stopped == [AnimationResult(finished=False)]
+
+
+# ======================================================================
+# Animatable props
+# ======================================================================
+
+
+def test_binding_non_animatable_style_key_raises() -> None:
+    from pythonnative.animated import ANIMATABLE_PROPS, _resolve_style_with_values
+
+    assert ANIMATABLE_PROPS == frozenset(
+        {
+            "opacity",
+            "background_color",
+            "color",
+            "translate_x",
+            "translate_y",
+            "scale",
+            "scale_x",
+            "scale_y",
+            "rotate",
+            "rotate_x",
+            "rotate_y",
+        }
+    )
+    v = AnimatedValue(0.0)
+    with pytest.raises(ValueError) as excinfo:
+        _resolve_style_with_values({"width": v})
+    message = str(excinfo.value)
+    assert "'width'" in message and "opacity" in message and "translate_x" in message
+    with pytest.raises(ValueError):
+        _resolve_style_with_values({"margin": v})
+    with pytest.raises(ValueError):
+        _resolve_style_with_values({"transform": [{"skew_x": v}]})
+
+
+def test_binding_animatable_keys_is_accepted() -> None:
+    from pythonnative.animated import _resolve_style_with_values
+
+    v = AnimatedValue(0.5)
+    plain, bindings = _resolve_style_with_values({"opacity": v, "rotate_x": v, "transform": [{"rotate_y": v}]})
+    assert set(bindings) == {"opacity", "rotate_x", "rotate_y"}
+    assert plain["transform"] == [{"rotate_y": 0.5}, {"rotate_x": 0.5}]
 
 
 # Suppress unused-import lint for the typing helper.

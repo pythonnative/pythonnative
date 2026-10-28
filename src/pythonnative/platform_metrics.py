@@ -14,7 +14,7 @@ that state to size themselves correctly:
   of asking each native view for window metrics.
 
 Rather than threading those values through every
-[`measure_intrinsic`][pythonnative.native_views.base.ViewHandler.measure_intrinsic]
+the backend's intrinsic measurement
 call signature, the screen host writes them here and handlers read
 them on demand. Values are in **dp on Android** and **pt on iOS**,
 i.e., the same "layout units" the layout engine uses on each
@@ -36,7 +36,7 @@ Example:
 from __future__ import annotations
 
 import threading
-from typing import Callable, List, NamedTuple
+from typing import Callable, List, NamedTuple, Optional
 
 
 class SafeAreaInsets(NamedTuple):
@@ -49,14 +49,27 @@ class SafeAreaInsets(NamedTuple):
 
 
 class WindowDimensions(NamedTuple):
-    """Viewport size in layout units (pt on iOS, dp on Android)."""
+    """Viewport size in layout units (pt on iOS, dp on Android) plus its density.
+
+    Attributes:
+        width: Width in layout units.
+        height: Height in layout units.
+        scale: Physical pixels per layout unit (``UIScreen.scale`` /
+            ``DisplayMetrics.density`` / ``devicePixelRatio``); ``1.0``
+            until the host reports it.
+        font_scale: The user's text-size multiplier (Dynamic Type /
+            ``fontScale``); ``1.0`` until the host reports it.
+    """
 
     width: float
     height: float
+    scale: float = 1.0
+    font_scale: float = 1.0
 
 
 _safe_area_insets: SafeAreaInsets = SafeAreaInsets(0.0, 0.0, 0.0, 0.0)
 _window_dimensions: WindowDimensions = WindowDimensions(0.0, 0.0)
+_screen_dimensions: WindowDimensions = WindowDimensions(0.0, 0.0)
 _keyboard_height: float = 0.0
 
 _subscribers: List[Callable[[], None]] = []
@@ -157,16 +170,42 @@ def reset_safe_area_insets() -> None:
     _safe_area_insets = SafeAreaInsets(0.0, 0.0, 0.0, 0.0)
 
 
-def set_window_dimensions(width: float, height: float) -> None:
+def _dimensions(
+    current: WindowDimensions,
+    width: float,
+    height: float,
+    scale: Optional[float],
+    font_scale: Optional[float],
+) -> WindowDimensions:
+    """Build a dimensions record, keeping the current density when it isn't given."""
+    return WindowDimensions(
+        max(0.0, float(width)),
+        max(0.0, float(height)),
+        current.scale if scale is None else max(0.0, float(scale)) or 1.0,
+        current.font_scale if font_scale is None else max(0.0, float(font_scale)) or 1.0,
+    )
+
+
+def set_window_dimensions(
+    width: float, height: float, *, scale: Optional[float] = None, font_scale: Optional[float] = None
+) -> None:
     """Publish the viewport size in layout units.
 
     Called by the screen host on initial layout, rotation, and split-
     view changes. Notifies subscribers (and therefore re-renders
-    components using ``use_window_dimensions``) only when the size
+    components using ``use_window_dimensions``) only when a value
     actually changes.
+
+    Args:
+        width: Viewport width in layout units.
+        height: Viewport height in layout units.
+        scale: Pixels per layout unit. ``None`` keeps the current value
+            (``1.0`` until a host reports one); ``0`` is treated as ``1.0``.
+        font_scale: Text-size multiplier. ``None`` keeps the current
+            value; ``0`` is treated as ``1.0``.
     """
     global _window_dimensions
-    new_dims = WindowDimensions(max(0.0, float(width)), max(0.0, float(height)))
+    new_dims = _dimensions(_window_dimensions, width, height, scale, font_scale)
     if new_dims == _window_dimensions:
         return
     _window_dimensions = new_dims
@@ -174,14 +213,52 @@ def set_window_dimensions(width: float, height: float) -> None:
 
 
 def get_window_dimensions() -> WindowDimensions:
-    """Return the current viewport size, or ``(0, 0)`` before first layout."""
+    """Return the current viewport size, or ``(0, 0, 1, 1)`` before first layout."""
     return _window_dimensions
 
 
 def reset_window_dimensions() -> None:
-    """Reset window dimensions back to ``(0, 0)``. Intended for tests."""
+    """Reset window dimensions back to ``(0, 0, 1, 1)``. Intended for tests."""
     global _window_dimensions
     _window_dimensions = WindowDimensions(0.0, 0.0)
+
+
+def set_screen_dimensions(
+    width: float, height: float, *, scale: Optional[float] = None, font_scale: Optional[float] = None
+) -> None:
+    """Publish the physical screen size in layout units.
+
+    The screen is the whole display (``UIScreen.main.bounds`` /
+    ``DisplayMetrics``), as opposed to the window the app occupies in
+    split view or with a keyboard showing. Hosts that can't tell the two
+    apart publish the window size here. Notifies subscribers only when a
+    value actually changes.
+
+    Args:
+        width: Screen width in layout units.
+        height: Screen height in layout units.
+        scale: Pixels per layout unit; ``None`` keeps the current value.
+        font_scale: Text-size multiplier; ``None`` keeps the current value.
+    """
+    global _screen_dimensions
+    new_dims = _dimensions(_screen_dimensions, width, height, scale, font_scale)
+    if new_dims == _screen_dimensions:
+        return
+    _screen_dimensions = new_dims
+    _notify_subscribers()
+
+
+def get_screen_dimensions() -> WindowDimensions:
+    """Return the physical screen size, or the window size before a host publishes one."""
+    if _screen_dimensions.width > 0 and _screen_dimensions.height > 0:
+        return _screen_dimensions
+    return _window_dimensions
+
+
+def reset_screen_dimensions() -> None:
+    """Reset screen dimensions back to ``(0, 0, 1, 1)``. Intended for tests."""
+    global _screen_dimensions
+    _screen_dimensions = WindowDimensions(0.0, 0.0)
 
 
 def set_keyboard_height(height: float) -> None:

@@ -1,22 +1,20 @@
-"""Unit tests for StyleSheet, resolve_style, theming, and typed Style."""
+"""Unit tests for StyleSheet namespaces, resolve_style, theme tokens, and typed Style."""
 
 import dataclasses
-from typing import Any, List
+from typing import Any, Dict, List, Set, get_args
 
 import pytest
 
 from pythonnative import diagnostics
 from pythonnative.style import (
-    DEFAULT_DARK_THEME,
-    DEFAULT_LIGHT_THEME,
+    ABSOLUTE_FILL,
     Style,
     StyleSheet,
-    Theme,
-    ThemeContext,
     resolve_style,
     style,
     validate_style_keys,
 )
+from pythonnative.theme import DARK_THEME, LIGHT_THEME, Theme
 
 
 @pytest.fixture()
@@ -43,80 +41,68 @@ def test_resolve_style_dict() -> None:
 
 
 def test_resolve_style_list() -> None:
-    base = {"font_size": 16, "color": "#000"}
-    override = {"color": "#FFF", "bold": True}
+    base: Style = {"font_size": 16, "color": "#000"}
+    override: Style = {"color": "#FFF", "bold": True}
     result = resolve_style([base, override])
     assert result == {"font_size": 16, "color": "#FFF", "bold": True}
 
 
 def test_resolve_style_list_with_none_entries() -> None:
-    result = resolve_style([None, {"a": 1}, None, {"b": 2}])
-    assert result == {"a": 1, "b": 2}
+    result = resolve_style([None, {"padding": 1}, None, {"margin": 2}])
+    assert result == {"padding": 1, "margin": 2}
 
 
-def test_stylesheet_create() -> None:
-    styles = StyleSheet.create(
-        heading={"font_size": 28, "bold": True},
-        body={"font_size": 16},
-    )
-    assert "heading" in styles
-    assert styles["heading"]["font_size"] == 28
-    assert styles["body"]["font_size"] == 16
+def test_stylesheet_subclass_is_a_namespace_of_styles() -> None:
+    class Styles(StyleSheet):
+        heading = style(font_size=28, bold=True)
+        body: Style = {"font_size": 16}
+
+    assert Styles.heading == {"font_size": 28, "bold": True}
+    assert Styles.body["font_size"] == 16
+    with pytest.raises(TypeError, match="namespace"):
+        Styles()
 
 
-def test_stylesheet_compose() -> None:
-    base = {"font_size": 16, "color": "#000"}
-    override = {"color": "#FFF", "bold": True}
-    merged = StyleSheet.compose(base, override)
+def test_style_lists_compose_later_entries_winning() -> None:
+    base: Style = {"font_size": 16, "color": "#000"}
+    override: Style = {"color": "#FFF", "bold": True}
+    merged = resolve_style([base, override])
     assert merged["font_size"] == 16
     assert merged["color"] == "#FFF"
     assert merged["bold"] is True
 
 
-def test_stylesheet_compose_none_safe() -> None:
-    result = StyleSheet.compose(None, {"a": 1}, None)
-    assert result == {"a": 1}
+def test_style_lists_skip_none_entries() -> None:
+    assert resolve_style([None, {"padding": 1}, None]) == {"padding": 1}
 
 
-def test_stylesheet_flatten_dict() -> None:
-    result = StyleSheet.flatten({"font_size": 20})
-    assert result == {"font_size": 20}
-
-
-def test_stylesheet_flatten_list() -> None:
-    result = StyleSheet.flatten([{"a": 1}, {"b": 2}])
-    assert result == {"a": 1, "b": 2}
-
-
-def test_stylesheet_flatten_none() -> None:
-    result = StyleSheet.flatten(None)
-    assert result == {}
-
-
-def test_theme_context_defaults_to_follow_system_sentinel() -> None:
-    # Without a Provider, the raw context value is the follow-system
-    # sentinel; `use_theme` resolves it against the color scheme.
-    from pythonnative.style import _FOLLOW_SYSTEM_THEME
-
-    assert ThemeContext.current() is _FOLLOW_SYSTEM_THEME
+def test_resolve_style_flattens_dict_list_and_none() -> None:
+    assert resolve_style({"font_size": 20}) == {"font_size": 20}
+    assert resolve_style([{"padding": 1}, {"margin": 2}]) == {"padding": 1, "margin": 2}
+    assert resolve_style(None) == {}
 
 
 def test_light_and_dark_themes_differ() -> None:
-    assert DEFAULT_LIGHT_THEME.background_color != DEFAULT_DARK_THEME.background_color
-    assert DEFAULT_LIGHT_THEME.text_color != DEFAULT_DARK_THEME.text_color
+    assert LIGHT_THEME.colors.background != DARK_THEME.colors.background
+    assert LIGHT_THEME.colors.text != DARK_THEME.colors.text
+    assert not LIGHT_THEME.dark and DARK_THEME.dark
 
 
 def test_theme_is_immutable_and_replaceable() -> None:
-    brand = DEFAULT_LIGHT_THEME.replace(primary_color="#FF2D55", spacing=12)
+    brand = dataclasses.replace(
+        LIGHT_THEME,
+        colors=dataclasses.replace(LIGHT_THEME.colors, primary="#FF2D55"),
+        spacing=dataclasses.replace(LIGHT_THEME.spacing, md=12),
+    )
     assert isinstance(brand, Theme)
-    assert brand.primary_color == "#FF2D55"
-    assert brand.spacing == 12
-    assert brand.text_color == DEFAULT_LIGHT_THEME.text_color
-    assert DEFAULT_LIGHT_THEME.primary_color == "#007AFF"
+    assert brand.colors.primary == "#FF2D55"
+    assert brand.spacing.md == 12
+    assert brand.colors.text == LIGHT_THEME.colors.text
+    assert LIGHT_THEME.colors.primary == "#007AFF"
     with pytest.raises(dataclasses.FrozenInstanceError):
-        brand.primary_color = "#000000"  # type: ignore[misc]
+        brand.dark = True  # type: ignore[misc]
     with pytest.raises(TypeError):
-        DEFAULT_LIGHT_THEME.replace(primary_colour="#000000")
+        dataclasses.replace(LIGHT_THEME, primary_color="#000000")  # type: ignore[call-arg]
 
 
 # ---------------------------------------------------------------------------
@@ -161,34 +147,19 @@ def test_style_helper_used_with_view_factory() -> None:
     assert el.props["flex_direction"] == "column"
 
 
-def test_stylesheet_compose_flattens_lists() -> None:
-    base = style(font_size=16, color="#000")
-    override = style(color="#FFF", bold=True)
-    merged = StyleSheet.compose([base, override])
-    assert merged["font_size"] == 16
-    assert merged["color"] == "#FFF"
-    assert merged["bold"] is True
-
-
-def test_stylesheet_compose_mixed_dict_and_list() -> None:
-    merged = StyleSheet.compose(
-        style(font_size=14),
-        [None, style(color="#0A84FF")],
-        style(bold=True),
-    )
+def test_style_lists_mix_helpers_and_none() -> None:
+    merged = resolve_style([style(font_size=14), None, style(color="#0A84FF"), style(bold=True)])
     assert merged == {"font_size": 14, "color": "#0A84FF", "bold": True}
 
 
-def test_stylesheet_absolute_fill() -> None:
-    fill = StyleSheet.absolute_fill()
-    assert fill == {"position": "absolute", "top": 0, "right": 0, "bottom": 0, "left": 0}
+def test_absolute_fill() -> None:
+    assert ABSOLUTE_FILL == {"position": "absolute", "top": 0, "right": 0, "bottom": 0, "left": 0}
 
 
-def test_stylesheet_absolute_fill_returns_fresh_dict() -> None:
-    fill_a = StyleSheet.absolute_fill()
-    fill_b = StyleSheet.absolute_fill()
-    fill_a["top"] = 99
-    assert fill_b["top"] == 0
+def test_absolute_fill_composes_without_mutation() -> None:
+    fill = resolve_style([ABSOLUTE_FILL, {"top": 99}])
+    assert fill["top"] == 99
+    assert ABSOLUTE_FILL["top"] == 0
 
 
 def test_resolve_style_list_with_typed_styles() -> None:
@@ -201,7 +172,7 @@ def test_resolve_style_list_with_typed_styles() -> None:
 
 def test_resolve_style_returns_fresh_dict() -> None:
     """resolve_style never mutates the caller's dict."""
-    src = {"font_size": 16}
+    src: Style = {"font_size": 16}
     out = resolve_style(src)
     out["font_size"] = 99
     assert src["font_size"] == 16
@@ -287,3 +258,100 @@ def test_validate_is_noop_outside_dev_mode() -> None:
     diagnostics.clear_warnings()
     validate_style_keys({"display": "block", "bogus": 1}, owner="View")
     assert _warnings() == []
+
+
+# ---------------------------------------------------------------------------
+# RFC 0002 additions: insets, border_style, dynamic colors, typed style()
+# ---------------------------------------------------------------------------
+
+
+def test_inset_shorthand_expands_to_every_edge() -> None:
+    assert resolve_style({"inset": 4}) == {"top": 4, "right": 4, "bottom": 4, "left": 4}
+    assert resolve_style({"inset_horizontal": 8}) == {"left": 8, "right": 8}
+    assert resolve_style({"inset_vertical": "10%"}) == {"top": "10%", "bottom": "10%"}
+
+
+def test_inset_axis_shorthands_override_inset_and_explicit_edges_win() -> None:
+    resolved = resolve_style({"top": 1, "inset": 4, "inset_horizontal": 8})
+    assert resolved == {"top": 1, "right": 8, "bottom": 4, "left": 8}
+    # Order of keys never matters: an explicit edge wins even when written first.
+    assert resolve_style([{"inset_vertical": 2}, {"bottom": 9}]) == {"top": 2, "bottom": 9}
+    assert resolve_style({"bottom": 9, "inset_vertical": 2}) == {"top": 2, "bottom": 9}
+
+
+def test_inset_shorthands_never_reach_element_props() -> None:
+    from pythonnative.components import View
+
+    el = View(style=style(position="absolute", inset=0))
+    assert el.props["top"] == 0 and el.props["left"] == 0 and el.props["right"] == 0 and el.props["bottom"] == 0
+    assert "inset" not in el.props
+
+
+def test_inset_shorthands_are_not_in_the_wire_contract() -> None:
+    from pythonnative.sdk.schema import COMPONENTS
+
+    assert not {"inset", "inset_horizontal", "inset_vertical"} & COMPONENTS["View"].props.keys()
+    assert {"top", "right", "bottom", "left"} <= COMPONENTS["View"].props.keys()
+
+
+def test_border_style_is_declared_and_validated(dev_mode: Any) -> None:
+    assert "border_style" in Style.__annotations__
+    validate_style_keys({"border_style": "dashed"}, owner="View")
+    assert _warnings() == []
+    validate_style_keys({"border_style": "wavy"}, owner="View")
+    assert len(_warnings()) == 1 and "border_style" in _warnings()[0]
+
+
+def test_dynamic_color_is_a_valid_color() -> None:
+    from pythonnative.components import View
+    from pythonnative.style import Color, DynamicColor
+
+    assert DynamicColor in get_args(Color)
+    el = View(style=style(background_color={"light": "#FFF", "dark": "#000"}))
+    assert el.props["background_color"] == {"light": "#FFF", "dark": "#000"}
+
+
+def test_keyboard_type_gained_the_react_native_values() -> None:
+    from pythonnative.style import KeyboardType
+
+    assert {"ascii", "numbers_and_punctuation", "web_search", "visible_password"} <= set(get_args(KeyboardType))
+
+
+def test_transform_spec_covers_3d_operations() -> None:
+    from pythonnative.style import (
+        TransformEntry,
+        TransformPerspective,
+        TransformRotateX,
+        TransformRotateY,
+        TransformRotateZ,
+        TransformSkewX,
+        TransformSkewY,
+    )
+
+    entries = set(get_args(TransformEntry))
+    expected: Set[Any] = {
+        TransformRotateX,
+        TransformRotateY,
+        TransformRotateZ,
+        TransformSkewX,
+        TransformSkewY,
+        TransformPerspective,
+    }
+    assert expected <= entries
+
+
+def test_style_helper_is_typed_with_unpack() -> None:
+    import typing
+
+    hints = typing.get_type_hints(style)
+    assert hints["return"] is Style
+    # ``**properties: Unpack[Style]`` shows up as the TypedDict itself.
+    assert typing.get_origin(style.__annotations__["properties"]) is typing.Unpack
+
+
+def test_style_prop_drops_the_untyped_dict_alternative() -> None:
+    from pythonnative.style import StyleProp
+
+    alternatives = get_args(StyleProp)
+    assert Style in alternatives
+    assert dict not in alternatives and Dict[str, Any] not in alternatives

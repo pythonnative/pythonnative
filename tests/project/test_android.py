@@ -182,11 +182,18 @@ def test_configure_manifest_deep_link_filter(template: Path, tmp_path: Path) -> 
     assert text.index("android.intent.action.VIEW") < text.index("</activity>")
 
 
-def test_configure_manifest_no_deep_links_by_default(template: Path, tmp_path: Path) -> None:
+def test_configure_manifest_release_has_no_deep_links_by_default(template: Path, tmp_path: Path) -> None:
     cfg = _config(tmp_path)
-    android.configure_manifest(template, cfg)
+    android.configure_manifest(template, cfg, release=True)
     text = (template / "app" / "src" / "main" / "AndroidManifest.xml").read_text()
     assert "android.intent.action.VIEW" not in text
+
+
+def test_debug_manifests_register_the_dev_client_connect_scheme(template: Path, tmp_path: Path) -> None:
+    cfg = _config(tmp_path, app={"id": "com.acme.cool_app", "name": "cool"})
+    android.configure_manifest(template, cfg)
+    text = (template / "app" / "src" / "main" / "AndroidManifest.xml").read_text()
+    assert '<data android:scheme="pn-com.acme.cool-app" />' in text
 
 
 def test_configure_strings_escapes(template: Path, tmp_path: Path) -> None:

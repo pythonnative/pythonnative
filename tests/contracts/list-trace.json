@@ -1,0 +1,430 @@
+[
+  {
+    "name": "initial snapshot",
+    "packet": {
+      "base": 0,
+      "revision": 1,
+      "changes": [
+        [
+          "reset",
+          [
+            [
+              "a",
+              1,
+              44,
+              true
+            ],
+            [
+              "b",
+              1,
+              60,
+              false
+            ],
+            [
+              "c",
+              1,
+              44,
+              false
+            ]
+          ]
+        ]
+      ]
+    },
+    "valid": true,
+    "keys": [
+      "a",
+      "b",
+      "c"
+    ],
+    "revision": 1
+  },
+  {
+    "name": "changed row",
+    "packet": {
+      "base": 1,
+      "revision": 2,
+      "changes": [
+        [
+          "u",
+          [
+            "b",
+            2,
+            80,
+            false
+          ]
+        ]
+      ]
+    },
+    "valid": true,
+    "keys": [
+      "a",
+      "b",
+      "c"
+    ],
+    "revision": 2
+  },
+  {
+    "name": "stale snapshot",
+    "packet": {
+      "base": 0,
+      "revision": 1,
+      "changes": [
+        [
+          "reset",
+          []
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "a",
+      "b",
+      "c"
+    ],
+    "revision": 2
+  },
+  {
+    "name": "rejected partial insertion",
+    "packet": {
+      "base": 2,
+      "revision": 3,
+      "changes": [
+        [
+          "i",
+          0,
+          [
+            "x",
+            1,
+            44,
+            false
+          ]
+        ],
+        [
+          "d",
+          "missing"
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "a",
+      "b",
+      "c"
+    ],
+    "revision": 2
+  },
+  {
+    "name": "duplicate key",
+    "packet": {
+      "base": 2,
+      "revision": 3,
+      "changes": [
+        [
+          "i",
+          0,
+          [
+            "a",
+            1,
+            44,
+            false
+          ]
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "a",
+      "b",
+      "c"
+    ],
+    "revision": 2
+  },
+  {
+    "name": "mixed edits",
+    "packet": {
+      "base": 2,
+      "revision": 3,
+      "changes": [
+        [
+          "m",
+          "c",
+          0
+        ],
+        [
+          "d",
+          "b"
+        ],
+        [
+          "i",
+          1,
+          [
+            "d",
+            1,
+            40,
+            false
+          ]
+        ]
+      ]
+    },
+    "valid": true,
+    "keys": [
+      "c",
+      "d",
+      "a"
+    ],
+    "revision": 3
+  },
+  {
+    "name": "reset after update",
+    "packet": {
+      "base": 3,
+      "revision": 4,
+      "changes": [
+        [
+          "u",
+          [
+            "a",
+            2,
+            44,
+            true
+          ]
+        ],
+        [
+          "reset",
+          []
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "c",
+      "d",
+      "a"
+    ],
+    "revision": 3
+  },
+  {
+    "name": "boolean extent",
+    "packet": {
+      "base": 3,
+      "revision": 4,
+      "changes": [
+        [
+          "u",
+          [
+            "a",
+            2,
+            true,
+            true
+          ]
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "c",
+      "d",
+      "a"
+    ],
+    "revision": 3
+  },
+  {
+    "name": "boolean index",
+    "packet": {
+      "base": 3,
+      "revision": 4,
+      "changes": [
+        [
+          "m",
+          "a",
+          true
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "c",
+      "d",
+      "a"
+    ],
+    "revision": 3
+  },
+  {
+    "name": "unsafe revision",
+    "packet": {
+      "base": 3,
+      "revision": 4,
+      "changes": [
+        [
+          "u",
+          [
+            "a",
+            9007199254740992,
+            44,
+            true
+          ]
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "c",
+      "d",
+      "a"
+    ],
+    "revision": 3
+  },
+  {
+    "name": "negative extent",
+    "packet": {
+      "base": 3,
+      "revision": 4,
+      "changes": [
+        [
+          "u",
+          [
+            "a",
+            2,
+            -1,
+            true
+          ]
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "c",
+      "d",
+      "a"
+    ],
+    "revision": 3
+  },
+  {
+    "name": "invalid sticky flag",
+    "packet": {
+      "base": 3,
+      "revision": 4,
+      "changes": [
+        [
+          "u",
+          [
+            "a",
+            2,
+            44,
+            1
+          ]
+        ]
+      ]
+    },
+    "valid": false,
+    "keys": [
+      "c",
+      "d",
+      "a"
+    ],
+    "revision": 3
+  },
+  {
+    "name": "move to end",
+    "packet": {
+      "base": 3,
+      "revision": 4,
+      "changes": [
+        [
+          "m",
+          "c",
+          2
+        ]
+      ]
+    },
+    "valid": true,
+    "keys": [
+      "d",
+      "a",
+      "c"
+    ],
+    "revision": 4
+  },
+  {
+    "name": "delete and reinsert",
+    "packet": {
+      "base": 4,
+      "revision": 5,
+      "changes": [
+        [
+          "d",
+          "a"
+        ],
+        [
+          "i",
+          0,
+          [
+            "a",
+            1,
+            44,
+            false
+          ]
+        ]
+      ]
+    },
+    "valid": true,
+    "keys": [
+      "a",
+      "d",
+      "c"
+    ],
+    "revision": 5
+  },
+  {
+    "name": "reset with following edits",
+    "packet": {
+      "base": 5,
+      "revision": 6,
+      "changes": [
+        [
+          "reset",
+          [
+            [
+              "fresh",
+              1,
+              50,
+              true
+            ]
+          ]
+        ],
+        [
+          "i",
+          1,
+          [
+            "last",
+            1,
+            30,
+            false
+          ]
+        ]
+      ]
+    },
+    "valid": true,
+    "keys": [
+      "fresh",
+      "last"
+    ],
+    "revision": 6
+  },
+  {
+    "name": "clear",
+    "packet": {
+      "base": 6,
+      "revision": 7,
+      "changes": [
+        [
+          "reset",
+          []
+        ]
+      ]
+    },
+    "valid": true,
+    "keys": [],
+    "revision": 7
+  }
+]

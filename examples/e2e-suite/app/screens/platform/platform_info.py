@@ -8,20 +8,20 @@ varies by device.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def PlatformInfoDemo() -> pn.Element:
+def PlatformInfoDemo() -> pn.Node:
     """Render Platform.OS and Platform.Version."""
-    return demo_screen(
+    return DemoScreen(
         "Platform info",
         "Platform.OS and Platform.Version values.",
-        section(
+        DemoSection(
             "Platform values",
-            result_text("OS", pn.Platform.OS),
-            result_text("Version", pn.Platform.Version),
-            result_text("PythonNative", pn.__version__),
-            hint("Maestro asserts the OS line and the version line are visible."),
+            ResultText("OS", pn.Platform.OS),
+            ResultText("Version", pn.Platform.Version),
+            ResultText("PythonNative", pn.__version__),
+            Hint("Maestro asserts the OS line and the version line are visible."),
         ),
     )

@@ -17,6 +17,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+        // Python starts beside UIKit's own launch work; the first screen
+        // waits for it without blocking the main thread.
+        PythonRuntime.shared.startInBackground()
         BatteryModule.startMonitoring()
         return true
     }

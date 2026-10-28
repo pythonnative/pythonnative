@@ -13,8 +13,9 @@ accessibility labels, roles, and testing on each deployment target.
 
 The component model is React-style (functions plus hooks plus a
 reconciler) so you get a familiar declarative API on top of those
-native widgets. Python runs on its own application thread and communicates
-with the native UI through a versioned bridge.
+native widgets. Python runs on its own application thread and commits through a
+versioned bridge to a shared C++ renderer core, which validates and lays out
+each commit before the platform's UI thread mounts it.
 
 ## Can I write Android-only or iOS-only code?
 
@@ -47,22 +48,23 @@ Yes. Two patterns:
 
 ## How do I add a new widget?
 
-Implement a [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-for each platform you support, register it on
-[`get_registry()`][pythonnative.native_views.get_registry], and write
-a small Python factory that returns
-`Element(<type>, props, children)`. Step-by-step instructions live in
-[Native views (concept)](../concepts/native-views.md#custom-widgets).
+Declare a frozen [`Props`][pythonnative.sdk.Props] dataclass, call
+[`define_component(name, props)`][pythonnative.sdk.define_component]
+to get a typed element factory, generate the native contract, and
+implement a Swift `PNComponentManager` and a Kotlin `ComponentManager`
+under the same name. Headless tests and the browser preview need no
+extra Python code. Step-by-step instructions live in
+[Custom native components](../guides/custom-native-components.md).
 
 ## Does PythonNative work on the desktop or the web?
 
 For **previewing**, yes. `pn preview` renders your app in a browser tab
 inside a phone frame, with Fast Refresh on every save. It's the fastest
 inner loop: see your real UI and iterate in seconds without booting a
-simulator or deploying to a device. The page speaks the same bridge
-protocol as the Swift and Kotlin runtimes. It shares Python components,
-hooks, reconciliation, and logical navigation with mobile apps; the page
-implements widgets in the DOM and layout with Yoga WebAssembly. See the
+simulator or deploying to a device. The page runs the same renderer core as
+the mobile apps, compiled to WebAssembly, and shares Python components,
+hooks, reconciliation, and logical navigation with them; it implements
+widgets in the DOM. See the
 [Browser preview guide](../guides/browser-preview.md).
 
 The browser preview is a **development tool**, not a production target:
@@ -113,38 +115,49 @@ bundles the installed copy directly.
 
 ## Where do `flex`, `padding`, and `position: "absolute"` actually run?
 
-In the Yoga C++ engine compiled into each mobile runtime. Python sends
-styles through the bridge; native widgets supply intrinsic measurements,
-and the renderer returns changed frames to Python. The browser uses Yoga
-WebAssembly, while headless tests use the Python host binding in
-`pythonnative.layout`. The layout rules are shared, but platform fonts
-and controls can have different intrinsic sizes. See
-[Layout engine](../concepts/layout.md).
+In the renderer core, a C++ library with Yoga built in that every target
+links: the iOS and Android apps, the browser preview (as WebAssembly), and
+the `pythonnative._core` extension headless tests use. Python sends styles
+in each commit; the core lays out off the UI thread, asks the platform to
+measure text and controls, and returns changed frames to Python. The
+layout rules are shared, but platform fonts and controls can have
+different intrinsic sizes. See [Layout engine](../concepts/layout.md).
 
 ## How is state shared across screens?
 
-Two main options:
+Every screen is part of one component tree, so the usual tools work
+across screens:
 
+- A [`pn.Store`][pythonnative.Store] for app-wide, long-lived state.
+  Define it at module level, change it with plain functions that call
+  `store.update(...)`, and read it with
+  [`use_store`][pythonnative.use_store]. A selector
+  (`pn.use_store(store, lambda s: s.unread)`) re-renders a component
+  only when the value it reads changes. It fills the role of Zustand
+  or Redux in a React Native app.
 - [`use_context`][pythonnative.use_context] /
-  [`Context.Provider`][pythonnative.hooks.Context.Provider] for tree-scoped values
-  (themes, current user). The provider sits at the top of the
-  navigator and descendants subscribe.
-- A plain Python module-level object (a "store") for app-wide,
-  long-lived state. Subscribe to changes via your own event bus and
-  call `set_state` on a hook to trigger re-renders.
+  [`Context.Provider`][pythonnative.hooks.Context.Provider] for
+  tree-scoped values (the current user, a repository object). Place
+  the provider above the `NavigationContainer` so every screen can
+  read it.
+- Screen params for the data a screen needs to show: pass an id as a
+  parameter (`nav.push(ItemScreen(id=42))`) and look the record up in
+  the screen.
 
-PythonNative doesn't ship a Redux-style store; the
-[`use_reducer`][pythonnative.use_reducer] hook covers most cases
-without one.
+See [Managing state](../guides/state.md) for when to use each, and for
+persisting state across launches.
 
 ## How do I navigate between screens?
 
-Use [`NavigationContainer`][pythonnative.NavigationContainer] plus one
-of [`create_stack_navigator`][pythonnative.create_stack_navigator],
-[`create_tab_navigator`][pythonnative.create_tab_navigator], or
-[`create_drawer_navigator`][pythonnative.create_drawer_navigator].
-From a screen, call [`use_navigation`][pythonnative.use_navigation]
-to get an imperative handle (`navigate`, `go_back`, etc.). See the
+Define your screens as components, list them in a module-level
+[`StackNavigator`][pythonnative.StackNavigator],
+[`TabNavigator`][pythonnative.TabNavigator], or
+[`DrawerNavigator`][pythonnative.DrawerNavigator], and render it with
+[`NavigationContainer`][pythonnative.NavigationContainer]. From a
+screen, call [`use_navigation`][pythonnative.use_navigation] and pass
+the destination as a call to its component:
+`nav.push(ItemScreen(id=42))`. The screen's parameters are its route
+params, so the type checker verifies them. See the
 [Navigation guide](../guides/navigation.md).
 
 ## Why hooks instead of class components?

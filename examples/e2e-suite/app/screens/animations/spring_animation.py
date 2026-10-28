@@ -7,11 +7,11 @@ spring" and asserts the status flips to "done" once the spring settles.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def SpringAnimationDemo() -> pn.Element:
+def SpringAnimationDemo() -> pn.Node:
     """Render an animated box driven by Animated.spring."""
     scale = pn.use_animated_value(0.5)
     status, set_status = pn.use_state("idle")
@@ -26,25 +26,25 @@ def SpringAnimationDemo() -> pn.Element:
         await pn.Animated.spring(scale, to=0.5, stiffness=160, damping=12)
         set_status("idle")
 
-    return demo_screen(
+    return DemoScreen(
         "Animated.spring",
         "Spring a box up to full scale and back.",
-        section(
+        DemoSection(
             "Spring demo",
-            result_text("Status", status),
+            ResultText("Status", status),
             pn.Animated.View(
                 pn.Text("spring-box label", style=pn.style(color="#FFFFFF", font_weight="700")),
-                style=pn.style(
-                    scale=scale,
-                    padding=20,
-                    background_color="#22C55E",
-                    border_radius=12,
-                ),
+                style={
+                    "scale": scale,
+                    "padding": 20,
+                    "background_color": "#22C55E",
+                    "border_radius": 12,
+                },
             ),
-            buttons_row(
-                pn.Button("Run spring", on_press=lambda: pn.run_async(run())),
-                pn.Button("Reset", on_press=lambda: pn.run_async(reset())),
+            ButtonsRow(
+                pn.Button("Run spring", on_press=run),
+                pn.Button("Reset", on_press=reset),
             ),
-            hint("Maestro taps 'Run spring' and asserts 'Status: done'."),
+            Hint("Maestro taps 'Run spring' and asserts 'Status: done'."),
         ),
     )

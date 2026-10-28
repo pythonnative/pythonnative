@@ -1,0 +1,530 @@
+{
+  "environment": {
+    "python": "3.13.15",
+    "system": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64",
+    "host": "Intel Mac (x86_64); load average about 5 to 20 during the runs",
+    "note": "Host timings only. Device measurements (UI-thread time per commit, commit-to-mount latency, cold launch) weren't recorded: the simulator and emulator shared the host with parallel builds."
+  },
+  "host_runtime": {
+    "command": "python scripts/benchmark-runtime.py --imports 9 (before: main at f9e6b86 via PYTHONPATH)",
+    "before": {
+      "import_ms": {
+        "median": 236.056,
+        "min": 230.994
+      },
+      "element_us": {
+        "median": 2.626,
+        "min": 2.596
+      },
+      "rerender_300_ms": {
+        "median": 47.0,
+        "min": 44.935
+      },
+      "commit_prepare_300_ms": {
+        "median": 1.822,
+        "min": 1.814
+      }
+    },
+    "after": {
+      "import_ms": {
+        "median": 243.16,
+        "min": 238.686
+      },
+      "element_us": {
+        "median": 2.602,
+        "min": 2.59
+      },
+      "rerender_300_ms": {
+        "median": 51.473,
+        "min": 48.772
+      },
+      "core_commit_300_ms": {
+        "median": 6.374,
+        "min": 6.292
+      }
+    },
+    "note": "commit_prepare_300_ms only validated the envelope in Python; layout then ran on the UI thread. core_commit_300_ms validates, lays out 300 views with Yoga, and encodes the mount transaction, all off the UI thread, so the two aren't comparable."
+  },
+  "mounted_views": {
+    "command": "Render examples/e2e-suite headlessly at 393x852, open every demo, and count logical views (live_view_count) against views the core mounted",
+    "screens": 118,
+    "logical": 10201,
+    "mounted": 7576,
+    "reduction": 0.257,
+    "per_screen": {
+      "home": {
+        "logical": 56,
+        "mounted": 38
+      },
+      "standard_asyncio": {
+        "logical": 75,
+        "mounted": 54
+      },
+      "text": {
+        "logical": 100,
+        "mounted": 79
+      },
+      "button": {
+        "logical": 83,
+        "mounted": 61
+      },
+      "text_input": {
+        "logical": 90,
+        "mounted": 68
+      },
+      "text_input_handle": {
+        "logical": 90,
+        "mounted": 66
+      },
+      "image": {
+        "logical": 85,
+        "mounted": 63
+      },
+      "icon": {
+        "logical": 95,
+        "mounted": 72
+      },
+      "svg": {
+        "logical": 81,
+        "mounted": 59
+      },
+      "linear_gradient": {
+        "logical": 83,
+        "mounted": 61
+      },
+      "blur_view": {
+        "logical": 82,
+        "mounted": 60
+      },
+      "switch": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "slider": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "progress_bar": {
+        "logical": 87,
+        "mounted": 65
+      },
+      "activity_indicator": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "view_column_row": {
+        "logical": 95,
+        "mounted": 72
+      },
+      "scroll_view": {
+        "logical": 170,
+        "mounted": 149
+      },
+      "scroll_view_handle": {
+        "logical": 127,
+        "mounted": 104
+      },
+      "safe_area_view": {
+        "logical": 76,
+        "mounted": 55
+      },
+      "modal": {
+        "logical": 84,
+        "mounted": 63
+      },
+      "pressable": {
+        "logical": 82,
+        "mounted": 60
+      },
+      "picker": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "refresh_control": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "fragment": {
+        "logical": 76,
+        "mounted": 55
+      },
+      "portal": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "error_boundary": {
+        "logical": 75,
+        "mounted": 54
+      },
+      "spacer": {
+        "logical": 78,
+        "mounted": 57
+      },
+      "status_bar": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "keyboard_avoiding_view": {
+        "logical": 78,
+        "mounted": 56
+      },
+      "list_data": {
+        "logical": 148,
+        "mounted": 126
+      },
+      "flat_list": {
+        "logical": 254,
+        "mounted": 197
+      },
+      "section_list": {
+        "logical": 139,
+        "mounted": 104
+      },
+      "web_view": {
+        "logical": 76,
+        "mounted": 55
+      },
+      "web_view_handle": {
+        "logical": 89,
+        "mounted": 66
+      },
+      "touchable_opacity": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "image_background": {
+        "logical": 78,
+        "mounted": 56
+      },
+      "checkbox": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "segmented_control": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "date_picker": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "suspense": {
+        "logical": 76,
+        "mounted": 55
+      },
+      "lazy": {
+        "logical": 75,
+        "mounted": 54
+      },
+      "accessibility_props": {
+        "logical": 87,
+        "mounted": 65
+      },
+      "use_state": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "use_effect": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "use_layout_effect": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "use_reducer": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "use_ref": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "use_imperative_handle": {
+        "logical": 188,
+        "mounted": 166
+      },
+      "use_back_handler": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "use_memo": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "use_callback": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "use_context": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "async_effect": {
+        "logical": 75,
+        "mounted": 54
+      },
+      "use_resource": {
+        "logical": 76,
+        "mounted": 55
+      },
+      "use_transition": {
+        "logical": 78,
+        "mounted": 57
+      },
+      "use_deferred_value": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "use_query": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "use_mutation": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "use_persisted_state": {
+        "logical": 78,
+        "mounted": 56
+      },
+      "use_window_dimensions": {
+        "logical": 75,
+        "mounted": 54
+      },
+      "memo": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "batch_updates": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "use_color_scheme": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "use_theme": {
+        "logical": 85,
+        "mounted": 62
+      },
+      "use_store": {
+        "logical": 84,
+        "mounted": 60
+      },
+      "use_locales": {
+        "logical": 78,
+        "mounted": 57
+      },
+      "use_reduce_motion": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "use_screen_reader_enabled": {
+        "logical": 76,
+        "mounted": 55
+      },
+      "tab_navigator": {
+        "logical": 84,
+        "mounted": 60
+      },
+      "drawer_navigator": {
+        "logical": 84,
+        "mounted": 59
+      },
+      "params_passing": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "focus_effect": {
+        "logical": 77,
+        "mounted": 55
+      },
+      "navigation_theme": {
+        "logical": 87,
+        "mounted": 65
+      },
+      "navigation_ref": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "stack_options": {
+        "logical": 100,
+        "mounted": 71
+      },
+      "tab_options": {
+        "logical": 95,
+        "mounted": 68
+      },
+      "presentation": {
+        "logical": 83,
+        "mounted": 61
+      },
+      "flex_layout": {
+        "logical": 81,
+        "mounted": 59
+      },
+      "aspect_ratio": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "absolute_position": {
+        "logical": 85,
+        "mounted": 64
+      },
+      "padding_margin": {
+        "logical": 85,
+        "mounted": 64
+      },
+      "alignment": {
+        "logical": 93,
+        "mounted": 72
+      },
+      "on_layout": {
+        "logical": 81,
+        "mounted": 59
+      },
+      "typography": {
+        "logical": 80,
+        "mounted": 59
+      },
+      "borders_shadows": {
+        "logical": 87,
+        "mounted": 65
+      },
+      "transform": {
+        "logical": 91,
+        "mounted": 68
+      },
+      "stylesheet": {
+        "logical": 80,
+        "mounted": 59
+      },
+      "dynamic_color": {
+        "logical": 86,
+        "mounted": 64
+      },
+      "interaction_props": {
+        "logical": 93,
+        "mounted": 70
+      },
+      "timing_animation": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "spring_animation": {
+        "logical": 80,
+        "mounted": 58
+      },
+      "parallel_animation": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "sequence_animation": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "interpolate_animation": {
+        "logical": 81,
+        "mounted": 59
+      },
+      "loop_stagger": {
+        "logical": 87,
+        "mounted": 64
+      },
+      "collapsing_header": {
+        "logical": 141,
+        "mounted": 119
+      },
+      "easing": {
+        "logical": 83,
+        "mounted": 61
+      },
+      "decay_animation": {
+        "logical": 83,
+        "mounted": 61
+      },
+      "gestures": {
+        "logical": 79,
+        "mounted": 58
+      },
+      "gesture_composition": {
+        "logical": 87,
+        "mounted": 66
+      },
+      "pan_gesture": {
+        "logical": 84,
+        "mounted": 62
+      },
+      "simple_alert": {
+        "logical": 75,
+        "mounted": 54
+      },
+      "bundled_image": {
+        "logical": 87,
+        "mounted": 64
+      },
+      "custom_font": {
+        "logical": 81,
+        "mounted": 60
+      },
+      "image_size": {
+        "logical": 79,
+        "mounted": 58
+      },
+      "confirm_alert": {
+        "logical": 77,
+        "mounted": 55
+      },
+      "async_storage": {
+        "logical": 79,
+        "mounted": 57
+      },
+      "run_async": {
+        "logical": 76,
+        "mounted": 55
+      },
+      "platform_info": {
+        "logical": 77,
+        "mounted": 56
+      },
+      "keyboard": {
+        "logical": 81,
+        "mounted": 60
+      },
+      "dimensions": {
+        "logical": 81,
+        "mounted": 60
+      },
+      "pixel_ratio": {
+        "logical": 81,
+        "mounted": 60
+      },
+      "device_info": {
+        "logical": 87,
+        "mounted": 66
+      },
+      "localization": {
+        "logical": 83,
+        "mounted": 62
+      },
+      "accessibility_info": {
+        "logical": 84,
+        "mounted": 62
+      },
+      "pypi_packages": {
+        "logical": 88,
+        "mounted": 67
+      },
+      "custom_component": {
+        "logical": 81,
+        "mounted": 60
+      },
+      "define_component": {
+        "logical": 81,
+        "mounted": 60
+      }
+    }
+  }
+}

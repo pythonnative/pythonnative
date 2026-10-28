@@ -36,19 +36,28 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional
 
+from ..assets import ASSETS_DIR, write_manifest
 from . import icons
+from .bundle import copy_library
 from .config import AppConfig
+
+
+def sdk_dir() -> Path:
+    """The Android SDK: ``ANDROID_HOME``, ``ANDROID_SDK_ROOT``, or the platform's default location."""
+    configured = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+    if configured:
+        return Path(configured)
+    import sys
+
+    return Path.home() / ("Library/Android/sdk" if sys.platform == "darwin" else "Android/Sdk")
+
 
 TEMPLATE_PACKAGE = "com.pythonnative.android_template"
 """The fixed package the bundled Android template ships under."""
 
 TEXT_SUFFIXES = {".kt", ".java", ".gradle", ".xml", ".pro", ".properties", ".cfg"}
 
-_SOURCE_ROOTS = (
-    ("app", "src", "main", "java"),
-    ("app", "src", "test", "java"),
-    ("app", "src", "androidTest", "java"),
-)
+_SOURCE_ROOTS = (("app", "src", "main", "java"),)
 
 Logger = Callable[[str], None]
 
@@ -84,9 +93,11 @@ def configure(
         config: The validated app configuration.
         dev_lib_root: Path to an in-repo ``pythonnative`` package to
             bundle (dev checkout); ``None`` to rely on the PyPI install.
-        release: Ship bytecode only (Chaquopy ``pyc.src``). Debug builds
-            keep the ``.py`` sources in the APK so tracebacks show code
-            and the dev client can tell what the app already runs.
+        release: Ship bytecode only (Chaquopy ``pyc.src``) and leave the
+            development modules out of the bundled library (see
+            ``pythonnative.project.bundle``). Debug builds keep the
+            ``.py`` sources in the APK so tracebacks show code and the dev
+            client can tell what the app already runs.
         log: Optional progress logger.
 
     Returns:
@@ -100,12 +111,12 @@ def configure(
     configure_gradle(project_dir, config, release=release)
     configure_settings_gradle(project_dir, config)
     configure_strings(project_dir, config)
-    configure_manifest(project_dir, config)
+    configure_manifest(project_dir, config, release=release)
     write_requirements(project_dir, config)
 
     _apply_branding(project_dir, config, emit)
 
-    python_root = stage_python_sources(project_dir, config, dev_lib_root=dev_lib_root)
+    python_root = stage_python_sources(project_dir, config, dev_lib_root=dev_lib_root, release=release)
     emit(f"Configured Android project ({config.application_id}).")
     return AndroidLayout(project_dir=project_dir, application_id=config.application_id, python_root=python_root)
 
@@ -293,12 +304,14 @@ def configure_strings(project_dir: Path, config: AppConfig) -> None:
     strings_path.write_text(content, encoding="utf-8")
 
 
-def configure_manifest(project_dir: Path, config: AppConfig) -> None:
+def configure_manifest(project_dir: Path, config: AppConfig, *, release: bool = False) -> None:
     """Inject permissions, the launch orientation, and deep-link filters.
 
     Args:
         project_dir: The staged Android project root.
         config: The validated app configuration.
+        release: Leave out the dev client's connect scheme, which debug
+            builds register (``pn-<app id>://connect?url=...``).
     """
     manifest_path = project_dir / "app" / "src" / "main" / "AndroidManifest.xml"
     content = manifest_path.read_text(encoding="utf-8")
@@ -316,8 +329,13 @@ def configure_manifest(project_dir: Path, config: AppConfig) -> None:
             1,
         )
 
-    if config.url_schemes:
-        schemes = "".join(f'                <data android:scheme="{scheme}" />\n' for scheme in config.url_schemes)
+    url_schemes = list(config.url_schemes)
+    if not release:
+        from ..devclient import dev_scheme
+
+        url_schemes.append(dev_scheme(config.app_id))
+    if url_schemes:
+        schemes = "".join(f'                <data android:scheme="{scheme}" />\n' for scheme in url_schemes)
         deep_link_filter = (
             "            <intent-filter>\n"
             '                <action android:name="android.intent.action.VIEW" />\n'
@@ -464,6 +482,7 @@ def stage_python_sources(
     config: AppConfig,
     *,
     dev_lib_root: Optional[Path] = None,
+    release: bool = False,
 ) -> Path:
     """Copy the user's ``app/`` and (optionally) the in-repo library.
 
@@ -472,6 +491,7 @@ def stage_python_sources(
         config: The validated app configuration.
         dev_lib_root: Path to an in-repo ``pythonnative`` package to
             bundle, or ``None``.
+        release: Leave the development-only modules out of the library.
 
     Returns:
         The Chaquopy Python source root (``app/src/main/python``).
@@ -481,21 +501,45 @@ def stage_python_sources(
 
     app_src = config.project_root / "app"
     if app_src.is_dir():
-        shutil.copytree(app_src, python_root / "app", dirs_exist_ok=True)
+        # Runtime assets don't belong in Chaquopy's Python source tree
+        # (it's extracted and byte-compiled); they ship as Android assets.
+        shutil.copytree(app_src, python_root / "app", dirs_exist_ok=True, ignore=_ignore_top_level_assets(app_src))
+        stage_assets(project_dir, config)
 
     if dev_lib_root and dev_lib_root.is_dir():
-        shutil.copytree(
-            dev_lib_root,
-            python_root / "pythonnative",
-            dirs_exist_ok=True,
-            ignore=LIB_IGNORE,
-        )
+        copy_library(dev_lib_root, python_root / "pythonnative", release=release)
 
     return python_root
 
 
-LIB_IGNORE = shutil.ignore_patterns("templates", "native", "*.so", "__pycache__", "*.pyc", "*.pyo")
-"""Ignore rules for bundling the ``pythonnative`` package (skips templates)."""
+def _ignore_top_level_assets(app_src: Path) -> Callable[[str, List[str]], List[str]]:
+    """A ``copytree`` ignore hook that skips ``app/assets/`` at the source root only."""
+    root = str(app_src)
+
+    def ignore(directory: str, names: List[str]) -> List[str]:
+        return [ASSETS_DIR] if directory == root and ASSETS_DIR in names else []
+
+    return ignore
+
+
+def stage_assets(project_dir: Path, config: AppConfig) -> Path:
+    """Copy ``app/assets/`` into the APK's assets as ``app/assets/`` and write the manifest.
+
+    The native runtime opens them through ``AssetManager`` under the same
+    relative paths the iOS bundle uses, so ``asset://images/logo.png``
+    resolves identically on both platforms.
+
+    Returns:
+        The staged assets directory (``app/src/main/assets/app/assets``).
+    """
+    destination = project_dir / "app" / "src" / "main" / "assets" / "app" / ASSETS_DIR
+    if destination.exists():
+        shutil.rmtree(destination)
+    source = config.project_root / "app" / ASSETS_DIR
+    if source.is_dir():
+        shutil.copytree(source, destination, ignore=shutil.ignore_patterns("__pycache__", ".*"))
+    write_manifest(destination)
+    return destination
 
 
 # ======================================================================

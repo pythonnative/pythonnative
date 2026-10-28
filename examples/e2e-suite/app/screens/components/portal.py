@@ -11,11 +11,11 @@ portal flow back (the banner's own button bumps the counter).
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def PortalDemo() -> pn.Element:
+def PortalDemo() -> pn.Node:
     """Render a toggleable floating banner hosted in a Portal."""
     shown, set_shown = pn.use_state(False)
     count, set_count = pn.use_state(0)
@@ -35,23 +35,23 @@ def PortalDemo() -> pn.Element:
                 background_color="#1F6FEB",
                 border_radius=12,
                 padding=16,
-                spacing=8,
+                gap=8,
             ),
         ),
     )
 
-    return demo_screen(
+    return DemoScreen(
         "Portal",
         "Render children into an overlay above the screen content.",
-        section(
+        DemoSection(
             "Overlay",
-            result_text("Banner shown", "yes" if shown else "no"),
-            result_text("Portal count", count),
-            buttons_row(
+            ResultText("Banner shown", "yes" if shown else "no"),
+            ResultText("Portal count", count),
+            ButtonsRow(
                 pn.Button("Show banner", on_press=lambda: set_shown(True)),
                 pn.Button("Hide banner", on_press=lambda: set_shown(False)),
             ),
-            hint(
+            Hint(
                 "The banner floats over the whole screen (including this "
                 "card) while its button stays wired to this component's "
                 "state."

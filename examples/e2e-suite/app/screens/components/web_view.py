@@ -11,7 +11,7 @@ WebView via the accessibility tree.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 _INLINE_HTML = (
     "<html><body style='font-family:sans-serif;padding:8px'>"
@@ -20,18 +20,18 @@ _INLINE_HTML = (
 
 
 @pn.component
-def WebViewDemo() -> pn.Element:
+def WebViewDemo() -> pn.Node:
     """Render a WebView with inline HTML via the ``html=`` prop."""
-    return demo_screen(
+    return DemoScreen(
         "WebView",
         "Renders inline HTML via the html= prop so the demo works offline.",
-        section(
+        DemoSection(
             "WebView body",
             pn.WebView(
                 html=_INLINE_HTML,
                 style=pn.style(height=160, border_radius=8, border_width=1, border_color="#CBD5E1"),
             ),
             pn.Text("WebView visible marker", style=pn.style(font_weight="600")),
-            hint("Maestro asserts the 'WebView visible marker' label is present."),
+            Hint("Maestro asserts the 'WebView visible marker' label is present."),
         ),
     )

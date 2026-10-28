@@ -76,19 +76,24 @@ Some capabilities need a code-signing entitlement rather than an
 `Info.plist` key. Declaring `remote_notifications` generates an
 `.entitlements` file with `aps-environment` and wires it into the
 build, so `await pn.Notifications.get_device_token()` can register with
-APNs. (Distribution builds get the production APNs environment
-automatically when Xcode re-signs the archive for the store.)
+APNs. Release builds exported for the App Store, ad hoc, or enterprise
+distribution use the production APNs environment; every other build uses
+development.
 
 ## Always-on permissions
 
-Every app receives two install-time Android permissions automatically,
+Every app receives three install-time Android permissions automatically,
 because almost every PythonNative app needs the network (`fetch`,
-`use_query`, `NetInfo`, remote images):
+`use_query`, `NetInfo`, remote images) and the built-in `Haptics` module
+vibrates:
 
 - `android.permission.INTERNET`
 - `android.permission.ACCESS_NETWORK_STATE`
+- `android.permission.VIBRATE`
 
-These never prompt the user and require no declaration.
+These never prompt the user and require no declaration. Runtime
+permissions, such as `POST_NOTIFICATIONS` for notifications, come only
+from the capabilities you declare.
 
 ## Adding raw Android permissions
 

@@ -1,5 +1,7 @@
 package com.pythonnative.runtime.components
 
+import com.pythonnative.generated.*
+
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.view.View
@@ -29,11 +31,13 @@ class SegmentedControlManager : ComponentManager() {
     override fun removeChild(parent: View, child: View) {}
 
     override fun applyProps(view: View, props: JSONObject, initial: Boolean) {
+        val typed = SegmentedControlProps(props)
+
         val ll = view as LinearLayout
         val state = stateOf(ll)
         val merged = propsOf(ll)
         var segmentsChanged = false
-        if (props.has("segments") || initial) {
+        if (typed.has_segments || initial) {
             val segments = JsonUtil.toList(merged.arr("segments")).map { it?.toString() ?: "" }
             if (initial || segments != state["segments"]) {
                 state["segments"] = segments

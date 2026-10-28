@@ -120,5 +120,8 @@ def get_system_color_scheme() -> str:
 def reset_color_scheme() -> None:
     """Reset to system ``"light"`` with no override. Intended for tests."""
     global _system_scheme, _override_scheme
+    changed = get_color_scheme() != "light"
     _system_scheme = "light"
     _override_scheme = None
+    if changed:
+        _notify_subscribers()

@@ -1,16 +1,9 @@
-# Tests FlatList virtualizes rows; scrolling reveals later rows.
-# With a fixed item_height the demo takes the native virtualization
-# path (RecyclerView / UICollectionView with keyed logical rows), so
-# this flow exercises native cell recycling end to end.
+# Tests FlatList renders and scrolls vertically and horizontally, and that
+# the inverted variant honors initial_scroll_index (rows separated by an
+# item_separator element in every mode).
 #
 # Demo screen: examples/e2e-suite/app/screens/components/flat_list.py
-# Source under test: src/pythonnative/components/lists.py :: FlatList, _NativeList
-#
-# The demo sizes the FlatList (~400 dp) so it overlaps the vertical
-# center of the screen on both the iOS and Android CI emulators,
-# letting us use Maestro's standard ``scrollUntilVisible`` (which
-# swipes from the screen center). See ``components/scroll_view.yaml``
-# for the full rationale.
+# Source under test: src/pythonnative/components/lists.py :: FlatList
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -18,6 +11,7 @@ appId: ${APP_ID}
     env:
       CATEGORY: Components
       DEMO_TITLE: FlatList
+- assertVisible: "Mode: vertical"
 - assertVisible: "FlatRow 1"
 # Target the *last* row. Virtualized rows exist in the accessibility
 # tree only while on screen, and one Maestro fling can travel several
@@ -36,8 +30,21 @@ appId: ${APP_ID}
 - assertVisible: "FlatRow 40"
 # Horizontal rows are wider than vertical row heights. Use a faster native
 # fling and allow the greater travel distance to the same final row.
+# On a short screen the page scrolls on once the list reaches its end,
+# which takes the "Mode" readout above the list off-screen, so the rows
+# show each switch instead: only the inverted list opens on row 21 (its
+# initial index), and only the new horizontal list starts back at row 1.
+- tapOn: "Show inverted list"
+- extendedWaitUntil:
+    visible: "FlatRow 21"
+    timeout: 10000
+# Horizontal last: a vertical swipe passes through a horizontal list, so
+# close_demo can still scroll the page to "Back to list". A vertical list
+# fills the middle of a short screen and would take those swipes itself.
 - tapOn: "Show horizontal list"
-- assertVisible: "FlatRow 1"
+- extendedWaitUntil:
+    visible: "FlatRow 1"
+    timeout: 10000
 - scrollUntilVisible:
     element: "FlatRow 40"
     direction: RIGHT

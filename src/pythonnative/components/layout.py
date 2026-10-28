@@ -6,30 +6,28 @@ hook-driven composites (``_SafeAreaContainer`` and
 and re-render when the insets or keyboard height change.
 """
 
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union, Unpack, cast
 
 from ..component import component
-from ..element import Element
+from ..element import Element, Node
 from ..hooks import Ref, use_keyboard_height, use_safe_area_insets, use_state
-from ..style import AccessibilityState, StyleProp, resolve_style
-from ._base import _make_element, _refresh_control_props
+from ..style import (
+    EdgeInsets,
+    Style,
+    StyleProp,
+    resolve_style,
+)
+from ._base import _layout_callback, _make_element, _refresh_control_props
+from .events import LayoutEvent, ScrollEvent
+from .props import ViewProps
 
 
 def View(
-    *children: Element,
+    *children: Node,
     style: StyleProp = None,
-    gestures: Optional[List[Any]] = None,
-    hit_slop: Optional[Union[float, Dict[str, float]]] = None,
-    on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[ViewProps],
 ) -> Element:
     """Universal flex container (like React Native's ``View``).
 
@@ -60,32 +58,11 @@ def View(
     Args:
         *children: Child elements rendered inside the container.
         style: Style dict (or list of dicts).
-        gestures: Optional list of gesture descriptors from
-            `pythonnative.gestures` (e.g. ``[gestures.Pan(on_change=…)]``)
-            recognized natively on this view.
-        hit_slop: Extend the touch target beyond the view's bounds
-            without changing layout: a uniform number of points, or a
-            dict with any of ``top`` / ``left`` / ``bottom`` /
-            ``right``.
-        on_layout: Callback invoked with
-            ``{"x", "y", "width", "height"}`` after this view is laid
-            out, and again whenever its frame changes.
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail (iOS only).
-        accessibility_role: Semantic role for assistive tech.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
-        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``;
+            receives a [`ViewHandle`][pythonnative.ViewHandle].
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`ViewProps`][pythonnative.ViewProps] (layout, gestures, and accessibility).
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"View"``.
@@ -96,35 +73,17 @@ def View(
         style=style,
         ref=ref,
         key=key,
-        gestures=gestures,
-        hit_slop=hit_slop,
-        on_layout=on_layout,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_live_region=accessibility_live_region,
-        test_id=test_id,
         _defaults={"flex_direction": "column"},
+        **props,
     )
 
 
 def Column(
-    *children: Element,
+    *children: Node,
     style: StyleProp = None,
-    gestures: Optional[List[Any]] = None,
-    hit_slop: Optional[Union[float, Dict[str, float]]] = None,
-    on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[ViewProps],
 ) -> Element:
     """Arrange children vertically.
 
@@ -138,21 +97,10 @@ def Column(
     Args:
         *children: Child elements stacked top to bottom.
         style: Style dict (or list of dicts).
-        gestures: Gesture descriptors recognized natively on this view.
-        hit_slop: Extra touch target beyond the bounds (see ``View``).
-        on_layout: Callback invoked with
-            ``{"x", "y", "width", "height"}`` after layout and on
-            frame changes.
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail (iOS only).
-        accessibility_role: Semantic role for assistive tech.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech.
-        accessibility_live_region: How AT announces dynamic changes
-            (Android only).
-        test_id: Stable identifier for UI tests.
         ref: Optional [`Ref`][pythonnative.Ref] for native-view access.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`ViewProps`][pythonnative.ViewProps] (layout, gestures, and accessibility).
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Column"``.
@@ -163,35 +111,17 @@ def Column(
         style=style,
         ref=ref,
         key=key,
-        gestures=gestures,
-        hit_slop=hit_slop,
-        on_layout=on_layout,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_live_region=accessibility_live_region,
-        test_id=test_id,
         _forced={"flex_direction": "column"},
+        **props,
     )
 
 
 def Row(
-    *children: Element,
+    *children: Node,
     style: StyleProp = None,
-    gestures: Optional[List[Any]] = None,
-    hit_slop: Optional[Union[float, Dict[str, float]]] = None,
-    on_layout: Optional[Callable[[Dict[str, float]], None]] = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessibility_role: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[ViewProps],
 ) -> Element:
     """Arrange children horizontally.
 
@@ -205,21 +135,10 @@ def Row(
     Args:
         *children: Child elements arranged left to right.
         style: Style dict (or list of dicts).
-        gestures: Gesture descriptors recognized natively on this view.
-        hit_slop: Extra touch target beyond the bounds (see ``View``).
-        on_layout: Callback invoked with
-            ``{"x", "y", "width", "height"}`` after layout and on
-            frame changes.
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail (iOS only).
-        accessibility_role: Semantic role for assistive tech.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech.
-        accessibility_live_region: How AT announces dynamic changes
-            (Android only).
-        test_id: Stable identifier for UI tests.
         ref: Optional [`Ref`][pythonnative.Ref] for native-view access.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`ViewProps`][pythonnative.ViewProps] (layout, gestures, and accessibility).
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Row"``.
@@ -230,17 +149,8 @@ def Row(
         style=style,
         ref=ref,
         key=key,
-        gestures=gestures,
-        hit_slop=hit_slop,
-        on_layout=on_layout,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessibility_role=accessibility_role,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_live_region=accessibility_live_region,
-        test_id=test_id,
         _forced={"flex_direction": "row"},
+        **props,
     )
 
 
@@ -279,16 +189,43 @@ def Spacer(
     )
 
 
+def _content_inset_props(inset: Optional[EdgeInsets]) -> Optional[Dict[str, Any]]:
+    """Normalize an ``EdgeInsets`` into the ``{top, left, bottom, right}`` wire dict."""
+    if not inset:
+        return None
+    out: Dict[str, Any] = {}
+    if "all" in inset:
+        out.update(top=inset["all"], left=inset["all"], bottom=inset["all"], right=inset["all"])
+    if "horizontal" in inset:
+        out.update(left=inset["horizontal"], right=inset["horizontal"])
+    if "vertical" in inset:
+        out.update(top=inset["vertical"], bottom=inset["vertical"])
+    for edge in ("top", "left", "bottom", "right"):
+        if edge in inset:
+            out[edge] = inset[edge]
+    return out or None
+
+
 def ScrollView(
-    *children: Element,
+    *children: Node,
+    horizontal: bool = False,
     refresh_control: Optional[Element] = None,
-    scroll_axis: Optional[Literal["vertical", "horizontal"]] = None,
-    on_scroll: Optional[Callable[[Dict[str, float]], None]] = None,
+    content_container_style: StyleProp = None,
+    content_inset: Optional[EdgeInsets] = None,
+    scroll_enabled: bool = True,
+    scroll_event_throttle: float = 16,
+    on_scroll: Optional[Callable[[ScrollEvent], Any]] = None,
+    on_scroll_begin_drag: Optional[Callable[[ScrollEvent], Any]] = None,
+    on_scroll_end_drag: Optional[Callable[[ScrollEvent], Any]] = None,
+    on_momentum_scroll_end: Optional[Callable[[ScrollEvent], Any]] = None,
     shows_scroll_indicator: bool = True,
     paging_enabled: bool = False,
     bounces: bool = True,
-    content_container_style: StyleProp = None,
     keyboard_dismiss_mode: Optional[Literal["none", "on_drag", "interactive"]] = None,
+    keyboard_should_persist_taps: Literal["never", "always", "handled"] = "never",
+    snap_to_interval: Optional[float] = None,
+    snap_to_alignment: Literal["start", "center", "end"] = "start",
+    deceleration_rate: Union[Literal["normal", "fast"], float] = "normal",
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
@@ -300,44 +237,107 @@ def ScrollView(
     for ergonomic call sites; the underlying native scroll view stacks
     them on its content axis.
 
+    ```python
+    pn.ScrollView(
+        *rows,
+        content_container_style=pn.style(padding=16, gap=12),
+        content_inset=pn.EdgeInsets(bottom=80),
+        on_scroll=lambda e: print(e.y),
+        keyboard_should_persist_taps="handled",
+        keyboard_dismiss_mode="on_drag",
+        ref=scroll_ref,
+    )
+    ```
+
     Args:
         *children: Child elements to scroll.
+        horizontal: Scroll along the x axis instead of the y axis.
         refresh_control: Optional [`RefreshControl`][pythonnative.RefreshControl]
             element attached to the scroll view for pull-to-refresh.
-        scroll_axis: ``"vertical"`` (default) or ``"horizontal"``.
-        on_scroll: Callback invoked with ``{"x": …, "y": …}`` content
-            offsets as the user scrolls.
+        content_container_style: Style applied to the scrollable
+            content (padding, gap, alignment), distinct from ``style``
+            (the scroll view frame). The children are wrapped in one
+            inner [`View`][pythonnative.View] carrying this style, so
+            every layout key works on every renderer.
+        content_inset: Extra scrollable space around the content, as an
+            [`EdgeInsets`][pythonnative.EdgeInsets]; useful for
+            keeping the last row clear of a floating footer.
+        scroll_enabled: When ``False``, the user can't scroll (the
+            content still lays out and imperative scrolling works).
+        scroll_event_throttle: Minimum milliseconds between ``on_scroll``
+            callbacks while scrolling. Native emits ``on_scroll`` only
+            when the app wired it.
+        on_scroll: Callback invoked with a
+            [`ScrollEvent`][pythonnative.ScrollEvent] as the user
+            scrolls.
+        on_scroll_begin_drag: Callback invoked with a ``ScrollEvent``
+            when the user's finger starts dragging.
+        on_scroll_end_drag: Callback invoked with a ``ScrollEvent`` when
+            the user's finger lifts.
+        on_momentum_scroll_end: Callback invoked with a ``ScrollEvent``
+            when the deceleration after a fling comes to rest.
         shows_scroll_indicator: When ``False``, hides the scroll bar.
         paging_enabled: When ``True``, the scroll view snaps to
             multiples of its own size (carousel behavior).
         bounces: When ``False``, disables the iOS rubber-band overscroll.
-        content_container_style: Style applied to the inner content
-            wrapper (padding, alignment, spacing of the scrollable
-            content), distinct from ``style`` (the scroll view frame).
         keyboard_dismiss_mode: ``"none"`` (default), ``"on_drag"``, or
             ``"interactive"``. Controls whether scrolling dismisses
             the keyboard.
+        keyboard_should_persist_taps: Whether a tap inside the scroll
+            view dismisses the keyboard: ``"never"`` (the default; a
+            tap dismisses it), ``"always"`` (never dismiss), or
+            ``"handled"`` (dismiss only when nothing inside handled the
+            tap).
+        snap_to_interval: Snap the resting offset to multiples of this
+            many points (a carousel of fixed-size cards).
+        snap_to_alignment: Which edge of the viewport the snapped
+            offset aligns to: ``"start"``, ``"center"``, or ``"end"``.
+        deceleration_rate: How quickly a fling comes to rest:
+            ``"normal"``, ``"fast"``, or a per-millisecond factor
+            (``0.998`` is normal, ``0.99`` is fast).
         style: Style dict (or list of dicts).
-        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
+        ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``;
+            receives a [`ScrollViewHandle`][pythonnative.ScrollViewHandle].
         key: Stable identity for keyed reconciliation.
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"ScrollView"``.
     """
+    content: Tuple[Node, ...] = children
+    container_style = resolve_style(content_container_style)
+    if container_style:
+        inner: Style = {"flex_direction": "row" if horizontal else "column"}
+        if not horizontal:
+            inner["width"] = "100%"
+        inner.update(cast(Style, container_style))
+        content = (View(*children, style=inner),)
     return _make_element(
         "ScrollView",
-        *children,
+        *content,
         style=style,
         ref=ref,
         key=key,
+        # A horizontal ScrollView arranges its content in a row, as in React
+        # Native. Every renderer's layout reads the direction from the
+        # style, which is what lets the content grow past the viewport.
+        _forced={"flex_direction": "row"} if horizontal else None,
+        horizontal=horizontal or None,
         refresh_control=_refresh_control_props(refresh_control, owner="ScrollView"),
-        scroll_axis=scroll_axis,
+        content_inset=_content_inset_props(content_inset),
+        scroll_enabled=False if scroll_enabled is False else None,
+        scroll_event_throttle=float(scroll_event_throttle) if scroll_event_throttle != 16 else None,
         on_scroll=on_scroll,
+        on_scroll_begin_drag=on_scroll_begin_drag,
+        on_scroll_end_drag=on_scroll_end_drag,
+        on_momentum_scroll_end=on_momentum_scroll_end,
         shows_scroll_indicator=False if shows_scroll_indicator is False else None,
         paging_enabled=paging_enabled or None,
         bounces=False if bounces is False else None,
-        content_container_style=resolve_style(content_container_style) or None,
         keyboard_dismiss_mode=keyboard_dismiss_mode,
+        keyboard_should_persist_taps=keyboard_should_persist_taps if keyboard_should_persist_taps != "never" else None,
+        snap_to_interval=snap_to_interval,
+        snap_to_alignment=snap_to_alignment if snap_to_alignment != "start" else None,
+        deceleration_rate=deceleration_rate if deceleration_rate != "normal" else None,
     )
 
 
@@ -367,7 +367,7 @@ def _numeric_edge_padding(style: Dict[str, Any], edge: str) -> float:
 
 @component
 def _SafeAreaContainer(
-    *children: Element,
+    *children: Node,
     edges: Optional[Tuple[str, ...]] = None,
     style: Optional[Dict[str, Any]] = None,
 ) -> Element:
@@ -392,7 +392,7 @@ def _SafeAreaContainer(
 
 
 def SafeAreaView(
-    *children: Element,
+    *children: Node,
     edges: Optional[Tuple[Literal["top", "left", "bottom", "right"], ...]] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
@@ -428,7 +428,7 @@ def SafeAreaView(
 
 @component
 def _KeyboardAvoidingContainer(
-    *children: Element,
+    *children: Node,
     behavior: Literal["padding", "position", "height"] = "padding",
     keyboard_vertical_offset: float = 0.0,
     style: Optional[Dict[str, Any]] = None,
@@ -457,14 +457,14 @@ def _KeyboardAvoidingContainer(
     props: Dict[str, Any] = resolved
     if mode == "height":
 
-        def _record_layout(frame: Dict[str, float]) -> None:
+        def _record_layout(frame: LayoutEvent) -> None:
             if keyboard <= 0:
-                measured = float(frame.get("height", 0.0))
+                measured = float(frame.height)
                 if measured > 0 and abs(measured - base_height) > 0.5:
                     set_base_height(measured)
 
         props = dict(resolved)
-        props["on_layout"] = _record_layout
+        props["on_layout"] = _layout_callback(_record_layout)
         if shift > 0 and base_height > 0:
             props["height"] = max(0.0, base_height - shift)
     elif shift > 0:
@@ -478,7 +478,7 @@ def _KeyboardAvoidingContainer(
 
 
 def KeyboardAvoidingView(
-    *children: Element,
+    *children: Node,
     behavior: Literal["padding", "position", "height"] = "padding",
     keyboard_vertical_offset: float = 0.0,
     style: StyleProp = None,

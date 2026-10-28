@@ -1,40 +1,47 @@
-"""Demo screen for navigation params and [`pn.use_route`][pythonnative.use_route].
+"""Demo screen for typed route params and [`pn.use_route`][pythonnative.use_route].
 
-The Stack screen for this demo (route id ``"params_passing"``) reads
-its route params via ``pn.use_route()``. To exercise that without
-needing a second Stack screen, the demo pushes its own route id again
-with new params and asserts the readout updates. ``nav.push`` is used
-rather than ``nav.navigate`` because ``navigate`` would merge the params
-into the current entry instead of adding one, and the flow pops back
-through the pushed entries.
+A screen's parameters are its route params: ``ParamsPassingDemo`` takes
+an optional ``value``, and ``nav.push(ParamsPassingDemo(value="alpha"))``
+pushes a new entry whose params the type checker verifies. The demo
+pushes itself with new params and shows both the typed argument and the
+untyped params dict ``use_route()`` reports for the same route. ``push``
+is used rather than ``navigate`` because ``navigate`` would merge the
+params into the current entry instead of adding one, and the flow pops
+back through the pushed entries.
 """
 
 from __future__ import annotations
 
+from typing import Optional
+
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def ParamsPassingDemo() -> pn.Element:
-    """Render the active route's params using ``use_route``."""
+def ParamsPassingDemo(value: Optional[str] = None) -> pn.Node:
+    """Render the ``value`` param, as an argument and as ``use_route`` reports it."""
     route = pn.use_route()
     nav = pn.use_navigation()
 
-    def push_with(value: str) -> None:
-        nav.push("params_passing", value=value)
+    given = sorted(name for name, param in route.params.items() if param is not None)
 
-    return demo_screen(
+    def push_with(next_value: str) -> None:
+        nav.push(ParamsPassingDemo(value=next_value))
+
+    return DemoScreen(
         "Route Params",
-        "use_route reads the active route's params; pushing with new params updates the readout.",
-        section(
+        "A screen's parameters are its route params; pushing with new params updates the readout.",
+        DemoSection(
             "Route info",
-            result_text("Param 'value'", route.params.get("value") or "(none)"),
-            buttons_row(
+            ResultText("Param 'value'", value or "(none)"),
+            ResultText("Route name", route.name),
+            ResultText("Route params", ", ".join(given) or "(none)"),
+            ButtonsRow(
                 pn.Button("Push value=alpha", on_press=lambda: push_with("alpha")),
                 pn.Button("Push value=beta", on_press=lambda: push_with("beta")),
             ),
-            hint(
+            Hint(
                 "Maestro taps 'Push value=alpha' and asserts \"Param 'value': alpha\". "
                 "Then taps the second button and asserts the param flipped to 'beta'."
             ),

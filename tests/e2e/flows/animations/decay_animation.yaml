@@ -1,0 +1,28 @@
+# Tests Animated.decay settles at velocity / (1 - deceleration) on the
+# platform driver and reports AnimationResult(finished=True).
+#
+# Demo screen: examples/e2e-suite/app/screens/animations/decay_animation.py
+# Source under test: src/pythonnative/animated.py :: Animated.decay
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Animations
+      DEMO_TITLE: Animated.decay
+- assertVisible: "Status: idle"
+- assertVisible: "Expected x: 150"
+- tapOn: "Fling"
+- extendedWaitUntil:
+    visible: "Finished: yes"
+    timeout: 10000
+- assertVisible: "Status: done"
+- assertVisible: "Settled x: 150"
+- tapOn: "Reset decay"
+- extendedWaitUntil:
+    visible: "Status: idle"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Animations

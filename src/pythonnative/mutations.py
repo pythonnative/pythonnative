@@ -1,12 +1,12 @@
 """Batched mutation protocol between the reconciler and native backends.
 
-The reconciler no longer talks to the native layer one call at a time.
-Instead, every commit pass produces an ordered list of small mutation
-ops referencing integer **tags** (stable per-view identifiers), and the
+Every commit pass produces an ordered list of small mutation ops
+referencing integer **tags** (stable per-view identifiers), and the
 whole list is applied in a single
-[`apply_mutations`][pythonnative.native_views.NativeViewRegistry.apply_mutations]
-call. This mirrors React Native's Fabric mounting layer: the diff phase
-is pure, and the native side sees one coherent transaction per commit.
+[`apply_mutations`][pythonnative.native_views.bridge_backend.BridgeBackend.apply_mutations]
+call. The renderer core validates the batch, lays it out, and turns it
+into a mount transaction for the platform's UI thread (RFC 0007); frames
+never travel as ops.
 
 Why tags instead of view objects?
 
@@ -14,9 +14,8 @@ Why tags instead of view objects?
   reference views directly.
 - Tags give the native side a stable identity to key its own view
   registry, event routing, and animation bookkeeping on.
-- A flat list of `(op, tag, payload)` tuples is trivially serializable,
-  which keeps the door open for applying mutations from a background
-  thread or through a single JNI/ObjC crossing in the future.
+- A flat list of `(op, tag, payload)` tuples serializes directly into
+  the bridge's transaction envelope, so one commit is one crossing.
 
 Op ordering rules (the reconciler guarantees these):
 
@@ -24,21 +23,34 @@ Op ordering rules (the reconciler guarantees these):
 2. `InsertOp` ops appear after both the parent and child exist.
 3. `DestroyOp` ops are emitted children-first; handlers detach the view
    from its parent as part of destruction.
-4. `SetFrameOp` ops are only emitted for frames that actually changed
-   since the last layout pass (frame diffing).
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Tuple, Union
+from enum import Enum
+from typing import Any, Dict, Union
 
 __all__ = [
+    "UNSET",
+    "UnsetType",
     "CreateOp",
     "UpdateOp",
     "InsertOp",
     "DestroyOp",
-    "SetFrameOp",
     "Mutation",
 ]
+
+
+class UnsetType(Enum):
+    """The explicit absence of a native property, distinct from null."""
+
+    VALUE = 0
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+UNSET = UnsetType.VALUE
+"""Remove a property and restore its native default on the next commit."""
 
 
 @dataclass(frozen=True)
@@ -62,13 +74,13 @@ class CreateOp:
 class UpdateOp:
     """Apply ``changed_props`` to the view registered under ``tag``.
 
-    Removed props are signaled with a value of ``None``, matching the
-    pre-existing handler contract.
+    Removed props are signaled with ``UNSET``. ``None`` sets a nullable
+    property to an explicit native null value.
 
     Attributes:
         tag: Unique integer identity of the target view.
         changed_props: Mapping of modified prop names to their new values.
-            Removed props appear with a value of ``None``.
+            Removed props appear with the ``UNSET`` sentinel.
     """
 
     tag: int
@@ -100,9 +112,9 @@ class InsertOp:
 class DestroyOp:
     """Release the native view registered under ``tag``.
 
-    The registry drops its tag record and calls the handler's
-    ``destroy`` hook so platform resources (listeners, timers, image
-    loads) can be released eagerly instead of waiting for GC.
+    The backend drops its tag record and the native component manager
+    releases platform resources (listeners, timers, image loads)
+    eagerly instead of waiting for GC.
 
     Attributes:
         tag: Unique integer identity of the view to destroy.
@@ -111,32 +123,5 @@ class DestroyOp:
     tag: int
 
 
-@dataclass(frozen=True)
-class SetFrameOp:
-    """Position and size the view registered under ``tag``.
-
-    Coordinates are points relative to the parent's content origin,
-    exactly as computed by the layout engine.
-
-    Attributes:
-        tag: Unique integer identity of the target view.
-        x: Horizontal origin offset in points relative to the parent.
-        y: Vertical origin offset in points relative to the parent.
-        width: View width in points.
-        height: View height in points.
-    """
-
-    tag: int
-    x: float
-    y: float
-    width: float
-    height: float
-
-    @property
-    def frame(self) -> Tuple[float, float, float, float]:
-        """Return ``(x, y, width, height)`` as a tuple."""
-        return (self.x, self.y, self.width, self.height)
-
-
-Mutation = Union[CreateOp, UpdateOp, InsertOp, DestroyOp, SetFrameOp]
+Mutation = Union[CreateOp, UpdateOp, InsertOp, DestroyOp]
 """Union of every op type carried by a commit transaction."""

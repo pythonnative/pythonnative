@@ -143,3 +143,21 @@ IS_NATIVE: bool = IS_ANDROID or IS_IOS or IS_WEB
 All three of iOS, Android, and the browser preview render through a
 bridge transport; only headless tests have no native side at all.
 """
+
+# ======================================================================
+# Development overlay
+# ======================================================================
+
+OVERLAY_ENV = "PYTHONNATIVE_HOT_RELOAD_ROOT"
+"""Environment variable naming the dev-client source overlay, when one is configured."""
+
+
+def overlay_root() -> Optional[str]:
+    """The dev-client overlay directory configured for this process, if any.
+
+    Debug builds set it through ``pythonnative.hot_reload.configure_dev_environment``;
+    release builds never do, so this is ``None`` there. It lives here rather
+    than in ``hot_reload`` because runtime code (asset resolution) asks for it,
+    and release bundles omit the development modules.
+    """
+    return os.environ.get(OVERLAY_ENV) or None

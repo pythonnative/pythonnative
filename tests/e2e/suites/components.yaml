@@ -6,12 +6,13 @@
 # Useful for AI agents iterating on a component fix: only the relevant
 # flows run, keeping the feedback loop tight.
 #
-# The flow list lives in components-a.yaml and components-b.yaml; this
-# file just chains the halves. CI runs the halves as separate Android
-# shards (a GitHub-hosted emulator can't survive all 28 flows in one
-# session; see the half files), while iOS simulators and local runs
-# can use this aggregate directly.
+# The flow list lives in components-a.yaml, components-b.yaml, and
+# components-c.yaml; this file just chains the parts. CI runs the parts
+# as separate Android shards (a GitHub-hosted emulator can't survive all
+# 35 flows in one session; see the part files), while iOS simulators and
+# local runs can use this aggregate directly.
 appId: ${APP_ID}
 ---
 - runFlow: components-a.yaml
 - runFlow: components-b.yaml
+- runFlow: components-c.yaml

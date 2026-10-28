@@ -8,11 +8,11 @@ confirmed" or "cancelled".
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def ConfirmAlertDemo() -> pn.Element:
+def ConfirmAlertDemo() -> pn.Node:
     """Render a button that fires Alert.confirm; persist the latest response."""
     last, set_last = pn.use_state("(none)")
 
@@ -25,16 +25,16 @@ def ConfirmAlertDemo() -> pn.Element:
         )
         set_last("confirmed" if ok else "cancelled")
 
-    return demo_screen(
+    return DemoScreen(
         "Alert.confirm",
         "Awaitable confirm alert; the response is shown below.",
-        section(
+        DemoSection(
             "Confirm",
-            result_text("Last response", last),
-            buttons_row(
-                pn.Button("Show confirm", on_press=lambda: pn.run_async(_run())),
+            ResultText("Last response", last),
+            ButtonsRow(
+                pn.Button("Show confirm", on_press=_run),
             ),
-            hint(
+            Hint(
                 "Maestro taps 'Show confirm', taps 'Confirm', asserts 'Last response: confirmed'. Repeat with 'Cancel'."
             ),
         ),
