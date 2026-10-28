@@ -8188,6 +8188,12 @@ arguments, converted with its annotations (<code>str</code>, <code>int</code>, <
 those). Query parameters the component doesn't accept are ignored. A
 URL whose values don't convert, or that lacks a required parameter,
 matches nothing.</p>
+<p>Path placeholders arrive percent-decoded, once, before conversion, so
+<code>users/Ada%20Lovelace</code> gives <code>user="Ada Lovelace"</code> and an encoded
+<code>%2F</code> stays inside one value instead of splitting the path. A <code>+</code> in
+a path is a literal plus, unlike in the query string, where it means a
+space. Bytes that don't decode as UTF-8 are left as they arrived.
+Literal segments are matched exactly as written.</p>
 
 
 
@@ -8251,6 +8257,11 @@ matches nothing.</p>
 
 
         <p>URL &lt;-&gt; navigation state mapping built from a navigator tree.</p>
+<p>Path placeholders are percent-decoded once, where the segment is
+captured and before conversion; <code>+</code> in a path stays a literal plus,
+and undecodable bytes are left as-is. Literal segments match exactly
+as the paths declare them, and query values are decoded by
+<code>parse_qsl</code> alone.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
