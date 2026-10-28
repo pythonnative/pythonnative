@@ -7,8 +7,8 @@ implementation detail:
 - ``core``: render, diff, commit.
 - ``boundaries``: ``ErrorBoundary``
   and ``Suspense``.
-- ``layout_pass``: the flexbox
-  pass and frame diffing.
+- ``layout_pass``: publishing the
+  frames the renderer core lays out.
 - ``children``: minimal move
   planning for keyed child lists.
 - ``vnode``: the mounted-tree node and
@@ -16,14 +16,14 @@ implementation detail:
 """
 
 from .children import plan_child_moves
-from .core import Reconciler
-from .vnode import VNode, next_tag, normalize_children, shallow_equal_props
+from .core import MAX_RENDER_PASSES, Reconciler
+from .vnode import VNode, next_tag, normalize_children
 
 __all__ = [
+    "MAX_RENDER_PASSES",
     "Reconciler",
     "VNode",
     "next_tag",
     "normalize_children",
     "plan_child_moves",
-    "shallow_equal_props",
 ]

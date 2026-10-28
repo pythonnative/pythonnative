@@ -8,14 +8,23 @@ runtime, however, is meaningfully different.
 ## TL;DR
 
 - `@pn.component` functions return immutable
-  [`Element`][pythonnative.Element] descriptors. Nothing is mounted
-  until the [`Reconciler`][pythonnative.reconciler.Reconciler] commits
-  the tree.
+  [`Element`][pythonnative.Element] descriptors, typed as
+  [`pn.Node`][pythonnative.element.Node]. Nothing is mounted until the
+  [`Reconciler`][pythonnative.reconciler.Reconciler] commits the tree.
+- A component's signature is its prop list, so your type checker
+  verifies every call, including navigation: a screen's parameters are
+  its route params, and `nav.push(ItemScreen(id=42))` is an ordinary
+  call.
 - Hooks ([`use_state`][pythonnative.use_state],
   [`use_effect`][pythonnative.use_effect], etc.) drive re-renders.
-  State updates are batched per render pass.
+  State updates are batched automatically: every setter call in one
+  callback, effect, or task step produces one render pass.
 - Re-rendering produces a new tree; the reconciler diffs it against
-  the previous one and applies the smallest set of native mutations.
+  the previous one, skips subtrees whose elements didn't change, and
+  applies the smallest set of native mutations.
+- State lives in hooks for one component, in context for a subtree,
+  and in a [`Store`][pythonnative.Store] for the app. See
+  [Managing state](../guides/state.md).
 - Native widgets are created and updated by Swift and Kotlin
   component managers that receive one serialized transaction per
   commit over the [native bridge](bridge.md). Mobile applications embed
@@ -38,15 +47,16 @@ Each render pass has three phases:
 1. **Render**: component functions run; hooks record state reads,
    queue effects, register memos. No native widgets change yet.
 2. **Commit**: the reconciler applies the diff to native views,
-   creating, updating, and removing widgets through the registered
-   [`ViewHandler`][pythonnative.native_views.base.ViewHandler]
-   implementations.
+   creating, updating, and removing widgets through one serialized
+   transaction that the Swift and Kotlin component managers apply.
 3. **Effect**: pending [`use_effect`][pythonnative.use_effect]
    callbacks fire in depth-first order; cleanups from the previous
    render run before the new callbacks.
 
-If an effect sets state, the loop kicks off again (with a safety cap
-that prevents render storms).
+If an effect sets state, the loop kicks off again. A component that
+keeps dirtying itself for more than fifty passes raises
+`RuntimeError("Too many re-renders")`, routed through the nearest
+[`ErrorBoundary`][pythonnative.ErrorBoundary] like any render error.
 
 ## How PythonNative differs from React Native
 
@@ -56,7 +66,12 @@ that prevents render storms).
 | Bridge | Fabric: one C++ shadow tree commit per render; TurboModules for device APIs | One JSON transaction per commit applied by Swift / Kotlin component managers; named native modules for device APIs |
 | Threading | UI runs on the main thread; JS on a separate thread | Native UI on its platform thread; Python on a dedicated asyncio application thread |
 | Distribution | Metro bundler ships a JS bundle | `pn build` bundles your `app/` and the `pythonnative` package into the native project |
-| Dev loop | Metro dev server; Expo Go / dev client on device; Fast Refresh | `pn start` dev server; debug builds and the `--dev-client` shell connect over WebSocket; Fast Refresh reloads `.py` modules in place |
+| Dev loop | Metro dev server; Expo Go / dev client on device; Fast Refresh | `pn start` dev server with a QR code; PythonNative Go or the project's debug build connect over an authenticated WebSocket; Fast Refresh reloads `.py` modules in place |
+| Dev tools | React Native DevTools, LogBox, the dev menu | DevTools served by `pn start` (components, console and REPL, problems, network, performance); the dev menu, element inspector, and performance monitor on device; `debugpy` breakpoints from VS Code |
+| Navigation | `navigation.navigate("Detail", {id})` with a typed `ParamList` | `nav.push(DetailScreen(id=42))`; navigators are module-level values |
+| Styles and themes | `StyleSheet.create({...})`; separate app and navigation themes | `class Styles(pn.StyleSheet)` namespaces; one `Theme` dataclass for the app and its navigators |
+| Global state | Zustand, Redux, or Jotai | `pn.Store` with `pn.use_store(store, selector)` |
+| Rules of hooks | `eslint-plugin-react-hooks` | `pn lint` |
 | Preview without a device | Expo web / Snack | `pn preview` renders in a browser tab through the same bridge protocol the native runtimes speak |
 | Native widgets | Wrapped by Fabric component managers | Wrapped by `PNComponentManager` (Swift) / `ComponentManager` (Kotlin) classes |
 
@@ -96,8 +111,10 @@ When something feels surprising, fall back on these rules:
 
 !!! tip "Native widgets are real"
     A `pn.Text` becomes a `UILabel` or a `TextView`. Anything you can
-    do to those in their respective SDKs, you can usually do via a
-    custom [`ViewHandler`][pythonnative.native_views.base.ViewHandler].
+    do to those in their respective SDKs, you can usually do with a
+    [custom native component](../guides/custom-native-components.md):
+    a Swift and a Kotlin manager plus a
+    [`define_component`][pythonnative.sdk.define_component] call.
 
 ## Next steps
 

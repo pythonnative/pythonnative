@@ -102,6 +102,40 @@ class Platform:
     """``True`` when running off-device (no native runtime)."""
 
     @staticmethod
+    def supports(name: str, member: str | None = None) -> bool:
+        """Check whether a compiled native contract supports this platform.
+
+        Args:
+            name: Native component or service name, including installed plugins.
+            member: Optional property, command, or service method to inspect.
+
+        Returns:
+            Whether the contract declares support. Hardware permission and
+            availability are checked separately by the service when called.
+        """
+        from .sdk.schema import COMPONENTS, MODULES
+
+        component = COMPONENTS.get(name)
+        if component is not None:
+            if Platform.OS not in component.platforms:
+                return False
+            if member is None:
+                return True
+            field = component.props.get(member)
+            if field is not None:
+                return Platform.OS in field.get("native", {}).get("platforms", component.platforms)
+            return member in component.commands
+        module = MODULES.get(name)
+        if module is None or Platform.OS not in {"ios", "android", "web"}:
+            return False
+        if member is None:
+            return any(
+                Platform.OS in method.get("platforms", ("ios", "android", "web")) for method in module.methods.values()
+            )
+        method = module.methods.get(member)
+        return method is not None and Platform.OS in method.get("platforms", ("ios", "android", "web"))
+
+    @staticmethod
     def select(spec: Dict[str, Any], default: Any = None) -> Any:
         """Pick the value matching the current platform.
 

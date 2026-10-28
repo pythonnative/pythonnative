@@ -28,14 +28,14 @@ content you actually want to recover) defeat the purpose.
 import pythonnative as pn
 
 @pn.component
-def UserCard(user):
+def UserCard(user: dict[str, str]) -> pn.Node:
     return pn.Column(
         pn.Text(user["name"]),
         pn.Text(user["email"]),
     )
 
 @pn.component
-def App(users):
+def App(users: list[dict[str, str]]) -> pn.Node:
     return pn.Column(
         *[
             pn.ErrorBoundary(
@@ -53,7 +53,10 @@ callable that receives the exception, or a callable that receives the
 exception *and* a `reset` function:
 
 ```python
-def render_error(exc: BaseException, reset):
+from collections.abc import Callable
+
+
+def render_error(exc: BaseException, reset: Callable[[], None]) -> pn.Node:
     return pn.Column(
         pn.Text("Something went wrong", style={"font_size": 18, "bold": True}),
         pn.Text(repr(exc), style={"color": "#888"}),
@@ -66,25 +69,27 @@ pn.ErrorBoundary(child, fallback=render_error)
 ## What gets caught
 
 - Exceptions raised inside a child `@component` function during
-  render.
-- Exceptions raised inside a child
-  [`ViewHandler`][pythonnative.native_views.base.ViewHandler]'s
-  `create` or `update` while the boundary is reconciling
-  that subtree.
+  render, including the synchronous part of an `async def` body.
+- Exceptions raised by a child's
+  [`use_layout_effect`][pythonnative.use_layout_effect] or
+  [`use_effect`][pythonnative.use_effect] callback (the synchronous
+  body, or the cleanup it returned). The reconciler routes them to the
+  nearest boundary exactly like render errors; a failing effect never
+  fails the native surface.
+- `RuntimeError("Too many re-renders")`, raised from a component that
+  keeps re-dirtying itself for more than fifty passes.
 
 ## What doesn't get caught
 
-- Exceptions inside [`use_effect`][pythonnative.use_effect] callbacks
-  (effects run *after* commit, so the boundary has already reported
-  success). Wrap the callback body in `try/except` and surface the
-  error via `set_state`. In dev mode these errors show the RedBox
+- Exceptions raised *inside an async task* after its first `await`:
+  an `async def` effect that fails later, or a coroutine started with
+  `pn.run_async`. Catch them at the boundary of the task, or surface
+  the error via `set_state`. In dev mode these errors show the RedBox
   overlay instead of vanishing.
-- Exceptions in event handlers (`on_press`, `on_change`). Same
-  reasoning: handlers fire later, on user interaction. Use
-  `try/except` inside the handler. Dev mode routes these to the
-  RedBox too.
-- Exceptions raised from threads or async tasks scheduled by your
-  code. Catch them at the boundary of the task.
+- Exceptions in event handlers (`on_press`, `on_change`). Handlers
+  fire later, on user interaction. Use `try/except` inside the
+  handler. Dev mode routes these to the RedBox too.
+- Exceptions raised from threads you start yourself.
 
 ## Recovery
 

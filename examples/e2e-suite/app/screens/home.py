@@ -1,8 +1,8 @@
 """Home screen: lists every category as a tappable row.
 
-Each row pushes the ``Category`` route with ``{"name": "<category>"}``
-as a route param. The category screen then lists every demo in that
-category.
+Each row pushes ``CategoryListScreen(name="<category>")``: the
+category screen's ``name`` parameter is its route param. The category
+screen then lists every demo in that category.
 
 Stable labels used by Maestro:
 
@@ -16,13 +16,16 @@ Stable labels used by Maestro:
 
 from __future__ import annotations
 
+from functools import partial
+
 import pythonnative as pn
 from app.registry import CATEGORIES, demos_for_category
-from app.theme import styles
+from app.screens.category import CategoryListScreen
+from app.theme import AppStyles, Layout
 
 
 @pn.component
-def HomeScreen() -> pn.Element:
+def HomeScreen() -> pn.Node:
     """Master list of categories.
 
     Renders one button per category from :data:`app.registry.CATEGORIES`,
@@ -32,32 +35,34 @@ def HomeScreen() -> pn.Element:
     button label itself is short and stable.
     """
     nav = pn.use_navigation()
+    styles = pn.use_styles(AppStyles)
 
     def open_category(name: str) -> None:
-        nav.navigate("Category", name=name)
+        nav.navigate(CategoryListScreen(name=name))
 
     return pn.ScrollView(
         pn.Column(
-            pn.Text("E2E Suite home", style=styles["title"]),
+            pn.Text("E2E Suite home", style=styles.title),
             pn.Text(
                 "Every category below maps to a folder of demo screens. "
                 "Tap a category, then tap a demo to exercise that feature.",
-                style=styles["hint"],
+                style=styles.hint,
             ),
             *[
                 pn.Column(
                     pn.Button(
                         f"Open {name}",
-                        on_press=lambda _name=name: open_category(_name),
+                        on_press=partial(open_category, name),
                     ),
                     pn.Text(
                         f"{len(demos_for_category(name))} demos",
-                        style=styles["hint"],
+                        style=styles.hint,
                     ),
-                    style=pn.style(spacing=4),
+                    style=Layout.stack,
+                    key=name,
                 )
                 for name in CATEGORIES
             ],
-            style=styles["screen"],
+            style=Layout.screen,
         )
     )

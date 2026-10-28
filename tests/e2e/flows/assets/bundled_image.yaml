@@ -1,0 +1,23 @@
+# Tests Image loads a bundled asset with density variants and pn.asset reports its URI and existence.
+#
+# Demo screen: examples/e2e-suite/app/screens/assets/bundled_image.py
+# Source under test: src/pythonnative/assets/__init__.py :: Asset, src/pythonnative/components/media.py :: Image
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Assets
+      DEMO_TITLE: Bundled image
+- assertVisible: "Asset URI: asset://images/badge.png"
+- assertVisible: "Asset exists: yes"
+- assertVisible: "Missing asset exists: no"
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Assets

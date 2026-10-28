@@ -11,7 +11,7 @@ public final class PNViewState {
     public let tag: Int64
     /// Element type name.
     public let typeName: String
-    /// Every prop the view has received so far (updates merge; `null` removes).
+    /// Current logical props; explicit null is retained and removed keys are absent.
     public var props: [String: Any] = [:]
     /// Free-form storage for manager-specific values (suppress flags, delegates, ...).
     public var extras: [String: Any] = [:]
@@ -19,6 +19,9 @@ public final class PNViewState {
     public var retained: [AnyObject] = []
     /// Recognizers installed from the `gestures` prop.
     public var gestureRecognizers: [UIGestureRecognizer] = []
+    /// Animated transform channels (`translate_x`, `rotate`, ...) overlaid
+    /// on the static `transform` prop by `PNTransform.compose`.
+    public var animatedTransform: [String: Double] = [:]
 
     // Style bookkeeping used by `PNViewStyler` at frame time.
     var requestedCornerRadius: CGFloat?
@@ -26,6 +29,9 @@ public final class PNViewState {
     var sideBorderWidths: [CGFloat]?
     var sideBorderColors: [UIColor]?
     var sideBorderLayers: [CALayer?] = [nil, nil, nil, nil]
+    /// `"dashed"` / `"dotted"` border drawn by `borderStyleLayer`; `nil` is solid.
+    var borderStyle: String?
+    var borderStyleLayer: CAShapeLayer?
 
     init(tag: Int64, typeName: String) {
         self.tag = tag
@@ -70,18 +76,15 @@ public final class PNViewState {
 
 /// Event emission keyed by view.
 public enum PNEvents {
-    /// Emit `name` for `view` with positional `args`. Returns Python's
-    /// JSON reply for request-style events, else `nil`.
-    @discardableResult
-    public static func emit(_ view: UIView, _ name: String, _ args: [Any?] = []) -> String? {
-        guard let state = PNViewState.existing(for: view) else { return nil }
-        return PNBridge.shared.emitEvent(tag: state.tag, name: name, args: args)
+    /// Emit `name` for `view` with positional `args`.
+    public static func emit(_ view: UIView, _ name: String, _ args: [Any?] = []) {
+        guard let state = PNViewState.existing(for: view) else { return }
+        PNBridge.shared.emitEvent(tag: state.tag, name: name, args: args)
     }
 
     /// Emit only when the element wired a handler for `name`.
-    @discardableResult
-    public static func emitIfWired(_ view: UIView, _ name: String, _ args: [Any?] = []) -> String? {
-        guard let state = PNViewState.existing(for: view), state.hasEvent(name) else { return nil }
-        return PNBridge.shared.emitEvent(tag: state.tag, name: name, args: args)
+    public static func emitIfWired(_ view: UIView, _ name: String, _ args: [Any?] = []) {
+        guard let state = PNViewState.existing(for: view), state.hasEvent(name) else { return }
+        PNBridge.shared.emitEvent(tag: state.tag, name: name, args: args)
     }
 }

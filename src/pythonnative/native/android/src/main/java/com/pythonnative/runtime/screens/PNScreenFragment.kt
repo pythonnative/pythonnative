@@ -1,10 +1,12 @@
 package com.pythonnative.runtime.screens
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.activity.BackEventCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
@@ -19,14 +21,32 @@ import org.json.JSONObject
  * On view creation it asks Python to create the screen
  * (`callback("host", screenId, "create", {...})`) and afterwards
  * forwards lifecycle and layout: `start`, `layout`, `resume`, `pause`,
- * `stop`, `destroy`, `back_pressed`, `save_state`, and
- * `restore_state`. Python attaches the screen's root view through the
+ * `stop`, `destroy`, and `back_pressed`. Saved state returns in the
+ * `create` payload as `restored_state`. Python attaches the screen's root view through the
  * `Host.attach_root` module call, which lands in [attachRoot].
  *
  * Apps subclass this (the nav graph names the subclass) and override
  * [defaultPath] to supply the entry module when the fragment arguments
  * don't carry one. Fast Refresh needs nothing from the fragment: the
  * Python dev client reloads modules and refreshes mounted screens.
+ *
+ * Back handling: an [OnBackPressedCallback] forwards `back_pressed` to
+ * Python, which pops its own stack or calls `Host.finish`. Its
+ * predictive-back hooks (`handleOnBackStarted` / `Progressed` /
+ * `Cancelled`) are no-ops. With `enableOnBackInvokedCallback` on in the
+ * manifest, Android 13+ plays the system back-to-home preview only while
+ * no callback is enabled. The callback is enabled by default and stays
+ * so until Python toggles [backEnabled] through `Host.set_back_enabled`
+ * (not called yet), so the preview does not appear today. There is no
+ * cross-screen predictive preview: the stack is Python-driven and pops
+ * only after the gesture commits.
+ *
+ * Viewport: `layout` is re-published on view size changes, window inset
+ * changes (which include the keyboard through [PNKeyboard]), and
+ * configuration changes such as font scale or rotation. Those arrive in
+ * [onConfigurationChanged] only because the app's activity declares them
+ * in `android:configChanges`; without that, Android recreates the
+ * activity and every screen instead.
  */
 open class PNScreenFragment : Fragment() {
     /** The screen id assigned by [ScreenRegistry]. */
@@ -40,6 +60,18 @@ open class PNScreenFragment : Fragment() {
     private var created = false
     private var pendingRestore: String? = null
     private var lastLayout: String? = null
+    private var backCallback: OnBackPressedCallback? = null
+    private var removeKeyboardListener: (() -> Unit)? = null
+
+    /**
+     * Whether the screen intercepts the system back gesture. `true` by
+     * default so Python decides; set `false` (through `Host.set_back_enabled`)
+     * when Python has nothing to pop, which lets the system's predictive
+     * back-to-home animation play.
+     */
+    var backEnabled: Boolean
+        get() = backCallback?.isEnabled ?: true
+        set(value) { backCallback?.isEnabled = value }
 
     /** Screen path when the arguments carry none (apps return the entry module). */
     protected open fun defaultPath(): String? = null
@@ -53,16 +85,18 @@ open class PNScreenFragment : Fragment() {
         super.onCreate(savedInstanceState)
         screenId = ScreenRegistry.register(this)
         pendingRestore = savedInstanceState?.getString(STATE_KEY)
-        requireActivity().onBackPressedDispatcher.addCallback(
-            this,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    if (created) host("back_pressed", "{}")
-                    else requireActivity().finish()
-
-                }
-            },
-        )
+        val callback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (created) host("back_pressed", "{}")
+                else requireActivity().finish()
+            }
+            // Predictive back: no in-app preview to drive, so progress is ignored.
+            override fun handleOnBackStarted(backEvent: BackEventCompat) {}
+            override fun handleOnBackProgressed(backEvent: BackEventCompat) {}
+            override fun handleOnBackCancelled() {}
+        }
+        backCallback = callback
+        requireActivity().onBackPressedDispatcher.addCallback(this, callback)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -78,18 +112,25 @@ open class PNScreenFragment : Fragment() {
         val payload = JSONObject()
             .put("path", screenPath() ?: JSONObject.NULL)
             .put("args", argsJson() ?: JSONObject.NULL)
+        pendingRestore?.let { payload.put("restored_state", it) }
+        pendingRestore = null
         host("create", payload.toString())
         created = true
-        pendingRestore?.let {
-            host("restore_state", JSONObject().put("state", it).toString())
-            pendingRestore = null
-        }
         view.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> publishLayout(v) }
         ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
             publishLayout(v, force = true)
             insets
         }
+        removeKeyboardListener?.invoke()
+        removeKeyboardListener = PNKeyboard.addListener { _, _, _ -> container?.let { publishLayout(it, force = true) } }
         publishLayout(view, force = true)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Delivered only for the changes the activity's `android:configChanges`
+        // declares; `PNBridge.configurationChanged` re-measures for them.
+        container?.let { publishLayout(it, force = true) }
     }
 
     private fun publishLayout(view: View, force: Boolean = false) {
@@ -146,12 +187,15 @@ open class PNScreenFragment : Fragment() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         if (!created) return
-        host("save_state", "{}")
+        // Python publishes state as it changes (`Host.set_state`), so saving
+        // needs no round trip.
         cachedStateJSON?.let { outState.putString(STATE_KEY, it) }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        removeKeyboardListener?.invoke()
+        removeKeyboardListener = null
         container = null
     }
 
@@ -162,12 +206,11 @@ open class PNScreenFragment : Fragment() {
         ScreenRegistry.unregister(screenId)
     }
 
-    private fun host(name: String, payloadJson: String): String? {
-        return try {
+    private fun host(name: String, payloadJson: String) {
+        try {
             PNBridge.callPython("host", screenId.toLong(), name, payloadJson)
         } catch (e: Exception) {
             PNLog.rateLimited("host:$name", "host callback '$name' failed", e)
-            null
         }
     }
 

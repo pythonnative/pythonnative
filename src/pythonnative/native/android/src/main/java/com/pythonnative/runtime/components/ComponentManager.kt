@@ -10,6 +10,7 @@ import com.pythonnative.runtime.animation.PNAnimator
 import com.pythonnative.runtime.bridge.JsonUtil
 import com.pythonnative.runtime.bridge.ViewRecord
 import com.pythonnative.runtime.bridge.present
+import com.pythonnative.runtime.core.PNCore
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.max
@@ -30,8 +31,9 @@ abstract class ComponentManager {
 
     /**
      * Apply `props` to `view`. `initial` is `true` for the create op;
-     * on updates `props` holds only the changed keys (JSON null means
-     * removed). The merged props are always available via [propsOf].
+     * on updates `props` holds changed values and normalized defaults for
+     * removed keys. The logical props, retaining explicit null but no removed
+     * keys, are available via [propsOf].
      */
     open fun applyProps(view: View, props: JSONObject, initial: Boolean) {
         ViewStyler.apply(view, props)
@@ -94,12 +96,16 @@ abstract class ComponentManager {
             if (record.props.present("hit_slop") || record.state["hit_slop_active"] == true) {
                 ViewStyler.updateHitSlop(view)
             }
+            // A skew pivots on the view's center, so it follows the frame.
+            if (record.state.containsKey("skew")) ViewStyler.updateSkew(view)
         }
     }
 
     /**
      * Natural size of `view` under the constraints, in dp. Either
-     * constraint may be `1e6` or infinite meaning unconstrained.
+     * constraint may be `1e6` or infinite meaning unconstrained. The core
+     * calls it on a prototype widget built from the props, on the main
+     * thread, and caches the result.
      */
     open fun measure(view: View, maxWidth: Double, maxHeight: Double): FloatArray {
         val density = PNBridge.density()
@@ -112,17 +118,17 @@ abstract class ComponentManager {
     /** Run an imperative command; unknown names return `null`. */
     open fun command(view: View, name: String, args: JSONObject): Any? = null
 
-    /** Apply one Python-driven animation frame immediately. */
+    /** Apply one animated prop value from the core's animator. */
     open fun setAnimatedProperty(view: View, prop: String, value: Any?) {
         PNAnimator.setProperty(view, prop, value)
     }
 
-    /** Start a natively driven animation; `false` asks Python to tick it instead. */
-    open fun startAnimation(view: View, id: Long, prop: String, spec: JSONObject): Boolean =
-        PNAnimator.start(view, id, prop, spec)
-
-    /** Cancel a native animation and return the presentation value, if readable. */
-    open fun cancelAnimation(view: View, id: Long): Any? = PNAnimator.cancel(id)
+    /**
+     * A plugin's thread-safe measurement (`define_component(measure="native")`),
+     * called from the core's workers with the view's props; `null` falls back
+     * to measuring a prototype widget on the main thread.
+     */
+    open fun measureNative(props: JSONObject, maxWidth: Double, maxHeight: Double): FloatArray? = null
 
     // ------------------------------------------------------------------
     // Helpers for subclasses
@@ -139,10 +145,6 @@ abstract class ComponentManager {
 
     /** Dispatch event `name` with positional `args` for `view`'s tag. */
     protected fun fire(view: View, name: String, vararg args: Any?): Boolean = PNEvents.fire(view, name, *args)
-
-    /** Dispatch event `name` and return Python's (JSON) reply. */
-    protected fun fireForResult(view: View, name: String, vararg args: Any?): String? =
-        PNEvents.fireForResult(view, name, *args)
 
     /** Whether the element wired a callback named `name`. */
     protected fun hasEvent(view: View, name: String): Boolean = recordOf(view)?.hasEvent(name) ?: false
@@ -196,13 +198,30 @@ object PNEvents {
         return true
     }
 
-    /** Dispatch `name` for `view` and return Python's JSON reply. */
-    fun fireForResult(view: View, name: String, vararg args: Any?): String? {
-        val tag = PNBridge.registry.tagOf(view) ?: return null
-        return fireTag(tag, name, JsonUtil.args(*args))
+    /**
+     * Dispatch `name` for `tag` with an already built argument array. Events
+     * are delivered asynchronously; Python never returns a result to native.
+     */
+    fun fireTag(tag: Long, name: String, args: JSONArray) {
+        // Prototype widgets measured for the core have negative tags.
+        if (tag < 0) return
+        var editRevision = 0L
+        if (name == "on_change") PNBridge.registry.get(tag)?.takeIf { it.typeName == "TextInput" }?.let { record ->
+            editRevision = ((record.state["edit_revision"] as? Number)?.toLong() ?: 0L) + 1L
+            record.state["edit_revision"] = editRevision
+        }
+        PNCore.event(tag, name, args, editRevision)
     }
+}
 
-    /** Dispatch `name` for `tag` with an already built argument array. */
-    fun fireTag(tag: Long, name: String, args: JSONArray): String? =
-        PNBridge.callPython("event", tag, name, args.toString())
+/** Typed managers consume the same generated contracts as extension managers. */
+abstract class TypedComponentManager<P: com.pythonnative.generated.PNViewProps>(
+    private val decode: (org.json.JSONObject, Boolean) -> P
+): ComponentManager() {
+    final override fun applyProps(view: android.view.View, props: org.json.JSONObject, initial: Boolean) {
+        applyTyped(view, decode(props, true), initial)
+    }
+    open fun applyTyped(view: android.view.View, props: P, initial: Boolean) {
+        ViewStyler.apply(view, props.values)
+    }
 }

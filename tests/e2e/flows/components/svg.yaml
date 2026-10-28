@@ -1,0 +1,26 @@
+# Tests Svg draws Python-declared shapes and svg.load parses a bundled .svg file.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/svg.py
+# Source under test: src/pythonnative/components/graphics.py :: Svg, src/pythonnative/svg.py :: load
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Svg
+- scrollUntilVisible:
+    element:
+      text: "Parsed shapes: 5"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Parsed shapes: 5"
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

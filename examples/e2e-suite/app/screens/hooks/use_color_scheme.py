@@ -9,20 +9,20 @@ light, then restores the system setting.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseColorSchemeDemo() -> pn.Element:
+def UseColorSchemeDemo() -> pn.Node:
     """Render the effective scheme with appearance-override buttons."""
     scheme = pn.use_color_scheme()
-    return demo_screen(
+    return DemoScreen(
         "use_color_scheme",
         "Effective color scheme; an appearance override wins over the system.",
-        section(
+        DemoSection(
             "Scheme",
-            result_text("Scheme", scheme),
-            buttons_row(
+            ResultText("Scheme", scheme),
+            ButtonsRow(
                 pn.Button(
                     "Force dark",
                     on_press=lambda: pn.appearance.set_color_scheme("dark"),
@@ -36,6 +36,6 @@ def UseColorSchemeDemo() -> pn.Element:
                 "Follow system",
                 on_press=lambda: pn.appearance.set_color_scheme(None),
             ),
-            hint("Maestro forces each scheme and asserts the Scheme line."),
+            Hint("Maestro forces each scheme and asserts the Scheme line."),
         ),
     )

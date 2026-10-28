@@ -1,0 +1,24 @@
+# Tests Easing: Animated.timing runs to completion with every named curve
+# and a bezier, and an unknown easing string raises instead of falling back.
+#
+# Demo screen: examples/e2e-suite/app/screens/animations/easing.py
+# Source under test: src/pythonnative/animated.py :: Easing, EasingSpec
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Animations
+      DEMO_TITLE: Easing
+- assertVisible: "Status: idle"
+- assertVisible: "Rejects unknown easing: yes"
+- tapOn: "Run all curves"
+- extendedWaitUntil:
+    visible: "Curves run: 9"
+    timeout: 15000
+- assertVisible: "Status: done"
+- assertVisible: "Last curve: bezier"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Animations

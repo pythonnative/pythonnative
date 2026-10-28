@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import pytest
 from pytest import MonkeyPatch
 
 from pythonnative.project import doctor
@@ -125,3 +126,24 @@ def test_check_result_to_dict() -> None:
         "level": doctor.OK,
         "message": "",
     }
+
+
+def test_toolchain_version_checks_reject_old_tools(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from pythonnative.project import doctor
+
+    monkeypatch.setattr(doctor.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        doctor, "_which_version", lambda tool, _: {"java": 'java version "1.8.0"', "xcodebuild": "Xcode 25.0"}.get(tool)
+    )
+    monkeypatch.setenv("ANDROID_HOME", str(tmp_path))
+    android = doctor.check_android(None)
+    assert next(check for check in android if check.name.startswith("Java")).level == doctor.ERROR
+    assert next(check for check in android if check.name.startswith("Android SDK")).level == doctor.ERROR
+    assert next(check for check in doctor.check_ios(None) if check.name.startswith("Xcode")).level == doctor.ERROR
+    monkeypatch.setattr(
+        doctor,
+        "_which_version",
+        lambda tool, _: {"java": 'openjdk version "21.0.1"', "xcodebuild": "Xcode 26.3"}.get(tool),
+    )
+    assert next(check for check in doctor.check_android(None) if check.name.startswith("Java")).level == doctor.OK
+    assert next(check for check in doctor.check_ios(None) if check.name.startswith("Xcode")).level == doctor.OK

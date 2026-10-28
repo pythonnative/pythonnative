@@ -8,10 +8,13 @@ The native ``Location`` module owns the ``CLLocationManager`` /
 ``LocationManager`` session and resolves the call with
 ``{"latitude", "longitude", "accuracy", "altitude", "timestamp"}``.
 
-Permission prompts are triggered the first time a location-using API
-is called; ensure the appropriate manifest entries
-(``android.permission.ACCESS_FINE_LOCATION``) and Info.plist keys
-(``NSLocationWhenInUseUsageDescription``) are present.
+The first call prompts for when-in-use permission on both platforms
+(``requestWhenInUseAuthorization`` on iOS, the
+``ACCESS_FINE_LOCATION`` runtime prompt on Android), so there is no
+separate ``Permissions.request`` step unless you want to ask earlier.
+Declare ``location_when_in_use`` in the ``[permissions]`` table of
+``pythonnative.toml`` so the manifest entry and Info.plist usage string
+are generated.
 
 Example:
     ```python
@@ -50,7 +53,8 @@ class Location:
 
         Returns:
             ``(latitude, longitude)`` if a fix was obtained, otherwise
-            ``None``.
+            ``None`` (permission denied, location services off, or the
+            request timed out).
 
         Raises:
             NativeModuleError: If the native module fails.

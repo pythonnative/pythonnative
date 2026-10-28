@@ -1,0 +1,28 @@
+# Tests the accessibility props added in RFC 0002 mount on every renderer:
+# accessibility_value / accessibility_actions / on_accessibility_action /
+# important_for_accessibility / accessibility_live_region. Screen-reader
+# actions can't be scripted, so the flow drives the same handler through
+# buttons and asserts the mirrored value.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/accessibility_props.py
+# Source under test: src/pythonnative/components/_base.py :: accessibility props
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: Accessibility props
+- assertVisible: "Value: 5"
+- assertVisible: "a11y-target 5"
+- tapOn: "Increment"
+- assertVisible: "Value: 6"
+- assertVisible: "Last action: increment"
+- assertVisible: "a11y-target 6"
+- tapOn: "Decrement"
+- assertVisible: "Value: 5"
+- assertVisible: "a11y-visible-marker"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

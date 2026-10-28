@@ -1,0 +1,22 @@
+# Tests use_reduce_motion reports the Reduce Motion setting, in agreement
+# with AccessibilityInfo.is_reduce_motion_enabled().
+#
+# Demo screen: examples/e2e-suite/app/screens/hooks/use_reduce_motion.py
+# Source under test: src/pythonnative/native_modules/accessibility_info.py :: use_reduce_motion
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Hooks
+      DEMO_TITLE: use_reduce_motion
+# CI's Android emulator runs with animations disabled, which Android
+# reports as Reduce Motion, so the value itself varies by device: check
+# that it's consistent and that the hook agrees with the module.
+- assertVisible: "Reduce motion: (yes|no)"
+- assertVisible: "Animation duration: (0|300)"
+- assertVisible: "Matches AccessibilityInfo: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Hooks

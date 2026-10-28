@@ -34,7 +34,7 @@ is required to make it declarable.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Mapping, Tuple, Union
+from typing import Dict, Iterable, List, Mapping, Tuple, Union
 
 PermissionValue = Union[bool, str]
 """Type of a value in the ``[permissions]`` table: a reason string or a bool."""
@@ -274,7 +274,7 @@ class ResolvedPermissions:
     android_permissions: List[str] = field(default_factory=list)
 
 
-def unknown_capabilities(keys: object) -> List[str]:
+def unknown_capabilities(keys: Iterable[str]) -> List[str]:
     """Return any declared capability keys that aren't in the catalog.
 
     Args:
@@ -295,7 +295,7 @@ def unknown_capabilities(keys: object) -> List[str]:
 def resolve_permissions(
     permissions: Mapping[str, PermissionValue],
     *,
-    extra_android_permissions: object = (),
+    extra_android_permissions: Iterable[str] = (),
 ) -> ResolvedPermissions:
     """Resolve a declared capability map into native permission artifacts.
 

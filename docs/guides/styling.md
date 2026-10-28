@@ -1,16 +1,21 @@
 # Styling
 
-Style properties are passed via the `style` prop on every element
-factory. The value can be a plain dict, a [typed
-`Style`](#typed-styles-with-pnstyle) `TypedDict` built with
-[`pn.style(...)`][pythonnative.style.style], a list mixing those
-(later entries win on key collision), or `None`. PythonNative also
-provides a [`StyleSheet`][pythonnative.StyleSheet] utility for
-declaring named styles and a theming system via context.
+Every element factory takes a `style` prop. Its value is a
+[`Style`][pythonnative.Style] dict, a list of them (later entries win),
+or `None`. On top of that, PythonNative gives you three tools that keep
+styles typed and consistent as an app grows:
+
+- [`StyleSheet`](#style-sheets) namespaces group named styles with
+  attribute access, so a misspelled style name is a static error.
+- A [`Theme`](#themes) holds the app's design tokens (colors,
+  typography, spacing, and radii), switches with dark mode, and also
+  styles the navigators.
+- [`use_styles`](#theme-dependent-styles-with-use_styles) derives
+  theme-dependent styles once per theme.
 
 ## Inline styles
 
-Pass a `style` dict to components:
+Pass a `style` dict to any component:
 
 ```python
 pn.Text("Hello", style={"color": "#FF3366", "font_size": 24, "bold": True})
@@ -20,18 +25,18 @@ pn.Column(pn.Text("Content"), style={"background_color": "#FFF5F5F5"})
 
 ## Typed styles with `pn.style()`
 
-[`pn.style(**props)`][pythonnative.style.style] is a tiny helper that
-returns a [`pn.Style`][pythonnative.style.Style] `TypedDict`. Values are
-plain Python `dict` instances at runtime, but the type is fully
-recognised by static checkers (mypy, pyright, Pylance) and editors
-will autocomplete known keys and `Literal` values:
+[`pn.style(**props)`][pythonnative.style.style] returns a
+[`pn.Style`][pythonnative.Style], a `TypedDict`. Values are plain
+Python `dict` instances at run time, but static checkers (mypy,
+pyright, Pylance) know every key, and editors autocomplete keys and
+`Literal` values:
 
 ```python
 import pythonnative as pn
 
 heading: pn.Style = pn.style(
     font_size=28,
-    font_weight="700",        # Literal: "100".."900" | "bold" | "normal" | …
+    font_weight="700",        # Literal: "100".."900" | "bold" | "normal"
     text_align="center",      # Literal: "left" | "center" | "right" | "justify"
     color="#0F172A",
 )
@@ -41,108 +46,301 @@ pn.Text("Welcome", style=heading)
 
 Why use `pn.style()` over a raw dict?
 
-- **IDE autocomplete** for every supported key (`flex_direction`,
-  `align_items`, `transform`, `shadow_offset`, …).
-- **Type-checked literals**: typos like `align_items="centre"` are
-  flagged before you ever run the app.
-- **Self-documenting code**: the `pn.Style` annotation tells readers
-  this dict is meant to flow into the `style` prop.
+- **Autocomplete** for every supported key (`flex_direction`,
+  `align_items`, `transform`, `shadow_offset`, and the rest).
+- **Checked literals:** a typo like `align_items="centre"` is flagged
+  before you run the app.
+- **Checked keys:** `pn.style()` is typed with `Unpack[Style]`, so
+  `pn.style(colour="red")` is a type error, not a silent no-op.
 
-Because `Style` is `total=False`, every key is optional; you only
-include the props you care about. Plain dicts continue to work
-everywhere (they're widened to the same `StyleProp` type) and
-existing code does not need to change.
+Because `Style` is `total=False`, every key is optional; include only
+the ones you need. Plain dict literals are checked the same way when
+they're passed straight to `style=` or annotated as `pn.Style`. In
+development builds the factories also warn once about each unknown key
+or bad value they see at run time. Release builds skip that check.
 
-### `StyleProp` for component authors
+## Style lists
 
-The argument type accepted by every built-in factory is
+Pass a list to combine styles. Entries merge left to right, so later
+entries win, and `None` entries are skipped. That makes conditional
+styles a one-liner:
+
+```python
+pn.Text("Saved", style=[Styles.label, Styles.success if saved else None])
+pn.View(content, style=[Styles.card, {"opacity": 0.5}])
+```
+
+A list is the only composition tool you need: there's no `compose` or
+`flatten` helper to learn. When you need the merged dict itself (for
+example, to read one key), call
+[`pn.resolve_style`][pythonnative.style.resolve_style], which flattens a
+style prop into a fresh dict.
+
+### Styles in your own components
+
+The type every built-in factory accepts is
 [`pn.StyleProp`][pythonnative.style.StyleProp]:
 
 ```python
-StyleProp = Style | dict[str, Any] | list[Style | dict | None] | None
+StyleProp = Style | Sequence[Style | None] | None
 ```
 
-Use it in your own components when you want to forward styles
-through:
+Annotate a `style` parameter with it when your component passes the
+caller's style through unchanged. When the component layers the
+caller's style over its own, take a single `pn.Style` instead, so the
+list stays one level deep:
 
 ```python
-from typing import Optional
 import pythonnative as pn
+
+
+class CardStyles(pn.StyleSheet):
+    card = pn.style(padding=16, border_radius=12, background_color="#FFFFFF")
+
 
 @pn.component
-def Card(
-    *children: pn.Element,
-    style: Optional[pn.StyleProp] = None,
-) -> pn.Element:
-    base: pn.Style = pn.style(
-        padding=16,
-        border_radius=12,
-        background_color="#FFFFFF",
-    )
-    return pn.View(*children, style=[base, style])
+def Card(*children: pn.Node, style: pn.Style | None = None) -> pn.Node:
+    return pn.View(*children, style=[CardStyles.card, style])
+
+
+@pn.component
+def Panel(*children: pn.Node, style: pn.StyleProp = None) -> pn.Node:
+    return pn.ScrollView(*children, style=style)
 ```
 
-The list form lets callers layer overrides on top of `base` without
-losing any keys you didn't override.
+Callers can then override any key of `card` without losing the keys
+they don't override: `Card(pn.Text("Hi"), style={"padding": 24})`.
 
-## StyleSheet
+## Style sheets
 
-Create reusable named styles with
-[`StyleSheet.create`][pythonnative.style.StyleSheet.create]:
+Group the styles a module uses in a
+[`StyleSheet`][pythonnative.StyleSheet] namespace. Subclass it and
+assign styles as class attributes:
 
 ```python
 import pythonnative as pn
 
-styles = pn.StyleSheet.create(
-    title={"font_size": 28, "bold": True, "color": "#333"},
-    subtitle={"font_size": 14, "color": "#666"},
-    container={"padding": 16, "spacing": 12, "align_items": "stretch"},
-)
 
-pn.Text("Welcome", style=styles["title"])
-pn.Column(
-    pn.Text("Subtitle", style=styles["subtitle"]),
-    style=styles["container"],
-)
+class Styles(pn.StyleSheet):
+    container = pn.style(padding=16, gap=12, align_items="stretch")
+    title = pn.style(font_size=28, bold=True, color="#333333")
+    subtitle = pn.style(font_size=14, color="#666666")
+
+
+@pn.component
+def Welcome() -> pn.Node:
+    return pn.Column(
+        pn.Text("Welcome", style=Styles.title),
+        pn.Text("Subtitle", style=Styles.subtitle),
+        style=Styles.container,
+    )
 ```
 
-### Composing styles
+- **Attribute access is typed.** `Styles.titel` is a static error, and
+  your editor autocompletes style names. (A dict of styles would accept
+  any string key.)
+- **Styles are checked once.** In development builds each style's
+  keys are validated when the class is defined, instead of every time
+  an element is built.
+- **It's a namespace, not an object.** Calling `Styles()` raises
+  `TypeError`; refer to `Styles.title` directly.
 
-Merge multiple style dicts with
-[`StyleSheet.compose`][pythonnative.style.StyleSheet.compose]:
+[`pn.ABSOLUTE_FILL`][pythonnative.style.ABSOLUTE_FILL] is the common
+"fill the parent" overlay style, like React Native's
+`StyleSheet.absoluteFill`:
 
 ```python
-base = {"font_size": 16, "color": "#000"}
-highlight = {"color": "#FF0000", "bold": True}
-merged = pn.StyleSheet.compose(base, highlight)
-# Result: {"font_size": 16, "color": "#FF0000", "bold": True}
+pn.View(pn.Text("Loading..."), style=[pn.ABSOLUTE_FILL, {"background_color": "#00000088"}])
 ```
 
-### Combining styles with a list
+Style sheets hold fixed values. For styles built from theme tokens,
+see [`use_styles`](#theme-dependent-styles-with-use_styles) below.
 
-You can also pass a list of dicts to `style`. They are merged left-to-right:
+## Themes
+
+A [`Theme`][pythonnative.Theme] is a frozen, keyword-only dataclass of
+design tokens. Components read the active one with
+[`use_theme`][pythonnative.use_theme], and the built-in navigators draw
+their headers, tab bars, and drawers from the same tokens, so one theme
+styles the whole app.
+
+| Field | Type | Tokens |
+| --- | --- | --- |
+| `dark` | `bool` | Whether the theme is meant for a dark appearance |
+| `colors` | [`Colors`][pythonnative.Colors] | `primary`, `background`, `surface`, `text`, `text_secondary`, `border`, `error`, `success`, `warning` |
+| `typography` | [`Typography`][pythonnative.Typography] | `title`, `heading`, `body`, `label`, `caption`, each a `Style` |
+| `spacing` | [`Spacing`][pythonnative.Spacing] | `xs` (4), `sm` (8), `md` (16), `lg` (24), `xl` (32) |
+| `radii` | [`Radii`][pythonnative.Radii] | `sm` (4), `md` (8), `lg` (16), `full` (9999) |
 
 ```python
-pn.Text("Highlighted", style=[base, highlight])
+@pn.component
+def Section(*children: pn.Node, title: str) -> pn.Node:
+    theme = pn.use_theme()
+    return pn.View(
+        pn.Text(title, style=[theme.typography.heading, {"color": theme.colors.text}]),
+        *children,
+        style={
+            "background_color": theme.colors.surface,
+            "border_radius": theme.radii.md,
+            "padding": theme.spacing.md,
+            "gap": theme.spacing.sm,
+        },
+    )
 ```
 
-### Flattening styles
+Without a provider, `use_theme()` returns the built-in
+[`LIGHT_THEME`][pythonnative.LIGHT_THEME] or
+[`DARK_THEME`][pythonnative.DARK_THEME] for the current color scheme,
+and re-renders the component when the scheme changes. Themed components
+are therefore dark-mode aware by default.
 
-Flatten a style or list of styles into a single dict:
+### Custom themes
+
+Provide your own light and dark themes with
+[`ThemeProvider`][pythonnative.ThemeProvider] at the root of the app.
+It picks `light` or `dark` from the effective color scheme. Derive a
+theme from a built-in one with
+[`dataclasses.replace`][dataclasses.replace]:
 
 ```python
-pn.StyleSheet.flatten([base, highlight])
-pn.StyleSheet.flatten(None)  # returns {}
+from dataclasses import replace
+
+import pythonnative as pn
+
+LIGHT = replace(pn.LIGHT_THEME, colors=replace(pn.LIGHT_THEME.colors, primary="#5B21B6"))
+DARK = replace(pn.DARK_THEME, colors=replace(pn.DARK_THEME.colors, primary="#A78BFA"))
+
+
+@pn.component
+def Home() -> pn.Node:
+    theme = pn.use_theme()
+    return pn.Text("Hello", style=[theme.typography.title, {"color": theme.colors.primary}])
+
+
+@pn.component
+def App() -> pn.Node:
+    return pn.ThemeProvider(Home(), light=LIGHT, dark=DARK)
 ```
 
-### `StyleSheet.absolute_fill`
+In an app with navigation, wrap the container,
+`pn.ThemeProvider(pn.NavigationContainer(Root), light=LIGHT, dark=DARK)`,
+so the navigators' headers and tab bars use the same colors. Pass the same theme as both `light` and `dark` to pin it regardless of
+the appearance. A nested `ThemeProvider` overrides the theme for its
+subtree only.
 
-Convenience factory for the common "fill the parent" overlay style:
+### Adding tokens
+
+Themes are dataclasses, so you add tokens by subclassing. Keep
+`frozen=True, kw_only=True`, give the new fields defaults, and read
+the subclass with `use_theme(BrandTheme)`, which returns a
+`BrandTheme` to your type checker:
 
 ```python
-overlay = pn.StyleSheet.absolute_fill()
-# {"position": "absolute", "top": 0, "right": 0, "bottom": 0, "left": 0}
-pn.View(pn.Text("Loading…"), style=[overlay, {"background_color": "#0008"}])
+from dataclasses import dataclass, replace
+
+import pythonnative as pn
+
+
+@dataclass(frozen=True, kw_only=True)
+class BrandTheme(pn.Theme):
+    accent: pn.Color = "#FF2D55"
+    card_elevation: float = 4
+
+
+LIGHT = BrandTheme(colors=replace(pn.LIGHT_THEME.colors, primary="#5B21B6"))
+DARK = BrandTheme(dark=True, colors=replace(pn.DARK_THEME.colors, primary="#A78BFA"), accent="#FF6482")
+
+
+@pn.component
+def Badge(count: int) -> pn.Node:
+    theme = pn.use_theme(BrandTheme)
+    return pn.Text(str(count), style={"background_color": theme.accent, "color": "#FFFFFF"})
+
+
+@pn.component
+def App() -> pn.Node:
+    return pn.ThemeProvider(Badge(count=3), light=LIGHT, dark=DARK)
+```
+
+`use_theme(BrandTheme)` raises `TypeError` when the active theme isn't
+a `BrandTheme`, which usually means the app forgot its
+`ThemeProvider`.
+
+### Theme-dependent styles with `use_styles`
+
+Building style dicts from tokens on every render is noisy and
+allocates new dicts each time. [`use_styles`][pythonnative.use_styles]
+calls a factory with the active theme once per theme and returns the
+result. The usual factory is a small class whose `__init__` takes the
+theme and assigns styles as attributes, so the styles are typed and
+misspelled names are static errors:
+
+```python
+import pythonnative as pn
+
+
+class RowStyles:
+    def __init__(self, theme: pn.Theme) -> None:
+        self.row = pn.style(
+            padding=theme.spacing.md,
+            gap=theme.spacing.xs,
+            border_bottom_width=1,
+            border_bottom_color=theme.colors.border,
+        )
+        self.title: pn.Style = {**theme.typography.label, "color": theme.colors.text}
+        self.subtitle: pn.Style = {**theme.typography.caption, "color": theme.colors.text_secondary}
+
+
+@pn.component
+def MessageRow(sender: str, preview: str) -> pn.Node:
+    styles = pn.use_styles(RowStyles)
+    return pn.Column(
+        pn.Text(sender, style=styles.title),
+        pn.Text(preview, style=styles.subtitle),
+        style=styles.row,
+    )
+```
+
+`use_styles` accepts any callable that takes a theme, including a
+plain function. A factory may annotate its parameter with your `Theme`
+subclass (`def __init__(self, theme: BrandTheme)`) to read custom
+tokens; `use_styles` passes it the active theme, so provide
+`BrandTheme` instances with `ThemeProvider`. When the user switches to
+dark mode, the component re-renders and the factory runs again with
+the dark theme; otherwise every render reuses the same style objects.
+
+Use a `StyleSheet` for styles that never change and `use_styles` for
+styles that read the theme. Both combine freely in style lists.
+
+### Dark mode
+
+Three tools cover dark mode, from most to least common:
+
+- **Theme tokens.** Components that read colors from the theme (with
+  `use_theme` or `use_styles`) switch automatically.
+- **Dynamic colors.** A [`DynamicColor`][pythonnative.DynamicColor],
+  written `{"light": ..., "dark": ...}`, is resolved by the renderer
+  itself, without a re-render. See [Colors](#colors).
+- **The color scheme itself.**
+  [`use_color_scheme`][pythonnative.use_color_scheme] returns the
+  effective scheme (`"light"` or `"dark"`) and re-renders the component
+  when it changes, including live when the user flips the system
+  setting while the app is open.
+
+```python
+@pn.component
+def Wallpaper() -> pn.Node:
+    scheme = pn.use_color_scheme()
+    return pn.Image(source="night.png" if scheme == "dark" else "day.png", style={"flex": 1})
+```
+
+An in-app appearance toggle overrides the system setting through the
+[`appearance`](../api/appearance.md) module. `ThemeProvider`,
+`use_theme`, and every renderer follow the override:
+
+```python
+pn.appearance.set_color_scheme("dark")  # force dark everywhere
+pn.appearance.set_color_scheme(None)  # follow the system again
 ```
 
 ## Colors
@@ -152,6 +350,16 @@ Pass hex strings (`#RRGGBB` or `#AARRGGBB`) to color properties inside `style`:
 ```python
 pn.Text("Hello", style={"color": "#FF3366"})
 pn.Button("Tap", style={"background_color": "#FF1E88E5", "color": "#FFFFFF"})
+```
+
+Every color key is typed as [`Color`][pythonnative.Color]: a string, or
+a [`DynamicColor`][pythonnative.DynamicColor] dictionary with a `light`
+and a `dark` entry. iOS, Android, and the browser preview all resolve
+the pair against the current color scheme when the style is applied and
+switch when the appearance changes, without a re-render:
+
+```python
+pn.View(style=pn.style(background_color={"light": "#FFFFFF", "dark": "#000000"}))
 ```
 
 ## Text styling
@@ -164,7 +372,7 @@ pn.Button("Tap", style={"background_color": "#FF1E88E5", "color": "#FFFFFF"})
 | `color` | hex string | `#RRGGBB` or `#AARRGGBB` |
 | `bold` | bool | Shorthand for `font_weight: "bold"` |
 | `font_weight` | `"normal"`, `"bold"`, `"100"`–`"900"` | |
-| `font_family` | string | System font name |
+| `font_family` | string | System font name or the family of a font under `app/assets/` (see [Assets](assets.md#fonts)) |
 | `italic` | bool | |
 | `text_align` | `"left"`, `"center"`, `"right"`, `"justify"` | |
 | `letter_spacing` | number | Tracking in points |
@@ -238,21 +446,29 @@ inline.
 ### Pressed-state styles
 
 [`Pressable`][pythonnative.Pressable]'s `style` prop also accepts a
-callable receiving a state dict, mirroring React Native's
-function-style prop. It's called with `{"pressed": bool}` and
-re-applied as the press state changes:
+callable, mirroring React Native's function-style prop. It receives a
+[`PressState`][pythonnative.PressState] (a frozen dataclass with
+`pressed: bool`) and is re-applied as the press state changes; a
+single callable child receives the same state:
 
 ```python
 pn.Pressable(
-    pn.Text("Save"),
+    lambda state: pn.Text("Saving" if state.pressed else "Save"),
     on_press=save,
-    style=lambda state: {
-        "padding": 12,
-        "border_radius": 8,
-        "background_color": "#1D4ED8" if state["pressed"] else "#3B82F6",
-    },
+    disabled=not valid,
+    android_ripple=pn.Ripple(color="#33000000"),
+    style=lambda state: pn.style(
+        padding=12,
+        border_radius=8,
+        background_color="#1D4ED8" if state.pressed else "#3B82F6",
+    ),
 )
 ```
+
+`disabled=True` suppresses every press callback and sets the disabled
+accessibility state. [`Ripple`][pythonnative.Ripple] draws Android's
+material ripple while pressed and is ignored on iOS and in the browser,
+where `pressed_opacity` or the callable style provides the feedback.
 
 ## Borders, shadows, and shape
 
@@ -266,11 +482,12 @@ Every element accepts these visual props in `style`:
 | `border_color` | hex string |
 | `border_left_width`, `border_top_width`, `border_right_width`, `border_bottom_width` | number (per side) |
 | `border_left_color`, `border_top_color`, `border_right_color`, `border_bottom_color` | hex string (per side) |
-| `shadow_color` | hex string |
-| `shadow_offset` | `{"width": x, "height": y}` |
-| `shadow_opacity` | 0.0 – 1.0 |
-| `shadow_radius` | number (blur radius) |
-| `elevation` | number (Android Material shadow shorthand) |
+| `border_style` | `"solid"` (default), `"dashed"`, or `"dotted"`, drawn the same way on every renderer |
+| `shadow_color` | hex string (iOS and browser) |
+| `shadow_offset` | `{"width": x, "height": y}` or `(x, y)` (iOS and browser) |
+| `shadow_opacity` | 0.0 – 1.0 (iOS and browser) |
+| `shadow_radius` | number (blur radius; iOS and browser) |
+| `elevation` | number (Android Material shadow) |
 | `opacity` | 0.0 – 1.0 |
 | `tint_color` | hex string (Image only) |
 
@@ -306,10 +523,11 @@ pn.View(
 )
 ```
 
-On Android, `shadow_color` and `shadow_opacity` apply on API 28+;
-older versions fall back to the elevation shadow's default color.
-When `shadow_radius` is set without `elevation`, the elevation is
-derived from it so shadows show up without extra Android-only props.
+Shadows follow React Native's platform split: the `shadow_*` keys draw
+on iOS and in the browser preview, `elevation` draws Android's material
+shadow, and each platform ignores the other's keys (Android no longer
+silently accepts `shadow_offset`). A card that looks right everywhere
+sets both:
 
 ```python
 pn.View(
@@ -331,26 +549,37 @@ pn.View(
 
 ## Transforms
 
-`transform` is either a 6-element CGAffineTransform-style array or a
-shorthand mapping:
+`transform` ([`TransformSpec`][pythonnative.TransformSpec]) is a single
+operation or an ordered list of operations, each a one-key mapping:
 
 ```python
 pn.View(
     pn.Text("Tilted"),
     style={
-        "transform": {"rotate": 15, "scale": 1.1, "translate_x": 10},
+        "transform": [{"rotate": 15}, {"scale": 1.1}, {"translate_x": 10}],
     },
+)
+
+pn.View(
+    card,
+    style={"transform": [{"perspective": 800}, {"rotate_y": "35deg"}]},
 )
 ```
 
-Supported keys: `rotate` (degrees), `scale`, `scale_x`, `scale_y`,
-`translate_x`, `translate_y`. For animated transforms, see
-[Animations](animations.md).
+Supported operations on every renderer: `rotate` (degrees, or a string
+with a `deg` or `rad` suffix), `rotate_x`, `rotate_y`, `rotate_z`,
+`scale`, `scale_x`, `scale_y`, `translate_x`, `translate_y`, `skew_x`,
+`skew_y`, and `perspective` (the distance for the 3D rotations that
+follow it in the list). iOS composes the list into a `CATransform3D`;
+Android applies skew through the animation matrix on API 29 and later
+and ignores it below that with a one-time log. For animated transforms,
+see [Animations](animations.md).
 
 ## Flex layout
 
-PythonNative uses the shared Yoga flexbox engine, compiled into each mobile
-runtime and provided as WebAssembly in the browser preview (see
+PythonNative uses the Yoga flexbox engine inside the shared renderer core,
+compiled into each mobile app and provided as WebAssembly in the browser
+preview (see
 [Layout engine](../concepts/layout.md)). `View` is
 the universal flex container, and `Column`/`Row` are convenience
 wrappers that fix the direction.
@@ -368,15 +597,15 @@ These go in the `style` dict of `View`, `Column`, or `Row`:
 - `align_items`: cross-axis alignment: `"stretch"`, `"flex_start"`,
   `"center"`, `"flex_end"`, `"baseline"`.
 - `overflow`: `"visible"` (default), `"hidden"`.
-- `spacing`: gap between children (dp / pt).
+- `gap`: space between children (dp / pt). `row_gap` and `column_gap`
+  set one axis.
 - `padding`: inner spacing (int for all sides, or dict).
 
 `align_items: "baseline"` (rows only) lines children up along a shared
-baseline instead of their top edges. Native text handlers report a
-size but not the position of the first line's baseline, so the engine
-approximates: a leaf's baseline is its height (leaves align along
-their bottom edges), and a container's baseline is that of its first
-in-flow child. Columns treat `"baseline"` as `"flex_start"`, matching
+baseline instead of their top edges. `Text` reports the position of
+its first line's baseline; other leaves use their height (they align
+along their bottom edges), and a container's baseline is that of its
+first in-flow child. Columns treat `"baseline"` as `"flex_start"`, matching
 Yoga.
 
 ### Child layout properties
@@ -403,6 +632,10 @@ All components accept these in `style`:
 - `position`: `"relative"` (default) or `"absolute"`.
 - `top`, `right`, `bottom`, `left`: edge offsets when
   `position: "absolute"` (number or percentage string).
+- `inset`, `inset_horizontal`, `inset_vertical`: shorthands for all
+  four edges, the horizontal pair, or the vertical pair, mirroring the
+  padding vocabulary; explicit edge keys win. `pn.style(position="absolute", inset=0)`
+  is the same overlay as `pn.ABSOLUTE_FILL`.
 - `z_index`: stacking order among siblings. Higher values render on
   top regardless of declaration order; siblings without one keep
   document order. Essential for absolutely positioned overlays like
@@ -460,7 +693,7 @@ pn.Column(
     pn.Text("Header", style={"font_size": 20, "bold": True}),
     pn.View(pn.Text("Content area"), style={"flex": 1}),
     pn.Text("Footer"),
-    style={"flex": 1, "spacing": 8},
+    style={"flex": 1, "gap": 8},
 )
 ```
 
@@ -470,7 +703,7 @@ pn.Column(
 pn.Row(
     pn.Button("Cancel", style={"flex": 1}),
     pn.Button("OK", style={"flex": 1, "background_color": "#007AFF", "color": "#FFF"}),
-    style={"spacing": 8, "padding": 16},
+    style={"gap": 8, "padding": 16},
 )
 ```
 
@@ -511,7 +744,7 @@ pn.Column(
     pn.Text("Password"),
     pn.TextInput(placeholder="Enter password", secure=True),
     pn.Button("Login", on_press=handle_login),
-    style={"spacing": 8, "padding": 16, "align_items": "stretch"},
+    style={"gap": 8, "padding": 16, "align_items": "stretch"},
 )
 ```
 
@@ -536,9 +769,11 @@ pn.Row(
 )
 ```
 
-### Spacing
+### Gap
 
-- `spacing` sets the gap between children in dp (Android) / points (iOS).
+- `gap` sets the space between children in dp (Android) and points
+  (iOS). `row_gap` and `column_gap` set one axis. Use the theme's
+  [spacing scale](#themes) to keep gaps consistent.
 
 ### Padding
 
@@ -567,7 +802,7 @@ subtree) takes part in hit testing:
 
 ```python
 pn.View(
-    style=[pn.StyleSheet.absolute_fill(), {
+    style=[pn.ABSOLUTE_FILL, {
         "background_color": "#00000022",
         "pointer_events": "none",   # decorative scrim; taps pass through
     }],
@@ -593,115 +828,55 @@ pn.Pressable(
 ### `on_layout`
 
 The `on_layout` prop reports the element's computed frame after each
-layout pass in which it changed. The payload carries `x`, `y`,
-`width`, and `height` in the parent's coordinate space:
+layout pass in which it changed. The callback receives a
+[`LayoutEvent`][pythonnative.LayoutEvent] with `x`, `y`, `width`, and
+`height` in the parent's coordinate space:
 
 ```python
-def handle_layout(frame):
-    set_width(frame["width"])
+def handle_layout(frame: pn.LayoutEvent) -> None:
+    set_width(frame.width)
 
 pn.View(content, on_layout=handle_layout)
 ```
+
+The same frame is available without a callback as `ref.current.frame`
+on the element's [handle](../api/handles.md).
 
 The callback runs post-commit, so setting state inside it is safe and
 schedules a normal re-render. Use it for measure-then-position
 patterns (tooltips, anchored popovers) or container-driven item
 sizing.
 
-## Dark mode and theming
-
-### Following the system appearance
-
-[`use_color_scheme`][pythonnative.use_color_scheme] returns the
-effective scheme (`"light"` or `"dark"`) and re-renders the component
-when it changes, including live when the user flips the system
-setting while the app is open:
-
-```python
-import pythonnative as pn
-
-
-@pn.component
-def Wallpaper():
-    scheme = pn.use_color_scheme()
-    bg = "#000000" if scheme == "dark" else "#FFFFFF"
-    return pn.View(style={"flex": 1, "background_color": bg})
-```
-
-[`use_theme`][pythonnative.use_theme] goes one step further: without
-any provider it resolves the built-in
-[`DEFAULT_LIGHT_THEME`][pythonnative.style.DEFAULT_LIGHT_THEME] or
-[`DEFAULT_DARK_THEME`][pythonnative.style.DEFAULT_DARK_THEME] from the
-current scheme, so themed components are dark-mode aware by default.
-Themes are typed [`Theme`][pythonnative.Theme] records, so
-`theme.text_color` autocompletes and a typo is a static error:
-
-```python
-@pn.component
-def ThemedText(text: str = ""):
-    theme = pn.use_theme()
-    return pn.Text(text, style={"color": theme.text_color, "font_size": theme.font_size})
-```
-
-An in-app appearance toggle overrides the system setting through the
-[`appearance`](../api/appearance.md) module:
-
-```python
-pn.appearance.set_color_scheme("dark")  # force dark everywhere
-pn.appearance.set_color_scheme(None)  # follow the system again
-```
-
-### Custom themes and providers
-
-Derive a brand theme from a built-in one with
-[`Theme.replace`][pythonnative.style.Theme.replace], then pin it for a
-subtree (ignoring the color scheme) with a `ThemeContext` provider.
-`use_theme` returns the provided value as-is, and rejects anything
-that isn't a `Theme` with a `TypeError`:
-
-```python
-import pythonnative as pn
-
-BRAND = pn.DEFAULT_DARK_THEME.replace(primary_color="#FF2D55", border_radius=12)
-
-
-@pn.component
-def DarkPage():
-    return pn.ThemeContext.Provider(
-        BRAND,
-        pn.Column(
-            ThemedText(text="Always dark!"),
-            style={"spacing": 8},
-        ),
-    )
-```
-
-### Theme fields
-
-Every `Theme` has these fields:
-
-- `primary_color`, `secondary_color`: accent colors.
-- `background_color`, `surface_color`: background colors.
-- `text_color`, `text_secondary_color`: text colors.
-- `error_color`, `success_color`, `warning_color`: semantic colors.
-- `font_size`, `font_size_small`, `font_size_large`,
-  `font_size_title`: typography.
-- `spacing`, `spacing_large`: layout spacing.
-- `border_radius`: corner rounding.
-
 ## ScrollView
 
-Wrap content in a [`ScrollView`][pythonnative.ScrollView]:
+Wrap content in a [`ScrollView`][pythonnative.ScrollView]. Style the
+frame with `style` and the scrollable content with
+`content_container_style`; the children are wrapped in one inner
+`View` carrying that style, so padding, gap, and alignment work on
+every renderer:
 
 ```python
 pn.ScrollView(
-    pn.Column(
-        pn.Text("Item 1"),
-        pn.Text("Item 2"),
-        style={"spacing": 8},
-    )
+    pn.Text("Item 1"),
+    pn.Text("Item 2"),
+    horizontal=False,
+    content_container_style=pn.style(padding=16, gap=8),
+    content_inset=pn.EdgeInsets(bottom=80),   # keep the last row clear of a footer
+    style=pn.style(flex=1),
 )
 ```
+
+`horizontal=True` scrolls along the x axis. `scroll_enabled=False`
+freezes user scrolling while imperative scrolling through the
+[`ScrollViewHandle`][pythonnative.ScrollViewHandle] still works;
+`snap_to_interval` and `snap_to_alignment` build carousels;
+`keyboard_should_persist_taps` decides whether a tap inside the scroll
+view dismisses the keyboard (`"never"`, `"always"`, or `"handled"`);
+and `deceleration_rate` (`"normal"`, `"fast"`, or a float) tunes the
+fling. `on_scroll`, `on_scroll_begin_drag`, `on_scroll_end_drag`, and
+`on_momentum_scroll_end` each receive a
+[`ScrollEvent`][pythonnative.ScrollEvent]; `scroll_event_throttle` (in
+milliseconds) caps how often `on_scroll` fires.
 
 ## Next steps
 

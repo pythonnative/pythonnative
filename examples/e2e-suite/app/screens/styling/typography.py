@@ -7,16 +7,16 @@ and text decoration. Maestro asserts each labelled line is present.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 
 @pn.component
-def TypographyDemo() -> pn.Element:
+def TypographyDemo() -> pn.Node:
     """Render text in several typographic styles."""
-    return demo_screen(
+    return DemoScreen(
         "Typography",
         "Six text variants with different size, weight, color, decoration.",
-        section(
+        DemoSection(
             "Variants",
             pn.Text("type-headline", style=pn.style(font_size=24, font_weight="700")),
             pn.Text("type-body", style=pn.style(font_size=16)),
@@ -27,6 +27,6 @@ def TypographyDemo() -> pn.Element:
                 "type-letter-spacing",
                 style=pn.style(font_size=15, letter_spacing=2.0),
             ),
-            hint("Maestro asserts each labelled line."),
+            Hint("Maestro asserts each labelled line."),
         ),
     )

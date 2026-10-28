@@ -9,13 +9,13 @@ instead of racing the storage I/O on slow CI runners.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 _KEY = "e2e.async_storage_demo"
 
 
 @pn.component
-def AsyncStorageDemo() -> pn.Element:
+def AsyncStorageDemo() -> pn.Node:
     """Render write / read / clear buttons for an AsyncStorage entry."""
     value, set_value = pn.use_state("(unread)")
 
@@ -31,17 +31,17 @@ def AsyncStorageDemo() -> pn.Element:
         await pn.AsyncStorage.delete(_KEY)
         set_value("(cleared)")
 
-    return demo_screen(
+    return DemoScreen(
         "AsyncStorage",
         "Write a value, read it back, optionally clear it.",
-        section(
+        DemoSection(
             "Storage I/O",
-            result_text("Read value", value),
-            buttons_row(
-                pn.Button("Write", on_press=lambda: pn.run_async(_write())),
-                pn.Button("Read", on_press=lambda: pn.run_async(_read())),
-                pn.Button("Clear", on_press=lambda: pn.run_async(_clear())),
+            ResultText("Read value", value),
+            ButtonsRow(
+                pn.Button("Write", on_press=_write),
+                pn.Button("Read", on_press=_read),
+                pn.Button("Clear", on_press=_clear),
             ),
-            hint("Tap Write, then Read; assert 'Read value: stored-value'."),
+            Hint("Tap Write, then Read; assert 'Read value: stored-value'."),
         ),
     )

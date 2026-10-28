@@ -1,0 +1,4 @@
+module PNCore {
+    header "pn_core.h"
+    export *
+}

@@ -7,23 +7,23 @@ increments on each press, confirming ``on_press`` fires.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def TouchableOpacityDemo() -> pn.Element:
+def TouchableOpacityDemo() -> pn.Node:
     """Render a TouchableOpacity plus a result line counting presses."""
     taps, set_taps = pn.use_state(0)
 
     def increment() -> None:
         set_taps(taps + 1)
 
-    return demo_screen(
+    return DemoScreen(
         "TouchableOpacity",
         "Tap the target; the Taps counter should increment.",
-        section(
+        DemoSection(
             "Tap target",
-            result_text("Taps", taps),
+            ResultText("Taps", taps),
             pn.TouchableOpacity(
                 pn.Text(
                     "Tap me",
@@ -37,6 +37,6 @@ def TouchableOpacityDemo() -> pn.Element:
                     align_items="center",
                 ),
             ),
-            hint("Maestro taps 'Tap me' and asserts the Taps count increases."),
+            Hint("Maestro taps 'Tap me' and asserts the Taps count increases."),
         ),
     )

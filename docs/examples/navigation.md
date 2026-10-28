@@ -1,9 +1,10 @@
 # Navigation
 
-Three small examples that show off the available navigators (stack,
-tab, drawer) and how to navigate between screens with
-[`use_navigation`][pythonnative.use_navigation] and read the current
-route with [`use_route`][pythonnative.use_route].
+Small examples that show the three navigators (stack, tab, and drawer),
+how screens receive their params as ordinary arguments, and how
+navigators nest. Every screen is a `@pn.component`, and every navigator
+is a module-level value rendered by
+[`NavigationContainer`][pythonnative.NavigationContainer].
 
 For the conceptual model and the full API, see the
 [Navigation guide](../guides/navigation.md) and the
@@ -12,8 +13,9 @@ For the conceptual model and the full API, see the
 ## Run it
 
 Create a project with `pn init navigation-demo`, then `cd navigation-demo`.
-Replace `app/main.py` with the Stack, Tab, or Drawer snippet below.
-Each includes its imports and defines `App`, the project's root component.
+Replace `app/main.py` with the Stack, Tab, Drawer, or Nesting snippet
+below. Each includes its imports and defines `App`, the project's root
+component.
 
 From the project root, run `pn preview` to open the app in your browser.
 To run on a device or simulator, leave the preview running and use
@@ -21,104 +23,99 @@ To run on a device or simulator, leave the preview running and use
 directory. See the [Browser preview guide](../guides/browser-preview.md)
 and [Development workflow](../guides/dev-workflow.md) for more options.
 
-The Nesting and Focus-aware effects snippets need additional definitions;
-follow the note at the end of each section to try them.
-
 ## Stack navigator
 
-A pushable, poppable stack. The default for "go from screen A to
-screen B with a back button".
+A pushable, poppable stack: the default for "go from screen A to
+screen B with a back button."
 
 ```python
 import pythonnative as pn
 
-Stack = pn.create_stack_navigator()
-
 
 @pn.component
-def HomeScreen():
+def HomeScreen() -> pn.Node:
     nav = pn.use_navigation()
     return pn.Column(
         pn.Text("Home", style={"font_size": 28, "bold": True}),
-        pn.Button(
-            "View profile",
-            on_press=lambda: nav.navigate("Profile", user_id=42),
-        ),
-        style={"spacing": 12, "padding": 16},
+        pn.Button("View profile", on_press=lambda: nav.push(ProfileScreen(user_id=42))),
+        style={"gap": 12, "padding": 16},
     )
 
 
 @pn.component
-def ProfileScreen():
-    route = pn.use_route()
+def ProfileScreen(user_id: int) -> pn.Node:
     nav = pn.use_navigation()
+    pn.use_screen_options(title=f"User {user_id}")
     return pn.Column(
-        pn.Text(f"User #{route.params['user_id']}", style={"font_size": 24}),
+        pn.Text(f"User #{user_id}", style={"font_size": 24}),
         pn.Button("Back", on_press=nav.go_back),
-        style={"spacing": 12, "padding": 16},
+        style={"gap": 12, "padding": 16},
     )
+
+
+Root = pn.StackNavigator(
+    pn.Screen(HomeScreen, title="Home"),
+    ProfileScreen,
+)
 
 
 @pn.component
-def App():
-    return pn.NavigationContainer(
-        Stack.Navigator(
-            Stack.Screen("Home", HomeScreen, title="Home"),
-            Stack.Screen("Profile", ProfileScreen, title="Profile"),
-        )
-    )
+def App() -> pn.Node:
+    return pn.NavigationContainer(Root)
 ```
 
-`nav.navigate("Profile", user_id=42)` pushes onto the stack (or
-returns to an existing `Profile` entry); `nav.push(...)` always adds a
-new one; `nav.go_back()` pops one frame. To replace the entire stack
-(e.g., after login), use `nav.reset("Home")`.
+`ProfileScreen(user_id=42)` is an ordinary call, so your editor
+autocompletes `user_id` and your type checker rejects a missing or
+misspelled param. `nav.push(...)` always adds a new screen,
+`nav.navigate(...)` returns to an existing `ProfileScreen` if there is
+one, and `nav.go_back()` pops one screen. To replace the entire history
+(after signing in, for example), use `nav.reset(HomeScreen())`.
 
 ## Tab navigator
 
-A persistent tab bar at the bottom (iOS) or top (Android), with one
-screen per tab. Each tab keeps its own state across switches.
+A persistent native tab bar, with one screen per tab. Each tab keeps
+its own state across switches.
 
 ```python
 import pythonnative as pn
 
-Tabs = pn.create_tab_navigator()
-
 
 @pn.component
-def Feed():
+def FeedScreen() -> pn.Node:
     return pn.Text("Feed", style={"padding": 16, "font_size": 24})
 
 
 @pn.component
-def Search():
-    q, set_q = pn.use_state("")
+def SearchScreen() -> pn.Node:
+    query, set_query = pn.use_state("")
     return pn.Column(
-        pn.TextInput(value=q, on_change=set_q, placeholder="Search..."),
-        pn.Text(f"Results for: {q}"),
-        style={"spacing": 12, "padding": 16},
+        pn.TextInput(value=query, on_change=set_query, placeholder="Search..."),
+        pn.Text(f"Results for: {query}"),
+        style={"gap": 12, "padding": 16},
     )
 
 
 @pn.component
-def Settings():
+def SettingsScreen() -> pn.Node:
     return pn.Text("Settings", style={"padding": 16, "font_size": 24})
 
 
+Tabs = pn.TabNavigator(
+    pn.Screen(FeedScreen, title="Feed", tab_bar_icon="house"),
+    pn.Screen(SearchScreen, title="Search", tab_bar_icon="search"),
+    pn.Screen(SettingsScreen, title="Settings", tab_bar_icon="settings"),
+)
+
+
 @pn.component
-def App():
-    return pn.NavigationContainer(
-        Tabs.Navigator(
-            Tabs.Screen(name="Feed", component=Feed),
-            Tabs.Screen(name="Search", component=Search),
-            Tabs.Screen(name="Settings", component=Settings),
-        )
-    )
+def App() -> pn.Node:
+    return pn.NavigationContainer(Tabs)
 ```
 
 The search box keeps its query when the user switches to **Settings**
-and back; tab screens are not unmounted on blur unless the navigator
-is configured otherwise.
+and back: tab screens stay mounted unless a screen sets
+`unmount_on_blur=True`. Tab screens must be callable without arguments,
+so give any tab parameters defaults.
 
 ## Drawer navigator
 
@@ -126,93 +123,146 @@ A side drawer for primary navigation in larger apps.
 
 ```python
 import pythonnative as pn
-
-Drawer = pn.create_drawer_navigator()
-
-
-@pn.component
-def Inbox():
-    return pn.Text("Inbox", style={"padding": 16, "font_size": 24})
+from pythonnative.navigation import DrawerNavigation
 
 
 @pn.component
-def Sent():
-    return pn.Text("Sent", style={"padding": 16, "font_size": 24})
+def MenuButton() -> pn.Node:
+    nav = pn.use_navigation()
+    assert isinstance(nav, DrawerNavigation)
+    return pn.Button("Menu", on_press=nav.toggle_drawer)
 
 
 @pn.component
-def App():
-    return pn.NavigationContainer(
-        Drawer.Navigator(
-            Drawer.Screen(name="Inbox", component=Inbox),
-            Drawer.Screen(name="Sent", component=Sent),
-        )
+def InboxScreen() -> pn.Node:
+    return pn.Column(
+        MenuButton(),
+        pn.Text("Inbox", style={"font_size": 24}),
+        style={"gap": 12, "padding": 16},
     )
+
+
+@pn.component
+def SentScreen() -> pn.Node:
+    return pn.Column(
+        MenuButton(),
+        pn.Text("Sent", style={"font_size": 24}),
+        style={"gap": 12, "padding": 16},
+    )
+
+
+Drawer = pn.DrawerNavigator(
+    pn.Screen(InboxScreen, title="Inbox"),
+    pn.Screen(SentScreen, title="Sent"),
+)
+
+
+@pn.component
+def App() -> pn.Node:
+    return pn.NavigationContainer(Drawer)
 ```
 
-The drawer opens via a swipe from the leading edge or
-`nav.toggle_drawer()` from inside any screen.
+The drawer is drawn in Python and has no navigation bar of its own, so
+each screen renders its own **Menu** button. The drawer opens with a
+swipe from the leading edge or with `toggle_drawer()` on the
+[`DrawerNavigation`][pythonnative.navigation.DrawerNavigation] handle.
+`use_navigation()` is typed as the base `Navigation`, so the
+`isinstance` check narrows it to the drawer handle.
 
 ## Nesting
 
-Navigators compose. A typical pattern is a tab navigator at the top
-with a stack navigator inside each tab:
+Navigators compose: a navigator is a valid screen of another
+navigator. A common shape is a root stack whose first screen is a tab
+navigator, so detail screens push over the tab bar:
 
 ```python
+import pythonnative as pn
+
+
 @pn.component
-def App():
-    return pn.NavigationContainer(
-        Tabs.Navigator(
-            Tabs.Screen(name="Home", component=HomeStack),
-            Tabs.Screen(name="Profile", component=ProfileStack),
-        )
+def PostLink(id: int) -> pn.Node:
+    nav = pn.use_navigation()
+    return pn.Button(f"Post {id}", on_press=lambda: nav.push(PostScreen(id=id)))
+
+
+@pn.component
+def FeedScreen() -> pn.Node:
+    return pn.Column(
+        *(PostLink(id=post_id).with_key(post_id) for post_id in range(1, 4)),
+        style={"gap": 8, "padding": 16},
     )
 
 
 @pn.component
-def HomeStack():
-    return Stack.Navigator(
-        Stack.Screen(name="Feed", component=Feed),
-        Stack.Screen(name="Post", component=Post),
+def ProfileScreen(user: str = "me") -> pn.Node:
+    return pn.Text(f"Profile: {user}", style={"padding": 16, "font_size": 24})
+
+
+@pn.component
+def PostScreen(id: int) -> pn.Node:
+    nav = pn.use_navigation()
+    pn.use_screen_options(title=f"Post {id}")
+    return pn.Column(
+        pn.Text(f"Post #{id} by ada"),
+        pn.Button("View author", on_press=lambda: nav.navigate(ProfileScreen(user="ada"))),
+        style={"gap": 12, "padding": 16},
     )
+
+
+Tabs = pn.TabNavigator(
+    pn.Screen(FeedScreen, title="Feed", tab_bar_icon="house", path="feed"),
+    pn.Screen(ProfileScreen, title="Profile", tab_bar_icon="user", path="u/{user}"),
+    name="Main",
+)
+
+Root = pn.StackNavigator(
+    pn.Screen(Tabs, header_shown=False),
+    pn.Screen(PostScreen, path="posts/{id}"),
+)
+
+
+@pn.component
+def App() -> pn.Node:
+    return pn.NavigationContainer(Root, link_prefixes=["navdemo://"])
 ```
 
-Pushing onto the inner stack leaves the tab bar visible; switching
-tabs preserves each stack's own history.
-
-This snippet sketches the composition rather than a complete app.
-To try it, start from the Tab navigator example, keeping its import,
-`Tabs`, and `Feed`. Add `Stack = pn.create_stack_navigator()`, a `Post`
-screen, and a `ProfileStack` component that returns a `Stack.Navigator`
-with its own screens. Add `HomeStack` and replace the Tab example's
-`App` with the one above, which wraps the navigators in
-`pn.NavigationContainer`. Then follow the same run instructions.
+`nav.push(PostScreen(id=...))` from the feed tab reaches the root
+stack, because a target the tab navigator doesn't know is handed to its
+parent. **View author** navigates back down: the root stack finds
+`ProfileScreen` inside `Tabs`, pops the post, and selects the profile
+tab with `user="ada"`. The same static tree answers deep links, so
+`navdemo://posts/2` opens `PostScreen(id=2)` above the feed and
+`navdemo://u/ada` opens the profile tab.
 
 ## Focus-aware effects
 
-When you need to start something only while a screen is on screen
-(camera, GPS, animation), use
+When you need to run something only while a screen is visible (a
+camera, GPS, or an animation), use
 [`use_focus_effect`][pythonnative.use_focus_effect]:
 
 ```python
+from collections.abc import Callable
+
+
 @pn.component
-def CameraScreen():
-    pn.use_focus_effect(
-        lambda: (start_camera(), stop_camera)[1],
-        deps=[],
-    )
+def CameraScreen() -> pn.Node:
+    def start() -> Callable[[], None]:
+        start_camera()
+        return stop_camera
+
+    pn.use_focus_effect(start, [])
     return pn.View()
 ```
 
 The cleanup runs as soon as the user navigates away, even if the
 screen stays mounted.
 
-To try this with the Tab navigator example, keep its import and `App`,
-add `CameraScreen` and stand-ins for `start_camera` and `stop_camera`,
-and replace `Tabs.Screen(name="Settings", component=Settings)` with
-`Tabs.Screen(name="Camera", component=CameraScreen)`. Run `pn preview`,
-then switch between the Camera and Feed tabs to trigger the effect
-and its cleanup.
+To try this with the Tab navigator example, add `CameraScreen` and
+stand-ins for `start_camera` and `stop_camera`, and replace
+`pn.Screen(SettingsScreen, ...)` with
+`pn.Screen(CameraScreen, title="Camera", tab_bar_icon="camera")`. Run
+`pn preview`, then switch between the Camera and Feed tabs to trigger
+the effect and its cleanup.
 
 ## Next steps
 

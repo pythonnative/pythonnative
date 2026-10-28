@@ -6,8 +6,12 @@ and forwards lifecycle, viewport, and back events. Its logical tree includes
 screens, overlays, and mounted list rows. Native containers present those
 children without creating a separate Python host for every screen or row.
 
-The host also publishes cached navigation restoration state through the
-`Host` module. It implements the
+The host also publishes navigation restoration state through the `Host`
+module as it changes. The platform saves the latest copy without calling
+into Python and hands it back in the next `create` event as
+`restored_state`. Viewport metrics (size, insets,
+keyboard height, color scheme, scale, and font scale) arrive on the
+`layout` and `resume` events. The host implements the
 [`HostNavigator`][pythonnative.navigation.HostNavigator] interface used by
 navigation and headless tests.
 

@@ -27,13 +27,15 @@ Example:
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 import ssl
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Union
 
 # A package-level SSL context lets callers (or tests) override TLS
 # verification globally without monkeypatching the stdlib. Defaults
@@ -178,7 +180,102 @@ async def fetch(
         ```
     """
     request = _build_request(url=url, method=method, headers=headers, body=body, params=params)
-    return await asyncio.to_thread(_dispatch_request, request, timeout)
+    if not _observers:
+        return await asyncio.to_thread(_dispatch_request, request, timeout)
+    return await _observed(request, timeout)
+
+
+# ======================================================================
+# Request observers (DevTools' Network panel)
+# ======================================================================
+
+_observers: List[Callable[[Dict[str, Any]], None]] = []
+_request_ids = itertools.count(1)
+_PREVIEW_BYTES = 4096
+
+
+def observe_requests(callback: Callable[[Dict[str, Any]], None]) -> Callable[[], None]:
+    """Receive a record for every [`fetch`][pythonnative.net.fetch] request.
+
+    The devtools agent subscribes in development builds. ``callback``
+    gets two records per request on the application loop: one when it
+    starts (``"phase": "start"``) and one when it finishes (``"end"`` or
+    ``"error"``), sharing an ``id``. Bodies are previewed up to 4 KB.
+
+    Returns:
+        A callable that removes the observer.
+    """
+    _observers.append(callback)
+
+    def remove() -> None:
+        try:
+            _observers.remove(callback)
+        except ValueError:
+            pass
+
+    return remove
+
+
+def _preview(data: Optional[bytes]) -> Optional[str]:
+    if not data:
+        return None
+    clipped = data[:_PREVIEW_BYTES]
+    try:
+        text = clipped.decode("utf-8")
+    except UnicodeDecodeError:
+        return f"<{len(data)} bytes of binary data>"
+    return text + ("…" if len(data) > _PREVIEW_BYTES else "")
+
+
+def _notify(record: Dict[str, Any]) -> None:
+    for callback in list(_observers):
+        try:
+            callback(record)
+        except Exception:
+            pass
+
+
+async def _observed(request: urllib.request.Request, timeout: float) -> Response:
+    request_id = next(_request_ids)
+    started = time.time()
+    body = request.data if isinstance(request.data, bytes) else None
+    _notify(
+        {
+            "id": request_id,
+            "phase": "start",
+            "method": request.get_method(),
+            "url": request.full_url,
+            "request_headers": dict(request.header_items()),
+            "request_body": _preview(body),
+            "request_size": len(body) if body else 0,
+            "started": started,
+        }
+    )
+    try:
+        response = await asyncio.to_thread(_dispatch_request, request, timeout)
+    except BaseException as exc:
+        _notify(
+            {
+                "id": request_id,
+                "phase": "error",
+                "error": f"{type(exc).__name__}: {exc}",
+                "duration_ms": round((time.time() - started) * 1000.0, 1),
+            }
+        )
+        raise
+    _notify(
+        {
+            "id": request_id,
+            "phase": "end",
+            "status": response.status,
+            "url": response.url,
+            "response_headers": dict(response.headers),
+            "response_body": _preview(response.content),
+            "response_size": len(response.content),
+            "duration_ms": round((time.time() - started) * 1000.0, 1),
+        }
+    )
+    return response
 
 
 def _build_request(

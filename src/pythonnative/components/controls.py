@@ -5,31 +5,41 @@
 ``RefreshControl``, and ``StatusBar``.
 """
 
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Unpack
 
 from ..element import Element
 from ..hooks import Ref
-from ..style import AccessibilityState, Color, StyleProp
+from ..style import (
+    Color,
+    StyleProp,
+)
 from ._base import REFRESH_CONTROL_TYPE, _make_element
+from .props import AccessibilityProps
 
 
 def Switch(
     *,
     value: bool = False,
     on_change: Optional[Callable[[bool], Any]] = None,
-    accessibility_label: Optional[str] = None,
+    disabled: bool = False,
+    on_tint_color: Optional[Color] = None,
+    thumb_color: Optional[Color] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Display a toggle switch.
 
     Args:
         value: Current on/off state.
         on_change: Callback invoked with the new boolean state.
-        accessibility_label: Label exposed to assistive technology (and
-            UI test drivers) for the switch.
+        disabled: Prevent changes while keeping the switch visible.
+        on_tint_color: Track color when the switch is on.
+        thumb_color: Thumb color, or the platform default.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Switch"``.
@@ -40,7 +50,10 @@ def Switch(
         key=key,
         value=value,
         on_change=on_change,
-        accessibility_label=accessibility_label,
+        disabled=disabled,
+        on_tint_color=on_tint_color,
+        thumb_color=thumb_color,
+        **props,
     )
 
 
@@ -50,9 +63,16 @@ def Slider(
     min_value: float = 0.0,
     max_value: float = 1.0,
     on_change: Optional[Callable[[float], Any]] = None,
-    accessibility_label: Optional[str] = None,
+    disabled: bool = False,
+    step: float = 0.0,
+    minimum_track_color: Optional[Color] = None,
+    maximum_track_color: Optional[Color] = None,
+    thumb_color: Optional[Color] = None,
+    on_sliding_start: Optional[Callable[[float], Any]] = None,
+    on_sliding_complete: Optional[Callable[[float], Any]] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """Continuous-value slider between ``min_value`` and ``max_value``.
 
@@ -62,10 +82,17 @@ def Slider(
         max_value: Upper bound.
         on_change: Callback invoked with the new value as the user
             drags.
-        accessibility_label: Label exposed to assistive technology (and
-            UI test drivers) for the slider.
+        disabled: Prevent dragging the slider.
+        step: Snap values to this increment, or zero for continuous movement.
+        minimum_track_color: Filled track color.
+        maximum_track_color: Unfilled track color.
+        thumb_color: Thumb color, or the platform default.
+        on_sliding_start: Callback when the user starts dragging.
+        on_sliding_complete: Callback when the user finishes dragging.
         style: Style dict (or list of dicts).
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Slider"``.
@@ -78,7 +105,14 @@ def Slider(
         min_value=min_value,
         max_value=max_value,
         on_change=on_change,
-        accessibility_label=accessibility_label,
+        disabled=disabled,
+        step=step,
+        minimum_track_color=minimum_track_color,
+        maximum_track_color=maximum_track_color,
+        thumb_color=thumb_color,
+        on_sliding_start=on_sliding_start,
+        on_sliding_complete=on_sliding_complete,
+        **props,
     )
 
 
@@ -160,13 +194,8 @@ def Checkbox(
     disabled: bool = False,
     color: Optional[Color] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A boolean checkbox with an optional inline label.
 
@@ -181,20 +210,9 @@ def Checkbox(
         disabled: When ``True``, the control is greyed out and inert.
         color: Tint applied to the checked box.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail (iOS only).
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Checkbox"``.
@@ -208,13 +226,8 @@ def Checkbox(
         label=label,
         disabled=disabled or None,
         color=color,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_live_region=accessibility_live_region,
-        test_id=test_id,
         _defaults={"accessibility_role": "checkbox"},
+        **props,
     )
 
 
@@ -226,12 +239,8 @@ def SegmentedControl(
     disabled: bool = False,
     tint_color: Optional[Color] = None,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A horizontal multi-choice control (one selected segment at a time).
 
@@ -245,19 +254,9 @@ def SegmentedControl(
         disabled: When ``True``, the control is disabled.
         tint_color: Accent color for the selected segment.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type
@@ -272,11 +271,7 @@ def SegmentedControl(
         on_change=on_change,
         disabled=disabled or None,
         tint_color=tint_color,
-        accessibility_label=accessibility_label,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_live_region=accessibility_live_region,
-        test_id=test_id,
+        **props,
     )
 
 
@@ -289,12 +284,8 @@ def DatePicker(
     maximum: Optional[str] = None,
     disabled: bool = False,
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    test_id: Optional[str] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A native date / time picker.
 
@@ -314,19 +305,9 @@ def DatePicker(
         maximum: Latest selectable value (ISO-8601), if any.
         disabled: When ``True``, the picker is disabled.
         style: Style dict (or list of dicts).
-        accessibility_label: Spoken description for screen readers.
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"DatePicker"``.
@@ -341,12 +322,8 @@ def DatePicker(
         minimum=minimum,
         maximum=maximum,
         disabled=disabled or None,
-        accessibility_label=accessibility_label,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_live_region=accessibility_live_region,
-        test_id=test_id,
         _defaults={"accessibility_role": "button"},
+        **props,
     )
 
 
@@ -358,14 +335,9 @@ def Picker(
     on_change: Optional[Callable[[Any], Any]] = None,
     placeholder: str = "Select…",
     style: StyleProp = None,
-    accessibility_label: Optional[str] = None,
-    accessibility_hint: Optional[str] = None,
-    accessible: Optional[bool] = None,
-    accessibility_state: Optional[AccessibilityState] = None,
-    accessibility_live_region: Optional[Literal["none", "polite", "assertive"]] = None,
-    test_id: Optional[str] = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
+    **props: Unpack[AccessibilityProps],
 ) -> Element:
     """A real native dropdown / select widget.
 
@@ -385,21 +357,10 @@ def Picker(
         on_change: Callback invoked with the new value.
         placeholder: Label shown when no item matches ``value``.
         style: Style dict applied to the trigger.
-        accessibility_label: Spoken description for screen readers.
-        accessibility_hint: Spoken extra detail (iOS only).
-        accessible: Override whether the element is exposed to AT.
-        accessibility_state: Current widget state for assistive tech,
-            e.g. ``{"disabled": True, "selected": False}``. Recognized
-            keys: ``disabled``, ``selected``, ``checked``, ``busy``,
-            ``expanded``.
-        accessibility_live_region: How AT announces dynamic changes to
-            this view: ``"none"``, ``"polite"``, or ``"assertive"``
-            (Android only).
-        test_id: Stable identifier for UI tests; exposed as
-            ``resource-id`` on Android and ``accessibilityIdentifier``
-            on iOS.
         ref: Optional [`Ref`][pythonnative.Ref] from ``use_ref()``.
         key: Stable identity for keyed reconciliation.
+        **props: Shared accessibility and test keywords; see
+            [`AccessibilityProps`][pythonnative.AccessibilityProps].
 
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Picker"``.
@@ -414,13 +375,8 @@ def Picker(
         items=list(items) if items is not None else [],
         on_change=on_change,
         placeholder=placeholder,
-        accessibility_label=accessibility_label,
-        accessibility_hint=accessibility_hint,
-        accessible=accessible,
-        accessibility_state=accessibility_state,
-        accessibility_live_region=accessibility_live_region,
-        test_id=test_id,
         _defaults={"accessibility_role": "button"},
+        **props,
     )
 
 
@@ -486,6 +442,8 @@ def StatusBar(
     bar_style: Optional[Literal["light", "dark", "default"]] = None,
     background_color: Optional[Color] = None,
     hidden: Optional[bool] = None,
+    translucent: bool = False,
+    animated: bool = False,
     key: Optional[str] = None,
 ) -> Element:
     """Configure the device's status bar appearance.
@@ -506,6 +464,10 @@ def StatusBar(
         background_color: Color of the status-bar background (Android
             only; iOS draws the bar transparent over your content).
         hidden: When ``True``, the status bar is hidden.
+        translucent: Draw your content under the status bar instead of
+            below it (Android only; iOS always draws underneath).
+        animated: Animate ``bar_style`` and ``hidden`` changes (iOS
+            only).
         key: Stable identity for keyed reconciliation.
 
     Returns:
@@ -518,4 +480,8 @@ def StatusBar(
         props["background_color"] = background_color
     if hidden is not None:
         props["hidden"] = hidden
+    if translucent:
+        props["translucent"] = True
+    if animated:
+        props["animated"] = True
     return Element("StatusBar", props, [], key=key)

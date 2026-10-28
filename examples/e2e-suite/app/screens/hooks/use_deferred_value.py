@@ -9,23 +9,23 @@ flow asserts.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def UseDeferredValueDemo() -> pn.Element:
+def UseDeferredValueDemo() -> pn.Node:
     """Show a value and its deferred copy converging after updates."""
     count, set_count = pn.use_state(0)
     deferred = pn.use_deferred_value(count)
 
-    return demo_screen(
+    return DemoScreen(
         "use_deferred_value",
         "use_deferred_value returns a copy that lags during bursts and catches up when things go quiet.",
-        section(
+        DemoSection(
             "Deferred value",
-            result_text("Value", count),
-            result_text("Deferred", deferred),
+            ResultText("Value", count),
+            ResultText("Deferred", deferred),
             pn.Button("Increment", on_press=lambda: set_count(count + 1)),
-            hint("Maestro taps Increment and waits for both 'Value: 1' and 'Deferred: 1'."),
+            Hint("Maestro taps Increment and waits for both 'Value: 1' and 'Deferred: 1'."),
         ),
     )

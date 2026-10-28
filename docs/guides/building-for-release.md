@@ -30,12 +30,62 @@ pn doctor ios
 ```
 
 `pn doctor` validates `pythonnative.toml` and checks the platform
-toolchain: for Android, `adb`, a JDK, and whether release signing is
-configured; for iOS, macOS, Xcode, `simctl`, and a development team. It
+toolchain: Android needs JDK 17 through 23, the configured SDK (36 by
+default), NDK 28.2.13676358, and `adb`. iOS needs macOS, Xcode 26 or
+later, and `simctl`. The doctor also reports signing, lockfile, and
+privacy-manifest configuration. It
 exits non-zero on anything that will block a build, so you can gate CI
 on it.
 
 ---
+
+## Frozen dependencies
+
+Release builds with Python dependencies require a current `pn.lock` covering
+all build targets. Resolve and review the lock before building:
+
+```bash
+pn deps android --lock
+pn deps ios --lock
+```
+
+`pn deps --lock` prints the full resolution report first. A lock has to
+cover every target, so if any target fails to resolve, it says which ones
+failed, doesn't write `pn.lock`, and exits with status 1. Fix the failing
+requirement (or the target's wheel availability) and run it again.
+
+Commit the lock with your application. Changing requirements or replacing a
+local wheel requires refreshing it. Release builds reject missing or stale
+locks. A development build (`pn run`, or `pn build --debug`) with a stale
+lock prints a warning and resolves the current requirements without the lock,
+so you can keep iterating before you refresh it. Native extension manifests
+pin SwiftPM and Maven dependencies to exact versions.
+
+## What a release bundle leaves out
+
+Every build bundles a copy of the `pythonnative` package. Debug builds
+are dev clients, so their copy is complete. Release builds leave out the
+modules that exist only for development:
+
+- the `pn` CLI and build tooling (`pythonnative/cli`, `pythonnative/project`);
+- the dev server and browser preview (`pythonnative/devserver`,
+  `pythonnative/preview.py`, `pythonnative/bridge/web.py`);
+- the dev client and Fast Refresh (`pythonnative/devclient.py`,
+  `pythonnative/hot_reload.py`, `pythonnative/refresh.py`);
+- the test helpers (`pythonnative/testing`, `pythonnative/bridge/fake.py`);
+- the SDK code generators (`pythonnative/sdk/codegen.py`,
+  `builtins.py`, `module_codegen.py`, and their templates).
+
+The runtime never imports them, and the test suite checks that it stays
+that way, so a release app behaves exactly like a debug build that isn't
+connected to `pn start`. If your own code imports one of these modules,
+it works in debug builds but fails with `ModuleNotFoundError` in a
+release build; keep such imports in development-only code paths.
+
+iOS release builds also omit the `NSLocalNetworkUsageDescription` that
+debug builds add so they can reach `pn start` over Wi-Fi. If your app
+uses the local network itself, declare the key with your own wording in
+`[ios].extra_info_plist`.
 
 ## Android
 
@@ -47,6 +97,21 @@ the build and live under the staged project:
 build/android/android_template/app/build/outputs/apk/release/app-release.apk
 build/android/android_template/app/build/outputs/bundle/release/app-release.aab
 ```
+
+### Toolchain and packaged binaries
+
+The template uses compile/target SDK 36, Gradle 8.13, Android Gradle Plugin
+8.11.1, Kotlin 2.2.21, and NDK 28.2.13676358. Release builds reject a target
+SDK below 36. These are PythonNative's supported build defaults, independent
+of store submission deadlines.
+
+After Gradle builds, PythonNative inspects the APK and AAB. Every packaged
+64-bit ELF library must have 16 KB aligned LOAD segments, including Python
+extensions inside Chaquopy assets. Uncompressed APK libraries must also be
+ZIP aligned, and the AAB must request compatible generated APK alignment.
+An error names the offending dependency. Rebuild or replace that dependency;
+upgrading your app's NDK can't repair a prebuilt wheel. See Android's
+[16 KB page-size guidance](https://developer.android.com/guide/practices/page-sizes).
 
 ### Signing
 
@@ -110,16 +175,44 @@ The upload uses the App Store Connect credentials Xcode has stored; in
 CI, provide an ASC API key through Xcode's standard mechanisms or
 upload the exported `.ipa` with `xcrun altool`/Transporter instead.
 
-### Bytecode-only bundles
+### Privacy manifests
 
-Release builds byte-compile your `app/` sources and every bundled
-package to `.pyc` and drop the `.py` files, which shrinks the bundle
-and avoids shipping plain-text source. Because bytecode is
-version-specific, this requires the Python running `pn` to match
-`app.python_version`; otherwise `pn` prints a notice and ships `.py`
-sources instead. Debug builds (`pn run`, `pn build --debug`) keep the
-`.py` files on both platforms so tracebacks show source lines and the
-dev client can tell which sources the app already has.
+The template includes an app `PrivacyInfo.xcprivacy`. Supply your app's own
+manifest with a path relative to the project:
+
+```toml
+[ios]
+privacy_manifest = "assets/PrivacyInfo.xcprivacy"
+```
+
+PythonNativeKit ships its own resource-bundle manifest for preferences and
+cache-file timestamps. Archive validation checks that the app and runtime
+manifests are present and structurally valid before export or upload. It also
+parses manifests supplied by bundled dependencies. This check doesn't infer
+your application's data collection, tracking, or required-reason API usage.
+Declare those from your actual behavior using Apple's
+[privacy-manifest documentation](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files).
+
+### Bytecode everywhere
+
+An app bundle is read-only, so the device can't cache what it compiles.
+`pn` therefore compiles ahead of time, in every build:
+
+- **Release builds** byte-compile your `app/` sources, every bundled
+  package, and the embedded standard library to sourceless `.pyc` files
+  and drop the `.py` files. That shrinks the bundle, speeds up launch,
+  and avoids shipping plain-text source.
+- **Debug builds** (`pn run`, `pn build --debug`) keep the `.py` files
+  beside `__pycache__` bytecode, so tracebacks show source lines and Fast
+  Refresh can read sources, while launch still skips compilation. Sources
+  the dev client syncs are cached on the device after their first import.
+
+Bytecode records bundle-relative file names (`app/main.py`), never paths
+on your build machine. Because bytecode is version-specific, compiling
+needs an interpreter matching `app.python_version`: the one running `pn`,
+or `python3.13` (for example) on your `PATH`. Release builds fail without
+one; debug builds warn and let the device compile at launch. Android uses
+Chaquopy's own compilation and has no such requirement.
 
 ### Signing
 
@@ -143,10 +236,14 @@ export fails, the error points you back at `[ios.signing]`.
 
 iOS has no system Python, so PythonNative embeds CPython from the
 [Python-Apple-support](https://github.com/beeware/Python-Apple-support)
-project. On the first iOS build, `pn` downloads the pinned, checksum-
-verified runtime for your `app.python_version` and caches it under
-`build/ios/ios_runtime/`. The Xcode build links `Python.xcframework`,
-installs the standard library, and bundles your `app/` sources, the
+project. The first iOS build on a machine downloads the pinned,
+checksum-verified runtime for your `app.python_version` into a cache
+every project shares (`~/Library/Caches/pythonnative/ios/`, or
+`$PN_CACHE_DIR/ios/`) and prepares it once: the standard library loses
+CPython's test suite, GUI toolkits, installers, and test-only extension
+modules, and the rest is compiled to bytecode. `pn clean` doesn't touch
+this cache. The Xcode build links `Python.xcframework`, installs the
+prepared standard library, and bundles your `app/` sources, the
 `pythonnative` package, and the `[requirements].packages` resolved for
 the SDK being built (device or Simulator), binary wheels included.
 

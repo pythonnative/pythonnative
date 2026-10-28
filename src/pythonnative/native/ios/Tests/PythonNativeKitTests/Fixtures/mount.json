@@ -1,0 +1,248 @@
+[
+ {
+  "name": "mount a tree",
+  "bytes": "UE5NVAEAAAAHAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAANAAAAAQEAAAAAAAAABgAAAENvbHVtbgcCAAAABAAAAGZsZXgDAQAAAAAAAAAQAAAAYmFja2dyb3VuZF9jb2xvcgUHAAAAI0ZGRkZGRgEDAAAAAAAAAAQAAABUZXh0BwQAAAAEAAAAdGV4dAUKAAAASMOpbGxvIOKckwkAAABmb250X3NpemUEAAAAAAAAL0AJAAAAbWF4X2xpbmVzAwIAAAAAAAAABAAAAGJvbGQCAQQAAAAAAAAABgAAAEJ1dHRvbgcCAAAABQAAAHRpdGxlBQIAAABHbwgAAABkaXNhYmxlZAIBBQAAAAAAAAAEAAAAVmlldwcEAAAAEAAAAGJhY2tncm91bmRfY29sb3IFBwAAACNGRjAwMDAFAAAAd2lkdGgDFAAAAAAAAAAGAAAAaGVpZ2h0AxQAAAAAAAAACQAAAHRyYW5zZm9ybQYBAAAABwEAAAAGAAAAcm90YXRlAw8AAAAAAAAAAQYAAAAAAAAACQAAAFRleHRJbnB1dAcBAAAABQAAAHZhbHVlBQMAAABhYmMDAQAAAAAAAAAGAAAAAAAAAAAAAAADAQAAAAAAAAAFAAAAAAAAAAAAAAADAQAAAAAAAAAEAAAAAAAAAAAAAAADAQAAAAAAAAADAAAAAAAAAAAAAAAGAwAAAAAAAAAAAAAAAAAgQAAAAAAAACBAAAAAAAAAc0AAAAAAAAAwQAYEAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAAAAAAAAB0QAAAAAAAADBABgUAAAAAAAAAAAAAAAAAAAAAAAAAAABIQAAAAAAAADRAAAAAAAAANEAGBgAAAAAAAAAAAAAAAAAAAAAAAAAAAFFAAAAAAAAAdEAAAAAAAAAwQA==",
+  "surface": 7,
+  "revision": 1,
+  "id": 1,
+  "ops": [
+   {
+    "kind": "create",
+    "tag": 1,
+    "component": "Column",
+    "props": {
+     "flex": 1,
+     "background_color": "#FFFFFF"
+    }
+   },
+   {
+    "kind": "create",
+    "tag": 3,
+    "component": "Text",
+    "props": {
+     "text": "Héllo ✓",
+     "font_size": 15.5,
+     "max_lines": 2,
+     "bold": true
+    }
+   },
+   {
+    "kind": "create",
+    "tag": 4,
+    "component": "Button",
+    "props": {
+     "title": "Go",
+     "disabled": true
+    }
+   },
+   {
+    "kind": "create",
+    "tag": 5,
+    "component": "View",
+    "props": {
+     "background_color": "#FF0000",
+     "width": 20,
+     "height": 20,
+     "transform": [
+      {
+       "rotate": 15
+      }
+     ]
+    }
+   },
+   {
+    "kind": "create",
+    "tag": 6,
+    "component": "TextInput",
+    "props": {
+     "value": "abc"
+    }
+   },
+   {
+    "kind": "insert",
+    "tag": 6,
+    "parent": 1,
+    "index": 0
+   },
+   {
+    "kind": "insert",
+    "tag": 5,
+    "parent": 1,
+    "index": 0
+   },
+   {
+    "kind": "insert",
+    "tag": 4,
+    "parent": 1,
+    "index": 0
+   },
+   {
+    "kind": "insert",
+    "tag": 3,
+    "parent": 1,
+    "index": 0
+   },
+   {
+    "kind": "frame",
+    "tag": 3,
+    "frame": [
+     8.0,
+     8.0,
+     304.0,
+     16.0
+    ]
+   },
+   {
+    "kind": "frame",
+    "tag": 4,
+    "frame": [
+     0.0,
+     32.0,
+     320.0,
+     16.0
+    ]
+   },
+   {
+    "kind": "frame",
+    "tag": 5,
+    "frame": [
+     0.0,
+     48.0,
+     20.0,
+     20.0
+    ]
+   },
+   {
+    "kind": "frame",
+    "tag": 6,
+    "frame": [
+     0.0,
+     68.0,
+     320.0,
+     16.0
+    ]
+   }
+  ]
+ },
+ {
+  "name": "update and remove props",
+  "bytes": "UE5NVAEAAAAHAAAAAAAAAAIAAAAAAAAAAgAAAAAAAAABAAAAAgMAAAAAAAAAAAcEAAAABAAAAHRleHQFAwAAAEJ5ZQUAAABjb2xvcgUHAAAAIzAwRkYwMAkAAABtYXhfbGluZXMABAAAAGJvbGQAAgAAAAkAAABtYXhfbGluZXMEAAAAYm9sZA==",
+  "surface": 7,
+  "revision": 2,
+  "id": 2,
+  "ops": [
+   {
+    "kind": "update",
+    "tag": 3,
+    "props": {
+     "text": "Bye",
+     "color": "#00FF00",
+     "max_lines": null,
+     "bold": null
+    },
+    "removed": [
+     "max_lines",
+     "bold"
+    ],
+    "recreate": false
+   }
+  ]
+ },
+ {
+  "name": "move a child",
+  "bytes": "UE5NVAEAAAAHAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAAEAAAAAwEAAAAAAAAABQAAAAAAAAAAAAAABgUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADRAAAAAAAAANEAGAwAAAAAAAAAAAAAAAAAgQAAAAAAAADxAAAAAAAAAc0AAAAAAAAAwQAYEAAAAAAAAAAAAAAAAAAAAAAAAAAAASkAAAAAAAAB0QAAAAAAAADBA",
+  "surface": 7,
+  "revision": 3,
+  "id": 3,
+  "ops": [
+   {
+    "kind": "insert",
+    "tag": 5,
+    "parent": 1,
+    "index": 0
+   },
+   {
+    "kind": "frame",
+    "tag": 5,
+    "frame": [
+     0.0,
+     0.0,
+     20.0,
+     20.0
+    ]
+   },
+   {
+    "kind": "frame",
+    "tag": 3,
+    "frame": [
+     8.0,
+     28.0,
+     304.0,
+     16.0
+    ]
+   },
+   {
+    "kind": "frame",
+    "tag": 4,
+    "frame": [
+     0.0,
+     52.0,
+     320.0,
+     16.0
+    ]
+   }
+  ]
+ },
+ {
+  "name": "delete a subtree",
+  "bytes": "UE5NVAEAAAAHAAAAAAAAAAQAAAAAAAAABAAAAAAAAAADAAAABQMAAAAAAAAABgQAAAAAAAAAAAAAAAAAAAAAAAAAAAA0QAAAAAAAAHRAAAAAAAAAMEAGBgAAAAAAAAAAAAAAAAAAAAAAAAAAAEJAAAAAAAAAdEAAAAAAAAAwQA==",
+  "surface": 7,
+  "revision": 4,
+  "id": 4,
+  "ops": [
+   {
+    "kind": "delete",
+    "tag": 3
+   },
+   {
+    "kind": "frame",
+    "tag": 4,
+    "frame": [
+     0.0,
+     20.0,
+     320.0,
+     16.0
+    ]
+   },
+   {
+    "kind": "frame",
+    "tag": 6,
+    "frame": [
+     0.0,
+     36.0,
+     320.0,
+     16.0
+    ]
+   }
+  ]
+ },
+ {
+  "name": "queue a command",
+  "bytes": "UE5NVAEAAAAHAAAAAAAAAAQAAAAAAAAABQAAAAAAAAABAAAABwYAAAAAAAAADQAAAHNldF9zZWxlY3Rpb24HAgAAAAUAAABzdGFydAMBAAAAAAAAAAMAAABlbmQDAgAAAAAAAAApAAAAAAAAAA==",
+  "surface": 7,
+  "revision": 4,
+  "id": 5,
+  "ops": [
+   {
+    "kind": "command",
+    "tag": 6,
+    "name": "set_selection",
+    "arguments": {
+     "start": 1,
+     "end": 2
+    },
+    "call_id": 41
+   }
+  ]
+ }
+]

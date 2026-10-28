@@ -7,7 +7,7 @@ using percentage offsets. All five labels must be visible.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint
 
 _PIN = pn.style(
     position="absolute",
@@ -17,12 +17,12 @@ _PIN = pn.style(
 
 
 @pn.component
-def AbsolutePositionDemo() -> pn.Element:
+def AbsolutePositionDemo() -> pn.Node:
     """Render five absolutely-positioned labels on a dark canvas."""
-    return demo_screen(
+    return DemoScreen(
         "Absolute positioning",
         "Four corner labels and a centered label pinned absolutely.",
-        section(
+        DemoSection(
             "Canvas",
             pn.View(
                 pn.View(pn.Text("abs-top-left"), style={**_PIN, "top": 4, "left": 4}),
@@ -39,6 +39,6 @@ def AbsolutePositionDemo() -> pn.Element:
                     border_radius=8,
                 ),
             ),
-            hint("Maestro asserts each of the five labels."),
+            Hint("Maestro asserts each of the five labels."),
         ),
     )

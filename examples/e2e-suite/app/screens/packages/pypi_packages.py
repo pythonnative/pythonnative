@@ -31,7 +31,7 @@ import sys
 from typing import Tuple
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 def _import_version(module_name: str) -> Tuple[str, str]:
@@ -61,33 +61,33 @@ def _numpy_probe() -> Tuple[str, str]:
 
 
 @pn.component
-def PyPIPackagesDemo() -> pn.Element:
+def PyPIPackagesDemo() -> pn.Node:
     """Import the suite's declared PyPI packages and show their versions."""
     httpx_version, httpx_error = _import_version("httpx")
     numpy_version, numpy_error = _import_version("numpy")
     numpy_sum, numpy_sum_error = _numpy_probe()
 
-    return demo_screen(
+    return DemoScreen(
         "PyPI packages",
         "[requirements].packages resolved for this device and imported on it.",
-        section(
+        DemoSection(
             "Pure Python (httpx)",
-            result_text("httpx", httpx_version or "missing"),
-            *([result_text("Error", httpx_error)] if httpx_error else []),
-            hint("A py3-none-any wheel; the same file ships to every platform."),
+            ResultText("httpx", httpx_version or "missing"),
+            *([ResultText("Error", httpx_error)] if httpx_error else []),
+            Hint("A py3-none-any wheel; the same file ships to every platform."),
         ),
-        section(
+        DemoSection(
             "Binary wheel (numpy)",
-            result_text("numpy", numpy_version or "missing"),
-            *([result_text("Error", numpy_error)] if numpy_error else []),
-            result_text("numpy sum", numpy_sum or "failed"),
-            *([result_text("Error", numpy_sum_error)] if numpy_sum_error else []),
-            hint("A platform-specific wheel with compiled extension modules loaded by the embedded CPython."),
+            ResultText("numpy", numpy_version or "missing"),
+            *([ResultText("Error", numpy_error)] if numpy_error else []),
+            ResultText("numpy sum", numpy_sum or "failed"),
+            *([ResultText("Error", numpy_sum_error)] if numpy_sum_error else []),
+            Hint("A platform-specific wheel with compiled extension modules loaded by the embedded CPython."),
         ),
-        section(
+        DemoSection(
             "Interpreter",
-            result_text("Python", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"),
-            result_text("sys.platform", sys.platform),
-            hint("Maestro asserts both version lines and that the numpy sum is 6."),
+            ResultText("Python", f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"),
+            ResultText("sys.platform", sys.platform),
+            Hint("Maestro asserts both version lines and that the numpy sum is 6."),
         ),
     )

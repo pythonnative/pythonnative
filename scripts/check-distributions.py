@@ -18,12 +18,16 @@ PYTHONS = {"cp313", "cp314"}
 PLATFORMS = {"linux_x86_64", "linux_aarch64", "macos_x86_64", "macos_arm64", "win_amd64"}
 PACKAGE_FILES = {
     "pythonnative/py.typed",
-    "pythonnative/native/yoga/python.cpp",
-    "pythonnative/native/yoga/yoga/Yoga.h",
-    "pythonnative/native/yoga/yoga/YGNode.cpp",
+    "pythonnative/native/core/python.cpp",
+    "pythonnative/native/core/include/pn_core.h",
+    "pythonnative/native/core/src/core.cpp",
+    "pythonnative/native/core/yoga/Yoga.h",
+    "pythonnative/native/core/yoga/YGNode.cpp",
     "pythonnative/native/ios/Package.swift",
     "pythonnative/templates/android_template/gradlew",
-    "pythonnative/devserver/static/yoga/binaries/yoga-wasm-base64-esm.js",
+    "pythonnative/devserver/static/core/mount.js",
+    "pythonnative/devserver/static/core/pn_core.js",
+    "pythonnative/devserver/static/core/pn_core.wasm",
 }
 
 
@@ -77,8 +81,8 @@ def check_distributions(directory: Path, expected_version: str) -> None:
                 if wheel.get("Root-Is-Purelib") != "false" or archive_tags != tags:
                     raise ValueError(f"Wheel metadata disagrees with binary platform tags: {path.name}")
                 suffix = ".pyd" if next(iter(targets))[1] == "win_amd64" else ".so"
-                if not any(n.startswith("pythonnative/_yoga.") and n.endswith(suffix) for n in names):
-                    raise ValueError(f"Missing compiled Yoga extension: {path.name}")
+                if not any(n.startswith("pythonnative/_core.") and n.endswith(suffix) for n in names):
+                    raise ValueError(f"Missing compiled renderer core: {path.name}")
                 missing = PACKAGE_FILES - names
                 if missing:
                     raise ValueError(f"Missing package resources in {path.name}: {sorted(missing)}")
@@ -91,7 +95,11 @@ def check_distributions(directory: Path, expected_version: str) -> None:
                 prefix = f"pythonnative-{version}/"
                 names = set(archive.getnames())
                 required = {prefix + "src/" + name for name in PACKAGE_FILES}
-                required |= {prefix + "setup.py", prefix + "tests/test_layout.py"}
+                required |= {
+                    prefix + "setup.py",
+                    prefix + "tests/test_core.py",
+                    prefix + "tests/contracts/validation.json",
+                }
                 if missing := required - names:
                     raise ValueError(f"Incomplete source distribution: {sorted(missing)}")
                 metadata_file = archive.extractfile(prefix + "PKG-INFO")

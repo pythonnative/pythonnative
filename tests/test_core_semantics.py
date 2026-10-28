@@ -203,7 +203,7 @@ def test_layout_effect_sees_committed_frame() -> None:
         ref: Ref = use_ref(None)
 
         def read_frame() -> None:
-            frames.append(ref._pn_frame)
+            frames.append(ref.current.frame if ref.current is not None else None)
 
         use_layout_effect(read_frame, None)
         return Element(
@@ -219,8 +219,8 @@ def test_layout_effect_sees_committed_frame() -> None:
     rec.mount(App())
     committed = [f for f in frames if f is not None]
     assert committed, "layout effect should observe a committed frame"
-    _x, _y, w, h = committed[-1]
-    assert (w, h) == (300.0, 50.0)
+    frame = committed[-1]
+    assert (frame.width, frame.height) == (300.0, 50.0)
 
 
 def test_layout_effect_cleanup_on_unmount() -> None:
@@ -305,7 +305,7 @@ def test_context_change_rerenders_consumer_under_memo() -> None:
     def App() -> Element:
         theme, set_theme = use_state("light")
         setters["set"] = set_theme
-        return theme_ctx.Provider(theme, Wall())
+        return theme_ctx.Provider(Wall(), value=theme)
 
     rec, backend = _make_reconciler()
     rec.mount(App())
@@ -340,7 +340,7 @@ def test_context_same_value_does_not_rerender_consumer() -> None:
         _tick, set_tick = use_state(0)
         setters["set"] = set_tick
         # Provider value is constant even though App re-renders.
-        return ctx.Provider(42, Wall())
+        return ctx.Provider(Wall(), value=42)
 
     rec, _backend = _make_reconciler()
     rec.mount(App())
@@ -364,7 +364,7 @@ def test_provider_multiple_children_render_flat() -> None:
         Element(
             "Column",
             {},
-            [ctx.Provider("v", Leaf(label="a"), Leaf(label="b"))],
+            [ctx.Provider(Leaf(label="a"), Leaf(label="b"), value="v")],
         )
     )
     assert [c.props["text"] for c in root.children] == ["a:v", "b:v"]
@@ -468,6 +468,7 @@ def test_portal_state_and_events_stay_wired() -> None:
     root = rec.mount(App())
     overlay = backend.detached_views("Portal")[0]
     button = overlay.find_first("Button")
+    assert button is not None
     handled = dispatch_event(button.tag, "on_press")
     assert handled, "portal button press must reach the Python handler"
     rec.flush_dirty()
@@ -704,15 +705,15 @@ def test_hook_order_not_checked_in_production() -> None:
 
 
 def test_unknown_style_key_warns_with_suggestion(dev_mode: Any) -> None:
-    Text("hi", style={"font_siez": 20})
+    Text("hi", style={"font_siez": 20})  # type: ignore[arg-type]
     warnings = diagnostics.get_warnings()
     assert any("font_siez" in w for w in warnings)
     assert any("font_size" in w for w in warnings), "should suggest the close match"
 
 
 def test_unknown_style_key_warns_once(dev_mode: Any) -> None:
-    Text("hi", style={"font_siez": 20})
-    Text("hi again", style={"font_siez": 22})
+    Text("hi", style={"font_siez": 20})  # type: ignore[arg-type]
+    Text("hi again", style={"font_siez": 22})  # type: ignore[arg-type]
     warnings = [w for w in diagnostics.get_warnings() if "font_siez" in w]
     assert len(warnings) == 1
 
@@ -725,7 +726,7 @@ def test_known_style_keys_do_not_warn(dev_mode: Any) -> None:
 def test_style_validation_skipped_in_production() -> None:
     diagnostics.set_dev_mode(False)
     diagnostics.clear_warnings()
-    Text("hi", style={"font_siez": 20})
+    Text("hi", style={"font_siez": 20})  # type: ignore[arg-type]
     assert diagnostics.get_warnings() == []
 
 
@@ -748,6 +749,29 @@ def test_duplicate_sibling_keys_warn(dev_mode: Any) -> None:
     )
     warnings = diagnostics.get_warnings()
     assert any("same" in w and "key" in w.lower() for w in warnings)
+
+
+@pytest.mark.parametrize("dev", [True, False])
+def test_duplicate_keys_never_share_or_leak_nodes(dev: bool) -> None:
+    diagnostics.set_dev_mode(dev)
+    rec, backend = _make_reconciler()
+
+    def tree(*texts: str) -> Element:
+        return Element("Column", {}, [Element("Text", {"text": text}, [], key="same") for text in texts])
+
+    rec.mount(tree("a", "b"))
+    assert rec.root is not None
+    first = list(rec.root.children)
+    assert len({id(node) for node in first}) == 2
+    rec.reconcile(tree("c", "d", "e"))
+    children = rec.root.children
+    assert len({id(node) for node in children}) == 3
+    assert children[0] is first[0]
+    assert all(not node.mounted for node in first[1:])
+    assert len(backend.views) == 4
+    rec.reconcile(tree("f"))
+    assert len(rec.root.children) == 1
+    assert len(backend.views) == 2
 
 
 # ======================================================================

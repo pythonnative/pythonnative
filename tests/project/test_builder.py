@@ -1,4 +1,6 @@
+import json
 import sys
+import zipfile
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -6,7 +8,14 @@ import pytest
 
 from pythonnative.project import builder as builder_mod
 from pythonnative.project import runtime_assets
-from pythonnative.project.builder import Builder, BuildError, CommandResult, CommandRunner, stage_template
+from pythonnative.project.builder import (
+    Builder,
+    BuildError,
+    CommandResult,
+    CommandRunner,
+    PreparedProject,
+    stage_template,
+)
 from pythonnative.project.config import AppConfig
 
 
@@ -28,16 +37,32 @@ class RecordingRunner(CommandRunner):
         if cwd and any("assembleRelease" in a for a in args):
             apk = Path(cwd) / "app" / "build" / "outputs" / "apk" / "release"
             apk.mkdir(parents=True, exist_ok=True)
-            (apk / "app-release-unsigned.apk").write_bytes(b"apk")
+            with zipfile.ZipFile(apk / "app-release-unsigned.apk", "w") as archive:
+                archive.writestr("AndroidManifest.xml", b"test")
         if cwd and any("bundleRelease" in a for a in args):
             aab = Path(cwd) / "app" / "build" / "outputs" / "bundle" / "release"
             aab.mkdir(parents=True, exist_ok=True)
-            (aab / "app-release.aab").write_bytes(b"aab")
+            with zipfile.ZipFile(aab / "app-release.aab", "w") as archive:
+                archive.writestr("BundleConfig.pb", b"\x12\x06\x12\x04\x08\x01\x10\x02")
         if cwd and any("assembleDebug" in a for a in args):
             apk = Path(cwd) / "app" / "build" / "outputs" / "apk" / "debug"
             apk.mkdir(parents=True, exist_ok=True)
             (apk / "app-debug.apk").write_bytes(b"apk")
         return CommandResult(0)
+
+
+def test_archive_rejects_old_xcode_before_build_or_export(tmp_path: Path) -> None:
+    class OldXcode(RecordingRunner):
+        def run(self, args: Sequence[str], **kwargs: object) -> CommandResult:
+            self.commands.append(list(args))
+            return CommandResult(0, stdout="Xcode 16.4\nBuild version 16F6")
+
+    config = AppConfig.load(_project(tmp_path, _TOML))
+    runner = OldXcode()
+    prepared = PreparedProject(platform="ios", build_dir=tmp_path, project_dir=tmp_path, app_id="com.acme.cool")
+    with pytest.raises(BuildError, match="Xcode 26"):
+        Builder(config, runner=runner).build_ios_archive(prepared)
+    assert runner.commands == [["xcodebuild", "-version"]]
 
 
 def _project(tmp_path: Path, toml: str) -> Path:
@@ -110,6 +135,7 @@ def test_prepare_ios_integration(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert prepared.app_id == "com.acme.cool"
     import plistlib
 
+    assert prepared.ios is not None
     plist = plistlib.loads(prepared.ios.info_plist.read_bytes())
     assert plist["CFBundleDisplayName"] == "Cool App"
 
@@ -182,21 +208,64 @@ def test_prepare_ios_installs_requirements_per_slice(tmp_path: Path, monkeypatch
     assert any("iphonesimulator" in p for cmd in pip_cmds for p in cmd if p.startswith("ios_"))
 
 
-def test_prepare_ios_release_skips_bytecode_on_version_mismatch(
+def test_debug_prepare_warns_about_a_stale_lock_and_resolves_unlocked(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _fake_ios_runtime(tmp_path, monkeypatch)
-    root = _project(tmp_path, _TOML)
+    root = _project(tmp_path, _TOML + '\n[requirements]\npackages = ["httpx==0.27.0", "numpy"]\n')
+    (root / "pn.lock").write_text(
+        '{"version": 1, "python": "3.13", "requirements": ["httpx"], "indexes": [], "targets": {}}\n',
+        encoding="utf-8",
+    )
     cfg = AppConfig.load(root)
-    host = f"{sys.version_info[0]}.{sys.version_info[1]}"
-    if cfg.python_version == host:
-        cfg.python_version = "3.14" if host != "3.14" else "3.13"
-    messages: List[str] = []
-    prepared = Builder(cfg, runner=RecordingRunner(), log=messages.append).prepare("ios", release=True)
+    messages: list[str] = []
+    runner = RecordingRunner()
+    Builder(cfg, runner=runner, log=messages.append).prepare("ios")
 
-    # Sources ship as .py when the host can't produce matching bytecode.
+    assert any("pn.lock doesn't match this app" in message and "development build" in message for message in messages)
+    pip_cmds = [cmd for cmd in runner.commands if "pip" in cmd and "--target" in cmd]
+    assert len(pip_cmds) == 2
+    assert all("httpx==0.27.0" in cmd and "--no-deps" not in cmd for cmd in pip_cmds)
+    with pytest.raises(BuildError, match="doesn't match"):
+        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True)
+
+
+def test_prepare_ios_release_requires_a_matching_interpreter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    monkeypatch.setattr(builder_mod.bytecode, "compiler_for", lambda version: None)
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    with pytest.raises(BuildError, match="No Python .* interpreter is installed to compile bytecode"):
+        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True)
+
+
+def test_prepare_ios_debug_compiles_beside_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    cfg.python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
+    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios")
+
+    app_dir = prepared.project_dir / "app"
+    assert (app_dir / "main.py").is_file()
+    (compiled,) = (app_dir / "__pycache__").glob("main.*.pyc")
+    # Unchecked-hash bytecode: the interpreter trusts it without a timestamp check.
+    assert int.from_bytes(compiled.read_bytes()[4:8], "little") == 0b01
+    lib = prepared.project_dir / "app_packages.iphonesimulator" / "pythonnative"
+    assert (lib / "__init__.py").is_file()
+    assert (lib / "__pycache__").is_dir()
+
+
+def test_prepare_ios_debug_warns_without_a_matching_interpreter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    monkeypatch.setattr(builder_mod.bytecode, "compiler_for", lambda version: None)
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    messages: List[str] = []
+    prepared = Builder(cfg, runner=RecordingRunner(), log=messages.append).prepare("ios")
+
     assert (prepared.project_dir / "app" / "main.py").is_file()
-    assert any("Skipping bytecode compilation" in m for m in messages)
+    assert not (prepared.project_dir / "app" / "__pycache__").exists()
+    assert any("compile its modules at launch" in m for m in messages)
 
 
 def test_prepare_unknown_platform(tmp_path: Path) -> None:
@@ -256,3 +325,65 @@ def test_config_has_android_signing(tmp_path: Path) -> None:
     root = _project(tmp_path, _TOML + '\n[android.signing]\nkeystore = "r.keystore"\nkey_alias = "k"\n')
     cfg = AppConfig.load(root)
     assert builder_mod.config_has_android_signing(cfg) is True
+
+
+def test_release_preflight_requires_current_target_and_frozen_dependencies(tmp_path: Path) -> None:
+    root = _project(tmp_path, _TOML)
+    config = AppConfig.load(root)
+    builder = Builder(config, runner=RecordingRunner(), log=lambda _: None)
+    with pytest.raises(BuildError, match="target_sdk"):
+        builder.prepare("android", release=True)
+    assert not (root / "build/android/android_template").exists()
+    config.android.target_sdk = 36
+    config.requirements = ["example==1.0"]
+    with pytest.raises(BuildError, match="pn.lock"):
+        builder.prepare("android", release=True)
+    assert not (root / "build/android/android_template").exists()
+
+
+_DEV_ONLY = ("devclient.py", "hot_reload.py", "refresh.py", "devserver", "cli", "project", "testing")
+
+
+def test_prepare_ios_release_omits_development_modules(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import plistlib
+
+    _fake_ios_runtime(tmp_path, monkeypatch)
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    # Release builds compile bytecode, which needs an interpreter matching
+    # app.python_version; the one running the tests always qualifies.
+    cfg.python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
+    builder = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None)
+    debug = builder.prepare("ios", ios_sdks=("iphonesimulator",))
+    lib = debug.project_dir / "app_packages.iphonesimulator" / "pythonnative"
+    assert all((lib / name).exists() for name in _DEV_ONLY)
+    assert debug.ios is not None
+    assert "NSLocalNetworkUsageDescription" in plistlib.loads(debug.ios.info_plist.read_bytes())
+
+    release = builder.prepare("ios", release=True, ios_sdks=("iphoneos",))
+    lib = release.project_dir / "app_packages.iphoneos" / "pythonnative"
+    assert (lib / "bootstrap.py").exists() or (lib / "bootstrap.pyc").exists()
+    for name in (*_DEV_ONLY, "sdk/codegen.py"):
+        assert not (lib / name).exists() and not (lib / name.replace(".py", ".pyc")).exists(), name
+    assert release.ios is not None
+    assert "NSLocalNetworkUsageDescription" not in plistlib.loads(release.ios.info_plist.read_bytes())
+
+
+def test_prepare_android_release_omits_development_modules(tmp_path: Path) -> None:
+    cfg = AppConfig.load(_project(tmp_path, _TOML))
+    cfg.android.target_sdk = 36
+    builder = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None)
+    lib = tmp_path / "build" / "android" / "android_template" / "app" / "src" / "main" / "python" / "pythonnative"
+
+    builder.prepare("android")
+    assert all((lib / name).exists() for name in _DEV_ONLY)
+    # A release build staged over a debug build doesn't inherit its dev modules.
+    builder.prepare("android", release=True)
+    assert (lib / "bootstrap.py").exists()
+    contracts = json.loads((lib / "_native_contracts.json").read_text(encoding="utf-8"))
+    # Built-in contracts load from the package; the app only bundles plugins'
+    # contracts and the fingerprint the native library was generated from.
+    assert "View" not in contracts["components"] and "Device" not in contracts["modules"]
+    assert len(contracts["fingerprint"]) == 64
+    assert (lib / "sdk" / "_builtin_contracts.json").is_file()
+    for name in (*_DEV_ONLY, "sdk/codegen.py", "sdk/builtins.py"):
+        assert not (lib / name).exists(), name

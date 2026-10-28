@@ -10,6 +10,8 @@ appId: ${APP_ID}
     timeout: 30000
 - assertVisible: "Offline ready"
 - assertVisible: "2000 offline records"
+- tapOn: "2000 offline records"
+- assertVisible: "Preparation cancelled"
 - tapOn: "Search issues"
 - inputText: "2000"
 # A cold iOS keyboard can make the first XCTest hierarchy snapshot take more

@@ -13,7 +13,7 @@ Decorate a Python function with `@pn.component`:
 import pythonnative as pn
 
 @pn.component
-def Greeting(name: str = "World"):
+def Greeting(name: str = "World") -> pn.Node:
     return pn.Text(f"Hello, {name}!", style={"font_size": 20})
 ```
 
@@ -21,17 +21,17 @@ Use it like any other component:
 
 ```python
 @pn.component
-def MyPage():
+def MyPage() -> pn.Node:
     return pn.Column(
         Greeting(name="Alice"),
         Greeting(name="Bob"),
-        style={"spacing": 12},
+        style={"gap": 12},
     )
 ```
 
 ## Hooks
 
-Hooks let function components manage state and side effects. They must be called at the top level of a `@pn.component` function (not inside loops or conditions).
+Hooks let function components manage state and side effects. They must be called at the top level of a `@pn.component` function or a custom hook (not inside loops or conditions). [`pn lint`](../guides/linting.md) checks this for you; see [Rules of hooks](#rules-of-hooks).
 
 ### use_state
 
@@ -39,7 +39,7 @@ Local component state. Returns `(value, setter)`.
 
 ```python
 @pn.component
-def Counter(initial: int = 0):
+def Counter(initial: int = 0) -> pn.Node:
     count, set_count = pn.use_state(initial)
 
     return pn.Column(
@@ -68,17 +68,21 @@ lets you manage state transitions through a reducer function (similar
 to React's `useReducer`):
 
 ```python
-def reducer(state, action):
+from typing import Literal
+
+Action = Literal["increment", "decrement", "reset"]
+
+
+def reducer(state: int, action: Action) -> int:
     if action == "increment":
         return state + 1
     if action == "decrement":
         return state - 1
-    if action == "reset":
-        return 0
-    return state
+    return 0
+
 
 @pn.component
-def Counter():
+def Counter() -> pn.Node:
     count, dispatch = pn.use_reducer(reducer, 0)
 
     return pn.Column(
@@ -87,24 +91,26 @@ def Counter():
             pn.Button("-", on_press=lambda: dispatch("decrement")),
             pn.Button("+", on_press=lambda: dispatch("increment")),
             pn.Button("Reset", on_press=lambda: dispatch("reset")),
-            style={"spacing": 8},
+            style={"gap": 8},
         ),
     )
 ```
 
-The reducer receives the current state and an action, and returns the new state. Actions can be any value (strings, dicts, etc.). The component only re-renders when the reducer returns a different state.
+The reducer receives the current state and an action, and returns the new state. Actions can be any value (strings, tuples, dataclasses, and so on). The component only re-renders when the reducer returns a different state. The hook is generic over the state type and the action type, so with the annotated reducer above a type checker rejects `dispatch("typo")`.
 
 ### use_effect
 
 Run side effects **after** the native view tree is committed. The effect function may return a cleanup callable.
 
 ```python
+import asyncio
+
+
 @pn.component
-def Timer():
+def Timer() -> pn.Node:
     seconds, set_seconds = pn.use_state(0)
 
-    async def tick():
-        import asyncio
+    async def tick() -> None:
         await asyncio.sleep(1.0)
         set_seconds(seconds + 1)
 
@@ -124,82 +130,99 @@ automatically** when the effect re-runs or the component unmounts, so
 the sleeping tick above never fires against an unmounted component.
 See the [Async + data guide](../guides/async.md).
 
-Dependency control:
+Dependency control (`deps` is any [`Deps`][pythonnative.Deps] sequence,
+a list or a tuple):
 
 - `pn.use_effect(fn, None)`: run on every render.
-- `pn.use_effect(fn, [])`: run on mount only.
-- `pn.use_effect(fn, [a, b])`: run when `a` or `b` change.
+- `pn.use_effect(fn, [])` or `pn.use_effect(fn, ())`: run on mount only.
+- `pn.use_effect(fn, [a, b])`: run when `a` or `b` change (compared by
+  identity, then `==`; bound methods of the same object compare equal).
+
+List every value from the component that the effect reads. `pn lint`
+reports a missing dependency as `PN103`.
+
+An exception raised inside an effect is routed to the nearest
+[`ErrorBoundary`][pythonnative.ErrorBoundary], exactly like an
+exception raised during render. In dev mode the reconciler also warns
+once per site when a dependency list changes length between renders.
 
 ### use_layout_effect
 
-Like [`use_effect`][pythonnative.use_effect], but runs synchronously
-inside the commit, after native mutations and the layout pass and
+Like [`use_effect`][pythonnative.use_effect], but runs in the commit
+phase as soon as native has mounted the commit and applied its layout,
 before passive effects. Use it to read a committed frame from a ref or
-to issue an imperative command (like scrolling a list into position)
-before the user sees the new frame:
+to issue an imperative command (like scrolling a list into position) as
+early as possible:
 
 ```python
 @pn.component
-def Chat(messages):
+def Chat(messages: list[str]) -> pn.Node:
     list_ref = pn.use_ref()
 
-    def scroll_to_bottom():
+    def scroll_to_bottom() -> None:
         if list_ref.current is not None:
             list_ref.current.scroll_to_end(animated=False)
 
     pn.use_layout_effect(scroll_to_bottom, [len(messages)])
-    return pn.FlatList(data=messages, render_item=Bubble, ref=list_ref)
+    return pn.FlatList(data=messages, render_item=lambda text, index: pn.Text(text), ref=list_ref)
 ```
 
-Prefer `use_effect` for everything else; layout effects block the
-commit, so heavy work here delays the frame.
+Native renders on its own thread, so unlike React on the web the commit
+isn't held back from the screen: the user may see the committed frame
+before a layout effect runs, and state it sets commits in a following
+transaction, usually the next frame. Prefer `use_effect` for everything
+else; layout effects delay the commit's passive effects.
 
 ### use_navigation
 
 Access navigation from any screen. Returns the
 [`Navigation`][pythonnative.Navigation] handle for the current route,
 with `.navigate()`, `.push()`, `.go_back()`, `.set_options()`,
-`.add_listener()`, and more.
+`.add_listener()`, and more. Destinations are screen components called
+with their params, and a screen receives its params as ordinary
+arguments:
 
 ```python
 @pn.component
-def HomeScreen():
+def HomeScreen() -> pn.Node:
     nav = pn.use_navigation()
 
     return pn.Column(
         pn.Text("Home", style={"font_size": 24}),
-        pn.Button(
-            "Go to Details",
-            on_press=lambda: nav.navigate("Detail", id=42),
-        ),
-        style={"spacing": 12, "padding": 16},
+        pn.Button("Go to details", on_press=lambda: nav.push(DetailScreen(id=42))),
+        style={"gap": 12, "padding": 16},
     )
 
+
 @pn.component
-def DetailScreen():
+def DetailScreen(id: int) -> pn.Node:
     nav = pn.use_navigation()
-    item_id = pn.use_route().params.get("id", 0)
+    pn.use_screen_options(title=f"Item {id}")
 
     return pn.Column(
-        pn.Text(f"Detail #{item_id}", style={"font_size": 20}),
+        pn.Text(f"Detail #{id}", style={"font_size": 20}),
         pn.Button("Back", on_press=nav.go_back),
-        style={"spacing": 12, "padding": 16},
+        style={"gap": 12, "padding": 16},
     )
 ```
 
-See the [Navigation guide](../guides/navigation.md) for full details.
+[`use_screen_options`][pythonnative.use_screen_options] sets the
+calling screen's title, header buttons, and other
+[`ScreenOptions`][pythonnative.ScreenOptions] from its render. See the
+[Navigation guide](../guides/navigation.md) for full details.
 
 ### use_route
 
 Read the current [`Route`][pythonnative.navigation.Route]: its
-`name`, `params`, and stable `key`:
+`name`, raw `params` dict, and `key`, which is unique for each visit.
+Screens get their params as arguments, so reach for `use_route` only
+when you need the route's identity:
 
 ```python
 @pn.component
-def DetailScreen():
+def DetailScreen(id: int) -> pn.Node:
     route = pn.use_route()
-    item_id = route.params.get("id", 0)
-    return pn.Text(f"Detail #{item_id}")
+    return pn.Text(f"Detail #{id} (visit {route.key})")
 ```
 
 ### use_focus_effect
@@ -210,10 +233,10 @@ a screen:
 
 ```python
 @pn.component
-def FeedScreen():
-    items, set_items = pn.use_state([])
+def FeedScreen() -> pn.Node:
+    items, set_items = pn.use_state(list[str]())
     pn.use_focus_effect(lambda: load_items(set_items), [])
-    return pn.FlatList(data=items, render_item=lambda item, i: pn.Text(item))
+    return pn.FlatList(data=items, render_item=lambda item, index: pn.Text(item))
 ```
 
 ### use_memo
@@ -242,17 +265,58 @@ render_count = pn.use_ref(0)
 render_count.current += 1
 ```
 
-Pass a ref to a built-in element via the `ref=` prop and the
-reconciler populates `ref.current` with the underlying native view
-after commit (and clears it on unmount). The layout pass also mirrors
-the committed frame, so Python code can read measured geometry without
-a native round-trip:
+`use_ref(0)` is a `Ref[int]`; `use_ref()` with no argument is a
+`Ref[Any]` meant to be filled in later (by a handle, a timer, a task).
+
+### Refs and handles
+
+Pass a ref to a built-in element via the `ref=` prop and the reconciler
+publishes a typed imperative **handle** on `ref.current` after commit,
+chosen by element type, and clears it back to `None` on unmount:
+
+| Element | `ref.current` |
+|---|---|
+| `TextInput` | [`TextInputHandle`][pythonnative.TextInputHandle]: `focus()`, `blur()`, `clear()`, `select_all()`, `set_selection(start, end=None)`, `await get_value()` |
+| `ScrollView` | [`ScrollViewHandle`][pythonnative.ScrollViewHandle]: `scroll_to(x=None, y=None, animated=True)`, `scroll_to_end(animated=True)`, `flash_scroll_indicators()`, `await get_scroll_offset()` (a [`ScrollOffset`][pythonnative.ScrollOffset]) |
+| `WebView` | [`WebViewHandle`][pythonnative.WebViewHandle]: `reload()`, `go_back()`, `go_forward()`, `stop_loading()`, `load_url(url)`, `inject_javascript(script)`, `await eval_js(script)`, `await can_go_back()`, `await can_go_forward()`, `await get_url()` |
+| `FlatList`, `SectionList` | [`ListController`][pythonnative.ListController]: `scroll_to_index`, `scroll_to_offset`, `scroll_to_end` |
+| everything else | [`ViewHandle`][pythonnative.ViewHandle] |
+
+Every handle exposes `tag`, `type_name`, and `frame`, the last committed
+[`LayoutEvent`][pythonnative.LayoutEvent] written by the layout pass, so
+Python code can read measured geometry without a native round-trip.
+Methods that act on the view are plain calls; methods that need an
+answer from the native view are `async`:
 
 ```python
-box_ref = pn.use_ref()
-pn.View(ref=box_ref, style={"height": 48})
-# after commit: box_ref.current is the native view
+@pn.component
+def Search() -> pn.Node:
+    field = pn.use_ref()
+
+    def focus_field() -> None:
+        if field.current is not None:
+            field.current.focus()
+
+    pn.use_effect(focus_field, [])
+    return pn.TextInput(placeholder="Search", ref=field)
+
+
+@pn.component
+def MeasuredBox() -> pn.Node:
+    box = pn.use_ref()
+
+    def report() -> None:
+        if box.current is not None and box.current.frame is not None:
+            print(box.current.frame.width, box.current.frame.height)
+
+    pn.use_layout_effect(report)
+    return pn.View(ref=box, style={"height": 48})
 ```
+
+A custom native component's own commands go through
+[`ViewHandle.command`][pythonnative.handles.ViewHandle.command]; see
+the [Custom native components guide](../guides/custom-native-components.md#commands).
+The full reference is on the [Handles](../api/handles.md) page.
 
 ### use_imperative_handle
 
@@ -264,13 +328,17 @@ installs a [`ListController`][pythonnative.ListController] with
 Your own components use [`use_imperative_handle`][pythonnative.use_imperative_handle]:
 
 ```python
-@pn.component
-def VideoPlayer(source, ref=None):
-    pn.use_imperative_handle(ref, lambda: PlayerController(...), [source])
-    return pn.View(...)
+from typing import Any
+
 
 @pn.component
-def Screen():
+def VideoPlayer(source: str, ref: pn.Ref[Any] | None = None) -> pn.Node:
+    pn.use_imperative_handle(ref, lambda: PlayerController(source), [source])
+    return pn.View(style={"aspect_ratio": 16 / 9})
+
+
+@pn.component
+def PlayerScreen(url: str) -> pn.Node:
     player = pn.use_ref()
     return pn.Column(
         VideoPlayer(source=url, ref=player),
@@ -280,16 +348,16 @@ def Screen():
 
 ### use_back_handler
 
-Intercept the system back action (the Android hardware back button and
-predictive back gesture; Escape in the browser preview). Return `True`
-to consume the event, `False` to pass it along:
+Intercept the system back action (the Android back button or back
+gesture; Escape in the browser preview). Return `True` to consume the
+event, `False` to pass it along:
 
 ```python
 @pn.component
-def Editor():
+def Editor() -> pn.Node:
     dirty, set_dirty = pn.use_state(False)
     pn.use_back_handler(lambda: dirty)  # block back while dirty
-    ...
+    return pn.TextInput(on_change=lambda text: set_dirty(True))
 ```
 
 iOS has no system back button, so the handler never fires there;
@@ -315,14 +383,43 @@ Locale = pn.create_context("en")
 
 
 @pn.component
-def Greeting():
+def Greeting() -> pn.Node:
     locale = pn.use_context(Locale)
     return pn.Text("Hello" if locale == "en" else "Hola")
 ```
 
 For theming specifically, prefer [`use_theme`][pythonnative.use_theme],
 which returns a typed [`Theme`][pythonnative.Theme] and falls back to
-the built-in light or dark theme when no provider is mounted.
+the built-in light or dark theme when no provider is mounted, and
+[`use_styles`][pythonnative.use_styles], which derives styles from the
+theme once per theme. See [Styling](../guides/styling.md#themes).
+
+### use_store
+
+Read an app-wide [`Store`][pythonnative.Store], optionally through a
+selector. The component re-renders only when the selected value
+changes:
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Cart:
+    items: tuple[str, ...] = ()
+
+
+cart = pn.Store(Cart())
+
+
+@pn.component
+def CartBadge() -> pn.Node:
+    count = pn.use_store(cart, lambda state: len(state.items))
+    return pn.Text(str(count))
+```
+
+See [Managing state](../guides/state.md) for when to use a store
+instead of component state or context.
 
 ### Async hooks
 
@@ -346,42 +443,48 @@ the [Async + data guide](../guides/async.md):
 Share values through the component tree without passing props manually:
 
 ```python
-user_context = pn.create_context({"name": "Guest"})
+UserName = pn.create_context("Guest", name="UserName")
+
 
 @pn.component
-def App():
-    return user_context.Provider({"name": "Alice"}, UserProfile())
+def App() -> pn.Node:
+    return UserName.Provider(UserProfile(), value="Alice")
+
 
 @pn.component
-def UserProfile():
-    user = pn.use_context(user_context)
-    return pn.Text(f"Welcome, {user['name']}")
+def UserProfile() -> pn.Node:
+    name = pn.use_context(UserName)
+    return pn.Text(f"Welcome, {name}")
 ```
+
+Like every other container, `Provider` takes its children positionally
+and the value as the keyword-only `value=` argument.
 
 Context is **reactive**: when a `Provider`'s value changes, every
 component that read the context re-renders, even when a memoized
 ancestor in between would otherwise skip its subtree. This matches
 React's context propagation, so `@pn.memo` walls never trap stale
-theme or session values.
+theme or session values. Each provider keeps a registry of the
+components that read it, so a value change re-renders exactly those
+consumers without walking the rest of the subtree.
 
 ## Batching state updates
 
-By default, each state setter call triggers a re-render. When you
-need to update multiple pieces of state at once, use
-[`batch_updates`][pythonnative.scheduler.batch_updates] to coalesce them into a
-single render pass:
+State setters never render inline. Every setter call made during one
+callback, effect, or task step is coalesced into a single render pass
+scheduled on the application loop, on every host, including headless
+tests:
 
 ```python
 @pn.component
-def Form():
+def Form() -> pn.Node:
     name, set_name = pn.use_state("")
     email, set_email = pn.use_state("")
 
-    def on_submit():
-        with pn.batch_updates():
-            set_name("Alice")
-            set_email("alice@example.com")
-        # single re-render here
+    def on_submit() -> None:
+        set_name("Alice")
+        set_email("alice@example.com")
+        # one re-render, after on_submit returns
 
     return pn.Column(
         pn.Text(f"{name} <{email}>"),
@@ -389,10 +492,32 @@ def Form():
     )
 ```
 
-State updates triggered by effects during a render pass are
-automatically batched; the framework drains any pending re-renders
-after effect flushing completes, so you don't need `batch_updates()`
-inside effects.
+Automatic batching stops at an `await`: each step of a task is its own
+batch. Use [`batch_updates`][pythonnative.scheduler.batch_updates] when
+you want setters on both sides of an `await` to land in one pass:
+
+```python
+async def load() -> None:
+    with pn.batch_updates():
+        set_loading(True)
+        data = await fetch_data()
+        set_items(data)
+        set_loading(False)
+```
+
+A component that keeps dirtying itself (an effect that sets state
+unconditionally, or a setter called during its own render) is stopped
+after fifty passes with `RuntimeError("Too many re-renders")`, raised
+from that component and routed through the nearest
+[`ErrorBoundary`][pythonnative.ErrorBoundary] (or the RedBox in dev
+mode). In dev mode the reconciler also warns once per site for a
+setter called after unmount, a setter called during render, and a
+setter handed the identical `list`, `dict`, or `set` object it already
+holds (in-place mutation never re-renders; replace the object).
+
+[`use_color_scheme`][pythonnative.use_color_scheme] returns a
+[`ColorScheme`][pythonnative.hooks.ColorScheme] (`"light"` or `"dark"`) and
+re-renders when it changes.
 
 ## Memoizing function components
 
@@ -402,7 +527,7 @@ its body when neither its props nor its internal state have changed:
 ```python
 @pn.memo
 @pn.component
-def ExpensiveRow(label: str, value: int):
+def ExpensiveRow(label: str, value: int) -> pn.Node:
     return pn.Row(
         pn.Text(label, style={"flex": 1}),
         pn.Text(str(value)),
@@ -430,7 +555,7 @@ hooks in error reporting:
 
 ```python
 @pn.component
-def App():
+def App() -> pn.Node:
     return pn.ErrorBoundary(
         MyRiskyComponent(),
         fallback=lambda err, reset: pn.Column(
@@ -451,21 +576,28 @@ catch errors during both initial mount and subsequent reconciliation.
 Extract reusable stateful logic into plain functions:
 
 ```python
-def use_toggle(initial: bool = False):
+from collections.abc import Callable
+
+
+def use_toggle(initial: bool = False) -> tuple[bool, Callable[[], None]]:
     value, set_value = pn.use_state(initial)
-    toggle = pn.use_callback(lambda: set_value(not value), [value])
+    toggle = pn.use_callback(lambda: set_value(lambda current: not current), [])
     return value, toggle
 
-def use_text_input(initial: str = ""):
+
+def use_text_input(initial: str = "") -> tuple[str, Callable[[str], None]]:
     text, set_text = pn.use_state(initial)
     return text, set_text
 ```
+
+A custom hook's name starts with `use_`, which is how `pn lint`
+recognizes it and allows hook calls inside it.
 
 Use them in any component:
 
 ```python
 @pn.component
-def Settings():
+def Settings() -> pn.Node:
     dark_mode, toggle_dark = use_toggle(False)
 
     return pn.Column(
@@ -479,9 +611,11 @@ def Settings():
 
 ## Rules of hooks
 
-1. Only call hooks inside `@pn.component` functions.
-2. Call hooks at the top level, not inside loops, conditions, or
-   nested functions.
+1. Only call hooks inside `@pn.component` functions and custom hooks
+   (functions named `use_...`).
+2. Call hooks at the top level, not inside loops, conditions,
+   comprehensions, `try` blocks, or nested functions, and not after an
+   early `return`.
 3. Hooks must be called in the same order on every render.
 
 !!! tip "Why these rules?"
@@ -490,6 +624,12 @@ def Settings():
     and the framework can't keep your state straight. Move the
     condition *inside* the hook, or compose the hook into a helper
     that the parent calls unconditionally.
+
+Run `pn lint` to catch violations of these rules without running the
+app. It reports a conditional or late hook (`PN101`), a hook outside a
+component or custom hook (`PN102`), a missing effect, memo, or
+callback dependency (`PN103`), and `key=` passed to a user component
+(`PN104`). See the [Linting guide](../guides/linting.md).
 
 In dev mode (`pn preview`, `pn run` with hot reload, or `PN_DEV=1`),
 violating these rules raises a

@@ -1,0 +1,20 @@
+# Tests PixelRatio.get / get_font_scale / get_pixel_size_for_layout_size /
+# round_to_nearest_pixel agree with each other on the running device.
+#
+# Demo screen: examples/e2e-suite/app/screens/device/pixel_ratio.py
+# Source under test: src/pythonnative/native_modules/dimensions.py :: PixelRatio
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Device
+      DEMO_TITLE: PixelRatio
+- assertVisible: "Ratio positive: yes"
+- assertVisible: "Font scale positive: yes"
+- assertVisible: "Pixels match ratio: yes"
+- assertVisible: "Snap within a pixel: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Device

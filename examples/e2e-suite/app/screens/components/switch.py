@@ -7,25 +7,25 @@ the "State:" line flips between ON and OFF.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def SwitchDemo() -> pn.Element:
+def SwitchDemo() -> pn.Node:
     """Render a Switch plus a result line tracking its boolean state."""
     on, set_on = pn.use_state(False)
 
-    return demo_screen(
+    return DemoScreen(
         "Switch",
         "Toggle the switch and the State line should flip ON/OFF.",
-        section(
+        DemoSection(
             "Single switch",
-            result_text("State", "ON" if on else "OFF"),
+            ResultText("State", "ON" if on else "OFF"),
             pn.Switch(value=on, on_change=set_on, accessibility_label="Demo switch"),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Turn on", on_press=lambda: set_on(True)),
                 pn.Button("Turn off", on_press=lambda: set_on(False)),
             ),
-            hint("Maestro taps the switch itself, then the buttons."),
+            Hint("Maestro taps the switch itself, then the buttons."),
         ),
     )

@@ -1,4 +1,5 @@
-# Tests StatusBar toggles between dark and light styles.
+# Tests StatusBar bar_style toggles and the translucent / animated props
+# mount without error.
 #
 # Demo screen: examples/e2e-suite/app/screens/components/status_bar.py
 # Source under test: src/pythonnative/components/controls.py :: StatusBar
@@ -10,10 +11,15 @@ appId: ${APP_ID}
       CATEGORY: Components
       DEMO_TITLE: StatusBar
 - assertVisible: "Bar style: dark"
+- assertVisible: "Translucent: OFF"
 - tapOn: "Toggle"
 - assertVisible: "Bar style: light"
 - tapOn: "Toggle"
 - assertVisible: "Bar style: dark"
+- tapOn: "Toggle translucent"
+- assertVisible: "Translucent: ON"
+- tapOn: "Toggle translucent"
+- assertVisible: "Translucent: OFF"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

@@ -10,16 +10,19 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
 - `pn deps [platform]`: resolve ``[requirements].packages`` for every
   device target and report which wheels would be used (or why a package
   can't be installed), without building anything.
-- `pn start`: run the dev server. It renders the app in a browser tab
-  and syncs every save to every connected debug build (simulators,
-  emulators, physical devices) with Fast Refresh; device logs stream
-  back into the same terminal.
+- `pn start`: run the dev server. It prints a QR code that opens the
+  project on a phone, renders the app in a browser tab, serves DevTools
+  and the debugger proxy, syncs every save to every connected dev client
+  with Fast Refresh, and reads single-key commands (`i`, `a`, `r`, `j`,
+  ...); device logs stream back into the same terminal.
 - `pn preview`: `pn start` plus opening the browser preview.
+- `pn go android|ios`: install PythonNative Go, the prebuilt dev client,
+  and open the running `pn start` in it.
 - `pn devices [platform]`: list connected devices, emulators, and
   simulators, as a table or as JSON with `--json`.
-- `pn run android|ios [--device D]`: stage + build + install + launch a
-  debug build that connects to the dev server. The native project is
-  only rebuilt when something outside ``app/`` changed.
+- `pn run android|ios [--device D]`: stage + build + install + launch the
+  project's own debug build and connect it to the dev server. The native
+  project is only rebuilt when something outside ``app/`` changed.
 - `pn logs android|ios [--device D]`: stream logs from the running app
   without rebuilding.
 - `pn build android|ios`: produce standalone artifacts (signed APK/AAB,
@@ -27,6 +30,9 @@ The console script `pn` (declared in `pyproject.toml`) dispatches to:
 - `pn app-id android|ios`: print the resolved application/bundle id
   (handy for scripts and CI), as plain text or as JSON with `--json`.
 - `pn clean`: remove the local `build/` directory.
+- `pn lint [paths...]`: check the rules of hooks without running the
+  code, as ``path:line:col: CODE message`` lines or as JSON with
+  `--json`.
 
 The heavy lifting lives in the ``pythonnative.project`` and
 ``pythonnative.devserver`` packages; this module is a thin,
@@ -38,17 +44,19 @@ be unit tested.
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, TextIO
-from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 from ..project import builder as builder_mod
 from ..project import deps as deps_mod
@@ -57,64 +65,152 @@ from ..project import doctor as doctor_mod
 from ..project import fingerprint as fingerprint_mod
 from ..project.android import collect_logcat_filters
 from ..project.config import CONFIG_FILENAME, AppConfig, ConfigError, render_default_toml
+from ..project.plugins import PluginError
+from . import launch
+
+# Failures a build reports as one line instead of a traceback: a stale or
+# incomplete lock and an unusable plugin are as ordinary as a failed build.
+_BUILD_ERRORS = (builder_mod.BuildError, deps_mod.DependencyError, PluginError)
 
 DEFAULT_DEV_PORT = 8765
 """Port `pn start` listens on unless `--port` says otherwise."""
+
+DEFAULT_DEBUG_PORT = 5678
+"""Port of `pn start`'s debugger proxy unless `--debug-port` says otherwise."""
 
 
 # ======================================================================
 # init
 # ======================================================================
 
-_MAIN_TEMPLATE = """from typing import TypedDict
-
-import pythonnative as pn
-
-Stack = pn.create_stack_navigator()
+_MAIN_TEMPLATE = """import pythonnative as pn
 
 
-class DetailParams(TypedDict):
-    count: int
+class Styles:
+    def __init__(self, theme: pn.Theme) -> None:
+        self.screen = pn.style(padding=theme.spacing.md, gap=theme.spacing.md, align_items="stretch")
+        self.title: pn.Style = {**theme.typography.title, "color": theme.colors.text}
+        self.body: pn.Style = {**theme.typography.body, "color": theme.colors.text}
 
 
 @pn.component
-def HomeScreen():
+def HomeScreen() -> pn.Node:
     count, set_count = pn.use_state(0)
     nav = pn.use_navigation()
-    theme = pn.use_theme()
+    styles = pn.use_styles(Styles)
     return pn.ScrollView(
         pn.Column(
-            pn.Text("Hello from PythonNative!", style={"font_size": theme.font_size_title, "bold": True}),
-            pn.Text(f"Tapped {count} times"),
+            pn.Text("Hello from PythonNative!", style=styles.title),
+            pn.Text(f"Tapped {count} times", style=styles.body),
             pn.Button("Tap me", on_press=lambda: set_count(count + 1)),
-            pn.Button("Open detail", on_press=lambda: nav.navigate("Detail", count=count)),
-            style={"spacing": theme.spacing_large, "padding": 16, "align_items": "stretch"},
+            pn.Button("Open detail", on_press=lambda: nav.push(DetailScreen(count=count))),
+            style=styles.screen,
         )
     )
 
 
 @pn.component
-def DetailScreen():
+def DetailScreen(count: int) -> pn.Node:
     nav = pn.use_navigation()
-    route = pn.use_route(DetailParams)
+    styles = pn.use_styles(Styles)
     return pn.Column(
-        pn.Text(f"Detail: count was {route.params['count']}", style={"font_size": 20}),
+        pn.Text(f"The count was {count}", style=styles.body),
         pn.Button("Back", on_press=nav.go_back),
-        style={"spacing": 12, "padding": 16},
+        style=styles.screen,
     )
+
+
+Root = pn.StackNavigator(
+    pn.Screen(HomeScreen, title="Home"),
+    pn.Screen(DetailScreen, title="Detail"),
+)
 
 
 @pn.component
-def App():
-    return pn.NavigationContainer(
-        Stack.Navigator(
-            Stack.Screen("Home", HomeScreen, title="Home"),
-            Stack.Screen("Detail", DetailScreen, title="Detail"),
-        )
-    )
+def App() -> pn.Node:
+    return pn.NavigationContainer(Root)
 """
 
-_GITIGNORE = "# PythonNative\n__pycache__/\n*.pyc\n.venv/\nbuild/\n.DS_Store\n"
+_GITIGNORE = "# PythonNative\n__pycache__/\n*.pyc\n.venv/\nbuild/\n.mypy_cache/\n.pytest_cache/\n.DS_Store\n"
+
+_PYPROJECT_TEMPLATE = """[project]
+name = "{name}"
+version = "1.0.0"
+requires-python = ">={python}"
+# The app's runtime dependencies belong in pythonnative.toml's
+# [requirements], which builds bundle for each device. This file pins the
+# framework and the development tools for your computer.
+dependencies = ["pythonnative=={version}"]
+
+[dependency-groups]
+dev = ["pytest>=8", "mypy>=1.10"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+packages = ["app", "tests"]
+"""
+
+_TEST_TEMPLATE = """\"\"\"Tests for the app, rendered headlessly with pythonnative.testing.\"\"\"
+
+from pythonnative.testing import render
+
+from app.main import App
+
+
+def test_tapping_increments_the_counter() -> None:
+    screen = render(App())
+    assert screen.get_by_text("Tapped 0 times")
+    screen.press(screen.get_by_role("button", name="Tap me"))
+    assert screen.get_by_text("Tapped 1 times")
+"""
+
+_TESTS_INIT = ""
+
+_VSCODE_LAUNCH = """{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "PythonNative: Attach",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {"host": "127.0.0.1", "port": 5678},
+      "justMyCode": true
+    }
+  ]
+}
+"""
+
+_VSCODE_EXTENSIONS = """{
+  "recommendations": ["ms-python.python", "ms-python.debugpy", "ms-python.mypy-type-checker"]
+}
+"""
+
+_CI_WORKFLOW = """name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "{python}"
+      - name: Install
+        run: pip install -e . pytest mypy
+      - name: Rules of hooks
+        run: pn lint
+      - name: Types
+        run: mypy
+      - name: Tests
+        run: pytest
+"""
 
 
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
@@ -205,8 +301,13 @@ def init_project(args: argparse.Namespace) -> None:
     as ``a/b``, ``..``, or ``/tmp/app``, is refused, and so is a name that
     resolves somewhere else, such as a symlink to another directory.
 
+    It also writes ``pyproject.toml`` (pinning this ``pythonnative`` and
+    declaring ``pytest`` and ``mypy``), ``tests/test_app.py``, VS Code's
+    debugger configuration and extension recommendations, and a GitHub
+    Actions workflow that runs ``pn lint``, ``mypy``, and ``pytest``.
+
     It won't scaffold into a target directory that already holds files, and it
-    won't overwrite any of the three paths above; pass ``--force`` to override
+    won't overwrite any of the scaffolded paths; pass ``--force`` to override
     both. An existing but empty target directory is fine. A plain file at
     ``./<name>`` is always refused, since ``--force`` can't turn it into a
     directory, and ``--force`` lifts neither of the rules above.
@@ -262,17 +363,28 @@ def init_project(args: argparse.Namespace) -> None:
             print(f"Refusing to overwrite existing non-empty directory: {name}/. Use --force to overwrite.")
             sys.exit(1)
 
+    from ..project.config import DEFAULT_PYTHON_VERSION
+
+    extras = {
+        "pyproject.toml": _PYPROJECT_TEMPLATE.format(
+            name=project_name, python=DEFAULT_PYTHON_VERSION, version=pkg_version("pythonnative")
+        ),
+        "tests/__init__.py": _TESTS_INIT,
+        "tests/test_app.py": _TEST_TEMPLATE,
+        ".vscode/launch.json": _VSCODE_LAUNCH,
+        ".vscode/extensions.json": _VSCODE_EXTENSIONS,
+        ".github/workflows/ci.yml": _CI_WORKFLOW.format(python=DEFAULT_PYTHON_VERSION),
+    }
     if not force:
-        existing = [
-            label
-            for label, path in (("app/", app_dir), (CONFIG_FILENAME, config_path), (".gitignore", gitignore_path))
-            if path.exists()
-        ]
+        scaffolded = [("app/", app_dir), (CONFIG_FILENAME, config_path), (".gitignore", gitignore_path)]
+        scaffolded += [(rel, target / rel) for rel in extras]
+        existing = [label for label, path in scaffolded if path.exists()]
         if existing:
             print(f"Refusing to overwrite existing: {', '.join(existing)}. Use --force to overwrite.")
             sys.exit(1)
 
     app_dir.mkdir(parents=True, exist_ok=True)
+    (app_dir / "__init__.py").touch()
     main_py = app_dir / "main.py"
     if force or not main_py.exists():
         main_py.write_text(_MAIN_TEMPLATE, encoding="utf-8")
@@ -283,12 +395,18 @@ def init_project(args: argparse.Namespace) -> None:
     )
     if force or not gitignore_path.exists():
         gitignore_path.write_text(_GITIGNORE, encoding="utf-8")
+    for rel, content in extras.items():
+        path = target / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
 
     print(f"Initialized PythonNative project in {target}.")
-    next_steps = "pn start   (browser preview + dev server)   |   pn run android   |   pn run ios"
+    print()
     if name:
-        next_steps = f"cd {name}   |   {next_steps}"
-    print(f"Next: {next_steps}")
+        print(f"  cd {name}")
+    print("  pn start      run the dev server; scan its QR code, or press i (iOS) or a (Android)")
+    print("  pytest        run the tests in tests/")
+    print("  pn lint       check the rules of hooks")
 
 
 # ======================================================================
@@ -398,12 +516,7 @@ def deps_command(args: argparse.Namespace) -> None:
             f"across {len(targets)} target(s)...\n"
         )
     resolutions = deps_mod.resolve_all(config, targets, runner=runner, python=python)
-    if getattr(args, "lock", False):
-        from ..project.lockfile import write
-
-        path = write(config, resolutions)
-        if not as_json:
-            print(f"Wrote {path}")
+    failed = [res for res in resolutions if not res.ok]
 
     if as_json:
         print(
@@ -418,7 +531,22 @@ def deps_command(args: argparse.Namespace) -> None:
         )
     else:
         print(deps_mod.format_report(resolutions, requirements=config.requirements))
-    if any(not res.ok for res in resolutions):
+    if getattr(args, "lock", False):
+        if failed:
+            if not as_json:
+                labels = ", ".join(res.target.label for res in failed)
+                print(f"\nNot writing pn.lock: a lock needs every target to resolve, and {labels} didn't.")
+            sys.exit(1)
+        from ..project.lockfile import write
+
+        try:
+            path = write(config, resolutions)
+        except deps_mod.DependencyError as exc:
+            print(f"Error: {exc}", file=sys.stderr if as_json else sys.stdout)
+            sys.exit(1)
+        if not as_json:
+            print(f"Wrote {path}")
+    if failed:
         sys.exit(1)
 
 
@@ -453,6 +581,7 @@ def start_command(args: argparse.Namespace, *, open_browser: bool = False) -> No
     entry: Optional[str] = getattr(args, "entry", None)
     project_name = ""
     requirements: List[str] = []
+    config: Optional[AppConfig] = None
     try:
         config = AppConfig.load(project_dir)
         entry = entry or config.entry_module
@@ -462,12 +591,7 @@ def start_command(args: argparse.Namespace, *, open_browser: bool = False) -> No
         entry = entry or "app.main"
     missing = _missing_requirements(requirements)
     if missing:
-        print(f"Warning: {', '.join(missing)} from [requirements] is not installed in this Python environment.")
-        print(
-            "         The browser preview imports your app here, so install it first (e.g. `pip install "
-            + " ".join(missing)
-            + "`)."
-        )
+        print(_missing_requirements_message(missing), flush=True)
     if not (project_dir / "app").is_dir():
         print(f"Error: no app/ directory in {project_dir}. Run 'pn init' first or cd into a PythonNative project.")
         sys.exit(1)
@@ -477,14 +601,20 @@ def start_command(args: argparse.Namespace, *, open_browser: bool = False) -> No
     open_browser = open_browser or bool(getattr(args, "open", False))
     if getattr(args, "no_open", False):
         open_browser = False
+    debug_port = int(getattr(args, "debug_port", DEFAULT_DEBUG_PORT))
+    port = int(getattr(args, "port", DEFAULT_DEV_PORT) or 0)
+    interactive = sys.stdin.isatty() and not getattr(args, "no_interactive", False)
     try:
         serve(
             entry,
             project_root=str(project_dir),
             host=getattr(args, "host", "0.0.0.0") or "0.0.0.0",
-            port=int(getattr(args, "port", DEFAULT_DEV_PORT) or 0),
+            port=port,
             project_name=project_name,
             open_browser=open_browser,
+            config=config,
+            debug_port=debug_port or None,
+            ready=(lambda session: _start_key_commands(session)) if interactive else None,
         )
     except OSError as exc:
         print(f"Error: could not start the dev server: {exc}")
@@ -495,24 +625,67 @@ def start_command(args: argparse.Namespace, *, open_browser: bool = False) -> No
         sys.exit(1)
 
 
-def _missing_requirements(requirements: Sequence[str]) -> List[str]:
-    """Names from ``[requirements]`` that aren't installed in this interpreter.
+def _start_key_commands(session: Any) -> None:
+    """Read single-key commands on a background thread while the server runs."""
+    import threading
 
-    Requirement strings may carry version specifiers or extras
-    (``"httpx[http2]>=0.27"``); only the distribution name is checked.
+    from .keys import KeyCommands, read_keys
+
+    stopped = threading.Event()
+
+    def stop() -> None:
+        stopped.set()
+        session.stop_soon()
+
+    commands = KeyCommands(session, session.server.info.port, session.log, stop)
+    session.log("  Press ? for commands: i iOS, a Android, w preview, j DevTools, r reload, m dev menu, q quit.")
+    session.log("")
+    threading.Thread(target=read_keys, args=(commands.handle, stopped), name="pn-keys", daemon=True).start()
+
+
+def _requirement_distribution(requirement: str) -> str:
+    """Return the distribution name a ``[requirements]`` entry installs.
+
+    Entries are PEP 508 strings (``"httpx[http2]>=0.27"``) or paths to
+    local wheels (``"vendor/pkg-0.1.0-py3-none-any.whl"``), whose name is
+    the wheel filename's first component.
+    """
+    text = requirement.strip()
+    if text.endswith(".whl"):
+        return Path(text).name.split("-", 1)[0]
+    return re.split(r"[\s\[<>=!~;@(]", text, maxsplit=1)[0]
+
+
+def _missing_requirements(requirements: Sequence[str]) -> List[str]:
+    """``[requirements]`` entries that aren't installed in this interpreter.
+
+    Only the distribution name is checked, so version specifiers and
+    extras don't cause false reports; the entries are returned unchanged
+    so the install hint reproduces them exactly.
     """
     import importlib.metadata as metadata
 
     missing: List[str] = []
     for requirement in requirements:
-        name = re.split(r"[\s\[<>=!~;@]", requirement.strip(), maxsplit=1)[0]
+        name = _requirement_distribution(requirement)
         if not name:
             continue
         try:
             metadata.distribution(name)
         except metadata.PackageNotFoundError:
-            missing.append(name)
+            missing.append(requirement.strip())
     return missing
+
+
+def _missing_requirements_message(missing: Sequence[str]) -> str:
+    """The warning ``pn start`` prints, ending in a command that installs ``missing`` here."""
+    command = " ".join([shlex.quote(sys.executable), "-m", "pip", "install", *(shlex.quote(m) for m in missing)])
+    names = ", ".join(_requirement_distribution(m) for m in missing)
+    return (
+        f"Warning: [requirements] lists {names}, which this Python environment doesn't have.\n"
+        "The browser preview imports your app in this interpreter, so the first import of a missing\n"
+        f"package fails. Install them here with:\n\n    {command}\n"
+    )
 
 
 def preview_command(args: argparse.Namespace) -> None:
@@ -520,11 +693,26 @@ def preview_command(args: argparse.Namespace) -> None:
     start_command(args, open_browser=True)
 
 
-def _running_dev_server(port: int) -> Optional[Dict[str, Any]]:
-    """Return ``/status`` of a dev server on ``localhost:port``, or ``None``."""
+def _running_dev_server(port: int, token: str) -> Optional[Dict[str, Any]]:
+    """Return ``/status`` of a dev server on ``localhost:port``, or ``None``.
+
+    The request carries this user's dev ``token``. A server that refuses
+    it (another user's, or one started with a different ``PN_DEV_TOKEN``)
+    counts as absent, with a note saying why.
+    """
+    from ..devserver.auth import HEADER_NAME
+
+    request = Request(f"http://127.0.0.1:{port}/status", headers={HEADER_NAME: token})
     try:
-        with urlopen(f"http://127.0.0.1:{port}/status", timeout=0.5) as response:
+        with urlopen(request, timeout=0.5) as response:
             data = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code in (401, 403):
+            print(
+                f"Note: the dev server on port {port} refused this user's dev token. Start 'pn start' "
+                "as the same user (with the same PN_DEV_TOKEN, if you set one) and relaunch."
+            )
+        return None
     except Exception:
         return None
     return data if isinstance(data, dict) else None
@@ -598,22 +786,6 @@ def _resolve_device(platform: str, query: Optional[str]) -> Optional[devices_mod
 # ======================================================================
 
 
-def _dev_server_url_for(platform: str, device: Optional[devices_mod.Device], port: int) -> str:
-    """The WebSocket URL a launched app should use to reach ``pn start``.
-
-    Simulators share the host's loopback. Android emulators and USB
-    devices reach it through ``adb reverse`` (set up by the caller), so
-    ``localhost`` works for every Android target. A physical iOS device
-    is on the LAN, so it gets the first LAN address.
-    """
-    if platform == "ios" and device is not None and device.kind == "device":
-        from ..devserver import lan_addresses
-
-        for address in lan_addresses():
-            return f"ws://{address}:{port}/ws?role=client"
-    return f"ws://localhost:{port}/ws?role=client"
-
-
 def run_project(args: argparse.Namespace) -> None:
     """Stage, build, install, and launch a debug build that talks to ``pn start``.
 
@@ -626,21 +798,16 @@ def run_project(args: argparse.Namespace) -> None:
     Args:
         args: Parsed namespace (``platform``, ``device``,
             ``prepare_only``, ``no_logs``, ``rebuild``, ``dev_server``,
-            ``port``, ``dev_client``).
+            ``port``).
     """
     platform: str = args.platform
     prepare_only: bool = getattr(args, "prepare_only", False)
     show_logs: bool = not getattr(args, "no_logs", False)
     force_rebuild: bool = getattr(args, "rebuild", False)
-    dev_client: bool = getattr(args, "dev_client", False)
     port: int = int(getattr(args, "port", DEFAULT_DEV_PORT) or DEFAULT_DEV_PORT)
     device = _resolve_device(platform, getattr(args, "device", None))
 
     config = _load_config_or_exit()
-    if dev_client:
-        # A dev client is the same native app whose entry module is the
-        # connect screen; the real app arrives from the dev server.
-        config = dataclasses.replace(config, entry_point="pythonnative/devclient.py")
     builder = builder_mod.Builder(config, log=print)
 
     # Resolve third-party packages only for the destination being built
@@ -653,12 +820,15 @@ def run_project(args: argparse.Namespace) -> None:
     else:
         ios_sdks = ("iphonesimulator",)
 
+    from ..devserver.auth import load_token
+
     explicit_server: Optional[str] = getattr(args, "dev_server", None)
-    status = _running_dev_server(port) if not explicit_server else None
+    token = load_token()
+    status = _running_dev_server(port, token) if not explicit_server else None
     if explicit_server:
         server_url: Optional[str] = explicit_server
     elif status is not None:
-        server_url = _dev_server_url_for(platform, device, int(status.get("port") or port))
+        server_url = launch.server_connect_url(platform, device, int(status.get("port") or port), token)
     else:
         server_url = None
         if not prepare_only:
@@ -667,7 +837,7 @@ def run_project(args: argparse.Namespace) -> None:
                 "app will run its bundled sources without Fast Refresh."
             )
 
-    fingerprint = _native_fingerprint(config, platform, builder, ios_sdks=ios_sdks, dev_client=dev_client)
+    fingerprint = _native_fingerprint(config, platform, builder, ios_sdks=ios_sdks)
     build_dir = builder.build_root / platform
     stamp = fingerprint_mod.read_stamp(build_dir)
     artifact = Path(stamp["artifact"]) if stamp and stamp.get("artifact") else None
@@ -687,7 +857,7 @@ def run_project(args: argparse.Namespace) -> None:
     else:
         try:
             prepared = builder.prepare(platform, ios_sdks=ios_sdks)
-        except builder_mod.BuildError as exc:
+        except _BUILD_ERRORS as exc:
             print(f"Error: {exc}")
             sys.exit(1)
         if prepare_only:
@@ -695,17 +865,19 @@ def run_project(args: argparse.Namespace) -> None:
             return
 
     app_id = config.application_id if platform == "android" else config.bundle_id
+    link: Optional[str] = None
     if server_url:
-        print(f"Dev server: {server_url} (saves in app/ apply with Fast Refresh).")
+        from ..devclient import connect_link, dev_scheme
+
+        link = connect_link(dev_scheme(config.app_id), server_url)
+        print(f"Dev server: {urlsplit(server_url).netloc} (saves in app/ apply with Fast Refresh).")
     try:
         if platform == "android":
             artifact = _run_android(
-                builder, prepared, artifact=artifact, app_id=app_id, device=device, server_url=server_url, port=port
+                builder, prepared, artifact=artifact, app_id=app_id, device=device, link=link, port=port
             )
         elif device is not None and device.kind == "device":
-            artifact = _run_ios_device(
-                builder, prepared, artifact=artifact, app_id=app_id, device=device, server_url=server_url
-            )
+            artifact = _run_ios_device(builder, prepared, artifact=artifact, app_id=app_id, device=device, link=link)
         else:
             artifact = _run_ios_simulator(
                 builder,
@@ -713,10 +885,10 @@ def run_project(args: argparse.Namespace) -> None:
                 artifact=artifact,
                 app_id=app_id,
                 device=device,
-                server_url=server_url,
+                link=link,
                 show_logs=show_logs,
             )
-    except builder_mod.BuildError as exc:
+    except _BUILD_ERRORS as exc:
         print(f"Error: {exc}")
         sys.exit(1)
     if artifact is not None and not reuse:
@@ -726,21 +898,13 @@ def run_project(args: argparse.Namespace) -> None:
         _stream_logs_until_interrupt(platform, app_id, device)
 
 
-def _native_fingerprint(
-    config: AppConfig,
-    platform: str,
-    builder: builder_mod.Builder,
-    *,
-    ios_sdks: tuple,
-    dev_client: bool,
-) -> str:
+def _native_fingerprint(config: AppConfig, platform: str, builder: builder_mod.Builder, *, ios_sdks: tuple) -> str:
     return fingerprint_mod.compute(
         config,
         platform,
         template_root=builder_mod.template_source(platform),
         lib_root=builder.dev_lib_root,
         ios_sdks=ios_sdks,
-        extra={"dev_client": "1" if dev_client else "0"},
     )
 
 
@@ -751,27 +915,29 @@ def _run_android(
     artifact: Optional[Path],
     app_id: str,
     device: Optional[devices_mod.Device],
-    server_url: Optional[str],
+    link: Optional[str],
     port: int,
 ) -> Optional[Path]:
-    if device is not None:
-        # Both Gradle's install task and every adb call below honor
-        # ANDROID_SERIAL, so exporting it targets the whole run.
-        os.environ["ANDROID_SERIAL"] = device.identifier
+    serial = launch.ensure_android_device(device, print)
+    if serial is None:
+        raise builder_mod.BuildError("No Android device or emulator is available.")
+    # Both Gradle's install task and every adb call below honor
+    # ANDROID_SERIAL, so exporting it targets the whole run.
+    os.environ["ANDROID_SERIAL"] = serial
     if prepared is not None:
         builder.install_android_debug(prepared)
         artifact = builder.android_debug_apk(prepared)
     elif artifact is not None:
-        install = subprocess.run(["adb", "install", "-r", str(artifact)], check=False)
-        if install.returncode != 0:
+        if not launch.install_android(serial, artifact, app_id, print):
             raise builder_mod.BuildError("adb install failed; run again with --rebuild.")
-    if server_url and "localhost" in server_url:
+    launch.stop_android_app(serial, app_id)
+    if link:
         # Emulators and USB devices reach the host through adb's reverse tunnel.
-        subprocess.run(["adb", "reverse", f"tcp:{port}", f"tcp:{port}"], check=False, capture_output=True)
-    command = ["adb", "shell", "am", "start", "-n", f"{app_id}/.MainActivity"]
-    if server_url:
-        command += ["--es", "pn_dev_server", server_url]
-    subprocess.run(command, check=True)
+        launch.reverse_port(serial, port)
+        launch.reverse_port(serial, DEFAULT_DEBUG_PORT)
+        launch.open_link_android(serial, link, app_id)
+    else:
+        subprocess.run(["adb", "shell", "am", "start", "-n", f"{app_id}/.MainActivity"], check=True)
     return artifact
 
 
@@ -782,34 +948,27 @@ def _run_ios_simulator(
     artifact: Optional[Path],
     app_id: str,
     device: Optional[devices_mod.Device],
-    server_url: Optional[str],
+    link: Optional[str],
     show_logs: bool,
 ) -> Optional[Path]:
     if prepared is not None:
         artifact = builder.build_ios_simulator(prepared)
     if artifact is None:
         raise builder_mod.BuildError("No simulator build to install; run again with --rebuild.")
-    udid = device.identifier if device is not None else _select_ios_simulator()
+    udid = device.identifier if device is not None else launch.select_ios_simulator()
     if udid is None:
         print("No available iOS Simulators found; open the project in Xcode to run.")
         return artifact
-    subprocess.run(["xcrun", "simctl", "boot", udid], check=False, capture_output=True)
-    subprocess.run(["xcrun", "simctl", "install", udid, str(artifact)], check=False)
-    env = {**os.environ, "SIMCTL_CHILD_PYTHONUNBUFFERED": "1"}
-    if server_url:
-        env["SIMCTL_CHILD_PN_DEV_SERVER"] = server_url
-    command = ["xcrun", "simctl", "launch", "--terminate-running-process"]
-    if show_logs:
-        # A console PTY streams Python's stdout here; the launch blocks.
-        command.append("--console-pty")
-    command += [udid, app_id]
+    launch.boot_ios_simulator(udid)
+    launch.install_ios_simulator(udid, artifact)
+    process = launch.launch_ios_simulator(udid, app_id, link, console=show_logs)
     if not show_logs:
-        subprocess.run(command, env=env, check=False)
+        process.wait()
         print("Launched iOS app on Simulator.")
         return artifact
     print("Launched iOS app on Simulator. Streaming logs (Ctrl+C to stop)...")
     try:
-        subprocess.run(command, env=env, check=False)
+        process.wait()
     except KeyboardInterrupt:
         print()
         subprocess.run(["xcrun", "simctl", "terminate", udid, app_id], check=False, capture_output=True)
@@ -824,7 +983,7 @@ def _run_ios_device(
     artifact: Optional[Path],
     app_id: str,
     device: devices_mod.Device,
-    server_url: Optional[str],
+    link: Optional[str],
 ) -> Optional[Path]:
     """Build, install, and launch on a physical iOS device via devicectl."""
     if prepared is not None:
@@ -842,16 +1001,96 @@ def _run_ios_device(
             "and has Developer Mode enabled (Settings > Privacy & Security > Developer Mode)."
         )
         sys.exit(1)
-    command = ["xcrun", "devicectl", "device", "process", "launch", "--terminate-existing"]
-    if server_url:
-        command += ["--environment-variables", json.dumps({"PN_DEV_SERVER": server_url})]
-    command += ["--device", device.identifier, app_id]
-    launch = subprocess.run(command, check=False)
-    if launch.returncode != 0:
+    if not launch.launch_ios_device(device.identifier, app_id, link):
         print("Error: launch failed. Launch the app from the home screen to see details.")
         sys.exit(1)
     print(f"Launched on {device.name}. Logs stream to the 'pn start' terminal (or Console.app).")
     return artifact
+
+
+# ======================================================================
+# go
+# ======================================================================
+
+
+def go_command(args: argparse.Namespace) -> None:
+    """Install PythonNative Go and open the running ``pn start`` in it.
+
+    Go is the prebuilt dev client: it runs any project that adds no native
+    code, without building the project. The artifact for this framework
+    version comes from the cache, the GitHub release, or (once) a local
+    build; see ``pythonnative.project.go``.
+
+    Args:
+        args: Parsed namespace (``platform``, ``device``, ``build``, ``port``).
+    """
+    from ..devclient import connect_link, dev_scheme
+    from ..devserver.auth import load_token
+    from ..project import go as go_mod
+
+    platform: str = args.platform
+    port = int(getattr(args, "port", DEFAULT_DEV_PORT) or DEFAULT_DEV_PORT)
+    device = _resolve_device(platform, getattr(args, "device", None))
+    token = load_token()
+    status = _running_dev_server(port, token)
+    if status is None:
+        print(f"Note: no dev server on port {port}; Go will open on its home screen. Run 'pn start' to connect it.")
+    try:
+        if platform == "ios" and device is not None and device.kind == "device":
+            config = _load_config_or_exit()
+            team = config.ios.development_team
+            if not team:
+                print("Error: a physical iPhone needs [ios].development_team in pythonnative.toml to sign Go.")
+                sys.exit(1)
+            artifact = go_mod.build(
+                "ios", out_dir=go_mod.cache_dir() / "ios-device", device=True, development_team=team, log=print
+            )
+        else:
+            artifact = go_mod.ensure_artifact(platform, force_build=getattr(args, "build", False), log=print)
+    except go_mod.GoError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+    link = None
+    if status is not None:
+        server_url = launch.server_connect_url(platform, device, int(status.get("port") or port), token)
+        link = connect_link(dev_scheme(go_mod.GO_APP_ID), server_url)
+    app_id = go_mod.GO_APP_ID
+    if platform == "android":
+        serial = launch.ensure_android_device(device, print)
+        if serial is None:
+            sys.exit(1)
+        if not launch.install_android(serial, artifact, app_id, print):
+            print("Error: couldn't install PythonNative Go.")
+            sys.exit(1)
+        launch.stop_android_app(serial, app_id)
+        if link:
+            launch.reverse_port(serial, port)
+            launch.reverse_port(serial, DEFAULT_DEBUG_PORT)
+            launch.open_link_android(serial, link, app_id)
+        else:
+            subprocess.run(
+                ["adb", "-s", serial, "shell", "monkey", "-p", app_id, "1"], check=False, capture_output=True
+            )
+        print(f"Opened {go_mod.GO_DISPLAY_NAME} on {serial}.")
+        return
+    if device is not None and device.kind == "device":
+        subprocess.run(
+            ["xcrun", "devicectl", "device", "install", "app", "--device", device.identifier, str(artifact)],
+            check=False,
+        )
+        launch.launch_ios_device(device.identifier, app_id, link)
+        print(f"Opened {go_mod.GO_DISPLAY_NAME} on {device.name}.")
+        return
+    udid = device.identifier if device is not None else launch.select_ios_simulator()
+    if udid is None:
+        print("Error: no iOS Simulator is available. Install one in Xcode > Settings > Components.")
+        sys.exit(1)
+    launch.boot_ios_simulator(udid)
+    if not launch.install_ios_simulator(udid, artifact):
+        print("Error: couldn't install PythonNative Go on the simulator.")
+        sys.exit(1)
+    launch.launch_ios_simulator(udid, app_id, link).wait()
+    print(f"Opened {go_mod.GO_DISPLAY_NAME} on the iOS Simulator.")
 
 
 def _stream_logs_until_interrupt(platform: str, app_id: str, device: Optional[devices_mod.Device]) -> None:
@@ -910,7 +1149,7 @@ def build_project(args: argparse.Namespace) -> None:
                 artifacts = builder_mod.BuildArtifacts(paths=[app_path])
             else:
                 artifacts = builder.build_ios_archive(prepared, upload=upload)
-    except builder_mod.BuildError as exc:
+    except _BUILD_ERRORS as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 
@@ -920,9 +1159,12 @@ def build_project(args: argparse.Namespace) -> None:
         if not upload:
             print("Build completed, but no artifacts were found. Check the build output above.")
         return
+    from ..project.artifacts import size_report
+
     print("\nBuilt artifacts:")
     for path in artifacts.paths:
-        print(f"  {path}")
+        report = size_report(path)
+        print(f"  {path}" + (f" ({report})" if report else ""))
 
 
 # ======================================================================
@@ -1062,34 +1304,6 @@ def _booted_ios_udid() -> Optional[str]:
     return None
 
 
-def _select_ios_simulator() -> Optional[str]:
-    """Return a simulator UDID to target (booted first, else an iPhone)."""
-    booted = _booted_ios_udid()
-    if booted:
-        return booted
-    try:
-        result = subprocess.run(
-            ["xcrun", "simctl", "list", "devices", "available", "--json"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError:
-        return None
-    try:
-        data = json.loads(result.stdout or "{}")
-    except json.JSONDecodeError:
-        return None
-    devices: List[Dict[str, Any]] = [d for lst in (data.get("devices") or {}).values() for d in (lst or [])]
-    for device in devices:
-        if "iphone 15" in (device.get("name") or "").lower() and device.get("isAvailable"):
-            return device.get("udid")
-    for device in devices:
-        if device.get("isAvailable") and (device.get("name") or "").lower().startswith("iphone"):
-            return device.get("udid")
-    return None
-
-
 def _start_ios_log_stream(bundle_id: str, *, udid: Optional[str] = None) -> Optional[subprocess.Popen]:
     """Re-launch the iOS app with a console PTY so its stdio streams here.
 
@@ -1128,6 +1342,54 @@ def _terminate_subprocess(proc: Optional[subprocess.Popen]) -> None:
         proc.wait(timeout=3)
     except subprocess.TimeoutExpired:
         proc.kill()
+
+
+# ======================================================================
+# lint
+# ======================================================================
+
+
+def lint_command(args: argparse.Namespace) -> None:
+    """Check the rules of hooks and exit 1 when anything is found.
+
+    Lints each path in ``args.paths`` (files, or directories searched
+    recursively for ``*.py``). With no paths it lints ``app/`` when that
+    directory exists and the current directory otherwise. The checks
+    themselves live in [`lint_paths`][pythonnative.lint.lint_paths].
+
+    Without ``--json``, each finding prints as ``path:line:col: CODE
+    message`` followed by a summary line. With ``--json``, stdout
+    carries a JSON array and nothing else, one object per finding with
+    ``path``, ``line``, ``col``, ``code``, and ``message`` keys, and the
+    summary goes to stderr. Either way the exit status is 1 when there
+    are findings, 0 when there aren't, and 2 when a path doesn't exist.
+
+    Args:
+        args: Parsed namespace with ``paths`` and optional ``json``.
+    """
+    from .. import lint as lint_mod
+
+    as_json: bool = getattr(args, "json", False)
+    paths: List[str] = list(getattr(args, "paths", None) or [])
+    if not paths:
+        paths = ["app" if Path("app").is_dir() else "."]
+    try:
+        findings = lint_mod.lint_paths(paths)
+    except FileNotFoundError as exc:
+        print(f"pn lint: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+    summary_stream = sys.stderr if as_json else sys.stdout
+    if as_json:
+        print(json.dumps([finding.to_dict() for finding in findings], indent=2))
+    else:
+        for finding in findings:
+            print(finding.format())
+    if findings:
+        noun = "problem" if len(findings) == 1 else "problems"
+        print(f"Found {len(findings)} {noun}.", file=summary_stream)
+        sys.exit(1)
+    print("No problems found.", file=summary_stream)
 
 
 # ======================================================================
@@ -1206,9 +1468,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "--port", type=int, default=DEFAULT_DEV_PORT, help=f"Port to listen on (default: {DEFAULT_DEV_PORT})"
         )
         sub.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0 so devices can connect)")
+        sub.add_argument(
+            "--debug-port",
+            type=int,
+            default=DEFAULT_DEBUG_PORT,
+            help=f"Debugger proxy port on 127.0.0.1 (default: {DEFAULT_DEBUG_PORT}; 0 disables it)",
+        )
+        sub.add_argument("--no-interactive", action="store_true", help="Don't read single-key commands from stdin")
 
     parser_start = subparsers.add_parser(
-        "start", help="Run the dev server: browser preview + Fast Refresh for every connected debug build"
+        "start", help="Run the dev server: QR code, browser preview, DevTools, and Fast Refresh for every dev client"
     )
     _add_server_args(parser_start)
     parser_start.add_argument("--open", action="store_true", help="Also open the browser preview")
@@ -1218,6 +1487,19 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_server_args(parser_preview)
     parser_preview.add_argument("--no-open", action="store_true", help="Don't open the browser automatically")
     parser_preview.set_defaults(func=preview_command)
+
+    parser_go = subparsers.add_parser(
+        "go", help="Install PythonNative Go (the prebuilt dev client) and open the running dev server in it"
+    )
+    parser_go.add_argument("platform", choices=["android", "ios"], help="Target platform")
+    parser_go.add_argument(
+        "--device", "-d", help="Target device: an identifier or name from 'pn devices' (default: a simulator/emulator)"
+    )
+    parser_go.add_argument("--build", action="store_true", help="Build Go locally instead of using the release")
+    parser_go.add_argument(
+        "--port", type=int, default=DEFAULT_DEV_PORT, help=f"Port 'pn start' listens on (default: {DEFAULT_DEV_PORT})"
+    )
+    parser_go.set_defaults(func=go_command)
 
     parser_devices = subparsers.add_parser("devices", help="List devices, emulators, and simulators")
     parser_devices.add_argument("platform", nargs="?", choices=["android", "ios"], help="Restrict to a platform")
@@ -1241,15 +1523,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser_run.add_argument(
         "--dev-server",
-        help="Dev server WebSocket URL for the app (default: the 'pn start' found on --port, via localhost/LAN)",
+        help=(
+            "Dev server URL for the app, including its ?token= (default: the 'pn start' found on --port, "
+            "via localhost/LAN, with your dev token)"
+        ),
     )
     parser_run.add_argument(
         "--port", type=int, default=DEFAULT_DEV_PORT, help=f"Port 'pn start' listens on (default: {DEFAULT_DEV_PORT})"
-    )
-    parser_run.add_argument(
-        "--dev-client",
-        action="store_true",
-        help="Build a dev client: a shell app that shows a connect screen and loads the app from any dev server",
     )
     parser_run.set_defaults(func=run_project)
 
@@ -1282,6 +1562,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser_clean = subparsers.add_parser("clean", help="Remove the local build/ directory")
     parser_clean.set_defaults(func=clean_project)
+
+    parser_lint = subparsers.add_parser("lint", help="Check the rules of hooks (exits 1 on findings)")
+    parser_lint.add_argument(
+        "paths", nargs="*", help="Files or directories to lint (default: app/ if it exists, else the current directory)"
+    )
+    parser_lint.add_argument(
+        "--json", action="store_true", help="Print a JSON array to stdout for scripting (the summary goes to stderr)"
+    )
+    parser_lint.set_defaults(func=lint_command)
 
     return parser
 

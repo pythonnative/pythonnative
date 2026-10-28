@@ -8,22 +8,22 @@ deterministic, since native date wheels are hard to script.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import demo_screen, hint, result_text, section
+from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def DatePickerDemo() -> pn.Element:
+def DatePickerDemo() -> pn.Node:
     """Render a DatePicker plus a button that sets a fixed ISO date."""
     value, set_value = pn.use_state("2026-01-01")
 
-    return demo_screen(
+    return DemoScreen(
         "DatePicker",
         "Set the date via the button; the Date line shows the ISO value.",
-        section(
+        DemoSection(
             "Date",
-            result_text("Date", value),
+            ResultText("Date", value),
             pn.DatePicker(value=value, mode="date", on_change=set_value),
             pn.Button("Set 2026-12-25", on_press=lambda: set_value("2026-12-25")),
-            hint("Maestro taps 'Set 2026-12-25' and asserts 'Date: 2026-12-25'."),
+            Hint("Maestro taps 'Set 2026-12-25' and asserts 'Date: 2026-12-25'."),
         ),
     )

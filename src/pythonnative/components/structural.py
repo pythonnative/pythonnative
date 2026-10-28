@@ -8,7 +8,7 @@ view name, so they never create a platform view of their own.
 
 from typing import Any, Callable, Dict, Optional
 
-from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element
+from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element, Node
 
 
 def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element:
@@ -50,7 +50,7 @@ def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element
 
 
 def ErrorBoundary(
-    *children: Element,
+    *children: Node,
     fallback: Optional[Any] = None,
     on_error: Optional[Callable[[BaseException], Any]] = None,
     key: Optional[str] = None,
@@ -110,7 +110,7 @@ def ErrorBoundary(
 
 
 def Suspense(
-    *children: Element,
+    *children: Node,
     fallback: Optional[Any] = None,
     key: Optional[str] = None,
 ) -> Element:

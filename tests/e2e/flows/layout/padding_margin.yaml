@@ -1,7 +1,7 @@
 # Tests padding / margin labels render at different sizes.
 #
 # Demo screen: examples/e2e-suite/app/screens/layout/padding_margin.py
-# Source under test: src/pythonnative/layout.py, src/pythonnative/style.py
+# Source under test: src/pythonnative/native/core/src/style.cpp, src/pythonnative/native/core/src/shadow.cpp, src/pythonnative/style.py
 appId: ${APP_ID}
 ---
 - runFlow:

@@ -8,25 +8,25 @@ state through the Check/Uncheck buttons.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def CheckboxDemo() -> pn.Element:
+def CheckboxDemo() -> pn.Node:
     """Render a Checkbox plus a result line tracking its boolean state."""
     on, set_on = pn.use_state(False)
 
-    return demo_screen(
+    return DemoScreen(
         "Checkbox",
         "Toggle the checkbox and the Checked line should flip ON/OFF.",
-        section(
+        DemoSection(
             "Single checkbox",
-            result_text("Checked", "ON" if on else "OFF"),
+            ResultText("Checked", "ON" if on else "OFF"),
             pn.Checkbox(value=on, on_change=set_on, label="Accept"),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Check", on_press=lambda: set_on(True)),
                 pn.Button("Uncheck", on_press=lambda: set_on(False)),
             ),
-            hint("Maestro taps the box itself, then the buttons."),
+            Hint("Maestro taps the box itself, then the buttons."),
         ),
     )

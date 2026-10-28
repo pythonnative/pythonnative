@@ -18,16 +18,20 @@ Key building blocks:
   [`use_effect`][pythonnative.use_effect],
   [`use_reducer`][pythonnative.use_reducer], etc.) manage state, side
   effects, and context inside `@component` functions.
-- **Navigation** is built from
-  [`NavigationContainer`][pythonnative.NavigationContainer] plus one of
-  the [`create_stack_navigator`][pythonnative.create_stack_navigator],
-  [`create_tab_navigator`][pythonnative.create_tab_navigator], or
-  [`create_drawer_navigator`][pythonnative.create_drawer_navigator]
-  factories.
-- **Styling** uses a single ``style`` dict per element (or a list of
-  dicts), composable via [`StyleSheet`][pythonnative.StyleSheet].
-  PythonNative ships a fully-typed [`Style`][pythonnative.style.Style]
-  TypedDict so editors and ``mypy`` validate every key as you type.
+- **Navigation**: screens are components whose parameters are their
+  route params, listed in module-level
+  [`StackNavigator`][pythonnative.StackNavigator],
+  [`TabNavigator`][pythonnative.TabNavigator], or
+  [`DrawerNavigator`][pythonnative.DrawerNavigator] values and rendered
+  by [`NavigationContainer`][pythonnative.NavigationContainer].
+  ``nav.push(ItemScreen(id=42))`` is checked by the type checker.
+- **Styling** uses a ``style`` dict per element (or a list of dicts),
+  typed by the [`Style`][pythonnative.style.Style] ``TypedDict``.
+  [`StyleSheet`][pythonnative.StyleSheet] namespaces group named
+  styles, and one [`Theme`][pythonnative.Theme] styles the app and
+  its navigators.
+- **State** lives in hooks for a component and in a typed
+  [`Store`][pythonnative.Store] for the app.
 - **Animations** use the ``Animated`` namespace. Serialized graphs
   connect values, arithmetic, interpolation, and style bindings.
   Native timing, spring, decay, scroll, and gesture drivers update
@@ -42,73 +46,91 @@ Key building blocks:
   [`Rotation`][pythonnative.gestures.Rotation]).
 - **Custom native components** can be authored with the
   ``pythonnative.sdk`` package: define a typed
-  [`Props`][pythonnative.sdk.Props] dataclass, implement a
-  [`ViewHandler`][pythonnative.native_views.base.ViewHandler] for each
-  platform, and register it via
-  [`@native_component`][pythonnative.sdk.native_component] (or expose
-  it from a PyPI package via the ``pythonnative.handlers`` entry-point
-  group).
+  [`Props`][pythonnative.sdk.Props] dataclass and declare the component
+  with [`define_component`][pythonnative.sdk.define_component], which
+  returns its element factory (or expose it from a PyPI package via the
+  ``pythonnative.handlers`` entry-point group).
 
 Example:
     ```python
     import pythonnative as pn
 
     @pn.component
-    def App():
+    def App() -> pn.Node:
         count, set_count = pn.use_state(0)
         return pn.Column(
             pn.Text(f"Count: {count}", style=pn.style(font_size=24)),
             pn.Button("+", on_press=lambda: set_count(count + 1)),
-            style=pn.style(spacing=12),
+            style=pn.style(gap=12),
         )
     ```
 """
 
-__version__ = "0.43.1"
+__version__ = "0.52.0"
 
-from . import appearance, diagnostics, gestures, runtime, sdk
+import importlib
+from typing import TYPE_CHECKING, Any
+
+from . import appearance, diagnostics, runtime, sdk, svg
 from .alerts import Alert
-from .animated import Animated, AnimatedValue, use_animated_value
+from .assets import Asset, asset
 from .component import Component, component, memo
 from .components import (
     ActivityIndicator,
+    BlurView,
     Button,
     Checkbox,
     Column,
+    ContentSizeEvent,
     DatePicker,
     ErrorBoundary,
     FlatList,
     Fragment,
     Image,
     ImageBackground,
+    ImageLoadEvent,
+    ImageSource,
     KeyboardAvoidingView,
+    KeyPressEvent,
+    LayoutEvent,
+    LinearGradient,
     ListController,
     Modal,
     Picker,
     Portal,
     Pressable,
+    PressState,
     ProgressBar,
     RefreshControl,
+    Ripple,
     Row,
     SafeAreaView,
+    ScrollEvent,
     ScrollView,
     SectionList,
     SegmentedControl,
+    SelectionEvent,
     Slider,
     Spacer,
     StatusBar,
     Suspense,
+    Svg,
     Switch,
     Text,
     TextInput,
     TouchableOpacity,
     View,
+    WebNavigationEvent,
     WebView,
 )
+from .components.props import AccessibilityProps, ViewProps
 from .diagnostics import HookOrderError
-from .element import Element
+from .element import Element, Node
+from .handles import ScrollOffset, ScrollViewHandle, TextInputHandle, ViewHandle, WebViewHandle
 from .hooks import (
+    ColorScheme,
     Context,
+    Deps,
     MutationCall,
     MutationState,
     QueryResult,
@@ -136,63 +158,63 @@ from .hooks import (
     use_window_dimensions,
 )
 from .hosts import create_screen
+from .mutations import UNSET, UnsetType
 from .native_modules import (
+    AccessibilityEvent,
+    AccessibilityInfo,
     AppState,
     Battery,
     Biometrics,
     Camera,
     Clipboard,
+    Device,
+    DeviceInfo,
+    Dimensions,
+    DimensionsEvent,
     FileSystem,
     Haptics,
+    Images,
+    ImageSize,
+    Keyboard,
+    KeyboardEvent,
     Linking,
+    Locale,
+    Localization,
     Location,
     NetInfo,
     Notifications,
     Permissions,
+    PixelRatio,
     SecureStore,
     Share,
     Vibration,
     use_app_state,
+    use_locales,
     use_net_info,
+    use_reduce_motion,
+    use_screen_reader_enabled,
 )
-from .navigation import (
-    LinkingConfig,
-    Navigation,
-    NavigationContainer,
-    NavigationState,
-    Route,
-    ScreenOptions,
-    create_drawer_navigator,
-    create_stack_navigator,
-    create_tab_navigator,
-    use_focus_effect,
-    use_is_focused,
-    use_navigation,
-    use_route,
-)
-from .net import HTTPError, Response, fetch
 from .platform import Platform, get_platform
+from .platform_metrics import WindowDimensions
 from .runtime import run_async, run_blocking
 from .scheduler import batch_updates
-from .sdk import (
-    Props,
-    ViewHandler,
-    element_factory,
-    native_component,
-    register_component,
-)
+from .sdk import Props, define_component, element_factory
 from .storage import AsyncStorage, use_persisted_state
+from .store import Store, use_store
 from .style import (
-    DEFAULT_DARK_THEME,
-    DEFAULT_LIGHT_THEME,
+    ABSOLUTE_FILL,
+    AccessibilityAction,
     AccessibilityState,
+    AccessibilityValue,
     AlignContent,
     AlignItems,
     AlignSelf,
     AutoCapitalize,
+    BorderStyle,
     Color,
     Dimension,
     Display,
+    DynamicColor,
     EdgeInsets,
     FlexDirection,
     FlexWrap,
@@ -212,36 +234,58 @@ from .style import (
     TextAlign,
     TextDecoration,
     TextTransform,
-    Theme,
-    ThemeContext,
     TransformSpec,
-    default_theme,
     resolve_style,
     style,
-    use_theme,
 )
 from .suspense import Resource, lazy, start_resource
+from .theme import (
+    DARK_THEME,
+    LIGHT_THEME,
+    Colors,
+    Radii,
+    Spacing,
+    Theme,
+    ThemeProvider,
+    Typography,
+    use_styles,
+    use_theme,
+)
 
 __all__ = [
+    "UNSET",
+    "UnsetType",
     # Components
     "ActivityIndicator",
+    "BlurView",
     "Button",
     "Checkbox",
     "Column",
     "DatePicker",
     "ErrorBoundary",
     "FlatList",
+    "ListData",
+    "Section",
+    "ViewableItem",
     "Fragment",
+    "Icon",
+    "IconName",
     "Image",
     "ImageBackground",
+    "ImageLoadEvent",
+    "ImageSource",
+    "WebNavigationEvent",
     "KeyboardAvoidingView",
+    "LinearGradient",
     "ListController",
     "Modal",
     "Picker",
     "Portal",
     "Pressable",
+    "PressState",
     "ProgressBar",
     "RefreshControl",
+    "Ripple",
     "Row",
     "SafeAreaView",
     "ScrollView",
@@ -251,19 +295,43 @@ __all__ = [
     "Spacer",
     "StatusBar",
     "Suspense",
+    "Svg",
     "Switch",
     "Text",
     "TextInput",
     "TouchableOpacity",
     "View",
     "WebView",
+    # Shared props
+    "AccessibilityProps",
+    "ViewProps",
+    # Typed events
+    "ContentSizeEvent",
+    "KeyPressEvent",
+    "LayoutEvent",
+    "ScrollEvent",
+    "SelectionEvent",
+    # Imperative handles
+    "ScrollOffset",
+    "ScrollViewHandle",
+    "TextInputHandle",
+    "ViewHandle",
+    "WebViewHandle",
+    # Assets and graphics
+    "Asset",
+    "asset",
+    "icons",
+    "svg",
     # Core
     "Component",
     "Element",
+    "Node",
     "component",
     "create_screen",
     "memo",
     # Hooks
+    "ColorScheme",
+    "Deps",
     "Context",
     "MutationCall",
     "MutationState",
@@ -297,30 +365,37 @@ __all__ = [
     "lazy",
     "start_resource",
     # Navigation
-    "LinkingConfig",
+    "DrawerNavigator",
+    "Group",
     "Navigation",
     "NavigationContainer",
+    "NavigationRef",
     "NavigationState",
+    "Navigator",
     "Route",
+    "Screen",
     "ScreenOptions",
-    "create_drawer_navigator",
-    "create_stack_navigator",
-    "create_tab_navigator",
+    "StackNavigator",
+    "TabBarStyle",
+    "TabNavigator",
     "use_focus_effect",
     "use_is_focused",
     "use_navigation",
     "use_route",
+    "use_screen_options",
     # Styling - typed primitives
+    "AccessibilityAction",
     "AccessibilityState",
+    "AccessibilityValue",
     "AlignContent",
     "AlignItems",
     "AlignSelf",
     "AutoCapitalize",
+    "BorderStyle",
     "Color",
-    "DEFAULT_DARK_THEME",
-    "DEFAULT_LIGHT_THEME",
     "Dimension",
     "Display",
+    "DynamicColor",
     "EdgeInsets",
     "FlexDirection",
     "FlexWrap",
@@ -341,24 +416,51 @@ __all__ = [
     "TextDecoration",
     "TextTransform",
     "Theme",
-    "ThemeContext",
+    "ThemeProvider",
+    "Colors",
+    "Typography",
+    "Spacing",
+    "Radii",
+    "LIGHT_THEME",
+    "DARK_THEME",
+    "ABSOLUTE_FILL",
+    "use_styles",
     "TransformSpec",
-    "default_theme",
     "resolve_style",
     "style",
     "use_theme",
     # Appearance
     "appearance",
-    # Image pipeline
     # Animation
+    "ANIMATABLE_PROPS",
     "Animated",
     "AnimatedValue",
+    "AnimationResult",
+    "Easing",
+    "EasingSpec",
     "use_animated_value",
     # Gestures
+    "GestureSpec",
+    "SwipeDirection",
     "gestures",
     # Imperative
     "Alert",
     # Native modules
+    "AccessibilityEvent",
+    "AccessibilityInfo",
+    "Device",
+    "DeviceInfo",
+    "Dimensions",
+    "DimensionsEvent",
+    "Keyboard",
+    "KeyboardEvent",
+    "Locale",
+    "Localization",
+    "PixelRatio",
+    "WindowDimensions",
+    "use_locales",
+    "use_reduce_motion",
+    "use_screen_reader_enabled",
     "AppState",
     "Battery",
     "Biometrics",
@@ -366,6 +468,8 @@ __all__ = [
     "Clipboard",
     "FileSystem",
     "Haptics",
+    "ImageSize",
+    "Images",
     "Linking",
     "Location",
     "NetInfo",
@@ -376,6 +480,9 @@ __all__ = [
     "Vibration",
     "use_app_state",
     "use_net_info",
+    # Stores
+    "Store",
+    "use_store",
     # Networking + persistence
     "AsyncStorage",
     "fetch",
@@ -393,9 +500,98 @@ __all__ = [
     "get_platform",
     # Custom-component SDK
     "Props",
-    "ViewHandler",
+    "define_component",
     "element_factory",
-    "native_component",
-    "register_component",
     "sdk",
 ]
+
+from .list_data import ListData, Section, ViewableItem
+
+# Subsystems an app may never touch load on first use (PEP 562), so
+# ``import pythonnative`` stays fast on a phone. Names, ``__all__``, and
+# documentation are unchanged, and type checkers see ordinary imports.
+_LAZY_GROUPS: dict[str, tuple[str, ...]] = {
+    "animated": (
+        "ANIMATABLE_PROPS",
+        "Animated",
+        "AnimatedValue",
+        "AnimationResult",
+        "Easing",
+        "EasingSpec",
+        "use_animated_value",
+    ),
+    "gestures": ("GestureSpec", "SwipeDirection"),
+    "icons": ("Icon", "IconName"),
+    "navigation": (
+        "DrawerNavigator",
+        "Group",
+        "Navigation",
+        "NavigationContainer",
+        "NavigationRef",
+        "NavigationState",
+        "Navigator",
+        "Route",
+        "Screen",
+        "ScreenOptions",
+        "StackNavigator",
+        "TabBarStyle",
+        "TabNavigator",
+        "use_focus_effect",
+        "use_is_focused",
+        "use_navigation",
+        "use_route",
+        "use_screen_options",
+    ),
+    "net": ("HTTPError", "Response", "fetch"),
+}
+_LAZY = {name: module for module, names in _LAZY_GROUPS.items() for name in names}
+_LAZY_MODULES = frozenset({"gestures", "icons"})
+
+if TYPE_CHECKING:
+    from . import gestures, icons
+    from .animated import (
+        ANIMATABLE_PROPS,
+        Animated,
+        AnimatedValue,
+        AnimationResult,
+        Easing,
+        EasingSpec,
+        use_animated_value,
+    )
+    from .gestures import GestureSpec, SwipeDirection
+    from .icons import Icon, IconName
+    from .navigation import (
+        DrawerNavigator,
+        Group,
+        Navigation,
+        NavigationContainer,
+        NavigationRef,
+        NavigationState,
+        Navigator,
+        Route,
+        Screen,
+        ScreenOptions,
+        StackNavigator,
+        TabBarStyle,
+        TabNavigator,
+        use_focus_effect,
+        use_is_focused,
+        use_navigation,
+        use_route,
+        use_screen_options,
+    )
+    from .net import HTTPError, Response, fetch
+
+
+def __getattr__(name: str) -> Any:
+    module = _LAZY.get(name)
+    if module is None and name not in _LAZY_MODULES:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    imported = importlib.import_module(f".{module or name}", __name__)
+    value = imported if module is None else getattr(imported, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | _LAZY.keys() | _LAZY_MODULES)

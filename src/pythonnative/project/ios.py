@@ -29,6 +29,7 @@ Python sources into the project before invoking ``xcodebuild``.
 from __future__ import annotations
 
 import plistlib
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -86,12 +87,17 @@ class IOSLayout:
     bundle_id: str
 
 
-def configure(project_dir: Path, config: AppConfig, *, log: Optional[Logger] = None) -> IOSLayout:
+def configure(
+    project_dir: Path, config: AppConfig, *, release: bool = False, log: Optional[Logger] = None
+) -> IOSLayout:
     """Configure a staged iOS template for ``config``.
 
     Args:
         project_dir: The staged ``ios_template`` directory.
         config: The validated app configuration.
+        release: Configure a release build, which doesn't talk to the
+            dev server (see
+            [`configure_info_plist`][pythonnative.project.ios.configure_info_plist]).
         log: Optional progress logger.
 
     Returns:
@@ -101,8 +107,16 @@ def configure(project_dir: Path, config: AppConfig, *, log: Optional[Logger] = N
     project_dir = Path(project_dir)
     info_plist = project_dir / "ios_template" / "Info.plist"
 
-    configure_info_plist(info_plist, config)
-    write_entitlements(project_dir, config)
+    from .artifacts import privacy_manifest
+
+    manifest_path = project_dir / "ios_template" / "PrivacyInfo.xcprivacy"
+    if config.ios.privacy_manifest:
+        source = config.resolve_path(config.ios.privacy_manifest)
+        privacy_manifest(source)
+        shutil.copy2(source, manifest_path)
+    privacy_manifest(manifest_path)
+    configure_info_plist(info_plist, config, release=release)
+    write_entitlements(project_dir, config, release=release)
     _apply_branding(project_dir, config, emit)
 
     emit(f"Configured iOS project ({config.bundle_id}).")
@@ -114,12 +128,16 @@ def configure(project_dir: Path, config: AppConfig, *, log: Optional[Logger] = N
 # ======================================================================
 
 
-def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
+def configure_info_plist(info_plist: Path, config: AppConfig, *, release: bool = False) -> None:
     """Write display name, orientation, permissions, and extras to the plist.
 
     Args:
         info_plist: Path to the app ``Info.plist``.
         config: The validated app configuration.
+        release: Leave out the development-only keys. Debug builds add
+            an ``NSLocalNetworkUsageDescription`` so they can reach
+            ``pn start`` over the LAN; release builds carry one only when
+            ``[ios].extra_info_plist`` sets it.
     """
     with open(info_plist, "rb") as handle:
         plist = plistlib.load(handle)
@@ -135,20 +153,28 @@ def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
     resolved = config.resolved_permissions()
     for key, reason in resolved.ios_usage_descriptions.items():
         plist[key] = reason
-    # Debug builds connect to `pn start` over the LAN, which iOS gates
-    # behind the local-network prompt; the prompt needs this string.
-    plist.setdefault(
-        "NSLocalNetworkUsageDescription",
-        "Development builds connect to the PythonNative dev server on your computer.",
-    )
+    if not release:
+        # Debug builds connect to `pn start` over the LAN, which iOS gates
+        # behind the local-network prompt; the prompt needs this string.
+        plist.setdefault(
+            "NSLocalNetworkUsageDescription",
+            "Development builds connect to the PythonNative dev server on your computer.",
+        )
     if resolved.ios_background_modes:
         plist["UIBackgroundModes"] = list(resolved.ios_background_modes)
 
-    if config.url_schemes:
+    schemes = list(config.url_schemes)
+    if not release:
+        # Debug builds are dev clients: `pn-<app id>://connect?url=...`
+        # (a scanned QR code, `pn run`, `pn go`) points them at a server.
+        from ..devclient import dev_scheme
+
+        schemes.append(dev_scheme(config.app_id))
+    if schemes:
         plist["CFBundleURLTypes"] = [
             {
                 "CFBundleURLName": config.bundle_id,
-                "CFBundleURLSchemes": list(config.url_schemes),
+                "CFBundleURLSchemes": schemes,
             }
         ]
 
@@ -162,24 +188,35 @@ def configure_info_plist(info_plist: Path, config: AppConfig) -> None:
         plistlib.dump(plist, handle)
 
 
-def write_entitlements(project_dir: Path, config: AppConfig) -> Optional[Path]:
+_PRODUCTION_EXPORTS = frozenset({"app-store", "ad-hoc", "enterprise"})
+
+
+def write_entitlements(project_dir: Path, config: AppConfig, *, release: bool = False) -> Optional[Path]:
     """Generate the app entitlements file when a capability needs one.
+
+    The push environment (``aps-environment``) follows the build: release
+    builds exported for the App Store, ad hoc, or enterprise distribution
+    use ``production``; everything else uses ``development``.
 
     Args:
         project_dir: The staged ``ios_template`` directory.
         config: The validated app configuration.
+        release: Whether this is a release (archive) build.
 
     Returns:
         The written entitlements path, or ``None`` when no declared
         capability requires entitlements.
     """
-    entitlements = config.resolved_permissions().ios_entitlements
+    entitlements = dict(config.resolved_permissions().ios_entitlements)
     if not entitlements:
         return None
+    if "aps-environment" in entitlements:
+        production = release and config.ios.signing.export_method in _PRODUCTION_EXPORTS
+        entitlements["aps-environment"] = "production" if production else "development"
     dest = project_dir / ENTITLEMENTS_FILE
     dest.parent.mkdir(parents=True, exist_ok=True)
     with open(dest, "wb") as handle:
-        plistlib.dump(dict(entitlements), handle)
+        plistlib.dump(entitlements, handle)
     return dest
 
 

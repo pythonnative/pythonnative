@@ -8,11 +8,11 @@ the percentage line steps up to 50.
 from __future__ import annotations
 
 import pythonnative as pn
-from app.screens.scaffold import buttons_row, demo_screen, hint, result_text, section
+from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 
 
 @pn.component
-def ProgressBarDemo() -> pn.Element:
+def ProgressBarDemo() -> pn.Node:
     """Render static and stateful progress bars with stable labels."""
     progress, set_progress = pn.use_state(0.25)
 
@@ -22,10 +22,10 @@ def ProgressBarDemo() -> pn.Element:
     def reset() -> None:
         set_progress(0.0)
 
-    return demo_screen(
+    return DemoScreen(
         "ProgressBar",
         "Static bars + a stateful bar driven by tap to test value updates.",
-        section(
+        DemoSection(
             "Static bars",
             pn.Text("0%"),
             pn.ProgressBar(value=0.0),
@@ -34,14 +34,14 @@ def ProgressBarDemo() -> pn.Element:
             pn.Text("100%"),
             pn.ProgressBar(value=1.0),
         ),
-        section(
+        DemoSection(
             "Stateful bar",
-            result_text("Progress", f"{int(progress * 100)}%"),
+            ResultText("Progress", f"{int(progress * 100)}%"),
             pn.ProgressBar(value=progress),
-            buttons_row(
+            ButtonsRow(
                 pn.Button("Advance", on_press=advance),
                 pn.Button("Reset", on_press=reset),
             ),
-            hint("Tap 'Advance' to move the bar in 25% steps up to 100%."),
+            Hint("Tap 'Advance' to move the bar in 25% steps up to 100%."),
         ),
     )

@@ -146,8 +146,8 @@ If the list is empty, install one via `Xcode -> Settings -> Platforms`.
 
 The pinned upstream archive was rotated. Update PythonNative (`pip
 install --upgrade pythonnative`); the new release will pin the new
-asset. As a stopgap, you can clear the cached archive at
-`build/ios/ios_runtime/` and re-run.
+asset. As a stopgap, you can clear the cached runtime under
+`~/Library/Caches/pythonnative/ios/` (or `$PN_CACHE_DIR/ios/`) and re-run.
 
 ### App crashes on launch with `dyld: Library not loaded`
 
@@ -159,6 +159,15 @@ and try again:
 pn clean
 pn run ios
 ```
+
+### A release build fails with `ModuleNotFoundError: No module named 'pythonnative.devclient'`
+
+Release bundles leave out the development modules (the dev client, Fast
+Refresh, the dev server, the CLI, the test helpers, and the SDK code
+generators), so application code that imports one of them works in
+debug builds only. Move the import into a code path that runs only in
+development. See
+[What a release bundle leaves out](../guides/building-for-release.md#what-a-release-bundle-leaves-out).
 
 ### Blank screen on Simulator, no logs
 
@@ -214,13 +223,22 @@ You're either missing keys or using positional keys. See
 
 - Is `pn start` (or `pn preview`) running? Debug builds connect to it
   on launch; the terminal prints `[pn] ios <device> connected` when
-  one arrives. If you launched `pn run` with no server up, the app is
+  one arrives. If it prints "can't run this project" instead, the
+  device shows the reason and the command that fixes it (usually `pn go
+  <platform>` for an outdated PythonNative Go, or `pn run <platform>
+  --rebuild` for a build that predates a native plugin). If you launched `pn run` with no server up, the app is
   running its bundled sources: start the server and relaunch.
 - Is the device on the same network? Simulators and emulators reach
   the server through `localhost` (Android via `adb reverse`), but a
   physical iPhone needs your Mac's LAN address and an open port. Pass
-  `--dev-server ws://<ip>:8765/ws?role=client` to `pn run` if the
-  auto-detected address is wrong.
+  the device URL `pn start` printed (`--dev-server
+  "http://<ip>:8765/?token=..."`) to `pn run` if the auto-detected
+  address is wrong.
+- Did the server refuse the app's token? The app logs "refused the
+  connection" when its URL has no dev token or an old one (after the
+  token file was deleted, say). Scan the QR code `pn start` prints, or
+  relaunch with `pn run` or `pn go`. See
+  [The dev token](../guides/dev-workflow.md#the-dev-token).
 - The watcher only sees files under `app/`. Code outside `app/` needs
   a rebuild.
 - Top-level side effects re-run on each reload; if your module
@@ -234,6 +252,19 @@ rebuild means a native input changed (`pythonnative.toml`, the
 `pythonnative` package version, native plugins) or no dev server was
 running when `pn run` started. See
 [When native rebuilds happen](../guides/dev-workflow.md#when-native-rebuilds-happen).
+
+### The browser preview keeps saying it's waiting for `pn start`
+
+The page itself is public, but its connection needs your dev token.
+If you opened `http://localhost:8765/` directly (a bookmark, or a
+browser that cleared its cookies), the page says it doesn't have the
+token. Open the preview URL that `pn start` printed, which ends in
+`?token=...`, once; the page stores the token as a cookie and removes it
+from the address bar. `curl` and other scripts get `401 Unauthorized`
+for the same reason; send the token in an `X-PN-Token` header.
+
+To start over with a new token, stop `pn start`, delete
+`~/.pythonnative/dev-token`, and start it again.
 
 ### The browser preview shows a blank frame
 
@@ -249,11 +280,23 @@ reload. Restart the app to clear `sys.modules`.
 
 ## Tests
 
-### Tests fail with `RuntimeError: No handler registered for type ...`
+### Tests fail with `RuntimeError: No view backend is available off device`
 
-Install the fake backend from the
-[Testing guide](../guides/testing.md) before
-the first render. A session-scoped fixture is the easiest place.
+Render through [`render`][pythonnative.testing.render], which installs a
+[`FakeBackend`][pythonnative.testing.FakeBackend], or install one
+yourself with [`set_backend`][pythonnative.native_views.set_backend]
+before the first commit. If you disabled the shipped pytest plugin with
+`-p no:pythonnative`, the runtime is no longer reset between tests;
+re-enable it or reset it in your own fixture.
+
+### `RuntimeError: Too many re-renders`
+
+A component kept re-dirtying itself for more than fifty passes in one
+flush: an effect that sets state unconditionally (give it a `deps`
+list), or a setter called during the component's own render (move it
+into an effect or a handler). The error names the component and is
+routed through the nearest `ErrorBoundary`; in dev mode the RedBox
+shows it.
 
 ### `mkdocs build --strict` fails on PR with autorefs warnings
 

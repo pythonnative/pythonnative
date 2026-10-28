@@ -4,18 +4,28 @@ import UIKit
 
 final class PNLifecycleTests: XCTestCase {
     private var window: UIWindow!
-    private var revision = 0
-    private let application = UUID().uuidString
-    private func apply(_ ops: [[Any]]) {
-        revision += 1
-        let json = PNJSON.encode(["version": 2, "application": application, "surface": 1, "revision": revision, "ops": ops])
-        let result = PNJSON.decodeObject(PNCommit.apply(json))
-        XCTAssertEqual(result["ok"] as? Bool, true, String(describing: result))
+    private var core: PNCoreHarness!
+    override func setUp() {
+        super.setUp()
+        core = PNCoreHarness()
+    }
+    private func apply(_ ops: [[Any]], file: StaticString = #filePath, line: UInt = #line) {
+        core.commit(ops, file: file, line: line)
     }
     private func settle() {
         let ready = expectation(description: "native transition completes")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { ready.fulfill() }
-        wait(for: [ready], timeout: 3)
+        // The wait measures when the main thread is free again after a UIKit
+        // transition; a loaded CI simulator can stall it for several seconds.
+        wait(for: [ready], timeout: 15)
+        window.layoutIfNeeded()
+    }
+    /// Waits for a UIKit transition's end state rather than a fixed delay,
+    /// because presentation and dismissal take longer on a loaded simulator.
+    private func settle(until condition: @escaping () -> Bool, _ description: String) {
+        let done = expectation(for: NSPredicate { _, _ in condition() }, evaluatedWith: nil)
+        done.expectationDescription = description
+        wait(for: [done], timeout: 15)
         window.layoutIfNeeded()
     }
     override func tearDown() {
@@ -25,6 +35,7 @@ final class PNLifecycleTests: XCTestCase {
         super.tearDown()
     }
     func testNativeStackPushPopKeepsOriginalScreenAttached() throws {
+        core.roots = [801]
         apply([["c", 801, "ScreenStack", ["flex": 1]], ["c", 802, "Screen", ["title": "Inbox", "flex": 1]],
                ["c", 803, "Text", ["text": "Original screen"]], ["i", 802, 803, 0], ["i", 801, 802, 0]])
         let stack = try XCTUnwrap(PNViewRegistry.shared.view(for: 801))
@@ -35,7 +46,6 @@ final class PNLifecycleTests: XCTestCase {
         window.rootViewController = controller
         window.makeKeyAndVisible()
         settle()
-        _ = PNLayout.compute(["roots": [801], "width": 390, "height": 844])
         XCTAssertTrue(first.window === window)
         apply([["c", 804, "Screen", ["title": "Detail", "flex": 1]], ["c", 805, "Text", ["text": "Detail screen"]],
                ["i", 804, 805, 0], ["i", 801, 804, 1]])
@@ -61,7 +71,7 @@ final class PNLifecycleTests: XCTestCase {
         input.becomeFirstResponder()
         input.setMarkedText("composing", selectedRange: NSRange(location: 2, length: 0))
         XCTAssertNotNil(input.markedTextRange)
-        apply([["u", 811, ["value": "controlled", "_pn_edit_revision": 100]]])
+        apply([["u", 811, ["value": "controlled", "_pn_edit_revision": 100], []]])
         XCTAssertNotEqual(input.text, "controlled")
         input.unmarkText()
         PNTextInputManager.scheduleCompositionFlush(input)
@@ -69,7 +79,7 @@ final class PNLifecycleTests: XCTestCase {
         XCTAssertEqual(input.text, "controlled", "after composition flush")
         input.selectedRange = NSRange(location: 1, length: 3)
         XCTAssertEqual(input.text, "controlled", "after selection change")
-        apply([["u", 811, ["multiline": false]]])
+        apply([["u", 811, ["multiline": false], []]])
         let replacement = try XCTUnwrap(PNViewRegistry.shared.view(for: 811) as? UITextField)
         XCTAssertEqual(replacement.text, "controlled", "after physical replacement")
         XCTAssertTrue(replacement.isFirstResponder)
@@ -77,4 +87,37 @@ final class PNLifecycleTests: XCTestCase {
         XCTAssertEqual(replacement.offset(from: replacement.beginningOfDocument, to: range.start), 1)
         XCTAssertEqual(replacement.offset(from: replacement.beginningOfDocument, to: range.end), 4)
     }
+    func testNativeHeaderSlotsAndModalPresentationKeepScreenOwnership() throws {
+        core.roots = [821]
+        apply([["c", 821, "ScreenStack", ["flex": 1]],
+               ["c", 822, "Screen", ["title": "Inbox", "flex": 1]],
+               ["c", 823, "View", ["_pn_header_slot": "right", "width": 80, "height": 44]],
+               ["c", 824, "Button", ["title": "Compose"]], ["i", 823, 824, 0],
+               ["i", 822, 823, 0], ["i", 821, 822, 0]])
+        let stack = try XCTUnwrap(PNViewRegistry.shared.view(for: 821))
+        let root = UIViewController()
+        root.view = stack
+        window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = root
+        window.makeKeyAndVisible()
+        settle()
+        let navigation = try XCTUnwrap(root.children.first as? UINavigationController)
+        XCTAssertTrue(navigation.topViewController?.navigationItem.rightBarButtonItem?.customView === PNViewRegistry.shared.view(for: 823))
+        apply([["c", 825, "Screen", ["title": "Compose", "presentation": "modal", "gesture_enabled": false, "animation": "none", "flex": 1]],
+               ["i", 821, 825, 1]])
+        settle(until: { navigation.presentedViewController != nil }, "modal is presented")
+        let modal = try XCTUnwrap(navigation.presentedViewController as? UINavigationController)
+        XCTAssertEqual(modal.topViewController?.title, "Compose")
+        XCTAssertTrue(modal.isModalInPresentation)
+        XCTAssertEqual(navigation.viewControllers.count, 1)
+        XCTAssertTrue(PNViewRegistry.shared.view(for: 825)?.window === window)
+        apply([["d", 825]])
+        settle(until: { navigation.presentedViewController == nil }, "modal is dismissed")
+        XCTAssertNil(navigation.presentedViewController)
+        XCTAssertTrue(PNViewRegistry.shared.view(for: 822)?.window === window)
+        apply([["d", 824], ["d", 823]])
+        settle()
+        XCTAssertNil(navigation.topViewController?.navigationItem.rightBarButtonItem)
+    }
+
 }

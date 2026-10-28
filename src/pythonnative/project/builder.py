@@ -29,23 +29,26 @@ builder stops at producing installable/archivable artifacts.
 
 from __future__ import annotations
 
-import compileall
+import dataclasses
 import json
 import os
 import platform as platform_module
+import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence, Union
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
+from .. import assets
 from . import android as android_config
-from . import deps, runtime_assets
+from . import artifacts, bytecode, deps, runtime_assets
 from . import ios as ios_config
 from . import plugins as native_plugins
 from .android import AndroidLayout
+from .bundle import copy_library
 from .config import AppConfig
 from .ios import IOSLayout
 
@@ -274,7 +277,9 @@ def _stage_runtime(name: str, destination: Path) -> None:
                 if not (source / platform / managed / rel).exists():
                     path.unlink()
     shutil.copytree(source / platform, destination / runtime_name, dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
-    shutil.copytree(source / "yoga", destination / "yoga", dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
+    # The renderer core (with the Yoga release it embeds) is compiled into
+    # both native runtimes from the same sources.
+    shutil.copytree(source / "core", destination / "core", dirs_exist_ok=True, ignore=_TEMPLATE_IGNORE)
     from ..sdk.codegen import generate
 
     generated = destination / "contracts"
@@ -286,7 +291,7 @@ def _stage_runtime(name: str, destination: Path) -> None:
         output = destination / runtime_name / "src/main/java/com/pythonnative/generated"
         extension = "kt"
     output.mkdir(parents=True, exist_ok=True)
-    for name in ("PNContracts", "NativeProps", "NativeModules"):
+    for name in ("PNContracts", "NativeProps", "NativeModules", "NativeValues"):
         shutil.copy2(generated / f"{name}.{extension}", output / f"{name}.{extension}")
 
 
@@ -333,6 +338,7 @@ class Builder:
         *,
         release: bool = False,
         ios_sdks: Sequence[str] = deps.IOS_SDKS,
+        dev_client: str = "app",
     ) -> PreparedProject:
         """Stage and configure the native project for ``platform``.
 
@@ -350,6 +356,10 @@ class Builder:
                 Defaults to both; the CLI narrows it to the destination
                 it is about to build so a package that only has a
                 Simulator wheel doesn't block a Simulator run.
+            dev_client: What kind of dev client a debug build is:
+                ``"app"`` (the project's own) or ``"go"`` (PythonNative
+                Go). Recorded in the bundled package's
+                ``_dev_client.json``; release builds aren't dev clients.
 
         Returns:
             A [`PreparedProject`][pythonnative.project.builder.PreparedProject].
@@ -361,12 +371,35 @@ class Builder:
         if platform not in _TEMPLATE_NAMES:
             raise BuildError(f"Unknown platform: {platform!r} (expected 'android' or 'ios').")
 
-        build_dir = self.build_root / platform
-        build_dir.mkdir(parents=True, exist_ok=True)
-        project_dir = stage_template(_TEMPLATE_NAMES[platform], build_dir)
         targets = (
             deps.android_targets(self.config) if platform == "android" else deps.ios_targets(self.config, sdks=ios_sdks)
         )
+        if release:
+            if platform == "android" and self.config.android.target_sdk < 36:
+                raise BuildError("Android release builds require target_sdk >= 36.")
+            if self.config.requirements:
+                from .lockfile import requirements
+
+                try:
+                    locked = requirements(self.config, targets)
+                except deps.DependencyError as error:
+                    raise BuildError(str(error)) from error
+                if locked is None:
+                    raise BuildError(f"Release dependencies need pn.lock. Run 'pn deps {platform} --lock' first.")
+        elif self.config.requirements:
+            from .lockfile import requirements
+
+            try:
+                requirements(self.config, targets)
+            except deps.DependencyError as error:
+                # Development builds may resolve unlocked requirements; only
+                # release builds insist on a current lock.
+                self.log(f"Warning: {error} Resolving the current requirements without it for this development build.")
+                self.config = dataclasses.replace(self.config, use_lock=False)
+
+        build_dir = self.build_root / platform
+        build_dir.mkdir(parents=True, exist_ok=True)
+        project_dir = stage_template(_TEMPLATE_NAMES[platform], build_dir)
         plugins = self._discover_plugins(targets)
 
         if platform == "android":
@@ -379,6 +412,8 @@ class Builder:
             )
             native_plugins.stage_android_plugins(project_dir, plugins, log=self.log)
             self._stage_contracts(project_dir, platform, plugins, [layout.python_root / "pythonnative"])
+            if not release:
+                self._stage_dev_client([layout.python_root / "pythonnative"], plugins, dev_client)
             return PreparedProject(
                 platform=platform,
                 build_dir=build_dir,
@@ -387,15 +422,13 @@ class Builder:
                 android=layout,
             )
 
-        ios_layout = ios_config.configure(project_dir, self.config, log=self.log)
+        ios_layout = ios_config.configure(project_dir, self.config, release=release, log=self.log)
         native_plugins.stage_ios_plugins(project_dir, plugins, log=self.log)
         self._stage_ios_python(project_dir, release=release, sdks=ios_sdks)
-        self._stage_contracts(
-            project_dir,
-            platform,
-            plugins,
-            [project_dir / target.slice_name / "pythonnative" for target in targets],
-        )
+        roots = [project_dir / target.slice_name / "pythonnative" for target in targets]
+        self._stage_contracts(project_dir, platform, plugins, roots)
+        if not release:
+            self._stage_dev_client(roots, plugins, dev_client)
         self._link_ios_runtime(project_dir)
         return PreparedProject(
             platform=platform,
@@ -428,16 +461,39 @@ class Builder:
                 else "pythonnative/src/main/java/com/pythonnative/generated"
             )
             extension = "swift" if platform == "ios" else "kt"
-            for name in ("PNContracts", "NativeProps", "NativeModules"):
+            for name in ("PNContracts", "NativeProps", "NativeModules", "NativeValues"):
                 shutil.copy2(generated / f"{name}.{extension}", output / f"{name}.{extension}")
+            # The app loads its built-in contracts from the package; it only
+            # needs the plugins' contracts and the combined fingerprint.
+            bundled = schema.manifest()
+            bundled["fingerprint"] = schema.fingerprint()
+            bundled["components"] = {k: v for k, v in bundled["components"].items() if k not in components}
+            bundled["modules"] = {k: v for k, v in bundled["modules"].items() if k not in modules}
+            encoded = json.dumps(bundled, sort_keys=True, default=str)
             for root in python_roots:
                 root.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(generated / "schema.json", root / "_native_contracts.json")
+                (root / "_native_contracts.json").write_text(encoded, encoding="utf-8")
         finally:
             schema.COMPONENTS.clear()
             schema.COMPONENTS.update(components)
             schema.MODULES.clear()
             schema.MODULES.update(modules)
+
+    def _stage_dev_client(
+        self, roots: Sequence[Path], plugins: Sequence[native_plugins.NativePlugin], kind: str
+    ) -> None:
+        """Record what kind of dev client a debug build is (see ``pythonnative.devclient.client_info``)."""
+        from ..devclient import CLIENT_INFO_FILE, dev_scheme
+
+        info = {
+            "kind": kind,
+            "app_id": self.config.app_id,
+            "scheme": dev_scheme(self.config.app_id),
+            "plugins": sorted(plugin.name for plugin in plugins),
+        }
+        for root in roots:
+            root.mkdir(parents=True, exist_ok=True)
+            (root / CLIENT_INFO_FILE).write_text(json.dumps(info, sort_keys=True), encoding="utf-8")
 
     def _discover_plugins(self, targets: Sequence[deps.Target] = ()) -> List[native_plugins.NativePlugin]:
         """Collect native plugins from entry points and ``[plugins].paths``.
@@ -482,7 +538,11 @@ class Builder:
         app_src = self.config.project_root / "app"
         if not app_src.is_dir():
             raise BuildError(f"No app/ directory found at {app_src}; nothing to bundle.")
-        shutil.copytree(app_src, app_dir)
+        shutil.copytree(app_src, app_dir, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".*"))
+        # ``app/`` is a folder reference in the Xcode project, so
+        # ``app/assets/`` lands in the bundle as is; the manifest lets the
+        # runtime resolve density variants and register fonts.
+        assets.write_manifest(app_dir / assets.ASSETS_DIR, log=self.log)
 
         slices: List[Path] = []
         for target in deps.ios_targets(self.config, sdks=sdks):
@@ -494,12 +554,7 @@ class Builder:
             # bridge into PythonNativeKit is ctypes), so it is copied
             # verbatim into every slice.
             if self.dev_lib_root.is_dir():
-                shutil.copytree(
-                    self.dev_lib_root,
-                    packages_dir / "pythonnative",
-                    dirs_exist_ok=True,
-                    ignore=android_config.LIB_IGNORE,
-                )
+                copy_library(self.dev_lib_root, packages_dir / "pythonnative", release=release)
 
             if self.config.requirements:
                 self.log(f"Resolving {len(self.config.requirements)} requirement(s) for {target.label}...")
@@ -508,35 +563,35 @@ class Builder:
                 except deps.DependencyError as exc:
                     raise BuildError(str(exc)) from exc
 
-        if release:
-            self._compile_ios_bytecode(app_dir, *slices)
+        self._compile_ios_bytecode(
+            [(app_dir, "app"), *((slice_dir, "app_packages") for slice_dir in slices)], release=release
+        )
 
-    def _compile_ios_bytecode(self, *roots: Path) -> None:
-        """Byte-compile staged Python code and drop the ``.py`` sources.
+    def _compile_ios_bytecode(self, roots: Sequence[Tuple[Path, str]], *, release: bool) -> None:
+        """Compile the staged app and packages so the device never compiles them at launch.
 
-        Ships ``.pyc`` only: smaller bundles, faster cold start, and no
-        plain-text source in the store artifact. Requires the host
-        interpreter to match ``app.python_version``, since bytecode is
-        version-specific.
+        Debug builds keep sources beside ``__pycache__`` bytecode; release
+        builds ship sourceless bytecode (see ``project.bytecode``). Bytecode
+        is version-specific, so this needs an interpreter matching
+        ``app.python_version``: release builds fail without one, and debug
+        builds warn and compile on the device instead.
         """
-        host_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
-        if host_version != self.config.python_version:
-            self.log(
-                f"Skipping bytecode compilation: the build host runs Python {host_version} "
-                f"but app.python_version is {self.config.python_version}, and bytecode is "
-                "version-specific. The app will ship .py sources. Run pn with Python "
-                f"{self.config.python_version} to ship bytecode."
+        version = self.config.python_version
+        compiler = bytecode.compiler_for(version)
+        if compiler is None:
+            message = (
+                f"No Python {version} interpreter is installed to compile bytecode (app.python_version is "
+                f"{version}). Install python{version} or run pn with it."
             )
+            if release:
+                raise BuildError(message)
+            self.log(message + " The app will compile its modules at launch, which is slower.")
             return
-        for root in roots:
-            # legacy=True writes module.pyc next to module.py (no
-            # __pycache__), which the embedded interpreter imports
-            # directly once the .py files are gone.
-            if not compileall.compile_dir(str(root), quiet=1, legacy=True, optimize=1):
-                raise BuildError(f"Byte-compiling {root} failed; fix the syntax error above.")
-            for source in root.rglob("*.py"):
-                source.unlink()
-        self.log("Compiled Python sources to bytecode for release.")
+        for root, label in roots:
+            if not bytecode.compile_tree(root, compiler, sourceless=release, label=label):
+                if release:
+                    raise BuildError(f"Byte-compiling {root} failed; fix the syntax error above.")
+                self.log(f"Some modules in {root} didn't compile; they'll compile on the device.")
 
     def _link_ios_runtime(self, project_dir: Path) -> None:
         """Make ``Python.xcframework`` available at the project root.
@@ -599,7 +654,16 @@ class Builder:
         candidates = list(outputs.rglob("*-release.apk")) + list(outputs.rglob("*-release.aab"))
         if not config_has_android_signing(self.config):
             candidates += list(outputs.rglob("*-release-unsigned.apk"))
-        return BuildArtifacts(paths=_existing(candidates))
+        paths = _existing(candidates)
+        if not paths:
+            raise BuildError("Gradle succeeded but produced no release artifacts")
+        try:
+            for path in paths:
+                checked = artifacts.android(path)
+                self.log(f"Verified {checked} native libraries in {path.name} for 16 KB pages.")
+        except artifacts.ArtifactError as exc:
+            raise BuildError(str(exc)) from exc
+        return BuildArtifacts(paths=paths)
 
     def _gradlew(self, prepared: PreparedProject, tasks: Sequence[str]) -> None:
         gradlew = prepared.project_dir / "gradlew"
@@ -612,6 +676,11 @@ class Builder:
 
     def _android_env(self) -> dict:
         env = dict(os.environ)
+        # Gradle needs the SDK that `pn doctor` found, even when the shell
+        # doesn't export ANDROID_HOME.
+        sdk = android_config.sdk_dir()
+        if not (env.get("ANDROID_HOME") or env.get("ANDROID_SDK_ROOT")) and sdk.is_dir():
+            env["ANDROID_HOME"] = str(sdk)
         if sys.platform == "darwin" and not env.get("JAVA_HOME"):
             try:
                 jdk = subprocess.check_output(["brew", "--prefix", "openjdk@17"], text=True).strip()
@@ -736,6 +805,10 @@ class Builder:
         Raises:
             BuildError: If archiving or export fails.
         """
+        version = self.runner.run(["xcodebuild", "-version"], capture=True)
+        major = re.search(r"Xcode (\d+)", version.stdout)
+        if not version.ok or major is None or int(major.group(1)) < 26:
+            raise BuildError("iOS release archives require Xcode 26 or later. Run 'pn doctor ios'.")
         archive_path = prepared.build_dir / "ios_template.xcarchive"
         settings = ios_config.build_settings(self.config, for_archive=True)
         result = self.runner.run(
@@ -759,6 +832,12 @@ class Builder:
         )
         if not result.ok:
             raise BuildError("xcodebuild archive failed. See output above.")
+
+        try:
+            count = artifacts.ios_archive(archive_path)
+            self.log(f"Verified {count} bundled privacy manifests.")
+        except artifacts.ArtifactError as exc:
+            raise BuildError(str(exc)) from exc
 
         export_dir = prepared.build_dir / "export"
         options = ios_config.write_export_options(
@@ -784,9 +863,12 @@ class Builder:
         return BuildArtifacts(paths=_existing(list(export_dir.rglob("*.ipa")) + [archive_path]))
 
     def _ios_runtime(self) -> runtime_assets.IOSRuntime:
-        cache = self.build_root / "ios_runtime"
+        cache = runtime_assets.default_cache_dir() / "ios"
+        version = self.config.python_version
         try:
-            return runtime_assets.prepare_ios_runtime(cache, self.config.python_version, log=self.log)
+            return runtime_assets.prepare_ios_runtime(
+                cache, version, log=self.log, compiler=bytecode.compiler_for(version)
+            )
         except RuntimeError as exc:
             raise BuildError(str(exc)) from exc
 

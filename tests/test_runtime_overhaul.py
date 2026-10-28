@@ -7,9 +7,7 @@ from typing import Any
 import pytest
 
 import pythonnative as pn
-from pythonnative.bridge.commits import CommitState, ViewState
 from pythonnative.events import get_event_registry
-from pythonnative.profiling import Profiler
 from pythonnative.reconciler import Reconciler
 from pythonnative.runtime import run_blocking
 from pythonnative.testing import FakeBackend, render
@@ -49,7 +47,7 @@ def test_async_provider_environment_survives_await() -> None:
         await asyncio.sleep(0)
         return pn.Text(pn.use_context(context))
 
-    result = render(context.Provider("provided", pn.Suspense(Child(), fallback=pn.Text("loading"))))
+    result = render(context.Provider(pn.Suspense(Child(), fallback=pn.Text("loading")), value="provided"))
     assert result.get_by_text("provided")
     result.unmount()
 
@@ -73,8 +71,11 @@ def test_urgent_state_rebases_after_deferred_updates_and_setters_are_stable() ->
         rec.mount(Counter())
         handles["start"](lambda: handles["set"](lambda value: value + 10))
         handles["set"](lambda value: value + 1)
+        assert snapshots[-1] == (0, False), "setters schedule the flush for the next loop turn"
+        await asyncio.sleep(0)
         assert snapshots[-1] == (1, True)
         rec.transitions.flush()
+        await asyncio.sleep(0)
         assert snapshots[-1] == (11, False)
         assert all(setter is setters[0] for setter in setters)
         rec.unmount()
@@ -96,7 +97,7 @@ def test_failed_render_keeps_committed_tree_refs_events_and_effects() -> None:
     backend = FakeBackend()
     rec = Reconciler(backend)
     rec.mount(pn.Column(pn.Button("old", ref=old_ref, on_press=old_callback)))
-    tag = old_ref._pn_tag
+    tag = old_ref.current.tag
     before = old_ref.current
     with pytest.raises(ValueError, match="render rejected"):
         rec.reconcile(pn.Column(pn.Button("new", ref=new_ref, on_press=new_callback), Failing()))
@@ -107,20 +108,6 @@ def test_failed_render_keeps_committed_tree_refs_events_and_effects() -> None:
     assert rec.root is not None and rec.root.children[0].element.props["title"] == "old"
     rec.reconcile(pn.Column(pn.Button("recovered", ref=old_ref, on_press=old_callback)))
     rec.unmount()
-
-
-def test_commit_overlay_work_depends_on_changed_records() -> None:
-    state = CommitState("app", 1, views={i: ViewState("Text", {"text": "before"}) for i in range(1, 10001)})
-    untouched = state.views[2]
-    with Profiler() as profiler:
-        candidate = state.prepare(
-            {"version": 2, "application": "app", "surface": 1, "revision": 1, "ops": [["u", 1, {"text": "after"}]]}
-        )
-    assert state.views[1].props["text"] == "before"
-    assert candidate.views[2] is untouched
-    assert profiler.counters["commit.records_copied"] == 1
-    state = candidate.publish()
-    assert state.views[1].props["text"] == "after"
 
 
 def test_positional_only_name_can_also_be_in_keyword_arguments() -> None:
@@ -275,9 +262,12 @@ def test_failed_render_preserves_accepted_async_work() -> None:
         gate.set()
         for _ in range(8):
             await asyncio.sleep(0)
-        assert started == ["accepted"]
-        assert canceled == []
+        # Async bodies step eagerly, so the rejected sibling's body did start;
+        # the failed pass cancelled it before it could publish anything.
+        assert started == ["accepted", "rejected"]
+        assert canceled == ["rejected"]
         assert any(view.text == "accepted" for view in backend.views.values())
+        assert all(view.text != "rejected" for view in backend.views.values())
         rec.unmount()
 
     run_blocking(exercise(), timeout=2)

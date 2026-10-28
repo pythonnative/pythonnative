@@ -1,0 +1,74 @@
+# Tests every ScreenOptions.presentation value (modal, full_screen_modal,
+# form_sheet, transparent_modal) and the fade / slide_from_bottom animations
+# on the native root stack: each variant presents a screen with a stable
+# marker and dismisses back to the demo.
+#
+# Demo screen: examples/e2e-suite/app/screens/navigation/presentation.py
+# Source under test: src/pythonnative/navigation/screen.py :: ScreenOptions.presentation
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Navigation
+      DEMO_TITLE: Presentation
+- assertVisible: "Opened: 0"
+- tapOn: "Open modal"
+- extendedWaitUntil:
+    visible: "Presented: modal"
+    timeout: 10000
+- tapOn: "Dismiss presented"
+- extendedWaitUntil:
+    visible: "Demo: Presentation"
+    timeout: 10000
+- tapOn: "Open full_screen_modal"
+- extendedWaitUntil:
+    visible: "Presented: full_screen_modal"
+    timeout: 10000
+- tapOn: "Dismiss presented"
+- extendedWaitUntil:
+    visible: "Demo: Presentation"
+    timeout: 10000
+- tapOn: "Open form_sheet"
+- extendedWaitUntil:
+    visible: "Presented: form_sheet"
+    timeout: 10000
+- tapOn: "Dismiss presented"
+- extendedWaitUntil:
+    visible: "Demo: Presentation"
+    timeout: 10000
+- tapOn: "Open transparent_modal"
+- extendedWaitUntil:
+    visible: "Presented: transparent_modal"
+    timeout: 10000
+- tapOn: "Dismiss presented"
+- extendedWaitUntil:
+    visible: "Demo: Presentation"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: "Open fade"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Open fade"
+- extendedWaitUntil:
+    visible: "Presented: fade"
+    timeout: 10000
+- tapOn: "Dismiss presented"
+- extendedWaitUntil:
+    visible: "Demo: Presentation"
+    timeout: 10000
+- tapOn: "Open slide_from_bottom"
+- extendedWaitUntil:
+    visible: "Presented: slide_from_bottom"
+    timeout: 10000
+- tapOn: "Dismiss presented"
+- extendedWaitUntil:
+    visible: "Demo: Presentation"
+    timeout: 10000
+- assertVisible: "Opened: 6"
+- assertVisible: "Last variant: slide_from_bottom"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Navigation

@@ -18,8 +18,12 @@ Everything here is standard library only (``asyncio`` streams plus a
 hand-rolled RFC 6455 implementation in ``pythonnative.devserver.ws``)
 so the same
 code also runs inside the embedded interpreter on device.
+
+The server only answers peers that present the per-user dev token; see
+``pythonnative.devserver.auth``.
 """
 
+from .auth import load_token
 from .server import DEFAULT_PORT, DevServer, ServerInfo, lan_addresses
 from .watcher import FileWatcher, SourceSnapshot, snapshot_sources
 
@@ -30,5 +34,6 @@ __all__ = [
     "ServerInfo",
     "SourceSnapshot",
     "lan_addresses",
+    "load_token",
     "snapshot_sources",
 ]

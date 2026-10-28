@@ -1,0 +1,28 @@
+# Tests LinearGradient lays out children over vertical, horizontal, and multi-stop gradients.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/linear_gradient.py
+# Source under test: src/pythonnative/components/graphics.py :: LinearGradient
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: LinearGradient
+- assertVisible: "Top to bottom"
+- assertVisible: "Left to right"
+- scrollUntilVisible:
+    element:
+      text: "Three colors, weighted stops"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Three colors, weighted stops"
+- scrollUntilVisible:
+    element:
+      text: "Back to list"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

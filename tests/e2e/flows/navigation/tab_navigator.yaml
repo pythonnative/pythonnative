@@ -1,7 +1,7 @@
 # Tests the nested Tab navigator switches tabs and shows their body.
 #
 # Demo screen: examples/e2e-suite/app/screens/navigation/tab_navigator.py
-# Source under test: src/pythonnative/navigation/navigators.py :: create_tab_navigator
+# Source under test: src/pythonnative/navigation/navigators.py :: TabNavigator
 #
 # The tap target (the TabBar) is persistent across switches, so taps are
 # reliable. We `extendedWaitUntil` rather than assert immediately only
@@ -21,10 +21,12 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Tab Beta body"
     timeout: 10000
+# Gamma is a native stack nested in the tab, whose first mount (a UIKit
+# navigation controller or an Android fragment) takes longer on slow emulators.
 - tapOn: "Gamma"
 - extendedWaitUntil:
     visible: "Tab Gamma body"
-    timeout: 10000
+    timeout: 20000
 - tapOn: "Alpha"
 - extendedWaitUntil:
     visible: "Tab Alpha body"

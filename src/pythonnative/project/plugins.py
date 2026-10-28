@@ -98,6 +98,8 @@ class NativePlugin:
     android_resources: Sequence[Path] = field(default_factory=tuple)
     android_assets: Sequence[Path] = field(default_factory=tuple)
     contracts: Optional[Path] = None
+    swift_dependencies: tuple[SwiftDependency, ...] = ()
+    maven_dependencies: tuple[str, ...] = ()
 
     @property
     def has_ios(self) -> bool:
@@ -108,6 +110,130 @@ class NativePlugin:
     def has_android(self) -> bool:
         """Whether this plugin contributes Kotlin code."""
         return self.android_entry is not None
+
+
+@dataclass(frozen=True)
+class SwiftDependency:
+    """An exact Swift package release and the products linked into the runtime."""
+
+    url: str
+    version: str
+    products: tuple[str, ...]
+
+    @property
+    def identity(self) -> str:
+        """SwiftPM's identity for this Git repository."""
+        return self.url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git").lower()
+
+
+def _native_dependencies(manifest: dict[str, Any]) -> tuple[tuple[SwiftDependency, ...], tuple[str, ...]]:
+    from urllib.parse import urlsplit
+
+    swift = (manifest.get("ios") or {}).get("dependencies", [])
+    maven = (manifest.get("android") or {}).get("dependencies", [])
+    if not isinstance(swift, list) or not isinstance(maven, list):
+        raise PluginError("Native dependencies must be arrays")
+    packages = []
+    for item in swift:
+        if not isinstance(item, dict) or set(item) != {"url", "version", "products"}:
+            raise PluginError("Swift dependencies require url, version, and products")
+        url, version, products = item["url"], item["version"], item["products"]
+        if not isinstance(url, str) or not isinstance(version, str):
+            raise PluginError("Swift dependency URLs and versions must be strings")
+        parsed = urlsplit(url)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise PluginError("Swift dependencies require an HTTPS repository URL without credentials")
+        if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?", version):
+            raise PluginError("Swift dependencies require an exact semantic version")
+        if (
+            not isinstance(products, list)
+            or not products
+            or not all(isinstance(product, str) and _SWIFT_IDENT.fullmatch(product) for product in products)
+        ):
+            raise PluginError("Swift dependencies require a nonempty array of product identifiers")
+        package = SwiftDependency(url, version, tuple(sorted(set(products))))
+        if not re.fullmatch(r"[a-z0-9_.-]+", package.identity):
+            raise PluginError("Invalid Swift package repository identity")
+        packages.append(package)
+    for coordinate in maven:
+        if (
+            not isinstance(coordinate, str)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:\d[0-9A-Za-z_.-]*", coordinate)
+            or "SNAPSHOT" in coordinate.upper()
+        ):
+            raise PluginError("Android dependencies require exact group:artifact:version coordinates")
+    return tuple(packages), tuple(sorted(set(maven)))
+
+
+def _dependency_block(content: str, name: str, lines: Sequence[str]) -> str:
+    marker = f"// pn:{name}"
+    end = f"// pn:end-{name}"
+    pattern = re.escape(marker) + r".*?" + re.escape(end)
+    if not re.search(pattern, content, re.DOTALL):
+        if lines:
+            raise PluginError(f"Native template is missing its {name} dependency block")
+        return content
+    return re.sub(pattern, lambda _: marker + "\n" + "\n".join(lines) + "\n    " + end, content, flags=re.DOTALL)
+
+
+def _stage_dependencies(project_dir: Path, plugins: Sequence[NativePlugin], platform: str) -> None:
+    """Resolve declarations deterministically and reject cross-plugin conflicts."""
+    if platform == "ios":
+        packages: dict[str, SwiftDependency] = {}
+        for plugin in plugins:
+            for item in plugin.swift_dependencies:
+                old = packages.get(item.identity)
+                if old is not None and (old.url, old.version) != (item.url, item.version):
+                    raise PluginError(f"Conflicting Swift package dependency: {item.identity}")
+                products = tuple(sorted(set(item.products) | set(old.products if old else ())))
+                packages[item.identity] = SwiftDependency(item.url, item.version, products)
+        path = project_dir / "PythonNativeKit/Package.swift"
+        if not path.exists():
+            if packages:
+                raise PluginError("PythonNativeKit/Package.swift is missing")
+            return
+        content = path.read_text(encoding="utf-8")
+        ordered = [packages[name] for name in sorted(packages)]
+        content = _dependency_block(
+            content,
+            "packages",
+            [f"        .package(url: {json.dumps(item.url)}, exact: {json.dumps(item.version)})," for item in ordered],
+        )
+        content = _dependency_block(
+            content,
+            "products",
+            [
+                f"                .product(name: {json.dumps(product)}, package: {json.dumps(item.identity)}),"
+                for item in ordered
+                for product in item.products
+            ],
+        )
+    else:
+        modules: dict[str, str] = {}
+        for plugin in plugins:
+            for coordinate in plugin.maven_dependencies:
+                name, version = coordinate.rsplit(":", 1)
+                if name in modules and modules[name] != version:
+                    raise PluginError(f"Conflicting Android dependency: {name}")
+                modules[name] = version
+        path = project_dir / "pythonnative/build.gradle"
+        if not path.exists():
+            if modules:
+                raise PluginError("pythonnative/build.gradle is missing")
+            return
+        content = _dependency_block(
+            path.read_text(encoding="utf-8"),
+            "dependencies",
+            [f"    implementation '{name}:{version}'" for name, version in sorted(modules.items())],
+        )
+    path.write_text(content, encoding="utf-8")
 
 
 # ======================================================================
@@ -188,6 +314,7 @@ def load_plugin(root: Path, *, name: Optional[str] = None) -> NativePlugin:
         not (root / contract_path).is_file() or not (root / contract_path).resolve().is_relative_to(root)
     ):
         raise PluginError(f"{manifest_path}: contracts must name a file inside the plugin")
+    swift_dependencies, maven_dependencies = _native_dependencies(manifest)
     return NativePlugin(
         name=plugin_name,
         root=root,
@@ -199,6 +326,8 @@ def load_plugin(root: Path, *, name: Optional[str] = None) -> NativePlugin:
         android_resources=resources("android", "resources"),
         android_assets=resources("android", "assets"),
         contracts=contract_path,
+        swift_dependencies=swift_dependencies,
+        maven_dependencies=maven_dependencies,
     )
 
 
@@ -320,13 +449,11 @@ def stage_ios_plugins(project_dir: Path, plugins: Sequence[NativePlugin], *, log
     package = Path(project_dir) / "PythonNativeKit/Package.swift"
     if package.exists():
         contents = package.read_text(encoding="utf-8")
-        contents = contents.replace(', resources: [.process("PluginResources")]', "")
+        contents = contents.replace(', .copy("PluginResources")', "")
         if resource_root.exists():
-            contents = contents.replace(
-                'path: "Sources/PythonNativeKit"',
-                'path: "Sources/PythonNativeKit", resources: [.process("PluginResources")]',
-            )
+            contents = contents.replace('.process("Resources")', '.process("Resources"), .copy("PluginResources")')
         package.write_text(contents, encoding="utf-8")
+    _stage_dependencies(Path(project_dir), bundled, "ios")
     registration.write_text(_render_swift_registration(bundled), encoding="utf-8")
     if bundled:
         emit(
@@ -379,6 +506,7 @@ def stage_android_plugins(project_dir: Path, plugins: Sequence[NativePlugin], *,
                 shutil.copy2(plugin.root / rel, target)
                 managed.append(str(target.relative_to(project_dir)))
     registration.parent.mkdir(parents=True, exist_ok=True)
+    _stage_dependencies(Path(project_dir), bundled, "android")
     registration.write_text(_render_kotlin_registration(bundled), encoding="utf-8")
     managed_manifest.write_text(json.dumps(sorted(managed)) + "\n", encoding="utf-8")
     if bundled:
@@ -459,15 +587,25 @@ def discover_target_plugins(config: Any, targets: Sequence[Any], runner: Any) ->
             resolution = deps.resolve(config, target, runner=runner)
             if not resolution.ok:
                 raise PluginError(f"Cannot resolve plugins for {target.label}: {resolution.error}")
-            urls = [package.url for package in resolution.packages]
+            urls = [
+                package.url + ("#sha256=" + package.sha256 if package.sha256 else "") for package in resolution.packages
+            ]
         if urls:
+            from urllib.parse import unquote, urlparse
+
+            for url in urls:
+                parsed = urlparse(url)
+                cached = cache / Path(unquote(parsed.path)).name
+                digest = parsed.fragment.removeprefix("sha256=") if parsed.fragment.startswith("sha256=") else None
+                if cached.is_file() and (not digest or hashlib.sha256(cached.read_bytes()).hexdigest() != digest):
+                    cached.unlink()
             command = deps.pip_base_args(config, target)
             command[3] = "download"
             result = runner.run([*command, "--no-deps", "--dest", str(cache), *urls], capture=True)
             if not result.ok:
                 raise PluginError(f"Could not download plugin metadata for {target.label}: {result.stderr}")
         # Only inspect wheels in this resolution, excluding removed cached packages.
-        names = {url.split("#", 1)[0].rsplit("/", 1)[-1] for url in urls}
+        names = {Path(unquote(urlparse(url).path)).name for url in urls}
         for wheel in sorted(cache.glob("*.whl")):
             if wheel.name not in names:
                 continue

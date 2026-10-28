@@ -1,6 +1,8 @@
 import plistlib
 from pathlib import Path
 
+import pytest
+
 from pythonnative.project import ios
 from pythonnative.project.config import AppConfig
 
@@ -117,11 +119,19 @@ def test_info_plist_url_schemes(tmp_path: Path) -> None:
         tmp_path,
         app={"id": "com.acme.cool", "name": "cool", "url_schemes": ["coolapp", "cool-beta"]},
     )
-    ios.configure_info_plist(plist_path, cfg)
+    ios.configure_info_plist(plist_path, cfg, release=True)
     plist = plistlib.loads(plist_path.read_bytes())
     (url_type,) = plist["CFBundleURLTypes"]
     assert url_type["CFBundleURLSchemes"] == ["coolapp", "cool-beta"]
     assert url_type["CFBundleURLName"] == "com.acme.cool"
+
+
+def test_debug_builds_register_the_dev_client_connect_scheme(tmp_path: Path) -> None:
+    plist_path = _write_plist(tmp_path)
+    cfg = _config(tmp_path, app={"id": "com.acme.cool_app", "name": "cool", "url_schemes": ["coolapp"]})
+    ios.configure_info_plist(plist_path, cfg)
+    (url_type,) = plistlib.loads(plist_path.read_bytes())["CFBundleURLTypes"]
+    assert url_type["CFBundleURLSchemes"] == ["coolapp", "pn-com.acme.cool-app"]
 
 
 def test_write_entitlements_for_remote_notifications(tmp_path: Path) -> None:
@@ -135,7 +145,43 @@ def test_write_entitlements_for_remote_notifications(tmp_path: Path) -> None:
     assert f"CODE_SIGN_ENTITLEMENTS={ios.ENTITLEMENTS_FILE}" in ios.build_settings(cfg)
 
 
+@pytest.mark.parametrize(
+    ("method", "release", "environment"),
+    [
+        ("app-store", True, "production"),
+        ("ad-hoc", True, "production"),
+        ("enterprise", True, "production"),
+        ("development", True, "development"),
+        ("app-store", False, "development"),
+    ],
+)
+def test_push_environment_follows_the_release_export(
+    tmp_path: Path, method: str, release: bool, environment: str
+) -> None:
+    (tmp_path / "ios_template").mkdir()
+    cfg = _config(tmp_path, permissions={"remote_notifications": True}, ios={"signing": {"export_method": method}})
+    dest = ios.write_entitlements(tmp_path, cfg, release=release)
+    assert dest is not None
+    assert plistlib.loads(dest.read_bytes())["aps-environment"] == environment
+
+
 def test_no_entitlements_without_capabilities(tmp_path: Path) -> None:
     cfg = _config(tmp_path, permissions={"camera": "Scan"})
     assert ios.write_entitlements(tmp_path, cfg) is None
+
+
+def test_debug_info_plist_declares_local_network_use(tmp_path: Path) -> None:
+    plist_path = _write_plist(tmp_path)
+    ios.configure_info_plist(plist_path, _config(tmp_path))
+    assert "NSLocalNetworkUsageDescription" in plistlib.loads(plist_path.read_bytes())
+
+
+def test_release_info_plist_omits_the_dev_server_local_network_string(tmp_path: Path) -> None:
+    plist_path = _write_plist(tmp_path)
+    ios.configure_info_plist(plist_path, _config(tmp_path), release=True)
+    assert "NSLocalNetworkUsageDescription" not in plistlib.loads(plist_path.read_bytes())
+    # An app that needs the local network itself still declares it.
+    cfg = _config(tmp_path, ios={"extra_info_plist": {"NSLocalNetworkUsageDescription": "Find printers"}})
+    ios.configure_info_plist(plist_path, cfg, release=True)
+    assert plistlib.loads(plist_path.read_bytes())["NSLocalNetworkUsageDescription"] == "Find printers"
     assert not any(s.startswith("CODE_SIGN_ENTITLEMENTS=") for s in ios.build_settings(cfg))

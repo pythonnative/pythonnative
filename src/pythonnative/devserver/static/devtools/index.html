@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>PythonNative DevTools</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233572e8'/%3E%3Cpath d='M10 22V10h7a4 4 0 0 1 0 8h-7' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/devtools/devtools.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">Pn</span>
+      <span class="brand-name">DevTools</span>
+      <span id="project-name" class="project-name"></span>
+    </div>
+    <div class="target-picker">
+      <span id="status-dot" class="status-dot" data-state="connecting" title="Connecting to pn start"></span>
+      <span id="status-text" class="visually-hidden">Connecting</span>
+      <label for="target-select" class="visually-hidden">App</label>
+      <select id="target-select" class="select" title="The app DevTools inspects"></select>
+      <span id="target-kind" class="badge" hidden></span>
+    </div>
+    <div class="topbar-actions">
+      <button id="reload-button" class="btn" type="button" data-icon="reload" title="Reload the selected app" disabled>Reload</button>
+      <button id="menu-button" class="btn" type="button" data-icon="menu" title="Show the dev menu on the selected app" disabled>Dev menu</button>
+      <span id="debug-chip" class="debug-chip" data-state="none">
+        <span class="debug-dot" aria-hidden="true"></span>
+        <span id="debug-label">Debugger</span>
+        <button id="debug-button" class="btn btn-small btn-link" type="button" hidden>Debug this app</button>
+      </span>
+    </div>
+  </header>
+
+  <nav id="tabs" class="tabs" role="tablist" aria-label="DevTools panels"></nav>
+
+  <div id="banner" class="banner" role="status" hidden>
+    <span id="banner-text">Lost the connection to pn start. Reconnecting...</span>
+    <button id="retry-button" class="btn btn-small" type="button">Retry now</button>
+  </div>
+
+  <main id="panels" class="panels"></main>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script type="module" src="/devtools/devtools.js"></script>
+</body>
+</html>

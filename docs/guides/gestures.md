@@ -19,7 +19,7 @@ from pythonnative import gestures
 
 
 @pn.component
-def TapCard():
+def TapCard() -> pn.Node:
     count, set_count = pn.use_state(0)
     return pn.View(
         pn.Text(f"Tapped {count} times"),
@@ -30,25 +30,30 @@ def TapCard():
 
 Every callback receives a
 [`GestureEvent`][pythonnative.gestures.GestureEvent] snapshot with
-position, translation, velocity, scale, and rotation populated as
-appropriate for the gesture kind.
+position (`x`, `y` in the view; `absolute_x`, `absolute_y` in the
+window), translation, velocity, scale, rotation, and `direction`
+populated as appropriate for the gesture kind.
 
 ## How recognition works
 
 Gesture descriptors are frozen dataclasses: numeric configuration plus
 your callbacks. The reconciler serializes the configuration into plain
-dicts for the native handler (prop diffing never compares closures)
-and routes the callbacks through the same tag-based event channel as
-`on_press` et al.
+dicts in the view's `gestures` prop (prop diffing never compares
+closures) and routes the callbacks through the same tag-based event
+channel as `on_press` et al.
 
-Recognition itself is native:
+Recognition itself runs on the platform's UI thread, never in Python:
 
-- **iOS** attaches real `UIGestureRecognizer` instances.
-- **Android** processes `MotionEvent` streams with Kotlin recognizers
-  and an arbiter in the native rendering library.
-- **The browser preview** streams the page's pointer events into the
-  Python [`GestureArbiter`][pythonnative.gestures.GestureArbiter],
-  which also supports headless recognition tests.
+- **iOS** attaches real `UIGestureRecognizer` instances, which
+  coordinate with scroll views, the back swipe, and system gestures.
+- **Android**, **the browser preview**, and **headless tests** forward
+  pointer events to the renderer core's gesture engine, the same C++
+  recognizers, velocity tracking, activation and failure offsets, and
+  composition rules on every one of them.
+
+A recognized gesture reaches Python as an ordinary event and updates any
+animated bindings (`Animated.event`) in the core first, so a drag keeps
+moving while Python is busy.
 
 Gestures listed side by side in the `gestures=` list recognize
 *simultaneously*. Use the composition combinators below when you need
@@ -89,8 +94,9 @@ pn.View(
 With `Exclusive`, a single tap reports only after the double-tap
 window closes, and a double tap suppresses the single-tap callback
 entirely; you get exactly one of the two. On iOS this maps to
-`requireGestureRecognizerToFail`; Android's Kotlin arbiter and the
-browser's Python arbiter implement the corresponding priority rules.
+`requireGestureRecognizerToFail`; the core's gesture engine implements
+the corresponding priority rules for Android, the browser preview, and
+tests.
 
 ## Fling
 
@@ -119,7 +125,7 @@ from pythonnative import gestures
 
 
 @pn.component
-def Draggable():
+def Draggable() -> pn.Node:
     tx = pn.use_animated_value(0.0)
     ty = pn.use_animated_value(0.0)
 
@@ -144,9 +150,39 @@ def Draggable():
 ```
 
 `Pan` activates once the pointer travels `min_distance` points (10 by
-default), reports `on_change` with translation measured from the
-activation point, and `on_end` with release velocity, ready to feed
-into [`Animated.decay`][pythonnative.Animated] for a fling.
+default, unless another activation criterion is set), reports
+`on_change` with translation measured from the activation point, and
+`on_end` with release velocity, ready to feed into
+[`Animated.decay`][pythonnative.Animated] for a fling.
+
+### Activation offsets
+
+Inside a scrolling list a plain `Pan` fights the scroll view. `Pan`
+adds React Native Gesture Handler's activation criteria, applied the
+same way on iOS, Android, and in the browser preview:
+
+```python
+# A horizontal swipe-to-dismiss row inside a vertical list.
+gestures.Pan(
+    active_offset_x=(-20, 20),   # activate once the finger moves 20 pt left or right
+    fail_offset_y=(-15, 15),     # give up if it moves 15 pt up or down first
+    max_pointers=1,
+    on_change=drag,
+)
+```
+
+Before activation, with `dx` and `dy` the travel from where the finger
+touched down: crossing `fail_offset_x` or `fail_offset_y` fails the
+pan for the rest of the interaction; otherwise the pan activates as
+soon as `dx` crosses `active_offset_x`, `dy` crosses `active_offset_y`,
+the straight-line travel reaches `min_distance`, or the pointer speed
+reaches `min_velocity` (points per second). Each offset is a single
+number (`20` means `dx > 20`, `-20` means `dx < -20`) or a
+`(negative_bound, positive_bound)` pair. The default 10-point
+`min_distance` applies only when no offset or velocity criterion is
+given; pass it explicitly to combine it with them. `min_pointers` and
+`max_pointers` bound how many fingers may take part: too many fingers
+fail a pending pan and cancel an active one.
 
 ## Callback slots
 
@@ -160,8 +196,12 @@ Continuous gestures (`Pan`, `Pinch`, `Rotation`) expose three slots:
 
 Discrete gestures add a dedicated shortcut: `Tap(on_tap=...)`,
 `LongPress(on_long_press=...)` (fires at activation time, like
-`UILongPressGestureRecognizer`), and `Swipe(on_swipe=...)` (fires on
-release with the resolved `direction`).
+`UILongPressGestureRecognizer`), and `Swipe(on_swipe=...)` /
+`Fling(on_fling=...)` (fire on release with the resolved `direction`).
+`direction` is a [`SwipeDirection`][pythonnative.SwipeDirection]
+(`"left"`, `"right"`, `"up"`, or `"down"`) or `None` for other gesture
+kinds; `Swipe(direction=None)` and `Fling(direction=None)` accept any
+direction.
 
 ## Configuration
 
@@ -170,7 +210,14 @@ gestures.Tap(n_taps=2)                      # double-tap
 gestures.LongPress(min_duration_ms=350)     # quicker activation
 gestures.Pan(min_distance=4, min_pointers=2)
 gestures.Swipe(direction="left", min_velocity=200)
+gestures.Pan(on_change=drag, enabled=can_drag)   # keep the slot, stop recognizing
 ```
+
+Every descriptor accepts `enabled=False`. A disabled gesture stays in
+the list, so sibling indices and composition nodes are unchanged, but
+it never recognizes and is skipped by `Race` and `Exclusive`
+arbitration, so a later `Exclusive` member doesn't wait for it. Toggle
+`enabled` from state instead of rebuilding the `gestures=` list.
 
 `GestureEvent.state` is a
 [`GestureState`][pythonnative.gestures.GestureState] enum member
@@ -203,9 +250,44 @@ arbitrary view.
 
 ## Testing
 
-The arbiter that powers Android and desktop recognition is pure
-Python, so gesture logic is unit-testable with scripted pointer
-streams; see `tests/test_gestures.py` for ready-made patterns.
+Headless tests run the core's gesture engine, the one Android and the
+browser preview use, so gesture logic is testable with scripted pointer
+streams. [`FakeTransport.pointer`][pythonnative.bridge.fake.FakeTransport.pointer]
+feeds `(phase, pointer, x, y, window_x, window_y, time)` events to a
+mounted view's gestures, with phases from `pythonnative.bridge.core`
+(`POINTER_DOWN`, `POINTER_MOVE`, `POINTER_UP`, `POINTER_CANCEL`) and
+times in seconds:
+
+```python
+import pythonnative as pn
+from pythonnative import gestures
+from pythonnative.bridge.core import POINTER_DOWN, POINTER_UP
+from pythonnative.testing import render
+
+
+def test_tap_counts() -> None:
+    taps = []
+    result = render(
+        pn.View(
+            test_id="card",
+            style={"width": 100, "height": 100},
+            gestures=[gestures.Tap(on_tap=taps.append)],
+        )
+    )
+    card = result.get_by_test_id("card")
+    result.backend.native.pointer(
+        card.tag,
+        [(POINTER_DOWN, 0, 50, 50, 50, 50, 0.0), (POINTER_UP, 0, 50, 50, 50, 50, 0.05)],
+    )
+    result.settle()
+    assert len(taps) == 1
+```
+
+Time-based recognizers (long press, multi-tap windows) advance with
+`FakeTransport.poll_gestures(tag, time)`; `gesture_deadline(tag)` says
+when they next need it. `tests/gesture_harness.py` and
+`tests/test_gestures.py` in the repository have more patterns. iOS
+recognizers have their own tests in the native test suite.
 
 ## Next steps
 

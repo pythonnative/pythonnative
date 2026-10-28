@@ -88,7 +88,7 @@ def use_state(initial=None):
         import pythonnative as pn
 
         @pn.component
-        def Counter():
+        def Counter() -> pn.Node:
             count, set_count = pn.use_state(0)
             return pn.Button(
                 f"Count: {count}",
@@ -157,7 +157,7 @@ Example:
     import pythonnative as pn
 
     @pn.component
-    def Counter(initial=0):
+    def Counter(initial: int = 0) -> pn.Node:
         count, set_count = pn.use_state(initial)
         return pn.Button(
             f"Count: {count}",

@@ -41,12 +41,12 @@ uv run pn run android
 ```
 
 `uv run` looks upward for the nearest project, so it keeps using the
-repository's `.venv` from a subdirectory. The bundled example works the same
+repository's `.venv` from a subdirectory. The bundled examples work the same
 way:
 
 ```bash
-# run the Hello World example
-cd examples/hello-world && uv run pn run android
+# run the feature catalog example
+cd examples/e2e-suite && uv run pn run android
 ```
 
 ## Claiming an issue
@@ -63,20 +63,28 @@ Unsolicited pull requests for issues that are already assigned or already have a
 
 - `src/pythonnative/`: installable library and CLI
   - Core Python modules, UI components, and utilities
-  - `bridge/`: JSON codec and per-platform transports into the native rendering core
+  - `components/`: element factories and the typed event records (`components/events.py`)
+  - `handles.py`: typed imperative handles published on `ref.current`
+  - `journal.py`: the undo journal a failed render pass rolls back through
+  - `native_views/`: the thin backend accessor (`get_backend` / `set_backend`) and the bridge backend that serializes commits
+  - `native_modules/`: device module facades and their Python fallbacks
+  - `navigation/`: navigator values, screens, container, hooks, deep-link table, and the navigation ref
+  - `theme.py`, `style.py`, `store.py`: the app `Theme`, `StyleSheet` namespaces and style resolution, and `Store`
+  - `lint.py`: the `pn lint` rules-of-hooks checker
+  - `testing/`: the headless testing library and the shipped pytest plugin (`testing/pytest_plugin.py`)
+  - `bridge/`: the `ctypes` binding to the renderer core, the fake platform headless tests run it through, and per-platform transports
   - `cli/`: `pn` command
   - `project/`: config loading, template configuration, native plugin staging, and the builder behind `pn`
   - `native/`: native libraries and their tests, bundled with the Python package
-    - `ios/`: `PythonNativeKit` Swift package and its XCTest target
-    - `android/`: Android rendering library and its JUnit target
-    - `yoga/`: vendored Yoga source, native build definitions, and the host Python binding
+    - `core/`: the C++20 renderer core (C ABI in `include/pn_core.h`), its vendored Yoga source, and the `pythonnative._core` host extension
+    - `ios/`: `PythonNativeKit`, the Swift mounting layer, and its XCTest target
+    - `android/`: the Kotlin mounting layer and its JUnit target
   - `sdk/`: native contract definitions, code generation, and generator templates
-  - `devserver/static/`: browser preview assets, including the vendored Yoga JavaScript/WebAssembly distribution
+  - `devserver/static/`: browser preview assets, including the renderer core's WebAssembly build (`core/`)
   - `templates/`: Android/iOS app shells; the builder stages native libraries into generated app projects
 - `tests/`: unit tests for the library, plus the Maestro E2E suite
   - `e2e/`: the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
 - `examples/`: runnable example apps
-  - `hello-world/`: minimal marketing demo
   - `e2e-suite/`: comprehensive feature catalog that drives the Maestro E2E suite
   - `inbox/`: offline reference app with a custom native extension
 - `scripts/`: helper scripts (`check.sh`, `run-e2e.sh`, `check-e2e-coverage.py`)
@@ -86,8 +94,9 @@ Unsolicited pull requests for issues that are already assigned or already have a
 
 - Style: Black; lint: Ruff; typing where useful. Keep APIs stable.
 - Prefer explicit, descriptive names; keep platform abstractions clean.
-- Python never imports platform code. Everything that touches `UIView` or `android.view.View` lives in Swift (`PythonNativeKit`) or Kotlin (the `pythonnative` Gradle module) and is reached through `pythonnative.bridge`; see `docs/concepts/bridge.md` for the protocol. Bump `PROTOCOL_VERSION` on both sides when the wire format changes.
-- Add/extend tests under `tests/` for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.
+- Python never imports platform code. Everything that touches `UIView` or `android.view.View` lives in Swift (`PythonNativeKit`) or Kotlin (the `pythonnative` Gradle module) and is reached through `pythonnative.bridge`; see `docs/concepts/bridge.md` for the protocol. When the wire format changes, bump `PN_CORE_PROTOCOL_VERSION` in `native/core/include/pn_core.h` and its mirrors, `PROTOCOL_VERSION` in `pythonnative/bridge/core.py` and `devserver/static/core/mount.js`, then rebuild the WebAssembly core and run `scripts/generate-native-contracts.py`. The handshake rejects a Python runtime whose version doesn't match the core's.
+- Add/extend tests under `tests/` for new behavior. Renderer core changes get coverage in `tests/test_core.py`; native changes get XCTest / JUnit coverage next to the code they touch.
+- Design large changes in an RFC first. Anything that adds or removes public API, changes the Python-to-native wire contract, changes a convention apps depend on, or spans Python, Swift, Kotlin, and the browser preview gets a document under `rfcs/` (see [`rfcs/README.md`](https://github.com/pythonnative/pythonnative/blob/main/rfcs/README.md)). The RFC lands with the implementation and records what shipped, including removals.
 - Commit source, reviewed generated contracts, dependency locks, and vendored dependencies as described in [Generated source and vendored dependencies](#generated-source-and-vendored-dependencies). Don't commit local build outputs or caches.
 - Docstrings: Google style throughout. Ruff is configured with the Google
   convention (`pydocstyle.convention = "google"`) and enforces the `D` rule
@@ -105,7 +114,7 @@ uv run ruff check .             # lint
 uv run black src examples tests # format
 uv run --group docs mkdocs serve # preview the docs site locally
 
-# native rendering core (macOS with Xcode for the Swift package; JDK 17 for Gradle)
+# native mounting layers (macOS with Xcode for the Swift package; JDK 17 for Gradle)
 (cd src/pythonnative/native/ios && xcodebuild test -project Tests/NativeTests.xcodeproj -scheme NativeTests -destination 'platform=iOS Simulator,name=iPhone 15 Pro')
 (cd src/pythonnative/native/android && ../../templates/android_template/gradlew testDebugUnitTest)
 ```
@@ -124,27 +133,26 @@ of the source tree. Keep these in version control:
   Commit schema updates alongside their Python definitions and native
   implementations.
 - Dependency locks, including `uv.lock` and example apps' `pn.lock` files.
-- Vendored Yoga source and browser distribution files under
-  `src/pythonnative/native/yoga/` and `src/pythonnative/devserver/static/yoga/`.
-  The browser distribution includes its JavaScript/WebAssembly runtime, type
-  declarations, and source maps. Preserve upstream licenses and document the
-  version, source, and any local modifications when updating vendored code.
+- Vendored Yoga source under `src/pythonnative/native/core/yoga/`. Preserve
+  upstream licenses and document the version, source, and any local
+  modifications when updating vendored code.
+- The renderer core's WebAssembly build for the browser preview,
+  `src/pythonnative/devserver/static/core/pn_core.js` and `pn_core.wasm`.
+  Rebuild it with `python scripts/build-core-wasm.py` (Emscripten 4.0.10)
+  whenever the core changes; CI fails when it drifts from the sources.
 
-After changing built-in contracts or their generators, regenerate the checked-in
-native files from the repository root:
+After changing a built-in factory's signature, the contracts, or their
+generators, regenerate the checked-in files from the repository root:
 
 ```bash
-uv run pn codegen --output build/contracts
-cp build/contracts/{PNContracts,NativeProps,NativeModules}.swift \
-  src/pythonnative/native/ios/Sources/PythonNativeKit/Generated/
-cp build/contracts/{PNContracts,NativeProps,NativeModules}.kt \
-  src/pythonnative/native/android/src/main/java/com/pythonnative/generated/
-uv run pytest tests/test_codegen.py
+uv run python scripts/generate-native-contracts.py
+uv run pytest tests/test_codegen.py tests/test_performance_budgets.py
 ```
 
-The test checks that the committed native contracts match generation in a clean
-Python interpreter. The other files under `build/contracts/` are local outputs;
-don't add the whole directory to the commit.
+The script writes `src/pythonnative/sdk/_builtin_contracts.json` (which
+`import pythonnative` loads instead of evaluating annotations), the generated
+Swift and Kotlin sources, and the native test fixtures. The tests check that
+the committed files match generation in a clean Python interpreter.
 
 Exclude staged app projects, compiled apps and libraries, package distributions,
 test reports, local storage, credentials, and tool caches. Examples include
@@ -193,33 +201,37 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `bridge`: wire codec, transports, handshake, and native-to-Python callback (`bridge/`)
   - `cli`: CLI tool and `pn` command (`src/pythonnative/cli/`)
   - `component`: the `@component` decorator, `Component`, and `memo` (`component.py`)
-  - `components`: declarative element-creating functions (`components/`)
+  - `components`: declarative element-creating functions and their shared props (`components/`)
   - `element`: Element descriptor class (`element.py`)
   - `events`: tag-based event routing between native views and Python callbacks (`events.py`)
-  - `gestures`: gesture descriptors and the pure-Python recognition arbiter (`gestures.py`)
+  - `gestures`: gesture descriptors and composition (`gestures.py`)
+  - `handles`: typed imperative handles published on refs (`handles.py`)
   - `hooks`: hooks and contexts (`hooks.py`)
   - `hosts`: screen hosts, lifecycle forwarding, and render scheduling (`hosts/`)
   - `devserver`: dev server, file watcher, and WebSocket implementation (`devserver/`)
   - `devclient`: on-device dev client that syncs sources and Fast Refreshes (`devclient.py`)
   - `hot_reload`: module reloader and Fast Refresh (`hot_reload.py`)
-  - `layout`: Yoga layout integration and the host binding (`layout.py`, `native/yoga/`)
+  - `journal`: render undo journal (`journal.py`)
+  - `lint`: the `pn lint` rules-of-hooks checker (`lint.py`)
   - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
   - `native_modules`: native module registry, Python facades, and Python fallbacks (`native_modules/`)
-  - `native_views`: view registry protocol and bridge backend (`native_views/`)
-  - `navigation`: navigation state, container, navigators, hooks, and linking (`navigation/`)
+  - `native_views`: view backend accessor and bridge backend (`native_views/`)
+  - `navigation`: navigation state, container, navigators, screens, hooks, linking, and ref (`navigation/`)
   - `net`: awaitable HTTP client (`net.py`)
   - `package`: `src/pythonnative/__init__.py` exports and package boundary
   - `platform`: `Platform.OS`/`Platform.select` and version detection (`platform.py`)
   - `platform_metrics`: platform-reported metrics like safe-area insets and bar heights (`platform_metrics.py`)
   - `preview`: `pn start` / `pn preview` session and the browser preview page (`preview.py`, `devserver/static/`)
   - `project`: `pythonnative.toml` config, template configurators, plugin staging, and the builder (`project/`)
-  - `reconciler`: virtual view tree diffing, boundaries, and the layout pass (`reconciler/`)
+  - `reconciler`: virtual view tree diffing, boundaries, and publishing the core's layout frames (`reconciler/`)
   - `runtime`: framework-wide asyncio loop and thread-safe future helpers (`runtime.py`)
   - `sdk`: public extension SDK for custom native components (`sdk/`)
   - `storage`: AsyncStorage key/value persistence and `use_persisted_state` (`storage.py`)
+  - `store`: the `Store` app-state container and `use_store` (`store.py`)
   - `scheduler`: render batching and transition queues (`scheduler.py`)
-  - `style`: StyleSheet and theming (`style.py`)
-  - `testing`: public test utilities (`testing/`)
+  - `style`: the `Style` type, style resolution, and `StyleSheet` (`style.py`)
+  - `testing`: public test utilities and the pytest plugin (`testing/`)
+  - `theme`: `Theme`, `ThemeProvider`, `use_theme`, and `use_styles` (`theme.py`)
   - `utils`: shared utilities (`utils.py`)
 
 - Other scopes:
@@ -230,8 +242,9 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `repo`: repository metadata and top‑level files (`README.md`, `CONTRIBUTING.md`, `.gitignore`, licenses)
   - `scripts`: developer scripts under `scripts/` (e.g., `check.sh`)
   - `templates`: Android/iOS project templates under `src/pythonnative/templates/`
-  - `kit`: the Swift rendering core (`native/ios/`)
-  - `runtime-android`: the Kotlin rendering core (`native/android/`)
+  - `core`: the C++ renderer core, its C ABI, and its WebAssembly build (`native/core/`, `devserver/static/core/`)
+  - `kit`: the Swift mounting layer (`native/ios/`)
+  - `runtime-android`: the Kotlin mounting layer (`native/android/`)
   - `tests`: unit/integration/E2E tests under `tests/`
   - `workflows`: CI pipelines under `.github/workflows/`
 
@@ -293,7 +306,7 @@ feat(templates,cli): add ios template and wire pn init
   - Imperative mood; no trailing period; ≤ 72 chars; `!` for breaking changes.
 - PR description: include brief sections: What, Why, How (brief), Testing, Risks/Impact, Docs/Follow‑ups.
   - Link issues with keywords (e.g., `Closes #123`).
-- Merging: prefer "Squash and merge" with "Pull request title and description".
+- Merging: use "Squash and merge." The repository's default squash message is the pull request title alone, so the title becomes the commit subject and the description isn't copied into the commit.
 - Keep PRs focused; avoid unrelated changes in the same PR.
 
 Recommended PR template:
@@ -327,7 +340,7 @@ Co-authored-by: Name <email>
 - PR title: Conventional Commits format (CI-enforced by `pr-lint.yml`).
 - Tests: added/updated; `uv run pytest` passes.
 - Lint/format: `uv run ruff check .` and `uv run black --check src examples tests` pass.
-- Docs: update `README.md` if behavior changes.
+- Docs: update `README.md` and the affected pages under `docs/` if behavior changes; `uv run --group docs mkdocs build --strict` must pass.
 - Templates: update `src/pythonnative/templates/` if generator output changes.
 - Generated contracts and example schemas are regenerated and reviewed when changed; vendored dependencies retain their licenses and provenance.
 - No local build outputs, caches, credentials, or machine-specific files are committed.
@@ -339,9 +352,9 @@ Co-authored-by: Name <email>
   1. `python-semantic-release` scans Conventional Commits, updates the version files and `uv.lock`, generates `CHANGELOG.md`, and pushes the release commit and tag.
   2. A published GitHub release is created with generated release notes.
   3. The shared `Distributions` workflow builds a source archive from that exact commit, then uses [cibuildwheel](https://cibuildwheel.pypa.io/) to build all wheels from the archive.
-  4. Each wheel is repaired where needed, installed in an isolated environment, and tested with the Yoga layout suite and CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.
+  4. Each wheel is repaired where needed, installed in an isolated environment, and tested with the renderer core suite (`tests/test_core.py`) and the CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.
   5. Validated distributions are attached to the GitHub release before PyPI uploads begin. PyPI uses Trusted Publishing; no API token is needed.
-- The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled Yoga source in their native builds.
+- The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled renderer core source in their native builds.
 - Build policy lives in `scripts/cibuildwheel.toml`, separately from the tagged package source, so fixed tooling can rebuild an existing release without changing its code or version.
 - Commit types that trigger a release: `feat` (minor), `fix` and `perf` (patch), and `BREAKING CHANGE` (major, or minor before 1.0). Other types, including `build` and `ci`, don't trigger a release on their own. Use a `build` or `ci` title for a publishing-only repair that should recover the existing version.
 - Tag format: `v`-prefixed (for example, `v0.40.0`). Manual version bumps aren't needed.
@@ -406,8 +419,6 @@ fix/cli-regression
 
 End-to-end tests use [Maestro](https://maestro.dev/) to drive the dedicated `examples/e2e-suite` app on real emulators and simulators. That app contains one screen per public symbol in `pythonnative.__all__`; every flow under `tests/e2e/flows/<category>/` exercises one symbol.
 
-The dedicated `examples/hello-world` app is left in place as a small marketing demo; it's **not** the E2E target.
-
 ```bash
 # Install Maestro (one-time)
 curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -430,10 +441,14 @@ For tight iteration, run a single category instead of the full pass:
 
 ```bash
 uv run ./scripts/run-e2e.sh android hooks
-uv run ./scripts/run-e2e.sh ios components
+uv run ./scripts/run-e2e.sh ios navigation
 ```
 
-Available categories: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `misc`.
+Each category is one file under `tests/e2e/suites/` (`hooks.yaml`, `navigation.yaml`, `gestures.yaml`, and so on; large areas are split into lettered parts such as `components-a.yaml`). List the directory for the current set:
+
+```bash
+ls tests/e2e/suites
+```
 
 A coverage checker, `scripts/check-e2e-coverage.py`, gates CI: every name in `pythonnative.__all__` must be covered by a demo + flow, or listed in `INTENTIONAL_EXEMPTIONS` with a justification.
 
@@ -442,7 +457,7 @@ When you add a new public symbol you must also:
 1. Add a demo screen under `examples/e2e-suite/app/screens/<category>/`.
 2. Append a `DemoEntry` in `examples/e2e-suite/app/registry.py`.
 3. Add a Maestro flow at `tests/e2e/flows/<category>/<name>.yaml`.
-4. Append the flow to the top-level `tests/e2e/android.yaml`, `tests/e2e/ios.yaml`, and the matching `tests/e2e/suites/<category>.yaml`.
+4. Append the flow to the top-level `tests/e2e/android.yaml`, `tests/e2e/ios.yaml`, and the matching `tests/e2e/suites/<category>.yaml` (or the lettered part it belongs to).
 5. Confirm `uv run python scripts/check-e2e-coverage.py` exits 0.
 
 `tests/e2e/AGENTS.md` is the deeper reference (label conventions, failure triage, naming rules); AI agents should read it before touching the suite. The `e2e.yml` workflow runs the suite automatically on pushes to `main` and PRs.

@@ -47,7 +47,8 @@ def test_cli_init_and_clean() -> None:
         assert os.path.isfile(main_path)
         content = Path(main_path).read_text(encoding="utf-8")
         assert "def App(" in content
-        assert "Stack.Navigator" in content
+        assert "pn.StackNavigator(" in content
+        assert "pn.NavigationContainer(Root)" in content
 
         config_path = os.path.join(project_dir, "pythonnative.toml")
         assert os.path.isfile(config_path)
@@ -89,11 +90,26 @@ def test_cli_init_scaffold_renders_and_navigates() -> None:
         screen.press(screen.get_by_text("Tap me"))
         assert screen.get_by_text("Tapped 1 times")
         screen.press(screen.get_by_text("Open detail"))
-        assert screen.get_by_text("Detail: count was 1")
+        assert screen.get_by_text("The count was 1")
         screen.press(screen.get_by_text("Back"))
         assert screen.get_by_text("Tapped 1 times")
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_cli_init_scaffold_passes_lint_and_strict_mypy(tmp_path: Path) -> None:
+    """The scaffold is the first code a developer reads: it must pass ``pn lint`` and ``mypy --strict``."""
+    from mypy import api as mypy_api
+
+    from pythonnative.lint import lint_paths
+
+    assert run_pn(["init", "my_app"], str(tmp_path)).returncode == 0
+    main_path = tmp_path / "my_app" / "app" / "main.py"
+    assert lint_paths([main_path]) == []
+    stdout, stderr, status = mypy_api.run(
+        ["--strict", "--no-incremental", "--config-file", os.devnull, "--cache-dir", os.devnull, str(main_path)]
+    )
+    assert status == 0, stdout + stderr
 
 
 def test_cli_init_refuses_overwrite() -> None:
@@ -695,8 +711,28 @@ def test_deps_lock_is_usable_on_both_mac_architectures(
     for arch in ("arm64", "x86_64"):
         monkeypatch.setattr(deps, "host_simulator_arch", lambda: arch)
         pinned = lockfile.requirements(config, deps.targets_for(config, platform))
+        assert pinned is not None
         assert "numpy==2.2.1" in pinned
         assert "--hash=sha256:" + "a" * 64 in pinned
+
+
+def test_deps_lock_reports_every_target_before_refusing_a_partial_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(_deps_project(tmp_path))
+    runner = _FakePipRunner(fail_when=lambda args: any(a.startswith("android_") for a in args))
+    monkeypatch.setattr(pn_cli.builder_mod, "SubprocessRunner", lambda: runner)
+    monkeypatch.setattr(pn_cli.deps_mod, "host_simulator_arch", lambda: "arm64")
+
+    with pytest.raises(SystemExit) as exit_info:
+        pn_cli.deps_command(argparse.Namespace(platform=None, json=False, python=None, lock=True))
+
+    assert exit_info.value.code == 1
+    out = capsys.readouterr().out
+    assert "Traceback" not in out
+    assert "[ok] numpy 2.2.1" in out and "No matching distribution found for numpy" in out
+    assert "Not writing pn.lock: a lock needs every target to resolve" in out
+    assert not (tmp_path / "pn.lock").exists()
 
 
 def test_deps_command_platform_filter_and_json(
@@ -1199,17 +1235,21 @@ def test_logs_device_flag_is_wired_through_argparse(tmp_path: Path) -> None:
 # ======================================================================
 
 
-def test_dev_server_url_for_targets(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_server_connect_url_targets(monkeypatch: pytest.MonkeyPatch) -> None:
     import pythonnative.devserver as devserver
+    from pythonnative.cli import launch
 
     monkeypatch.setattr(devserver, "lan_addresses", lambda: ["192.168.1.20"])
     sim = Device(platform="ios", identifier="SIM", name="iPhone", kind="simulator", state="Booted")
     phone = Device(platform="ios", identifier="PHONE", name="iPhone", kind="device", state="connected")
 
-    assert pn_cli._dev_server_url_for("ios", None, 8765) == "ws://localhost:8765/ws?role=client"
-    assert pn_cli._dev_server_url_for("ios", sim, 8765) == "ws://localhost:8765/ws?role=client"
-    assert pn_cli._dev_server_url_for("android", None, 9000) == "ws://localhost:9000/ws?role=client"
-    assert pn_cli._dev_server_url_for("ios", phone, 8765) == "ws://192.168.1.20:8765/ws?role=client"
+    url = launch.server_connect_url
+    assert url("ios", None, 8765, "tok") == "http://localhost:8765/?token=tok"
+    assert url("ios", sim, 8765, "tok") == "http://localhost:8765/?token=tok"
+    assert url("android", None, 9000, "tok") == "http://localhost:9000/?token=tok"
+    assert url("ios", phone, 8765, "tok") == "http://192.168.1.20:8765/?token=tok"
+    monkeypatch.setattr(devserver, "lan_addresses", lambda: [])
+    assert url("ios", phone, 8765, "tok") == "http://localhost:8765/?token=tok"
 
 
 def test_running_dev_server_returns_none_when_nothing_listens() -> None:
@@ -1218,7 +1258,66 @@ def test_running_dev_server_returns_none_when_nothing_listens() -> None:
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         free_port = probe.getsockname()[1]
-    assert pn_cli._running_dev_server(free_port) is None
+    assert pn_cli._running_dev_server(free_port, "tok") is None
+
+
+def test_running_dev_server_presents_the_token(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from pythonnative.devserver import DevServer
+
+    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "main.py").write_text("App = None\n")
+    server = DevServer(str(tmp_path), host="127.0.0.1", port=0, token="right", watch=False, log=lambda _: None)
+    server.start()
+    try:
+        status = pn_cli._running_dev_server(server.info.port, "right")
+        assert status is not None and status["port"] == server.info.port
+        assert pn_cli._running_dev_server(server.info.port, "wrong") is None
+        assert "refused this user's dev token" in capsys.readouterr().out
+    finally:
+        server.stop()
+
+
+def test_token_file_is_created_once_with_private_permissions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`pn start` and `pn run` share one token, created on first use and reused after restarts."""
+    import stat
+
+    from pythonnative.devserver import auth
+
+    token_file = tmp_path / ".pythonnative" / "dev-token"
+    monkeypatch.setenv(auth.TOKEN_FILE_ENV, str(token_file))
+    token = auth.load_token()
+    assert stat.S_IMODE(token_file.stat().st_mode) == 0o600
+    assert auth.load_token() == token
+    monkeypatch.setenv(auth.TOKEN_ENV, "explicit")
+    assert auth.load_token() == "explicit"
+
+
+def test_android_connect_links_are_quoted_for_the_device_shell(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`adb shell` hands its arguments to the device's shell, where a bare `?` or `&` could break the command."""
+    import shlex
+
+    from pythonnative.cli import launch
+
+    commands: List[List[str]] = []
+
+    def fake_run(command: List[str], **kwargs: object) -> object:
+        commands.append(list(command))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(launch.subprocess, "run", fake_run)
+    link = "pn-com.example.demo://connect?url=http%3A%2F%2Flocalhost%3A8765%2F%3Ftoken%3Dabc"
+    launch.open_link_android("emulator-5554", link, "com.example.demo")
+    command = commands[-1]
+    assert command[:4] == ["adb", "-s", "emulator-5554", "shell"]
+    assert shlex.split(command[4]) == [
+        "am",
+        "start",
+        "-a",
+        "android.intent.action.VIEW",
+        "-d",
+        link,
+        "com.example.demo",
+    ]
 
 
 def test_run_reuses_artifact_when_fingerprint_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1233,9 +1332,7 @@ def test_run_reuses_artifact_when_fingerprint_matches(tmp_path: Path, monkeypatc
     monkeypatch.chdir(tmp_path)
     config = AppConfig.load(tmp_path)
     builder = builder_mod.Builder(config, log=lambda *_: None)
-    fingerprint = pn_cli._native_fingerprint(
-        builder.config, "ios", builder, ios_sdks=("iphonesimulator",), dev_client=False
-    )
+    fingerprint = pn_cli._native_fingerprint(builder.config, "ios", builder, ios_sdks=("iphonesimulator",))
     artifact = tmp_path / "Demo.app"
     artifact.mkdir()
     fingerprint_mod.write_stamp(tmp_path / "build" / "ios", fingerprint, artifact=artifact)
@@ -1246,22 +1343,26 @@ def test_run_reuses_artifact_when_fingerprint_matches(tmp_path: Path, monkeypatc
         prepared_calls.append(platform)
 
     monkeypatch.setattr(builder_mod.Builder, "prepare", fake_prepare)
-    monkeypatch.setattr(pn_cli, "_running_dev_server", lambda port: {"port": port})
+    monkeypatch.setattr(pn_cli, "_running_dev_server", lambda port, token: {"port": port})
     launched: Dict[str, object] = {}
 
     def fake_sim(builder: object, prepared: object, *, artifact: object, **kw: object) -> object:
-        launched.update(prepared=prepared, artifact=artifact, server_url=kw["server_url"])
+        launched.update(prepared=prepared, artifact=artifact, link=kw["link"])
         return artifact
 
     monkeypatch.setattr(pn_cli, "_run_ios_simulator", fake_sim)
 
-    args = argparse.Namespace(platform="ios", device=None, no_logs=True, rebuild=False, dev_client=False)
+    args = argparse.Namespace(platform="ios", device=None, no_logs=True, rebuild=False)
     pn_cli.run_project(args)
 
     assert prepared_calls == [], "native toolchain must not run for an unchanged fingerprint"
     assert launched["prepared"] is None
     assert launched["artifact"] == artifact
-    assert launched["server_url"] == "ws://localhost:8765/ws?role=client"
+    from pythonnative.devclient import connect_link
+    from pythonnative.devserver.auth import load_token
+
+    server_url = f"http://localhost:8765/?token={load_token()}"
+    assert launched["link"] == connect_link("pn-com.example.demo", server_url)
 
 
 def test_run_rebuilds_without_a_dev_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1276,9 +1377,7 @@ def test_run_rebuilds_without_a_dev_server(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.chdir(tmp_path)
     config = AppConfig.load(tmp_path)
     builder = builder_mod.Builder(config, log=lambda *_: None)
-    fingerprint = pn_cli._native_fingerprint(
-        builder.config, "ios", builder, ios_sdks=("iphonesimulator",), dev_client=False
-    )
+    fingerprint = pn_cli._native_fingerprint(builder.config, "ios", builder, ios_sdks=("iphonesimulator",))
     artifact = tmp_path / "Demo.app"
     artifact.mkdir()
     fingerprint_mod.write_stamp(tmp_path / "build" / "ios", fingerprint, artifact=artifact)
@@ -1287,18 +1386,18 @@ def test_run_rebuilds_without_a_dev_server(tmp_path: Path, monkeypatch: pytest.M
         platform="ios", build_dir=tmp_path / "build" / "ios", project_dir=tmp_path, app_id="x"
     )
     monkeypatch.setattr(builder_mod.Builder, "prepare", lambda self, platform, **kw: prepared)
-    monkeypatch.setattr(pn_cli, "_running_dev_server", lambda port: None)
+    monkeypatch.setattr(pn_cli, "_running_dev_server", lambda port, token: None)
     seen: Dict[str, object] = {}
 
     def fake_sim(builder: object, prepared_arg: object, *, artifact: object, **kw: object) -> object:
-        seen.update(prepared=prepared_arg, server_url=kw["server_url"])
+        seen.update(prepared=prepared_arg, link=kw["link"])
         return artifact
 
     monkeypatch.setattr(pn_cli, "_run_ios_simulator", fake_sim)
-    pn_cli.run_project(argparse.Namespace(platform="ios", device=None, no_logs=True, rebuild=False, dev_client=False))
+    pn_cli.run_project(argparse.Namespace(platform="ios", device=None, no_logs=True, rebuild=False))
 
     assert seen["prepared"] is prepared
-    assert seen["server_url"] is None
+    assert seen["link"] is None
 
 
 def test_start_help_lists_dev_server_flags(tmp_path: Path) -> None:
@@ -1306,7 +1405,40 @@ def test_start_help_lists_dev_server_flags(tmp_path: Path) -> None:
     assert result.returncode == 0
     assert "--port" in result.stdout
     assert "--open" in result.stdout
+    assert "--debug-port" in result.stdout
+    assert "--no-interactive" in result.stdout
     result = run_pn(["run", "--help"], str(tmp_path))
-    assert "--dev-client" in result.stdout
+    assert "--dev-client" not in result.stdout
     assert "--rebuild" in result.stdout
+    result = run_pn(["go", "--help"], str(tmp_path))
+    assert result.returncode == 0
+    assert "--build" in result.stdout
     assert "--hot-reload" not in result.stdout
+
+
+def test_missing_requirements_handle_specifiers_extras_and_local_wheels(tmp_path: Path) -> None:
+    from pythonnative.cli.pn import _missing_requirements, _requirement_distribution
+
+    assert _requirement_distribution("httpx[http2]>=0.27") == "httpx"
+    assert _requirement_distribution("vendor/pn_inbox_extension-0.1.0-py3-none-any.whl") == "pn_inbox_extension"
+    assert _requirement_distribution("  pytest ; python_version >= '3.13'") == "pytest"
+    # Installed distributions aren't reported, whatever the specifier.
+    assert _missing_requirements(["pytest>=1", "black[d]", "ruff ; python_version >= '3.13'"]) == []
+    # Missing entries come back verbatim so the install hint reproduces them.
+    wheel = "vendor/definitely_not_installed_pn-0.1.0-py3-none-any.whl"
+    assert _missing_requirements(["definitely-not-installed-pn>=2", wheel]) == [
+        "definitely-not-installed-pn>=2",
+        wheel,
+    ]
+
+
+def test_missing_requirements_message_names_an_exact_install_command() -> None:
+    import shlex
+    import sys
+
+    from pythonnative.cli.pn import _missing_requirements_message
+
+    message = _missing_requirements_message(["emoji>=2", "vendor/x-1.0-py3-none-any.whl"])
+    assert "emoji, x" in message
+    command = message.strip().splitlines()[-1].strip()
+    assert shlex.split(command) == [sys.executable, "-m", "pip", "install", "emoji>=2", "vendor/x-1.0-py3-none-any.whl"]

@@ -48,6 +48,18 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # Type-only re-exports: statically checkable, no UI surface.
     # --------------------------------------------------------------
     "Element",
+    "Node",  # recursive alias for element trees; every demo component returns one
+    "AccessibilityProps",  # TypedDict of shared accessibility keys; the accessibility_props demo passes them
+    "ViewProps",  # TypedDict of shared view keys; every demo container passes some of them
+    "Section",  # typed section record exercised by the SectionList flow
+    "ViewableItem",  # typed callback record exercised by the ListData flow
+    "UnsetType",  # sentinel type; UNSET is exercised by the custom_component flow
+    "ImageLoadEvent",  # typed callback record; real Image flow exercises delivery
+    "ImageSize",  # typed record returned by Images.get_size; asserted in the image_size demo
+    "ImageSource",  # type alias (str | Asset) for Image sources
+    "IconName",  # Literal of icon names; the Icon demo exercises the lookup
+    "WebNavigationEvent",  # typed callback record; WebView flow exercises navigation
+    "UNSET",  # custom_component flow removes font_size from a live native Text
     "AccessibilityState",
     "AlignContent",
     "AlignItems",
@@ -80,7 +92,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "TextAlign",
     "TextDecoration",
     "TextTransform",
-    "ThemeContext",
     "TransformSpec",
     "AnimatedValue",  # observed via use_animated_value usage in animations
     "QueryResult",  # observed via use_query demo
@@ -98,16 +109,16 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Column",  # used everywhere; co-tested with View in ViewColumnRowDemo
     "Row",  # used everywhere; co-tested with View in ViewColumnRowDemo
     "NavigationContainer",  # wraps the root navigator; used by main.py
-    "create_stack_navigator",  # used by main.py; every flow pushes screens
+    "StackNavigator",  # main.py's root navigator; every flow pushes screens on it
+    "Screen",  # main.py wraps every demo in one; the navigation demos set per-screen options
+    "Navigator",  # base type of the three navigator values; every navigation demo builds one
+    "Group",  # layers options over screens; the stack_options demo groups two screens
     "create_screen",  # platform bridge invoked by the native templates
     "use_navigation",  # used by every screen for go_back
     "use_is_focused",  # underlies use_focus_effect; covered by the focus_effect demo
     "use_subscription",  # underlies use_color_scheme / use_window_dimensions demos
     "use_animated_value",  # used in every animation demo
     "create_context",  # covered by use_context demo (Context.Provider)
-    # Deep linking needs the OS to deliver a URL to the app; the URL <->
-    # state mapping is unit-tested in tests/test_navigation.py.
-    "LinkingConfig",
     "style",  # the style helper itself is exercised by every styled demo
     "resolve_style",  # internal helper exposed for SDK authors
     # --------------------------------------------------------------
@@ -144,13 +155,21 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Share",
     "Vibration",
     # --------------------------------------------------------------
-    # Theming data: observed through the use_theme demo, which flips
-    # the scheme and asserts the built-in light/dark values render.
+    # Theming data: app/app_theme.py derives the suite's themes from
+    # the presets, main.py provides them, and the use_theme and
+    # navigation_theme demos flip the scheme and assert the values.
     # --------------------------------------------------------------
-    "Theme",  # frozen dataclass returned by use_theme; fields asserted in use_theme demo
-    "DEFAULT_LIGHT_THEME",  # constant Theme; values asserted in use_theme demo
-    "DEFAULT_DARK_THEME",  # constant Theme; values asserted in use_theme demo
-    "default_theme",  # pure lookup over the two constants; use_theme demo
+    "Theme",  # frozen dataclass returned by use_theme; fields asserted in the use_theme demo
+    "Colors",  # palette record on Theme.colors; the use_theme demo asserts background and primary
+    "Typography",  # text-style record on Theme; part of every theme the suite provides
+    "Spacing",  # spacing scale on Theme; the use_theme demo prints spacing.md
+    "Radii",  # corner radii on Theme; the shared card and use_theme swatches use radii
+    "LIGHT_THEME",  # preset the suite's light theme derives from; use_theme asserts its primary
+    "DARK_THEME",  # preset the suite's dark theme derives from; use_theme asserts its primary
+    "use_styles",  # builds the shared styles in app/theme.py for every demo; the use_theme demo
+    "ABSOLUTE_FILL",  # style constant; the stylesheet demo composes it in a style list
+    "Store",  # value class read by use_store; driven by the use_store demo
+    "TabBarStyle",  # TypedDict passed as TabNavigator(tab_bar_style=); the tab_options demo
     # --------------------------------------------------------------
     # SDK re-exports: module-level names mirroring submodule content.
     # --------------------------------------------------------------
@@ -158,10 +177,10 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "run_blocking",  # blocking script/test helper; can't run inside the app's live loop
     "start_resource",  # non-hook Resource constructor; driven by the lazy demo and unit tests
     "sdk",  # module re-export; custom_component demo covers it
+    "icons",  # module re-export; the Icon demo drives icon_names / is_icon_name
+    "svg",  # module re-export; the Svg demo drives svg.load and the shape classes
     "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
-    "ViewHandler",  # ABC; subclassed by built-in handlers
-    "element_factory",  # tested via unit tests; needs registered handlers
-    "register_component",  # tested via unit tests; needs handler implementations
+    "element_factory",  # unit-tested; define_component returns one, so the define_component demo renders through it
     "Props",  # tested in custom_component demo and SDK unit tests
     # --------------------------------------------------------------
     # Dev-mode diagnostics: warnings, hook-order checks, and RedBox
@@ -176,6 +195,37 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # already covered elsewhere.
     # --------------------------------------------------------------
     "get_platform",  # thin functional alias of Platform.OS
+    # --------------------------------------------------------------
+    # RFC 0002 type aliases and typed records. Each is a pure type
+    # (Literal alias, TypedDict, frozen dataclass, or constant) with no
+    # behavior of its own; the named demo constructs or receives it.
+    # --------------------------------------------------------------
+    "Deps",  # Sequence alias for use_effect deps; every use_effect demo passes one
+    "ColorScheme",  # Literal alias returned by use_color_scheme; asserted in the use_color_scheme demo
+    "BorderStyle",  # Literal alias; the borders_shadows demo draws solid/dashed/dotted boxes
+    "DynamicColor",  # TypedDict color pair; the dynamic_color demo paints from one and flips the scheme
+    "EasingSpec",  # frozen descriptor built by Easing.*; the easing demo runs every curve
+    "GestureSpec",  # wire dict alias produced by gesture descriptors; the gestures and pan_gesture demos
+    "SwipeDirection",  # Literal alias on GestureEvent.direction; asserted in the gestures demo ("Swipe: left")
+    "LayoutEvent",  # frozen record delivered to on_layout; the on_layout demo reads width/height from it
+    "ScrollEvent",  # frozen record delivered to on_scroll; the scroll_view demo reads x/y from it
+    "SelectionEvent",  # frozen record delivered to on_selection_change; text_input demo shows start:end
+    "KeyPressEvent",  # frozen record delivered to on_key_press; text_input demo shows the key
+    "ContentSizeEvent",  # frozen record delivered to on_content_size_change; text_input demo reads height
+    "ScrollOffset",  # frozen record from ScrollViewHandle.get_scroll_offset; scroll_view_handle demo
+    "PressState",  # frozen record passed to Pressable render/style callables; the pressable demo
+    "Ripple",  # frozen Android ripple config; the pressable demo passes android_ripple
+    "AccessibilityValue",  # TypedDict; the accessibility_props demo passes accessibility_value
+    "AccessibilityAction",  # TypedDict; the accessibility_props demo passes accessibility_actions
+    "AccessibilityEvent",  # frozen record from AccessibilityInfo.add_listener; accessibility_info demo
+    "KeyboardEvent",  # frozen record from Keyboard.add_listener; the keyboard demo mirrors height/visible
+    "DimensionsEvent",  # frozen record from Dimensions.add_listener; the dimensions demo counts them
+    "WindowDimensions",  # NamedTuple from Dimensions.get / use_window_dimensions; both demos print it
+    "DeviceInfo",  # frozen record from Device.info; every field printed by the device_info demo
+    "Locale",  # frozen record from Localization.get_locales / use_locales; both demos print its fields
+    "ANIMATABLE_PROPS",  # frozenset constant; its size is printed by the easing demo
+    "AnimationResult",  # frozen record returned by awaited animations; easing and decay demos read .finished
+    "ViewHandle",  # base handle on ref.current for plain views; the on_layout demo reads .frame
 }
 
 
