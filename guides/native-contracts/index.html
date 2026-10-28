@@ -2220,8 +2220,6 @@
       
         
       
-        
-      
     
     
     
@@ -2816,34 +2814,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3796,6 +3766,12 @@ Python object.</p>
 Python facades, browser metadata, and a property reference. Generated Python
 methods preserve defaults and keyword arguments. Generated <code>on_prepared</code>
 subscriptions accept typed callbacks and return an unsubscribe function.</p>
+<p>Nothing generated validates values. At startup the renderer core compiles the
+merged contract document (built-ins plus every plugin's <code>schema.json</code>) into
+indexed tables, then checks every commit, view command, and module call
+against them, on every platform. A rejected commit names the component and
+the property. The Swift and Kotlin wrappers only decode values the core has
+already accepted.</p>
 <p>Native mappings require string keys. Integers must fit JavaScript's exact
 integer range, numbers must be finite, and booleans don't count as numbers.
 Record field names must be Python identifiers; use a mapping for other JSON
@@ -3811,7 +3787,7 @@ make <code>Platform.supports</code> return true.</p>
 <h2 id="implement-the-native-side">Implement the native side<a class="headerlink" href="#implement-the-native-side" title="Permanent link">&para;</a></h2>
 <p>Use <code>PNTypedComponentManager&lt;BadgeProps&gt;</code> on iOS and
 <code>TypedComponentManager&lt;BadgeProps&gt;</code> on Android. The <code>applyTyped</code> method receives
-checked props. <code>has_count</code> distinguishes a changed property from one absent in
+props the core has checked. <code>has_count</code> distinguishes a changed property from one absent in
 a partial update. Common view props live in <code>PNViewProps</code>; they aren't repeated
 in every generated component. Use <code>PNComponentEvents.Badge.on_press</code> to emit
 the declared payload.</p>
@@ -3904,10 +3880,11 @@ a provider plugin if your application needs an Android image editor.
 <code>Notifications.get_device_token()</code> raises
 <code>NativeModuleError("unsupported")</code> on Android, where remote push needs a
 provider extension.</p>
-<p>Only clients that speak the current protocol (5) are supported. Rebuild the app
-after changing declarations,
-native sources, or native dependencies. Startup checks the exact contract
-fingerprint and Yoga version before mounting. Fast Refresh handles Python
+<p>Only clients that speak the current protocol (7) are supported. Rebuild the
+app after changing declarations, native sources, or native dependencies.
+Startup checks the exact contract fingerprint compiled into the native library
+before mounting, and a mismatch fails with "Native component contracts
+changed. Rebuild the app with 'pn run'." Fast Refresh handles Python
 application changes within that compiled interface.</p>
 <h2 id="verify-contracts">Verify contracts<a class="headerlink" href="#verify-contracts" title="Permanent link">&para;</a></h2>
 <p><code>scripts/generate-native-contracts.py</code> also writes the built-in contracts to

@@ -834,13 +834,41 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Layout and commits">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#surfaces-and-detached-roots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Surfaces and detached roots
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#headless-layout" class="md-nav__link">
+  <a href="#measurement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Headless layout
+        Measurement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#view-flattening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        View flattening
       
     </span>
   </a>
@@ -863,17 +891,6 @@
     <span class="md-ellipsis">
       
         Style keys
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#intrinsic-measurement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Intrinsic measurement
       
     </span>
   </a>
@@ -2264,8 +2281,6 @@
       
         
       
-        
-      
     
     
     
@@ -2860,34 +2875,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3716,13 +3703,41 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Layout and commits">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#surfaces-and-detached-roots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Surfaces and detached roots
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#headless-layout" class="md-nav__link">
+  <a href="#measurement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Headless layout
+        Measurement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#view-flattening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        View flattening
       
     </span>
   </a>
@@ -3745,17 +3760,6 @@
     <span class="md-ellipsis">
       
         Style keys
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#intrinsic-measurement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Intrinsic measurement
       
     </span>
   </a>
@@ -3840,37 +3844,127 @@
 
 
 <h1 id="layout-engine">Layout engine<a class="headerlink" href="#layout-engine" title="Permanent link">&para;</a></h1>
-<p>PythonNative uses Yoga 3.2.1 for flexbox layout on every renderer. The vendored
-C++ source compiles into the Python host binding, Swift runtime, and Android
-runtime. The browser preview uses Yoga WebAssembly from the same release.
-Native leaf widgets supply intrinsic sizes and text baselines.</p>
+<p>PythonNative uses Yoga 3.2.1 for flexbox layout. The vendored C++ source
+compiles into the renderer core, the C++ library every target links: the
+iOS and Android apps, the <code>pythonnative._core</code> extension that tests load,
+and the browser preview's WebAssembly build. Layout runs in the core, on
+the thread that commits, never on the platform UI thread. One set of rules
+therefore lays out devices, the preview, and headless tests.</p>
 <h2 id="layout-and-commits">Layout and commits<a class="headerlink" href="#layout-and-commits" title="Permanent link">&para;</a></h2>
-<p>Rendering first commits view creation, relationships, and props. The native
-layout pass then computes geometry and returns changed frames as a batch.
-Layout effects run after those frames exist, followed by passive effects.
-Viewport changes, text edits, and image completion can invalidate geometry.</p>
-<p>Native screens and recycled rows own their physical content rectangles. Yoga
-lays out each detached logical root within its native container's available
-space. Providers and component ownership continue through those containers.</p>
-<h2 id="headless-layout">Headless layout<a class="headerlink" href="#headless-layout" title="Permanent link">&para;</a></h2>
-<p>Headless tests use <code>LayoutNode</code> and <code>calculate_layout()</code> through the host Yoga
-binding. Stub intrinsic measurements make geometry tests deterministic. Real
-font metrics and platform control sizes must also be tested on devices.</p>
+<p>Rendering commits view creation, relationships, and props. The core
+validates the commit, applies it to its shadow tree, lays out the roots
+that changed, and returns the changed frames of observed views (those with
+a ref or an <code>on_layout</code> callback) in the acknowledgement. Layout effects
+run after those frames are published, followed by passive effects. The UI
+thread mounts the commit afterward, with each view's frame.</p>
+<p>Native changes can invalidate geometry too: a container reports a new
+size, an image finishes loading, or the font scale changes. The platform
+reports these to the core without waiting. The core relayouts on a
+worker, queues a frame-only mount transaction, and sends Python the
+observed frames as a <code>layout</code> message. See
+<a href="../bridge/#threads-and-the-deadlock-rule">The native bridge</a> for the
+threads involved.</p>
+<h3 id="surfaces-and-detached-roots">Surfaces and detached roots<a class="headerlink" href="#surfaces-and-detached-roots" title="Permanent link">&para;</a></h3>
+<p>The surface's screen roots lay out against the viewport Python's host
+reports in each commit. Some subtrees live in platform containers instead
+of in their parent's box: the children of <code>VirtualList</code>, <code>Modal</code>, and
+<code>ScreenStack</code>, <code>Portal</code> content, and navigation header slots. Each is a
+detached root that lays out against the size its container reports
+through <code>pn_core_report_container</code>. Until a container reports, its root
+uses its parent container's size or the viewport. List rows lay out
+against the list's width (vertical lists) or height (horizontal lists),
+with the other axis unbounded. Providers and component ownership continue
+through those containers.</p>
+<h2 id="measurement">Measurement<a class="headerlink" href="#measurement" title="Permanent link">&para;</a></h2>
+<p>Leaves declare how the core sizes them in their contract. A leaf is a
+measured view with no children; containers size from their style and
+children.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Components</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>container</code></td>
+<td><code>View</code>, <code>Row</code>, <code>Column</code>, <code>ScrollView</code>, <code>Pressable</code>, <code>Modal</code>, <code>Screen</code>, and the other containers</td>
+<td>Style and children only; never measured</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td><code>Text</code></td>
+<td>Thread-safe platform text layout through the platform's <code>measure</code> callback, plus the first baseline for <code>align_items: "baseline"</code></td>
+</tr>
+<tr>
+<td><code>image</code></td>
+<td><code>Image</code></td>
+<td>Computed in the core from the intrinsic size the platform reports once the image loads (<code>pn_core_report_intrinsic</code>), scaled down to fit</td>
+</tr>
+<tr>
+<td><code>svg</code></td>
+<td><code>Svg</code></td>
+<td>Computed in the core from <code>view_box</code> (24 by 24 without one)</td>
+</tr>
+<tr>
+<td><code>fill</code></td>
+<td><code>VirtualList</code></td>
+<td>Takes the available space</td>
+</tr>
+<tr>
+<td><code>intrinsic</code></td>
+<td><code>Button</code>, <code>TextInput</code>, <code>Switch</code>, <code>Slider</code>, <code>ProgressBar</code>, <code>ActivityIndicator</code>, <code>Checkbox</code>, <code>Picker</code>, <code>SegmentedControl</code>, <code>DatePicker</code>, <code>TabBar</code></td>
+<td>A prototype widget configured with the props and measured on the UI thread</td>
+</tr>
+</tbody>
+</table>
+<p>An <code>intrinsic</code> measurement keeps the platform's own sizing (UIKit's
+<code>sizeThatFits</code>, Android's <code>View.measure</code>) by making one synchronous hop
+to the UI thread from the core's worker. The UI thread never waits for
+the core, so the hop can't deadlock. A text input whose content changes
+asks the core to re-measure it, and a font scale or content size change
+re-measures every leaf. The engine respects the size a leaf returns,
+then clamps it to the active <code>min_*</code> and <code>max_*</code> constraints.</p>
+<p>Custom components choose a mode with
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;define_component&lt;/span&gt;" href="../../api/sdk/#pythonnative.sdk.define_component"><code>define_component(..., measurement=...)</code></a>:
+<code>"intrinsic"</code> (the default), <code>"native"</code> for a manager that can measure
+from props on any thread, or <code>"container"</code>. See
+<a href="../../guides/custom-native-components/#measurement">Custom native components</a>.</p>
+<h2 id="view-flattening">View flattening<a class="headerlink" href="#view-flattening" title="Permanent link">&para;</a></h2>
+<p>A <code>View</code>, <code>Row</code>, <code>Column</code>, or <code>Spacer</code> that only affects layout isn't
+mounted. Each contract field says whether it allows flattening. Layout
+style keys do, apart from <code>display</code> and border widths; everything else
+blocks it, including paint props (background, border, shadow, opacity,
+transform, <code>overflow</code>), event handlers, gestures, animated bindings, and
+accessibility and test props, which screen readers and Maestro use to
+address views. An <code>on_layout</code> callback or a ref doesn't block flattening,
+because the core answers layout events and <code>measure_in_window</code> from its
+shadow tree.</p>
+<p>The core mounts a flattened view's children into its nearest mounted
+ancestor at the flattened position, offsetting their frames by the
+flattened ancestors' positions. When an update adds a blocking prop, the
+core creates the view and moves its mounted descendants into it in the
+same transaction; removing the prop reverses that. Commands addressed to
+a flattened view fail with "view #N isn't mounted (it only affects
+layout)". Your component tree, refs, and test queries are unchanged:
+flattening only changes what the platform mounts.</p>
 <h2 id="installation-and-app-builds">Installation and app builds<a class="headerlink" href="#installation-and-app-builds" title="Permanent link">&para;</a></h2>
-<p>The host binding is included in the platform-specific PythonNative wheel.
-Precompiled wheels cover CPython 3.13 and 3.14 on macOS (Intel and Apple
-Silicon), Linux with glibc (x86-64 and ARM64), and Windows (x86-64). Pip or uv
-selects the matching wheel. Building from a source distribution requires a
-C++20 compiler.</p>
-<p>Device builds compile the bundled Yoga source for the application target.
-Xcode builds the <code>YogaCore</code> Swift package for iOS devices or simulators;
-Gradle invokes CMake and the Android NDK for the configured Android ABIs.
-The mobile renderer calls this native library through Swift or Kotlin, so it
-doesn't load the desktop Python extension. See the <a href="../../guides/ios/">iOS</a>
+<p>The host build of the core is the <code>pythonnative._core</code> extension in the
+platform-specific PythonNative wheel. Precompiled wheels cover CPython
+3.13 and 3.14 on macOS (Intel and Apple Silicon), Linux with glibc (x86-64
+and ARM64), and Windows (x86-64). Pip or uv selects the matching wheel.
+Building from a source distribution requires a C++20 compiler.</p>
+<p>Device builds compile the core, with the Yoga release it embeds, for the
+application target. Xcode builds it as the <code>PNCore</code> Swift package for
+iOS devices or simulators; Gradle invokes CMake and the Android NDK to
+build <code>libpncore.so</code> for the configured Android ABIs. The mobile apps
+don't load the desktop Python extension. See the <a href="../../guides/ios/">iOS</a>
 and <a href="../../guides/android/">Android</a> guides for toolchain setup.</p>
 <h2 id="style-keys">Style keys<a class="headerlink" href="#style-keys" title="Permanent link">&para;</a></h2>
-<p>The engine recognises (and the reconciler routes to it) the following
-style keys, listed as <code>pythonnative.layout.LAYOUT_STYLE_KEYS</code>:</p>
+<p>The core lays out with the following style keys, listed as
+<code>pythonnative.style.LAYOUT_STYLE_KEYS</code>:</p>
 <table>
 <thead>
 <tr>
@@ -3909,21 +4003,10 @@ content box.</p>
 <p><code>margin</code> and <code>padding</code> accept either a number (applied to all sides)
 or a dict with any of <code>horizontal</code>, <code>vertical</code>, <code>left</code>, <code>top</code>,
 <code>right</code>, <code>bottom</code>.</p>
-<h2 id="intrinsic-measurement">Intrinsic measurement<a class="headerlink" href="#intrinsic-measurement" title="Permanent link">&para;</a></h2>
-<p>Leaf widgets (<code>Text</code>, <code>Button</code>, <code>Image</code>, <code>TextInput</code>, <code>Switch</code>,
-<code>Slider</code>, <code>ProgressBar</code>, <code>ActivityIndicator</code>) ask their backend for
-an intrinsic size when neither dimension is fixed. The handler
-implements <code>measure_intrinsic(view, max_w, max_h)</code>:</p>
-<ul>
-<li>iOS uses the native manager and <code>UIView.sizeThatFits</code> with UIKit text metrics.</li>
-<li>Android wraps <code>View.measure(...)</code> with <code>MeasureSpec.AT_MOST</code> /
-  <code>UNSPECIFIED</code>.</li>
-</ul>
-<p>The engine respects whatever size the widget returns, then clamps it
-to the active <code>min_*</code> / <code>max_*</code> constraints.</p>
-<p><code>ScrollView</code> is a special case: the engine deliberately makes the
-scroll axis unbounded so that children can be larger than the
-viewport, and the wrapper itself is clipped to the available space.</p>
+<p>Scrolling containers (<code>ScrollView</code>, <code>VirtualList</code>, and <code>ScreenStack</code>)
+clip their content and shrink to the available space unless their style
+says otherwise. A <code>ScrollView</code>'s children can be larger than the
+viewport; the platform scroll view sizes its content to them.</p>
 <h2 id="absolute-positioning">Absolute positioning<a class="headerlink" href="#absolute-positioning" title="Permanent link">&para;</a></h2>
 <p>Setting <code>position: "absolute"</code> on a child takes it out of the flex
 flow. Its size and position come from a combination of <code>top</code> /
@@ -3954,28 +4037,28 @@ flow. Its size and position come from a combination of <code>top</code> /
 edge offsets are measured from the inside of the padding, just like
 in CSS.</p>
 <h2 id="testing-layouts">Testing layouts<a class="headerlink" href="#testing-layouts" title="Permanent link">&para;</a></h2>
-<p>Use the host Yoga binding to test layout without a simulator or emulator:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.layout</span><span class="w"> </span><span class="kn">import</span> <span class="n">LayoutNode</span><span class="p">,</span> <span class="n">calculate_layout</span>
+<p>Headless tests lay out with the shipping core. Render a component and
+read the frames it computed:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">root</span> <span class="o">=</span> <span class="n">LayoutNode</span><span class="p">(</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex_direction"</span><span class="p">:</span> <span class="s2">"row"</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">"gap"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>           <span class="s2">"width"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">100</span><span class="p">},</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">children</span><span class="o">=</span><span class="p">[</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">20</span><span class="p">}),</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">LayoutNode</span><span class="p">(</span><span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">20</span><span class="p">}),</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="p">],</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">)</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">calculate_layout</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="mi">400</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">x</span> <span class="o">==</span> <span class="mi">10</span>  <span class="c1"># padding-left</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">x</span> <span class="o">==</span> <span class="mi">65</span>  <span class="c1"># 10 + 50 + 5</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="k">assert</span> <span class="n">root</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">width</span> <span class="o">==</span> <span class="mi">125</span>  <span class="c1"># 200 - 10 - 10 - 50 - 5</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_row_distributes_flex_children</span><span class="p">():</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">test_id</span><span class="o">=</span><span class="s2">"a"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">20</span><span class="p">}),</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>            <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">test_id</span><span class="o">=</span><span class="s2">"b"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"flex"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">20</span><span class="p">}),</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">310</span><span class="p">,</span> <span class="s2">"gap"</span><span class="p">:</span> <span class="mi">10</span><span class="p">},</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="p">)</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="p">)</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"a"</span><span class="p">),</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"b"</span><span class="p">)</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">(</span><span class="mi">110</span><span class="p">)</span>
 </span></code></pre></div>
-<p>The reconciler also exposes
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;compute_layout_for_test&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler.compute_layout_for_test"><code>Reconciler.compute_layout_for_test</code></a>
-so you can render a real component tree (with the mock registry) and
-inspect the computed <code>LayoutNode</code> tree without having to dig into
-private attributes.</p>
+<p>The fake platform measures leaves with fixed sizes, so geometry tests are
+deterministic. See <a href="../../guides/testing/#testing-layouts">Testing layouts</a>.</p>
 <h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
 <p>The engine intentionally does <strong>not</strong> implement:</p>
 <ul>
@@ -3986,15 +4069,16 @@ private attributes.</p>
 (<code>direction: "rtl"</code>, with <code>start</code> / <code>end</code> edge insets resolving against
 the inherited direction) are both supported.</p>
 <p>Supported properties follow the public <code>Style</code> annotations and the pinned Yoga
-version. Platform font metrics can produce different intrinsic sizes.</p>
+version. Platform font metrics can produce different intrinsic sizes, so test
+text and control sizes on your deployment targets.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Browse the <code>style</code> keys you can use:
   <a href="../../api/component-properties/">Component properties</a>.</li>
 <li>Read about how the engine is wired in:
   <a href="../reconciliation/">Reconciliation</a>.</li>
-<li>See the platform side of <code>set_frame</code> /
-  <code>measure_intrinsic</code>: <a href="../native-views/">Native views</a>.</li>
+<li>See the platform side of frames and measurement:
+  <a href="../native-views/">Native views</a>.</li>
 </ul>
 
 

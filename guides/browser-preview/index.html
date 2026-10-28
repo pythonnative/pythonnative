@@ -2281,8 +2281,6 @@
       
         
       
-        
-      
     
     
     
@@ -2877,34 +2875,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3880,12 +3850,12 @@ PythonNative: edit a component, save, and see the result in well under a
 second, with no simulator boot, no device deploy, and no native build.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pn<span class="w"> </span>preview
 </span></code></pre></div>
-<p>The browser renderer speaks the same bridge protocol as the Swift and
-Kotlin renderers. Your components, hooks, reconciliation, logical navigation,
-and async work run in the <code>pn preview</code> Python process. The page implements
-widgets with DOM elements, layout with Yoga WebAssembly, and animation
-graphs with JavaScript. Platform controls, fonts, and device APIs differ
-from those in a mobile app.</p>
+<p>The page runs the same renderer core as the iOS and Android apps,
+compiled to WebAssembly, so commits are validated, laid out, and flattened
+by the code that ships. Your components, hooks, reconciliation, logical
+navigation, and async work run in the <code>pn preview</code> Python process. The page
+mounts DOM elements in place of native widgets. Platform controls, fonts,
+and device APIs differ from those in a mobile app.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <p>From a project directory (one created by <code>pn init</code>, with an
 <code>app/main.py</code> that defines <code>App</code>):</p>
@@ -3958,13 +3928,14 @@ scheme, and console state are remembered per browser.</p>
    background thread: HTTP for the page and its assets, WebSocket for
    the page and for dev clients.</li>
 <li>Installs a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WebTransport&lt;/span&gt;" href="../../api/devserver/#pythonnative.bridge.web.WebTransport"><code>WebTransport</code></a> as
-   the bridge transport. Transactions the reconciler commits become
-   <code>["apply", request_id, commit]</code> messages to the page; the page's events come back
-   as <code>["cb", ...]</code> callbacks. Commits acknowledge exact revisions, and native
-   Yoga WebAssembly layout returns a batch of changed frames.</li>
+   the bridge transport. It forwards the calls a device transport makes
+   into the renderer core (commits, layout reads, commands, and animation
+   requests) over the WebSocket to the core in the page, and the core's
+   messages come back as callbacks. Commits acknowledge exact revisions
+   with the frames of observed views.</li>
 <li>Runs Python callbacks and tasks on the standard application asyncio loop.
-   The page owns DOM widgets and Yoga WebAssembly layout. Network I/O and Python
-   work execute independently of the browser's UI thread.</li>
+   The page owns the core, DOM widgets, and the frame clock. Network I/O and
+   Python work execute independently of the browser's UI thread.</li>
 <li>When the page connects, tells it the entry module. The page asks
    the <code>Host</code> module to create a screen, exactly as
    <code>PNViewController</code> and <code>PNScreenFragment</code> do, and a
@@ -3974,11 +3945,16 @@ scheme, and console state are remembered per browser.</p>
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;apply_reload&lt;/span&gt;" href="../../api/hot_reload/#pythonnative.hot_reload.apply_reload"><code>apply_reload</code></a>, the same
    function the on-device dev client uses.</li>
 </ol>
-<p>Layout is owned by the engine, not the DOM: the
-<a href="../../concepts/layout/">flex layout engine</a> computes an absolute frame
-for every element, and the page positions each element with that frame.
-Text is measured by the page with the same font it renders, so wrapping
-and intrinsic sizes match what you see.</p>
+<p>Layout is owned by the core, not the DOM: the
+<a href="../../concepts/layout/">flex layout engine</a> computes a frame for every
+mounted element, and the page positions each element with that frame.
+Text and controls are measured by the page with the same fonts and
+elements it renders, so wrapping and intrinsic sizes match what you see.
+Views that only affect layout are flattened, as on device, so a plain
+<code>Row</code> or <code>Column</code> often has no element of its own; the element inspector
+then selects the nearest mounted view. See
+<a href="../../concepts/bridge/#the-browser-preview">The native bridge</a> for how the
+page plays the core's platform.</p>
 <h3 id="navigation">Navigation<a class="headerlink" href="#navigation" title="Permanent link">&para;</a></h3>
 <p>Root navigators (<code>StackNavigator</code>, <code>TabNavigator</code>, and
 <code>DrawerNavigator</code>) drive a real stack of screens in the page, the same
@@ -4041,12 +4017,12 @@ and logic rather than pixel-perfect platform chrome.</p>
 <li>Text wrapping and intrinsic sizing.</li>
 <li>Colors (hex, rgb(a), named, <code>{"light", "dark"}</code>), border radius,
   borders, opacity, shadows, and overflow clipping.</li>
-<li><code>Animated</code> timing, spring, and decay, run through the same
-  <code>animate</code> protocol the native animators implement; transforms,
-  opacity, and colors update through the page's animation graph.</li>
-<li>Gestures: the page streams raw pointer events to the Python
-  <a href="../gestures/">gesture arbiter</a>. Mobile renderers recognize gestures
-  in Swift and Kotlin.</li>
+<li><code>Animated</code> timing, spring, and decay, run by the core's animator in
+  the page, the same code the mobile apps use; transforms, opacity, and
+  colors update on the page's animation frames.</li>
+<li>Gestures: the page forwards pointer events to the core's
+  <a href="../gestures/">gesture engine</a>, the one Android uses. iOS uses UIKit's
+  recognizers.</li>
 <li>Scrolling, <code>FlatList</code> / <code>SectionList</code> windowing, pull to refresh
   (drag the content down at the top, or scroll up past it with a
   trackpad or mouse wheel), and scroll-driven <code>Animated.event</code> bindings.</li>

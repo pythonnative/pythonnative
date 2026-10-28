@@ -2342,8 +2342,6 @@
       
         
       
-        
-      
     
     
     
@@ -2938,34 +2936,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -4028,10 +3998,16 @@ all build targets. Resolve and review the lock before building:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pn<span class="w"> </span>deps<span class="w"> </span>android<span class="w"> </span>--lock
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pn<span class="w"> </span>deps<span class="w"> </span>ios<span class="w"> </span>--lock
 </span></code></pre></div>
+<p><code>pn deps --lock</code> prints the full resolution report first. A lock has to
+cover every target, so if any target fails to resolve, it says which ones
+failed, doesn't write <code>pn.lock</code>, and exits with status 1. Fix the failing
+requirement (or the target's wheel availability) and run it again.</p>
 <p>Commit the lock with your application. Changing requirements or replacing a
-local wheel requires refreshing it. Releases reject missing or stale locks;
-development builds can still resolve unlocked requirements. Native extension
-manifests pin SwiftPM and Maven dependencies to exact versions.</p>
+local wheel requires refreshing it. Release builds reject missing or stale
+locks. A development build (<code>pn run</code>, or <code>pn build --debug</code>) with a stale
+lock prints a warning and resolves the current requirements without the lock,
+so you can keep iterating before you refresh it. Native extension manifests
+pin SwiftPM and Maven dependencies to exact versions.</p>
 <h2 id="what-a-release-bundle-leaves-out">What a release bundle leaves out<a class="headerlink" href="#what-a-release-bundle-leaves-out" title="Permanent link">&para;</a></h2>
 <p>Every build bundles a copy of the <code>pythonnative</code> package. Debug builds
 are dev clients, so their copy is complete. Release builds leave out the
@@ -4042,9 +4018,9 @@ modules that exist only for development:</p>
   <code>pythonnative/preview.py</code>, <code>pythonnative/bridge/web.py</code>);</li>
 <li>the dev client and Fast Refresh (<code>pythonnative/devclient.py</code>,
   <code>pythonnative/hot_reload.py</code>, <code>pythonnative/refresh.py</code>);</li>
-<li>the test helpers (<code>pythonnative/testing</code>);</li>
+<li>the test helpers (<code>pythonnative/testing</code>, <code>pythonnative/bridge/fake.py</code>);</li>
 <li>the SDK code generators (<code>pythonnative/sdk/codegen.py</code>,
-  <code>contract_codegen.py</code>, <code>module_codegen.py</code>, and their templates).</li>
+  <code>builtins.py</code>, <code>module_codegen.py</code>, and their templates).</li>
 </ul>
 <p>The runtime never imports them, and the test suite checks that it stays
 that way, so a release app behaves exactly like a debug build that isn't

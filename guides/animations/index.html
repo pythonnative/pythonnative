@@ -2297,8 +2297,6 @@
       
         
       
-        
-      
     
     
     
@@ -2893,34 +2891,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3938,29 +3908,30 @@ without re-rendering the component tree on every frame.</p>
    only if every child finished.</p>
 <p>The animated component attaches the value to its native view's
 animation bindings after mount. From there, the <strong>native driver</strong>
-takes over whenever it can.</p>
+takes over.</p>
 <h2 id="the-native-driver">The native driver<a class="headerlink" href="#the-native-driver" title="Permanent link">&para;</a></h2>
 <p>When an animated node is bound to mounted views, PythonNative serializes
 its connected values, arithmetic, interpolation, and style bindings into
 an animation graph. Starting or awaiting a timing, spring, or decay driver
 sends its specification to the renderer.</p>
-<p>On mobile, Swift and Kotlin evaluate the graph and apply its bindings on
-the UI thread. Derived values, color interpolation, and native scroll and
-gesture inputs can update without Python work on every frame. The browser
-implements graph evaluation in JavaScript. Completion is delivered back to
-Python to settle the value and resolve an awaiting task.</p>
-<p>The Python-ticked fallback (a ~60 Hz loop) is used automatically
-when:</p>
+<p>The renderer core evaluates the graph and runs every driver on the
+platform's UI thread, at the display's refresh rate, on iOS, Android, and
+in the browser preview alike. Each frame it hands the platform the
+animated prop values to apply. Derived values, color interpolation, and
+native scroll and gesture inputs update without Python work on every
+frame. Completion is delivered back to Python to settle the value and
+resolve an awaiting task.</p>
+<p>Animations that need Python still run in the core:</p>
 <ul>
-<li>the value isn't attached to any mounted view (pure data animation),</li>
-<li>a Python listener is registered via <code>add_listener</code> (listeners want
-  per-frame values, and only the ticker provides those),</li>
-<li>a callable <code>easing</code> is supplied (custom curves can't cross the
-  bridge), or</li>
-<li>the platform declines the animation.</li>
+<li>A value that isn't attached to any mounted view (pure data animation),
+  or that has a Python listener registered via <code>add_listener</code>, asks the
+  core to report its value each frame, and Python updates the value and
+  runs the listeners.</li>
+<li>A callable <code>easing</code> is sampled into a curve the core interpolates.</li>
 </ul>
-<p>Either way the API and the observable end state are identical, so you
-never have to opt in or out manually.</p>
+<p>Headless tests run the host build of the same core, driven by the
+virtual clock, so tests and devices share one implementation of the
+animation math. You never have to opt in or out manually.</p>
 <h2 id="fade-in-on-mount">Fade in on mount<a class="headerlink" href="#fade-in-on-mount" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -4103,9 +4074,8 @@ plain numbers or between two nodes. The result is a read-only node:
 bind it into styles like any <code>AnimatedValue</code>, but drive the underlying
 source value.</p>
 <p>Derived nodes are part of the serialized animation graph. Arithmetic and
-interpolation can therefore run in the renderer alongside their source
-driver. A backend without graph support uses the Python ticker for
-derived bindings.</p>
+interpolation therefore run in the renderer core alongside their source
+driver.</p>
 <h2 id="scroll-driven-animation-with-animatedevent">Scroll-driven animation with <code>Animated.event</code><a class="headerlink" href="#scroll-driven-animation-with-animatedevent" title="Permanent link">&para;</a></h2>
 <p><code>Animated.event</code> builds an event handler that writes fields from the
 event payload straight into <code>AnimatedValue</code>s. The classic use is
@@ -4162,12 +4132,13 @@ for a CSS-style cubic bezier:</p>
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/animated/#pythonnative.animated.EasingSpec"><code>EasingSpec</code></a>,
-so it crosses the bridge as data and the native drivers run it on the
+so it crosses the bridge as data and the core's drivers run it on the
 UI thread; bezier control points travel as numbers, not as a string.
 A misspelled easing name raises <code>ValueError</code> instead of falling back
 silently. <code>Easing.ease</code> follows React Native (the same curve as
 <code>ease_in</code>), not CSS <code>ease</code>. A plain callable <code>progress -&gt; eased</code> is
-still accepted for custom curves, at the cost of ticking in Python.</p>
+still accepted for custom curves; Python samples it once into a curve the
+core interpolates.</p>
 <h2 id="decay-fling">Decay (fling)<a class="headerlink" href="#decay-fling" title="Permanent link">&para;</a></h2>
 <p><code>Animated.decay</code> decelerates a value from an initial velocity, the
 standard ending for a pan gesture. It uses React Native's model on

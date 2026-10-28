@@ -2281,8 +2281,6 @@
       
         
       
-        
-      
     
     
     
@@ -2877,34 +2875,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3947,18 +3917,21 @@ populated as appropriate for the gesture kind.</p>
 <h2 id="how-recognition-works">How recognition works<a class="headerlink" href="#how-recognition-works" title="Permanent link">&para;</a></h2>
 <p>Gesture descriptors are frozen dataclasses: numeric configuration plus
 your callbacks. The reconciler serializes the configuration into plain
-dicts for the native handler (prop diffing never compares closures)
-and routes the callbacks through the same tag-based event channel as
-<code>on_press</code> et al.</p>
-<p>Recognition itself is native:</p>
+dicts in the view's <code>gestures</code> prop (prop diffing never compares
+closures) and routes the callbacks through the same tag-based event
+channel as <code>on_press</code> et al.</p>
+<p>Recognition itself runs on the platform's UI thread, never in Python:</p>
 <ul>
-<li><strong>iOS</strong> attaches real <code>UIGestureRecognizer</code> instances.</li>
-<li><strong>Android</strong> processes <code>MotionEvent</code> streams with Kotlin recognizers
-  and an arbiter in the native rendering library.</li>
-<li><strong>The browser preview</strong> streams the page's pointer events into the
-  Python <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureArbiter&lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureArbiter"><code>GestureArbiter</code></a>,
-  which also supports headless recognition tests.</li>
+<li><strong>iOS</strong> attaches real <code>UIGestureRecognizer</code> instances, which
+  coordinate with scroll views, the back swipe, and system gestures.</li>
+<li><strong>Android</strong>, <strong>the browser preview</strong>, and <strong>headless tests</strong> forward
+  pointer events to the renderer core's gesture engine, the same C++
+  recognizers, velocity tracking, activation and failure offsets, and
+  composition rules on every one of them.</li>
 </ul>
+<p>A recognized gesture reaches Python as an ordinary event and updates any
+animated bindings (<code>Animated.event</code>) in the core first, so a drag keeps
+moving while Python is busy.</p>
 <p>Gestures listed side by side in the <code>gestures=</code> list recognize
 <em>simultaneously</em>. Use the composition combinators below when you need
 them to compete instead.</p>
@@ -3994,8 +3967,9 @@ combinators, nestable to any depth, control how recognizers relate:</p>
 <p>With <code>Exclusive</code>, a single tap reports only after the double-tap
 window closes, and a double tap suppresses the single-tap callback
 entirely; you get exactly one of the two. On iOS this maps to
-<code>requireGestureRecognizerToFail</code>; Android's Kotlin arbiter and the
-browser's Python arbiter implement the corresponding priority rules.</p>
+<code>requireGestureRecognizerToFail</code>; the core's gesture engine implements
+the corresponding priority rules for Android, the browser preview, and
+tests.</p>
 <h2 id="fling">Fling<a class="headerlink" href="#fling" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Fling&lt;/span&gt;
 
@@ -4150,9 +4124,41 @@ accessibility semantics. Reach for <code>gestures=</code> when you need motion
 (drags, flicks, pinches) or multi-tap/long-press recognition on an
 arbitrary view.</p>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
-<p>The arbiter that powers Android and desktop recognition is pure
-Python, so gesture logic is unit-testable with scripted pointer
-streams; see <code>tests/test_gestures.py</code> for ready-made patterns.</p>
+<p>Headless tests run the core's gesture engine, the one Android and the
+browser preview use, so gesture logic is testable with scripted pointer
+streams. <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;pointer&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.fake.FakeTransport.pointer"><code>FakeTransport.pointer</code></a>
+feeds <code>(phase, pointer, x, y, window_x, window_y, time)</code> events to a
+mounted view's gestures, with phases from <code>pythonnative.bridge.core</code>
+(<code>POINTER_DOWN</code>, <code>POINTER_MOVE</code>, <code>POINTER_UP</code>, <code>POINTER_CANCEL</code>) and
+times in seconds:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="kn">import</span> <span class="n">gestures</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.bridge.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">POINTER_DOWN</span><span class="p">,</span> <span class="n">POINTER_UP</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_tap_counts</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">taps</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>            <span class="n">test_id</span><span class="o">=</span><span class="s2">"card"</span><span class="p">,</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">100</span><span class="p">},</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>            <span class="n">gestures</span><span class="o">=</span><span class="p">[</span><span class="n">gestures</span><span class="o">.</span><span class="n">Tap</span><span class="p">(</span><span class="n">on_tap</span><span class="o">=</span><span class="n">taps</span><span class="o">.</span><span class="n">append</span><span class="p">)],</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>        <span class="p">)</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="p">)</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="n">card</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"card"</span><span class="p">)</span>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>    <span class="n">result</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">native</span><span class="o">.</span><span class="n">pointer</span><span class="p">(</span>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>        <span class="n">card</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span>
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>        <span class="p">[(</span><span class="n">POINTER_DOWN</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="n">POINTER_UP</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)],</span>
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>    <span class="p">)</span>
+</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>    <span class="n">result</span><span class="o">.</span><span class="n">settle</span><span class="p">()</span>
+</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">taps</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+</span></code></pre></div>
+<p>Time-based recognizers (long press, multi-tap windows) advance with
+<code>FakeTransport.poll_gestures(tag, time)</code>; <code>gesture_deadline(tag)</code> says
+when they next need it. <code>tests/gesture_harness.py</code> and
+<code>tests/test_gestures.py</code> in the repository have more patterns. iOS
+recognizers have their own tests in the native test suite.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Pair gestures with the <a href="../animations/">Animated API</a> for

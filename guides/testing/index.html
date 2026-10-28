@@ -1712,10 +1712,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#testing-the-bridge" class="md-nav__link">
+  <a href="#testing-what-the-platform-mounts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing the bridge
+        Testing what the platform mounts
       
     </span>
   </a>
@@ -2272,8 +2272,6 @@
   
     
     
-      
-        
       
         
       
@@ -2949,34 +2947,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3902,10 +3872,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#testing-the-bridge" class="md-nav__link">
+  <a href="#testing-what-the-platform-mounts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Testing the bridge
+        Testing what the platform mounts
       
     </span>
   </a>
@@ -4022,9 +3992,11 @@
 be tested without a device or simulator. The reconciler talks to
 native widgets exclusively through the batched mutation protocol (see
 <a href="../../concepts/native-views/">Native views</a>); <code>pythonnative.testing</code>
-swaps in an in-memory backend so a render produces a tree of plain
-Python objects that <code>pytest</code> can introspect, and gives you Testing
-Library-style queries to do it.</p>
+swaps in a backend that commits to the host build of the same renderer
+core the apps link, so tests validate, lay out, animate, and recognize
+gestures with the code that ships. A render produces a tree of plain
+Python objects that <code>pytest</code> can introspect, and Testing Library-style
+queries help you do it.</p>
 <h2 id="what-to-test">What to test<a class="headerlink" href="#what-to-test" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Components</strong>: render them, find things by text or <code>test_id</code>, fire
@@ -4302,12 +4274,20 @@ platform covering or revealing the screen:</p>
 <p>The host also records the screen options it receives in <code>options</code>, with
 the latest title in <code>title</code>.</p>
 <h2 id="testing-layouts">Testing layouts<a class="headerlink" href="#testing-layouts" title="Permanent link">&para;</a></h2>
-<p>Headless tests call Yoga through the <code>pythonnative.layout</code> host binding.
-The fake backend supplies deterministic intrinsic measurements; it doesn't
-reproduce platform fonts or control metrics. Rendered views carry their
-computed <code>frame</code> (<code>x, y, width, height</code>) once
-<code>render</code> runs the layout pass for the default 390x844 viewport (pass
-<code>viewport=(w, h)</code> to change it, or <code>viewport=None</code> to skip layout):</p>
+<p>Headless tests lay out in the renderer core, with the same Yoga rules,
+detached roots, and flattening as a device. The fake platform measures
+leaves with fixed sizes
+(<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;DEFAULT_INTRINSIC&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/testing/#pythonnative.testing.DEFAULT_INTRINSIC"><code>DEFAULT_INTRINSIC</code></a>: a <code>Text</code>
+is 60 by 16, for example); pass <code>FakeBackend(intrinsic={...})</code> to change
+them. It doesn't reproduce platform fonts or control metrics. Rendered
+views carry the <code>frame</code> (<code>x, y, width, height</code>) the core computed for the
+default 390x844 viewport (pass <code>viewport=(w, h)</code> to change it, or
+<code>viewport=None</code> to skip layout):</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_row_distributes_flex_children</span><span class="p">():</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span>
@@ -4320,9 +4300,9 @@ computed <code>frame</code> (<code>x, y, width, height</code>) once
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">((</span><span class="mi">310</span> <span class="o">-</span> <span class="mi">10</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span>
 </span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">pytest</span><span class="o">.</span><span class="n">approx</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="mi">10</span><span class="p">)</span>
 </span></code></pre></div>
-<p>For the engine alone, build <code>LayoutNode</code> trees and call
-<code>calculate_layout</code> directly (see
-<a href="../../api/layout/"><code>pythonnative.layout</code></a>).</p>
+<p>Frames on the logical views are relative to their logical parents, the
+way <code>on_layout</code> reports them. To check what the platform would mount
+instead, read the transport (see below).</p>
 <h2 id="testing-native-modules">Testing native modules<a class="headerlink" href="#testing-native-modules" title="Permanent link">&para;</a></h2>
 <p>Off device every native module facade resolves to a Python
 implementation, so <code>pn.Clipboard</code>, <code>pn.SecureStore</code>, <code>pn.AsyncStorage</code>,
@@ -4353,25 +4333,90 @@ surfaces through the facade to the component, which is the right way
 to test your error handling. User cancellations and denials are
 ordinary return values (<code>None</code> from <code>Camera.launch_camera</code>, <code>False</code>
 from <code>Permissions.request</code>), so fake those by returning them.</p>
-<h2 id="testing-the-bridge">Testing the bridge<a class="headerlink" href="#testing-the-bridge" title="Permanent link">&para;</a></h2>
-<p>The reconciler's on-device backend serializes commits to JSON. To assert
-on what native would receive (or to test a custom component's props at
-the wire level), install a
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeTransport&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.fake.FakeTransport"><code>FakeTransport</code></a>: it decodes
-transactions and keeps a native-style view tree, and lets tests inject
-events, module results, and host lifecycle from the "native" side.
-<code>tests/test_bridge.py</code> in the repository is the reference for this
+<h2 id="testing-what-the-platform-mounts">Testing what the platform mounts<a class="headerlink" href="#testing-what-the-platform-mounts" title="Permanent link">&para;</a></h2>
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a> commits through a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeTransport&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.fake.FakeTransport"><code>FakeTransport</code></a>, available as
+<code>result.backend.native</code>. The transport plays the platform's UI thread:
+it decodes each binary mount transaction the core queues and keeps the
+mounted tree, so tests can assert on what a device would receive.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_layout_wrappers_are_flattened</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Row</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"a"</span><span class="p">),</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"b"</span><span class="p">),</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">10</span><span class="p">})))</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">backend</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">backend</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="k">assert</span> <span class="n">backend</span><span class="o">.</span><span class="n">live_view_count</span><span class="p">()</span> <span class="o">==</span> <span class="mi">4</span>     <span class="c1"># Column, Row, and two Texts</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="k">assert</span> <span class="n">backend</span><span class="o">.</span><span class="n">mounted_view_count</span><span class="p">()</span> <span class="o">==</span> <span class="mi">3</span>  <span class="c1"># the Row only affects layout</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">text</span> <span class="o">=</span> <span class="n">backend</span><span class="o">.</span><span class="n">native</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">"Text"</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="k">assert</span> <span class="n">text</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">type_name</span> <span class="o">==</span> <span class="s2">"Column"</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="k">assert</span> <span class="n">text</span><span class="o">.</span><span class="n">frame</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">)</span>   <span class="c1"># offset by the flattened Row</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Attribute or method</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>native.views</code>, <code>find(type)</code>, <code>roots()</code></td>
+<td>Mounted <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeNativeView&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.fake.FakeNativeView"><code>FakeNativeView</code></a>s with merged props, mounted children, frames relative to the nearest mounted ancestor, and animated values</td>
+</tr>
+<tr>
+<td><code>native.transactions</code></td>
+<td>Every decoded <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;MountTransaction&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.core.MountTransaction"><code>MountTransaction</code></a></td>
+</tr>
+<tr>
+<td><code>native.commands</code></td>
+<td><code>(tag, name, args)</code> view commands in the order the UI thread ran them</td>
+</tr>
+<tr>
+<td><code>native.writes</code> (also <code>backend.animated</code>)</td>
+<td><code>(tag, prop, value)</code> animated prop writes from the core's animator</td>
+</tr>
+<tr>
+<td><code>native.calls</code></td>
+<td><code>(module, method, args)</code> native module calls</td>
+</tr>
+<tr>
+<td><code>native.measured</code></td>
+<td><code>(tag, component)</code> pairs the core asked the platform to measure</td>
+</tr>
+<tr>
+<td><code>backend.list_store(tag)</code></td>
+<td>A <code>VirtualList</code>'s dataset as the UI thread's data source sees it: revision, keys, and rows</td>
+</tr>
+<tr>
+<td><code>backend.request_list(tag, first)</code></td>
+<td>Simulates the native list viewport requesting rows from <code>first</code></td>
+</tr>
+</tbody>
+</table>
+<p>The transport also plays the native side in the other direction:
+<code>fire(tag, name, *args)</code> sends a view event through the core's stamping,
+<code>pointer(tag, events)</code> feeds gestures (see
+<a href="../gestures/#testing">Gestures</a>), <code>report_container</code> and
+<code>report_intrinsic</code> report native sizes and relayout, and
+<code>emit_module_event</code>, <code>resolve_pending</code>, and <code>host_event</code> deliver module
+and host messages. Animations advance on the framework loop's clock, so a
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeClock&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeClock"><code>FakeClock</code></a> drives them. Every
+<code>FakeTransport</code> owns its own core surface, so several can live in one
+test. <code>tests/test_bridge.py</code> in the repository is the reference for this
 style.</p>
 <h2 id="testing-native-code">Testing native code<a class="headerlink" href="#testing-native-code" title="Permanent link">&para;</a></h2>
 <p>The Swift and Kotlin halves have their own suites next to the code:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/ios
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-project<span class="w"> </span>Tests/NativeTests.xcodeproj<span class="w"> </span>-scheme<span class="w"> </span>NativeTests<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/android_template
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>./gradlew<span class="w"> </span>:pythonnative:testDebugUnitTest
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/ios
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-project<span class="w"> </span>Tests/NativeTests.xcodeproj<span class="w"> </span>-scheme<span class="w"> </span>NativeTests<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nb">cd</span><span class="w"> </span>src/pythonnative/templates/android_template
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>./gradlew<span class="w"> </span>:pythonnative:testDebugUnitTest
 </span></code></pre></div>
-<p>Both drive component managers and modules with decoded transactions and
-promise envelopes, so a wire-format change is caught on every side. Add
+<p>Both drive the mounting layer, component managers, and modules with
+mount transactions and promise envelopes, so a wire-format change is
+caught on every side. Add
 cases there when you change a manager or module rather than relying on
 the Maestro E2E suite alone.</p>
 <p>The iOS <code>NativeTests</code> scheme runs the Swift tests inside a minimal UIKit
@@ -4398,18 +4443,18 @@ See <a href="../async/#testing-async-code">Testing async code</a>.</p>
 assert on the <em>mutations</em> themselves (how many <code>InsertOp</code>s a reorder
 produced, which props an <code>UpdateOp</code> changed) can pass their own
 backend and read <code>backend.ops</code>, or construct the reconciler directly:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.reconciler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reconciler</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeBackend</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">FakeBackend</span><span class="p">()</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">Reconciler</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">rec</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">))</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="k">assert</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">backend</span><span class="o">.</span><span class="n">ops</span><span class="p">]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"CreateOp"</span><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.reconciler</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reconciler</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeBackend</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">FakeBackend</span><span class="p">()</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">rec</span> <span class="o">=</span> <span class="n">Reconciler</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="n">rec</span><span class="o">.</span><span class="n">mount</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">))</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="k">assert</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">backend</span><span class="o">.</span><span class="n">ops</span><span class="p">]</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"CreateOp"</span><span class="p">]</span>
 </span></code></pre></div>
 <h2 id="running-the-suite">Running the suite<a class="headerlink" href="#running-the-suite" title="Permanent link">&para;</a></h2>
 <p>PythonNative uses <code>pytest</code> plus the standard CI matrix (Ruff, Black,
 MyPy). Run them all locally before pushing:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>./scripts/check.sh
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>./scripts/check.sh
 </span></code></pre></div>
 <p>The same commands run in CI on every push and pull request.</p>
 <p>Two optional suites need the network and are skipped by default:</p>
@@ -4427,6 +4472,7 @@ MyPy). Run them all locally before pushing:</p>
 <li>Wrap subtrees with <a href="../error-boundaries/">Error boundaries</a> so test
   failures don't crash unrelated assertions.</li>
 <li>See how the fake backend fits underneath: <a href="../../concepts/native-views/">Native views</a>.</li>
+<li>The wire formats the transport decodes: <a href="../../concepts/bridge/">The native bridge</a>.</li>
 <li>Browse the API: <a href="../../api/testing/">Testing</a>.</li>
 </ul>
 

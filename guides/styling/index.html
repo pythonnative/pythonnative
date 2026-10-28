@@ -2531,8 +2531,6 @@
       
         
       
-        
-      
     
     
     
@@ -3127,34 +3125,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -5062,8 +5032,9 @@ Android applies skew through the animation matrix on API 29 and later
 and ignores it below that with a one-time log. For animated transforms,
 see <a href="../animations/">Animations</a>.</p>
 <h2 id="flex-layout">Flex layout<a class="headerlink" href="#flex-layout" title="Permanent link">&para;</a></h2>
-<p>PythonNative uses the shared Yoga flexbox engine, compiled into each mobile
-runtime and provided as WebAssembly in the browser preview (see
+<p>PythonNative uses the Yoga flexbox engine inside the shared renderer core,
+compiled into each mobile app and provided as WebAssembly in the browser
+preview (see
 <a href="../../concepts/layout/">Layout engine</a>). <code>View</code> is
 the universal flex container, and <code>Column</code>/<code>Row</code> are convenience
 wrappers that fix the direction.</p>
@@ -5084,11 +5055,10 @@ wrappers that fix the direction.</p>
 <li><code>padding</code>: inner spacing (int for all sides, or dict).</li>
 </ul>
 <p><code>align_items: "baseline"</code> (rows only) lines children up along a shared
-baseline instead of their top edges. Native text handlers report a
-size but not the position of the first line's baseline, so the engine
-approximates: a leaf's baseline is its height (leaves align along
-their bottom edges), and a container's baseline is that of its first
-in-flow child. Columns treat <code>"baseline"</code> as <code>"flex_start"</code>, matching
+baseline instead of their top edges. <code>Text</code> reports the position of
+its first line's baseline; other leaves use their height (they align
+along their bottom edges), and a container's baseline is that of its
+first in-flow child. Columns treat <code>"baseline"</code> as <code>"flex_start"</code>, matching
 Yoga.</p>
 <h3 id="child-layout-properties">Child layout properties<a class="headerlink" href="#child-layout-properties" title="Permanent link">&para;</a></h3>
 <p>All components accept these in <code>style</code>:</p>

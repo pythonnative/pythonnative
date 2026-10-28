@@ -708,6 +708,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-renderer-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The renderer core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#native-presentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2231,8 +2242,6 @@
       
         
       
-        
-      
     
     
     
@@ -2827,34 +2836,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3697,6 +3678,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-renderer-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The renderer core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#native-presentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3779,12 +3771,13 @@ Android widgets. A single logical tree connects the application root, providers,
 screens, overlays, and visible list rows.</p>
 <pre class="mermaid"><code>flowchart LR
     A[Python components and state] --&gt; B[Incremental reconciler]
-    B --&gt; C[Validated revisioned commit]
-    C --&gt; D[UIKit or Android widgets]
-    D --&gt; E[Queued native events]
-    E --&gt; A
-    D --- F[Yoga layout and native measurement]
-    D --- G[Native animation graph]</code></pre>
+    B --&gt;|revisioned commit| C[Renderer core]
+    C --&gt; D[Validation, shadow tree, Yoga layout, flattening]
+    D --&gt;|binary mount transaction| E[UIKit, Android, or DOM widgets]
+    E --&gt;|events, pointers, container sizes| C
+    C --&gt;|stamped events, frames, command results| A
+    F[Frame clock] --&gt; C
+    C --&gt;|animated prop writes| E</code></pre>
 <h2 id="the-authoring-model">The authoring model<a class="headerlink" href="#the-authoring-model" title="Permanent link">&para;</a></h2>
 <p>Application code is ordinary, typed Python. Components are functions
 whose signatures are their prop lists, and they return a
@@ -3820,7 +3813,8 @@ element that's the identical object from the previous render is skipped with
 its subtree, and a changed context value marks only the consumers recorded in
 its provider's registry (see <a href="../reconciliation/#skipping-unchanged-subtrees">Reconciliation</a>). Native
 child relationships are rebuilt when a component's native roots change.
-Effects run after committed views exist, with child effects preceding parents.
+Effects run after the renderer core accepts and lays out a commit, with child
+effects preceding parents.
 Renders are batched automatically: setter calls made in one callback, effect,
 or task step coalesce into one flush on the application loop. An effect that
 raises is routed to the nearest error boundary like a render error, and a
@@ -3833,15 +3827,51 @@ equal when they wrap the same function on the same object, so passing
 objects must be replaced to signal a state or dependency change. Frozen
 dataclasses are a good choice for shared snapshots and
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Store&lt;/span&gt;" href="../../api/store/#pythonnative.store.Store"><code>Store</code></a> values.</p>
+<h2 id="the-renderer-core">The renderer core<a class="headerlink" href="#the-renderer-core" title="Permanent link">&para;</a></h2>
+<p>Below the reconciler, one C++ library does the platform-neutral work on every
+target: the renderer core in <code>native/core/</code>. iOS links it into the app binary,
+Android loads it as <code>libpncore.so</code>, tests and tooling load the
+<code>pythonnative._core</code> extension, and the browser preview runs it as
+WebAssembly. Python reaches it through a C ABI with <code>ctypes</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Owner</th>
+<th>Responsibilities</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python (application thread)</td>
+<td>Components, hooks, reconciliation, commit operations, event handlers, effects, device module facades</td>
+</tr>
+<tr>
+<td>Renderer core (C++)</td>
+<td>Contract tables and validation, surfaces and revisions, the shadow tree, Yoga style mapping and layout, view flattening, mount diffing, list datasets, animation graphs and drivers, gesture recognition (Android, browser, and tests), event identity stamping</td>
+</tr>
+<tr>
+<td>Platform (UI thread)</td>
+<td>Widget creation and prop application, text drawing, text input, scroll physics, navigation containers, modal windows, accessibility, image decoding, the frame clock, iOS gesture recognizers, device modules, app lifecycle</td>
+</tr>
+</tbody>
+</table>
+<p>A commit worker hands each commit to the core while the application loop
+remains available for input and asyncio tasks. The core validates the commit,
+lays it out off the UI thread, flattens layout-only views, and queues a binary
+mount transaction that the UI thread applies without waiting on any other
+thread. Queued commits prepare against the latest acknowledged revision. Refs,
+effects, and queued native events publish after acknowledgement. State writes
+during mounting coalesce into the following render. See
+<a href="../bridge/">The native bridge</a> for the threads and the wire contract.</p>
 <h2 id="native-presentation">Native presentation<a class="headerlink" href="#native-presentation" title="Permanent link">&para;</a></h2>
-<p>Swift and Kotlin component managers create widgets, apply props, measure native
-content, handle commands, and release resources. Yoga owns geometry. The platform
-UI thread owns every widget mutation and input callback. A worker performs the
-blocking native commit crossing while the application
-loop remains available for input and asyncio tasks. One transaction mounts at a
-time; queued transactions prepare against the latest acknowledged revision.
-Refs, effects, and queued native events publish after acknowledgement. State
-writes during mounting coalesce into the following render.</p>
+<p>Swift and Kotlin component managers create widgets, apply props and frames,
+measure <code>intrinsic</code> controls on request, handle commands, and release
+resources. The platform UI thread owns every widget mutation and input
+callback. Because the core flattens views that only affect layout, a plain
+<code>Row</code> or <code>Column</code> wrapper usually doesn't become a <code>UIView</code> or <code>FrameLayout</code>.
+In the browser preview, the DOM managers in <code>devserver/static/renderer.js</code>
+play the same role: <code>devserver/static/core/mount.js</code> runs the WebAssembly
+core in the page and hands them each decoded transaction.</p>
 <p>Navigation presents logical screen roots through a nested UIKit navigation
 controller or Android fragments. Pushing a screen doesn't create another Python
 application root. Providers and repositories above the navigator remain shared;
@@ -3852,21 +3882,24 @@ window. Native collection and recycler views request rows asynchronously by
 key, index, and data revision. Measured heights replace estimates. Headers,
 footers, empty states, grouped grids, and sections use the same ownership model.</p>
 <h2 id="contracts-and-tooling">Contracts and tooling<a class="headerlink" href="#contracts-and-tooling" title="Permanent link">&para;</a></h2>
-<p>The bridge protocol (version 6) validates commits before mutation and
-acknowledges exact revisions.
-Events carry application and revision identities. Controlled inputs additionally
-acknowledge native edit revisions to avoid overwriting newer typing. Native
-animation graphs perform frame updates independently of Python callbacks.</p>
-<p>The SDK compiles dataclass props and protocol methods into portable contracts
-and executable Swift/Kotlin predicates. Native prop wrappers cache decoded
-fields. Yoga applies touched styles directly and returns geometry only for
-observed refs and layout callbacks. <code>ListData</code> feeds revisioned keyed patches;
-ordinary sequences use a scanning adapter to that same protocol.
+<p>The bridge protocol (version 7) validates commits in the core before mutation
+and acknowledges exact revisions. Events carry application and revision
+identities, which the core stamps. Controlled inputs additionally acknowledge
+native edit revisions to avoid overwriting newer typing. The core's animation
+graphs perform frame updates independently of Python callbacks.</p>
+<p>The SDK compiles dataclass props and protocol methods into portable contracts.
+The core compiles the merged contract document into indexed tables at startup
+and validates every commit, command, and module call against them; typed Swift
+and Kotlin prop wrappers cache decoded fields for the managers. The core
+applies touched styles to Yoga directly and returns geometry only for observed
+refs and layout callbacks. <code>ListData</code> feeds revisioned keyed patches; ordinary
+sequences use a scanning adapter to that same protocol.
 Generated artifacts are checked in and tested for drift. Target-wheel plugin
 metadata is read as data, without importing a mobile binary on the development
 machine. Resources and registration code are staged into the native libraries.</p>
 <p><code>pn deps --lock</code> records target-specific wheel versions, URLs, and SHA-256 hashes.
-Builds reject stale locks and missing targets. Wheel tag compatibility and native
+Release builds reject stale locks and missing targets; development builds warn
+and resolve the current requirements without the lock. Wheel tag compatibility and native
 SDK compatibility remain separate checks; a lock doesn't prove an extension can
 run on a device. Test every supported deployment target.</p>
 <p>Fast Refresh preserves compatible component state. Changes to hook order or
@@ -3877,15 +3910,16 @@ Native contract changes require rebuilding the dev client. Development errors
 use a host-owned overlay with a traceback and reload/dismiss controls. It can
 report a poisoned renderer and reload a fresh surface without rendering an
 additional Python error tree.</p>
-<p>Python phase timings and bridge work counters can be captured in Chrome trace
-format. See <a href="../../guides/dev-workflow/#profiling">Profiling</a> for collection and
+<p>Python phase timings, the core's commit and layout timings, and bridge work
+counters can be captured in Chrome trace format. See <a href="../../guides/dev-workflow/#profiling">Profiling</a> for collection and
 export instructions.</p>
 <h2 id="runtime-limits">Runtime limits<a class="headerlink" href="#runtime-limits" title="Permanent link">&para;</a></h2>
 <p>The application host uses one surface. A failed bridge commit requires a
 complete surface reset and remount; see <a href="../bridge/#commits">Commits</a>.
 Reconciliation reduces work at dirty component roots but doesn't time-slice
 arbitrary Python render functions. Long computations delay Python callbacks
-and commits even while native scrolling and animation drivers continue.
+and commits even while native scrolling and the core's animation drivers
+continue.
 Use cooperative async work, move blocking I/O off the application thread,
 and keep expensive computation out of render functions.</p>
 <p>Shared layout rules don't imply identical fonts or control sizes. Test
@@ -3930,12 +3964,12 @@ validate device signing, store submission, or performance on physical devices.</
 <td><code>handles.py</code>, <code>journal.py</code></td>
 </tr>
 <tr>
-<td>Native renderers</td>
-<td><code>native/ios/</code>, <code>native/android/</code></td>
+<td>Renderer core (C++) and its Python binding</td>
+<td><code>native/core/</code> (Yoga in <code>native/core/yoga/</code>), <code>bridge/core.py</code></td>
 </tr>
 <tr>
-<td>Shared layout core</td>
-<td><code>native/yoga/</code>, <code>layout.py</code></td>
+<td>Platform mounting layers</td>
+<td><code>native/ios/</code>, <code>native/android/</code></td>
 </tr>
 <tr>
 <td>Navigation and lists</td>
@@ -3963,7 +3997,7 @@ validate device signing, store submission, or performance on physical devices.</
 </tr>
 <tr>
 <td>Browser preview</td>
-<td><code>preview.py</code>, <code>devserver/static/</code></td>
+<td><code>preview.py</code>, <code>bridge/web.py</code>, <code>devserver/static/</code> (the WebAssembly core in <code>devserver/static/core/</code>)</td>
 </tr>
 </tbody>
 </table>

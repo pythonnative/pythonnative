@@ -2117,8 +2117,6 @@
       
         
       
-        
-      
     
     
     
@@ -2893,17 +2891,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.hosts.ScreenHost.flush_scheduled_render" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;flush_scheduled_render
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pythonnative.hosts.ScreenHost.show_redbox" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3163,17 +3150,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.hosts.base.ScreenHost.flush_scheduled_render" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;flush_scheduled_render
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pythonnative.hosts.base.ScreenHost.show_redbox" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3227,17 +3203,6 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;import_component
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pythonnative.hosts.base.flush_hosts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;flush_hosts
       
     </span>
   </a>
@@ -3373,34 +3338,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -4376,17 +4313,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.hosts.ScreenHost.flush_scheduled_render" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;flush_scheduled_render
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pythonnative.hosts.ScreenHost.show_redbox" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4646,17 +4572,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.hosts.base.ScreenHost.flush_scheduled_render" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;flush_scheduled_render
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#pythonnative.hosts.base.ScreenHost.show_redbox" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4710,17 +4625,6 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;import_component
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pythonnative.hosts.base.flush_hosts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;flush_hosts
       
     </span>
   </a>
@@ -5238,15 +5142,7 @@ navigation state under <code>"pn_nav"</code> for pushed screens.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;request_render&lt;/span&gt; (&lt;code&gt;pythonnative.hosts.ScreenHost.request_render&lt;/code&gt;)" href="#pythonnative.hosts.ScreenHost.request_render">request_render</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Request a render pass (queued if one is in progress).</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;flush_scheduled_render&lt;/span&gt; (&lt;code&gt;pythonnative.hosts.ScreenHost.flush_scheduled_render&lt;/code&gt;)" href="#pythonnative.hosts.ScreenHost.flush_scheduled_render">flush_scheduled_render</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Run a render deferred by <code>_schedule_render_async</code> (platform UI turn).</p>
+                  <p>Render now, from the reconciler's flush (queued if a pass is in progress).</p>
                 </div>
               </td>
             </tr>
@@ -5561,27 +5457,7 @@ case the platform must not pop the screen.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Request a render pass (queued if one is in progress).</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pythonnative.hosts.ScreenHost.flush_scheduled_render" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">flush_scheduled_render</span>
-
-
-<a href="#pythonnative.hosts.ScreenHost.flush_scheduled_render" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">flush_scheduled_render</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Run a render deferred by <code>_schedule_render_async</code> (platform UI turn).</p>
+        <p>Render now, from the reconciler's flush (queued if a pass is in progress).</p>
 
 
     </div>
@@ -5978,8 +5854,9 @@ own host references.</p>
 
         <p>Platform-independent application surface host.</p>
 <p>A host mounts one logical application tree, publishes native lifecycle and
-viewport changes, schedules Python work on the application thread, and caches
-navigation restoration state. Logical screen containers present the tree's
+viewport changes, and caches navigation restoration state. Renders run in
+the reconciler's own flush on the application thread; the host adds no
+scheduling of its own. Logical screen containers present the tree's
 screen roots through native navigation controllers and fragments.</p>
 
 
@@ -6260,15 +6137,7 @@ navigation state under <code>"pn_nav"</code> for pushed screens.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;request_render&lt;/span&gt; (&lt;code&gt;pythonnative.hosts.base.ScreenHost.request_render&lt;/code&gt;)" href="#pythonnative.hosts.base.ScreenHost.request_render">request_render</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Request a render pass (queued if one is in progress).</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;flush_scheduled_render&lt;/span&gt; (&lt;code&gt;pythonnative.hosts.base.ScreenHost.flush_scheduled_render&lt;/code&gt;)" href="#pythonnative.hosts.base.ScreenHost.flush_scheduled_render">flush_scheduled_render</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Run a render deferred by <code>_schedule_render_async</code> (platform UI turn).</p>
+                  <p>Render now, from the reconciler's flush (queued if a pass is in progress).</p>
                 </div>
               </td>
             </tr>
@@ -6583,27 +6452,7 @@ case the platform must not pop the screen.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Request a render pass (queued if one is in progress).</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pythonnative.hosts.base.ScreenHost.flush_scheduled_render" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">flush_scheduled_render</span>
-
-
-<a href="#pythonnative.hosts.base.ScreenHost.flush_scheduled_render" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">flush_scheduled_render</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Run a render deferred by <code>_schedule_render_async</code> (platform UI turn).</p>
+        <p>Render now, from the reconciler's flush (queued if a pass is in progress).</p>
 
 
     </div>
@@ -6820,26 +6669,6 @@ syntax error) propagate unchanged so the real cause stays visible.</p>
           </tr>
       </tbody>
     </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="pythonnative.hosts.base.flush_hosts" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">flush_hosts</span>
-
-
-<a href="#pythonnative.hosts.base.flush_hosts" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">flush_hosts</span><span class="p">(</span><span class="n">hosts</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Sequence">Sequence</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ScreenHost&lt;/span&gt; (&lt;code&gt;pythonnative.hosts.base.ScreenHost&lt;/code&gt;)" href="#pythonnative.hosts.base.ScreenHost">ScreenHost</a></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Run deferred renders for <code>hosts</code> (platform UI-thread drains call this).</p>
 
 
     </div>
@@ -7177,7 +7006,6 @@ children in that same application tree.</p>
 <li><code>back_pressed</code>: pops a handled screen, otherwise asks native to
   finish it (<code>Host.finish</code>).</li>
 <li><code>reload</code>: remount after the development error overlay.</li>
-<li><code>flush</code>: run deferred renders now.</li>
 </ul>
 <p>Native delivers every event asynchronously and ignores the return
 value; only tests read <code>create</code>'s <code>{"root": tag}</code>.</p>

@@ -2117,8 +2117,6 @@
       
         
       
-        
-      
     
     
     
@@ -2723,10 +2721,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.animated.native_animation_completed" class="md-nav__link">
+  <a href="#pythonnative.animated.release_view_backend" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;native_animation_completed
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;release_view_backend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.animated.native_animation_message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;native_animation_message
       
     </span>
   </a>
@@ -3143,34 +3152,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -4340,10 +4321,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pythonnative.animated.native_animation_completed" class="md-nav__link">
+  <a href="#pythonnative.animated.release_view_backend" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;native_animation_completed
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;release_view_backend
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.animated.native_animation_message" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;native_animation_message
       
     </span>
   </a>
@@ -4411,10 +4403,11 @@ animations declaratively by binding <a class="autorefs autorefs-internal" title=
 instances to the <code>style</code> of an <code>Animated.View</code>, <code>Animated.Text</code>, or
 <code>Animated.Image</code>. The reconciler holds a <code>ref</code> to the underlying
 native view. Connected values, derived expressions, and style bindings
-form a graph evaluated by the renderer, so supported animations bypass
-Python reconciliation on each frame. Unattached values, Python listeners,
-callable easing functions, and backends that decline native animation use
-the Python ticker.</p>
+form a graph the renderer core evaluates on the UI thread, so animations
+bypass Python reconciliation on each frame. Unattached values and values
+with Python listeners have the core report each frame's value to Python,
+and a callable easing function is sampled into a curve the core
+interpolates.</p>
 <p>A few types frame the surface:</p>
 <ul>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Easing&lt;/span&gt;
@@ -4499,7 +4492,7 @@ completion contract. The core primitives are:</p>
   descriptors for <code>Animated.timing</code> (<code>Easing.ease_in_out</code>,
   <code>Easing.bezier(0.2, 0.8, 0.2, 1.0)</code>, ...). Every renderer evaluates
   the same curve definitions; a plain Python callable is still accepted
-  but ticks in Python.</li>
+  and crosses the bridge as a sampled curve.</li>
 <li><code>Animated.event</code>: build an event-prop callback that copies event
   fields into animated values (<code>on_scroll=pn.Animated.event(y=v)</code>).</li>
 <li><code>Animated.diff_clamp</code>: accumulate an input's <em>deltas</em> into a
@@ -4508,26 +4501,24 @@ completion contract. The core primitives are:</p>
   components whose <code>style</code> may contain animated nodes, including
   inside <code>transform</code> entries.</li>
 </ul>
-<p>Driver architecture (the <strong>native driver</strong>):</p>
-<p>Mounted bindings install a serialized graph of connected values, arithmetic,
-interpolation, and view properties. When an animation starts, PythonNative
-offers its timing, spring, or decay specification to the renderer through
-the backend's <code>start_animation</code> hook (see
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="../native_views/#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>).</p>
-<ul>
-<li><strong>Accepted</strong>: the renderer evaluates the graph and applies its bindings
-  without Python work on every frame. Completion callbacks settle the
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> and resolve
-  awaiting tasks.</li>
-<li><strong>Declined</strong> (unattached values, callable easings,
-  values feeding Python-side listeners, or an unsupported backend): a single
-  background thread ticks the animation at ~60 Hz from Python, pushing
-  each frame through <code>set_animated_property</code>. Semantics are
-  identical; only the frame source differs.</li>
-</ul>
-<p>On mobile, scroll and gesture bindings feed graph values before input is
-queued to Python. Derived expressions can run in the renderer alongside their
-source drivers. Backends without graph support use Python for derived bindings.</p>
+<p>Driver architecture:</p>
+<p>Every animation runs in the renderer core's animator on the platform's UI
+thread (RFC 0007), at the display's refresh rate. Mounted bindings install
+a serialized graph of connected values, arithmetic, interpolation, and view
+properties; starting an animation hands its timing, spring, or decay
+specification to the core through the backend's <code>start_animation</code> hook
+(see <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="../native_views/#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>).
+The core evaluates the graph and applies its bindings without Python work
+on every frame. Completion settles the
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> and resolves
+awaiting tasks.</p>
+<p>A value with Python listeners, or one no view is bound to, asks the core to
+report its value every frame, and Python updates the value and runs the
+listeners. A Python easing callable is sampled into a curve the core
+interpolates. Headless code without a mounted screen animates on the host
+build of the same core, so tests see the shipping math.</p>
+<p>Scroll and gesture bindings feed graph values on the UI thread before input
+is queued to Python.</p>
 
 
 <details class="example" open>
@@ -4643,10 +4634,10 @@ source drivers. Backends without graph support use Python for derived bindings.<
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;native_animation_completed&lt;/span&gt; (&lt;code&gt;pythonnative.animated.native_animation_completed&lt;/code&gt;)" href="#pythonnative.animated.native_animation_completed">native_animation_completed</a></code></td>
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;native_animation_message&lt;/span&gt; (&lt;code&gt;pythonnative.animated.native_animation_message&lt;/code&gt;)" href="#pythonnative.animated.native_animation_message">native_animation_message</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Report a natively-driven animation as settled.</p>
+                  <p>Route an <code>animation</code> message from the core: a frame report or a completion.</p>
                 </div>
               </td>
             </tr>
@@ -5021,8 +5012,8 @@ animation never silently degrades to a re-render per frame.</p>
   &lt;/span&gt;" href="#pythonnative.animated.Easing"><code>Easing</code></a>
 namespace (<code>Easing.ease_in_out</code>, <code>Easing.bezier(...)</code>) rather
 than directly. The descriptor crosses the bridge as data, so the
-native drivers can run the curve on the UI thread, and it evaluates
-identically in Python for the fallback ticker and for tests.</p>
+renderer core can run the curve on the UI thread, and it evaluates
+identically in Python for tests.</p>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -5394,14 +5385,18 @@ leaves can be set or animated directly.</p>
 
 
 <a href="#pythonnative.animated.AnimatedNode.attach" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">attach</span><span class="p">(</span><span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">prop</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">attach</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">prop</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n">backend</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
         <p>Bind this node to <code>prop</code> of the native view under <code>tag</code>.</p>
 <p>The current value is pushed immediately so the view reflects it
-even if no animation is running. Returns a detach callable.</p>
+even if no animation is running. <code>backend</code> is the backend that
+owns the view (the process's backend by default). Returns a detach
+callable.</p>
 
 
     </div>
@@ -5707,7 +5702,7 @@ listeners see the final settled value.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;stop_animation&lt;/span&gt; (&lt;code&gt;pythonnative.animated.AnimatedValue.stop_animation&lt;/code&gt;)" href="#pythonnative.animated.AnimatedValue.stop_animation">stop_animation</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Cancel any in-flight animation on this value (native or Python).</p>
+                  <p>Cancel any in-flight animation on this value.</p>
                 </div>
               </td>
             </tr>
@@ -5817,7 +5812,7 @@ listeners see the final settled value.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Cancel any in-flight animation on this value (native or Python).</p>
+        <p>Cancel any in-flight animation on this value.</p>
 
 
     </div>
@@ -6142,72 +6137,41 @@ animations (<code>sequence</code>, <code>parallel</code>, <code>stagger</code>,
 <div class="doc doc-object doc-function">
 
 
-<h2 id="pythonnative.animated.native_animation_completed" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">native_animation_completed</span>
+<h2 id="pythonnative.animated.release_view_backend" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">release_view_backend</span>
 
 
-<a href="#pythonnative.animated.native_animation_completed" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">native_animation_completed</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">anim_id</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">finished</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#pythonnative.animated.release_view_backend" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">release_view_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">,</span> <span class="n">tags</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Report a natively-driven animation as settled.</p>
-<p>Called by platform handlers from their completion callbacks (iOS
-<code>UIView</code> completion blocks, Android <code>withEndAction</code> /
-<code>DynamicAnimation.OnAnimationEndListener</code>). Safe to call from any
-thread; unknown ids are ignored (e.g. an animation cancelled
-moments before its completion fired).</p>
+        <p>Forget that <code>backend</code> owns <code>tags</code> (its views were destroyed or its surface reset).</p>
 
 
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>anim_id</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The id passed to the backend's <code>start_animation</code>.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>finished</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#bool">bool</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p><code>False</code> when the platform reports the animation was
-interrupted rather than running to completion.</p>
-              </div>
-            </td>
-            <td>
-                  <code>True</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.animated.native_animation_message" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">native_animation_message</span>
+
+
+<a href="#pythonnative.animated.native_animation_message" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">native_animation_message</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Route an <code>animation</code> message from the core: a frame report or a completion.</p>
+<p>Completions carry <code>{"id", "finished", "value"}</code> (<code>finished</code> is
+<code>False</code> when the driver was cancelled or superseded); reports carry
+<code>{"id", "value"}</code>. Unknown ids are ignored (an animation cancelled
+moments before its completion arrived).</p>
 
 
     </div>

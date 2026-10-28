@@ -18,7 +18,7 @@
         <link rel="prev" href="../hosts/">
       
       
-        <link rel="next" href="../layout/">
+        <link rel="next" href="../style/">
       
       
         
@@ -2117,8 +2117,6 @@
       
         
       
-        
-      
     
     
     
@@ -2986,17 +2984,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#pythonnative.reconciler.core.Reconciler.compute_layout_for_test" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;compute_layout_for_test
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -3177,34 +3164,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -4237,17 +4196,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#pythonnative.reconciler.core.Reconciler.compute_layout_for_test" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;compute_layout_for_test
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4463,7 +4411,7 @@ mutations that bring the on-screen view tree in line with the new
 description. The reconciler is platform-agnostic; it talks to native
 widgets exclusively through a backend such as the
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="../native_views/#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>
-or the in-memory <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a>.
+or the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a> tests use.
 Renders are batched automatically (one flush per callback, effect, or
 task step), and a flush that re-schedules itself more than fifty times
 raises <code>RuntimeError("Too many re-renders")</code> through the nearest
@@ -4485,8 +4433,8 @@ implementation detail:</p>
 <li><code>core</code>: render, diff, commit.</li>
 <li><code>boundaries</code>: <code>ErrorBoundary</code>
   and <code>Suspense</code>.</li>
-<li><code>layout_pass</code>: the flexbox
-  pass and frame diffing.</li>
+<li><code>layout_pass</code>: publishing the
+  frames the renderer core lays out.</li>
 <li><code>children</code>: minimal move
   planning for keyed child lists.</li>
 <li><code>vnode</code>: the mounted-tree node and
@@ -4718,7 +4666,7 @@ and routes it through the nearest <code>ErrorBoundary</code>.</p>
             <td>
               <div class="doc-md-description">
                 <p>An object implementing the backend protocol
-(<code>apply_mutations</code>, <code>resolve_view</code>, <code>measure_intrinsic</code>,
+(<code>apply_mutations</code>, <code>resolve_view</code>, <code>compute_layout</code>,
 <code>command</code>). PythonNative ships the bridge backend for iOS,
 Android, and the browser preview; tests use
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeBackend&lt;/span&gt;" href="../testing/#pythonnative.testing.FakeBackend"><code>FakeBackend</code></a>.</p>
@@ -4931,14 +4879,6 @@ reconciler so screens never delay each other.</p>
               <td>
                 <div class="doc-md-description">
                   <p>Update the viewport size and re-run layout if it changed.</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;compute_layout_for_test&lt;/span&gt; (&lt;code&gt;pythonnative.reconciler.core.Reconciler.compute_layout_for_test&lt;/code&gt;)" href="#pythonnative.reconciler.core.Reconciler.compute_layout_for_test">compute_layout_for_test</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Build and compute a layout tree without touching the backend.</p>
                 </div>
               </td>
             </tr>
@@ -5344,30 +5284,6 @@ pass instead.</p>
 <p>Called by the screen host whenever the platform reports a new
 container size. The first call after mount triggers the
 initial layout pass; identical sizes are no-ops.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pythonnative.reconciler.core.Reconciler.compute_layout_for_test" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">compute_layout_for_test</span>
-
-
-<a href="#pythonnative.reconciler.core.Reconciler.compute_layout_for_test" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">compute_layout_for_test</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">viewport_width</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">,</span> <span class="n">viewport_height</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutNode&lt;/span&gt; (&lt;code&gt;pythonnative.layout.LayoutNode&lt;/code&gt;)" href="../layout/#pythonnative.layout.LayoutNode">LayoutNode</a></span><span class="p">]</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Build and compute a layout tree without touching the backend.</p>
-<p>Returns the synthetic viewport <code>LayoutNode</code> with all
-descendants positioned, or <code>None</code> if nothing is mounted.</p>
 
 
     </div>

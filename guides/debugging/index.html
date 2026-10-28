@@ -1175,6 +1175,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#native-view-debuggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native view debuggers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#other-editors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2231,8 +2242,6 @@
       
         
       
-        
-      
     
     
     
@@ -2827,34 +2836,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3719,6 +3700,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#native-view-debuggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native view debuggers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#other-editors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3833,13 +3825,28 @@ then continues, instead of starting <code>pdb</code>, which would wait forever f
 input on a phone.</p>
 <h2 id="while-paused">While paused<a class="headerlink" href="#while-paused" title="Permanent link">&para;</a></h2>
 <p>The paused thread is the app's Python thread. The native UI keeps
-running: scrolling, native animations, and gestures still move, but taps
+running: scrolling, animations, and gestures still move, and the UI thread
+finishes mounting any commit the renderer core already accepted, but taps
 that call Python wait until you continue, and Fast Refresh waits too.
 The dev client's network threads are excluded from the debugger, so the
 session stays connected while you inspect variables.</p>
 <p>Watch expressions and the debug console evaluate on the paused thread.
 To run code on the live application loop instead, with <code>await</code>, use the
 REPL in <a href="../devtools/#console">DevTools' Console</a>.</p>
+<h2 id="native-view-debuggers">Native view debuggers<a class="headerlink" href="#native-view-debuggers" title="Permanent link">&para;</a></h2>
+<p>Xcode's view hierarchy debugger and Android Studio's Layout Inspector show
+the views the platform mounted, which can differ from your component tree.
+The renderer core doesn't mount a <code>View</code>, <code>Row</code>, <code>Column</code>, or <code>Spacer</code> that
+only positions its children (see
+<a href="../../concepts/layout/#view-flattening">View flattening</a>); its children
+sit in the nearest mounted ancestor, with frames offset accordingly. A
+<code>test_id</code>, an accessibility prop, a background, or any other prop that
+affects drawing or input keeps a view mounted, so add one to a wrapper you
+want to find in the inspector, or set <code>PN_FLATTEN=0</code> in the environment
+to mount every view while you debug.</p>
+<p>When the core rejects a commit, nothing is applied, and the <code>CommitError</code>
+names the operation, the component, and the property: "Native commit 1
+rejected: invalid op 0: unknown Text prop colour".</p>
 <h2 id="other-editors">Other editors<a class="headerlink" href="#other-editors" title="Permanent link">&para;</a></h2>
 <p>Any Debug Adapter Protocol client that supports <code>debugpy</code> can attach to
 <code>127.0.0.1:5678</code> with an "attach" request: VS Code and its forks, Zed,

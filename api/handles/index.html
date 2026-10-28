@@ -2117,8 +2117,6 @@
       
         
       
-        
-      
     
     
     
@@ -2384,6 +2382,17 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;command
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pythonnative.handles.ViewHandle.measure_in_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;measure_in_window
       
     </span>
   </a>
@@ -3104,34 +3113,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3996,6 +3977,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#pythonnative.handles.ViewHandle.measure_in_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;measure_in_window
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4398,7 +4390,9 @@ after commit and clears it back to <code>None</code> on unmount:</p>
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../components/#pythonnative.components.events.LayoutEvent"><code>LayoutEvent</code></a>,
 written by the layout pass). Methods that act on the view are plain
-calls; methods that need an answer from the native view are <code>async</code>.
+calls; they queue behind the pending mount, so they reach the view the
+last commit created. Methods that need an answer from the native view
+are <code>async</code> and await it without blocking the application loop.
 Composite components (<code>FlatList</code>, <code>SectionList</code>) publish their own
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ListController&lt;/span&gt;" href="../components/#pythonnative.components.ListController"><code>ListController</code></a> instead.</p>
 
@@ -4730,7 +4724,20 @@ before the first layout. Written by the layout pass.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;command&lt;/span&gt; (&lt;code&gt;pythonnative.handles.ViewHandle.command&lt;/code&gt;)" href="#pythonnative.handles.ViewHandle.command">command</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Run a native view command by name and return its result.</p>
+                  <p>Queue a native view command by name; returns a future for its result.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;measure_in_window&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-async&quot;&gt;&lt;code&gt;async&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.handles.ViewHandle.measure_in_window&lt;/code&gt;)" href="#pythonnative.handles.ViewHandle.measure_in_window">measure_in_window</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The view's frame relative to its screen, read from the renderer core.</p>
                 </div>
               </td>
             </tr>
@@ -4761,15 +4768,47 @@ before the first layout. Written by the layout pass.</p>
 
 
 <a href="#pythonnative.handles.ViewHandle.command" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">command</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">command</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="o">**</span><span class="n">args</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;asyncio.Future&lt;/code&gt;" href="https://docs.python.org/3/library/asyncio-future.html#asyncio.Future">Future</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Run a native view command by name and return its result.</p>
+        <p>Queue a native view command by name; returns a future for its result.</p>
 <p>The typed methods on the subclasses are thin wrappers over this;
 it stays public for commands a custom native component declares
-in its own contract.</p>
+in its own contract. Await the future for a command that answers.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pythonnative.handles.ViewHandle.measure_in_window" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">measure_in_window</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-async"><code>async</code></small>
+  </span>
+
+<a href="#pythonnative.handles.ViewHandle.measure_in_window" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">measure_in_window</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LayoutEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.components.events.LayoutEvent&lt;/code&gt;)" href="../components/#pythonnative.components.events.LayoutEvent">LayoutEvent</a></span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The view's frame relative to its screen, read from the renderer core.</p>
+<p>Unlike <code>frame</code>, which is relative to the parent and updated after
+each layout, this answers for the latest layout immediately, and
+works for views the core flattened out of the mounted tree.</p>
 
 
     </div>

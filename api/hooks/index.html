@@ -2117,8 +2117,6 @@
       
         
       
-        
-      
     
     
     
@@ -3517,34 +3515,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -6314,6 +6284,9 @@ becomes the next cleanup. Effects that are <code>async def</code> (or
 that return an awaitable) run as tasks on the framework loop;
 their cleanup cancels the task, and a callable returned by the
 coroutine runs as an additional cleanup once it completed.</p>
+<p>An effect that raises leaves no cleanup behind (its previous one
+already ran), and the component's remaining effects still run;
+the first error then propagates to the nearest error boundary.</p>
 
 
     </div>

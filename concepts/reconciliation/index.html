@@ -2308,8 +2308,6 @@
       
         
       
-        
-      
     
     
     
@@ -2904,34 +2902,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3993,11 +3963,10 @@ Native scrolling and supported animation drivers run independently; see
 callbacks, refs, and effects. A render that fails restores the committed tree
 without publishing those changes. At the end of the pass, staged mutations are
 applied through a single <code>apply_mutations</code> call on the view backend (see
-<a href="../../api/native_views/">Native views</a>). The renderer validates the
-versioned transaction before applying it
-and acknowledges the committed revision. Layout then runs beside the native
-widgets and returns changed frames. Headless backends instead use the host
-Yoga binding and receive <code>SetFrameOp</code> mutations.</p>
+<a href="../../api/native_views/">Native views</a>). The renderer core validates the
+versioned transaction before applying it, lays it out with Yoga, and
+acknowledges the committed revision with the changed frames of observed
+views. Headless tests commit to the same core.</p>
 <p><code>flush_dirty</code> combines work from several dirty components into a batch, and
 state setters schedule that flush rather than rendering inline, so every
 setter call in one callback lands in one pass. Layout and passive effects

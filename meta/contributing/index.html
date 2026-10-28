@@ -2115,8 +2115,6 @@
       
         
       
-        
-      
     
     
     
@@ -2711,34 +2709,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -4124,17 +4094,17 @@ way:</p>
 <li><code>theme.py</code>, <code>style.py</code>, <code>store.py</code>: the app <code>Theme</code>, <code>StyleSheet</code> namespaces and style resolution, and <code>Store</code></li>
 <li><code>lint.py</code>: the <code>pn lint</code> rules-of-hooks checker</li>
 <li><code>testing/</code>: the headless testing library and the shipped pytest plugin (<code>testing/pytest_plugin.py</code>)</li>
-<li><code>bridge/</code>: JSON codec and per-platform transports into the native rendering core</li>
+<li><code>bridge/</code>: the <code>ctypes</code> binding to the renderer core, the fake platform headless tests run it through, and per-platform transports</li>
 <li><code>cli/</code>: <code>pn</code> command</li>
 <li><code>project/</code>: config loading, template configuration, native plugin staging, and the builder behind <code>pn</code></li>
 <li><code>native/</code>: native libraries and their tests, bundled with the Python package<ul>
-<li><code>ios/</code>: <code>PythonNativeKit</code> Swift package and its XCTest target</li>
-<li><code>android/</code>: Android rendering library and its JUnit target</li>
-<li><code>yoga/</code>: vendored Yoga source, native build definitions, and the host Python binding</li>
+<li><code>core/</code>: the C++20 renderer core (C ABI in <code>include/pn_core.h</code>), its vendored Yoga source, and the <code>pythonnative._core</code> host extension</li>
+<li><code>ios/</code>: <code>PythonNativeKit</code>, the Swift mounting layer, and its XCTest target</li>
+<li><code>android/</code>: the Kotlin mounting layer and its JUnit target</li>
 </ul>
 </li>
 <li><code>sdk/</code>: native contract definitions, code generation, and generator templates</li>
-<li><code>devserver/static/</code>: browser preview assets, including the vendored Yoga JavaScript/WebAssembly distribution</li>
+<li><code>devserver/static/</code>: browser preview assets, including the renderer core's WebAssembly build (<code>core/</code>)</li>
 <li><code>templates/</code>: Android/iOS app shells; the builder stages native libraries into generated app projects</li>
 <li><code>tests/</code>: unit tests for the library, plus the Maestro E2E suite</li>
 <li><code>e2e/</code>: the comprehensive E2E suite (see <a href="#e2e-tests-maestro">E2E tests</a> below and <code>tests/e2e/AGENTS.md</code>)</li>
@@ -4148,8 +4118,8 @@ way:</p>
 <ul>
 <li>Style: Black; lint: Ruff; typing where useful. Keep APIs stable.</li>
 <li>Prefer explicit, descriptive names; keep platform abstractions clean.</li>
-<li>Python never imports platform code. Everything that touches <code>UIView</code> or <code>android.view.View</code> lives in Swift (<code>PythonNativeKit</code>) or Kotlin (the <code>pythonnative</code> Gradle module) and is reached through <code>pythonnative.bridge</code>; see <code>docs/concepts/bridge.md</code> for the protocol. When the wire format changes, bump <code>PROTOCOL_VERSION</code> in <code>pythonnative/bridge/commits.py</code> and run <code>scripts/generate-native-contracts.py</code>: Swift, Kotlin, and the browser preview read the version from the generated contracts.</li>
-<li>Add/extend tests under <code>tests/</code> for new behavior. Native changes get XCTest / JUnit coverage next to the code they touch.</li>
+<li>Python never imports platform code. Everything that touches <code>UIView</code> or <code>android.view.View</code> lives in Swift (<code>PythonNativeKit</code>) or Kotlin (the <code>pythonnative</code> Gradle module) and is reached through <code>pythonnative.bridge</code>; see <code>docs/concepts/bridge.md</code> for the protocol. When the wire format changes, bump <code>PN_CORE_PROTOCOL_VERSION</code> in <code>native/core/include/pn_core.h</code> and its mirrors, <code>PROTOCOL_VERSION</code> in <code>pythonnative/bridge/core.py</code> and <code>devserver/static/core/mount.js</code>, then rebuild the WebAssembly core and run <code>scripts/generate-native-contracts.py</code>. The handshake rejects a Python runtime whose version doesn't match the core's.</li>
+<li>Add/extend tests under <code>tests/</code> for new behavior. Renderer core changes get coverage in <code>tests/test_core.py</code>; native changes get XCTest / JUnit coverage next to the code they touch.</li>
 <li>Design large changes in an RFC first. Anything that adds or removes public API, changes the Python-to-native wire contract, changes a convention apps depend on, or spans Python, Swift, Kotlin, and the browser preview gets a document under <code>rfcs/</code> (see <a href="https://github.com/pythonnative/pythonnative/blob/main/rfcs/README.md"><code>rfcs/README.md</code></a>). The RFC lands with the implementation and records what shipped, including removals.</li>
 <li>Commit source, reviewed generated contracts, dependency locks, and vendored dependencies as described in <a href="#generated-source-and-vendored-dependencies">Generated source and vendored dependencies</a>. Don't commit local build outputs or caches.</li>
 <li>Docstrings: Google style throughout. Ruff is configured with the Google
@@ -4166,7 +4136,7 @@ way:</p>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>uv<span class="w"> </span>run<span class="w"> </span>black<span class="w"> </span>src<span class="w"> </span>examples<span class="w"> </span>tests<span class="w"> </span><span class="c1"># format</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>uv<span class="w"> </span>run<span class="w"> </span>--group<span class="w"> </span>docs<span class="w"> </span>mkdocs<span class="w"> </span>serve<span class="w"> </span><span class="c1"># preview the docs site locally</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># native rendering core (macOS with Xcode for the Swift package; JDK 17 for Gradle)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># native mounting layers (macOS with Xcode for the Swift package; JDK 17 for Gradle)</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/ios<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>xcodebuild<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-project<span class="w"> </span>Tests/NativeTests.xcodeproj<span class="w"> </span>-scheme<span class="w"> </span>NativeTests<span class="w"> </span>-destination<span class="w"> </span><span class="s1">'platform=iOS Simulator,name=iPhone 15 Pro'</span><span class="o">)</span>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="o">(</span><span class="nb">cd</span><span class="w"> </span>src/pythonnative/native/android<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>../../templates/android_template/gradlew<span class="w"> </span>testDebugUnitTest<span class="o">)</span>
 </span></code></pre></div>
@@ -4183,11 +4153,13 @@ of the source tree. Keep these in version control:</p>
   Commit schema updates alongside their Python definitions and native
   implementations.</li>
 <li>Dependency locks, including <code>uv.lock</code> and example apps' <code>pn.lock</code> files.</li>
-<li>Vendored Yoga source and browser distribution files under
-  <code>src/pythonnative/native/yoga/</code> and <code>src/pythonnative/devserver/static/yoga/</code>.
-  The browser distribution includes its JavaScript/WebAssembly runtime, type
-  declarations, and source maps. Preserve upstream licenses and document the
-  version, source, and any local modifications when updating vendored code.</li>
+<li>Vendored Yoga source under <code>src/pythonnative/native/core/yoga/</code>. Preserve
+  upstream licenses and document the version, source, and any local
+  modifications when updating vendored code.</li>
+<li>The renderer core's WebAssembly build for the browser preview,
+  <code>src/pythonnative/devserver/static/core/pn_core.js</code> and <code>pn_core.wasm</code>.
+  Rebuild it with <code>python scripts/build-core-wasm.py</code> (Emscripten 4.0.10)
+  whenever the core changes; CI fails when it drifts from the sources.</li>
 </ul>
 <p>After changing a built-in factory's signature, the contracts, or their
 generators, regenerate the checked-in files from the repository root:</p>
@@ -4243,7 +4215,7 @@ aren't.</p>
 <li><code>components</code>: declarative element-creating functions and their shared props (<code>components/</code>)</li>
 <li><code>element</code>: Element descriptor class (<code>element.py</code>)</li>
 <li><code>events</code>: tag-based event routing between native views and Python callbacks (<code>events.py</code>)</li>
-<li><code>gestures</code>: gesture descriptors and the pure-Python recognition arbiter (<code>gestures.py</code>)</li>
+<li><code>gestures</code>: gesture descriptors and composition (<code>gestures.py</code>)</li>
 <li><code>handles</code>: typed imperative handles published on refs (<code>handles.py</code>)</li>
 <li><code>hooks</code>: hooks and contexts (<code>hooks.py</code>)</li>
 <li><code>hosts</code>: screen hosts, lifecycle forwarding, and render scheduling (<code>hosts/</code>)</li>
@@ -4251,7 +4223,6 @@ aren't.</p>
 <li><code>devclient</code>: on-device dev client that syncs sources and Fast Refreshes (<code>devclient.py</code>)</li>
 <li><code>hot_reload</code>: module reloader and Fast Refresh (<code>hot_reload.py</code>)</li>
 <li><code>journal</code>: render undo journal (<code>journal.py</code>)</li>
-<li><code>layout</code>: Yoga layout integration and the host binding (<code>layout.py</code>, <code>native/yoga/</code>)</li>
 <li><code>lint</code>: the <code>pn lint</code> rules-of-hooks checker (<code>lint.py</code>)</li>
 <li><code>mutations</code>: batched mutation ops between reconciler and native backends (<code>mutations.py</code>)</li>
 <li><code>native_modules</code>: native module registry, Python facades, and Python fallbacks (<code>native_modules/</code>)</li>
@@ -4263,7 +4234,7 @@ aren't.</p>
 <li><code>platform_metrics</code>: platform-reported metrics like safe-area insets and bar heights (<code>platform_metrics.py</code>)</li>
 <li><code>preview</code>: <code>pn start</code> / <code>pn preview</code> session and the browser preview page (<code>preview.py</code>, <code>devserver/static/</code>)</li>
 <li><code>project</code>: <code>pythonnative.toml</code> config, template configurators, plugin staging, and the builder (<code>project/</code>)</li>
-<li><code>reconciler</code>: virtual view tree diffing, boundaries, and the layout pass (<code>reconciler/</code>)</li>
+<li><code>reconciler</code>: virtual view tree diffing, boundaries, and publishing the core's layout frames (<code>reconciler/</code>)</li>
 <li><code>runtime</code>: framework-wide asyncio loop and thread-safe future helpers (<code>runtime.py</code>)</li>
 <li><code>sdk</code>: public extension SDK for custom native components (<code>sdk/</code>)</li>
 <li><code>storage</code>: AsyncStorage key/value persistence and <code>use_persisted_state</code> (<code>storage.py</code>)</li>
@@ -4285,8 +4256,9 @@ aren't.</p>
 <li><code>repo</code>: repository metadata and top‑level files (<code>README.md</code>, <code>CONTRIBUTING.md</code>, <code>.gitignore</code>, licenses)</li>
 <li><code>scripts</code>: developer scripts under <code>scripts/</code> (e.g., <code>check.sh</code>)</li>
 <li><code>templates</code>: Android/iOS project templates under <code>src/pythonnative/templates/</code></li>
-<li><code>kit</code>: the Swift rendering core (<code>native/ios/</code>)</li>
-<li><code>runtime-android</code>: the Kotlin rendering core (<code>native/android/</code>)</li>
+<li><code>core</code>: the C++ renderer core, its C ABI, and its WebAssembly build (<code>native/core/</code>, <code>devserver/static/core/</code>)</li>
+<li><code>kit</code>: the Swift mounting layer (<code>native/ios/</code>)</li>
+<li><code>runtime-android</code>: the Kotlin mounting layer (<code>native/android/</code>)</li>
 <li><code>tests</code>: unit/integration/E2E tests under <code>tests/</code></li>
 <li><code>workflows</code>: CI pipelines under <code>.github/workflows/</code></li>
 </ul>
@@ -4336,7 +4308,7 @@ aren't.</p>
 <li>Imperative mood; no trailing period; ≤ 72 chars; <code>!</code> for breaking changes.</li>
 <li>PR description: include brief sections: What, Why, How (brief), Testing, Risks/Impact, Docs/Follow‑ups.</li>
 <li>Link issues with keywords (e.g., <code>Closes #123</code>).</li>
-<li>Merging: prefer "Squash and merge" with "Pull request title and description".</li>
+<li>Merging: use "Squash and merge." The repository's default squash message is the pull request title alone, so the title becomes the commit subject and the description isn't copied into the commit.</li>
 <li>Keep PRs focused; avoid unrelated changes in the same PR.</li>
 </ul>
 <p>Recommended PR template:</p>
@@ -4379,9 +4351,9 @@ aren't.</p>
 <li><code>python-semantic-release</code> scans Conventional Commits, updates the version files and <code>uv.lock</code>, generates <code>CHANGELOG.md</code>, and pushes the release commit and tag.</li>
 <li>A published GitHub release is created with generated release notes.</li>
 <li>The shared <code>Distributions</code> workflow builds a source archive from that exact commit, then uses <a href="https://cibuildwheel.pypa.io/">cibuildwheel</a> to build all wheels from the archive.</li>
-<li>Each wheel is repaired where needed, installed in an isolated environment, and tested with the Yoga layout suite and CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.</li>
+<li>Each wheel is repaired where needed, installed in an isolated environment, and tested with the renderer core suite (<code>tests/test_core.py</code>) and the CLI. The complete artifact set must also pass platform, version, resource, and metadata checks.</li>
 <li>Validated distributions are attached to the GitHub release before PyPI uploads begin. PyPI uses Trusted Publishing; no API token is needed.</li>
-<li>The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled Yoga source in their native builds.</li>
+<li>The same distribution builds and checks run on PRs. The wheel matrix covers CPython 3.13 and 3.14 on Linux x86-64 and ARM64 (glibc 2.28 or newer), macOS Intel and Apple Silicon (macOS 11 or newer), and Windows x64. These are development-host wheels; mobile apps compile the bundled renderer core source in their native builds.</li>
 <li>Build policy lives in <code>scripts/cibuildwheel.toml</code>, separately from the tagged package source, so fixed tooling can rebuild an existing release without changing its code or version.</li>
 <li>Commit types that trigger a release: <code>feat</code> (minor), <code>fix</code> and <code>perf</code> (patch), and <code>BREAKING CHANGE</code> (major, or minor before 1.0). Other types, including <code>build</code> and <code>ci</code>, don't trigger a release on their own. Use a <code>build</code> or <code>ci</code> title for a publishing-only repair that should recover the existing version.</li>
 <li>Tag format: <code>v</code>-prefixed (for example, <code>v0.40.0</code>). Manual version bumps aren't needed.</li>

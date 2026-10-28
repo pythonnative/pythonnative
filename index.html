@@ -2226,8 +2226,6 @@
       
         
       
-        
-      
     
     
     
@@ -2822,34 +2820,6 @@
     
   
     Reconciler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="api/layout/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Layout
   
 
     
@@ -3789,8 +3759,8 @@ with one transaction per commit. Application components run in Python.</p>
 </span></code></pre></div>
 <p>That same <code>Counter</code> mounts as a <code>UILabel</code> plus a <code>UIButton</code> inside a
 <code>UIView</code> on iOS, and as a <code>TextView</code> plus a <code>Button</code> inside a
-<code>FrameLayout</code> on Android. The shared Yoga layout engine interprets
-<code>flex</code>, <code>padding</code>, and <code>position</code> beside the native widgets.
+<code>FrameLayout</code> on Android. A shared C++ renderer core interprets
+<code>flex</code>, <code>padding</code>, and <code>position</code> with Yoga, off the UI thread.
 Platform controls and fonts supply their own intrinsic sizes.</p>
 <h2 id="why-pythonnative">Why PythonNative?<a class="headerlink" href="#why-pythonnative" title="Permanent link">&para;</a></h2>
 <ul>
