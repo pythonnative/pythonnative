@@ -4110,7 +4110,24 @@ the documented behavior never drifts from the code.</p>
   for scripting; the summary line goes to stderr instead. Exits 1 when
   there are findings and 2 when a path doesn't exist. See the
   <a href="../../guides/linting/">Linting guide</a>.</li>
-<li><code>pn --version</code> (<code>-V</code>): print the installed PythonNative version.</li>
+<li>
+<p><code>pn codegen</code>: generate native contract files and print each generated
+  file's path. Flags: <code>--output</code> to choose the output directory (default
+  <code>generated</code>), and <code>--module</code> to import a module that declares extension
+  schemas before generation. Repeat <code>--module</code> for each module; each must be
+  importable by the Python interpreter running <code>pn</code>. For example, to write
+  the contracts to an explicit temporary directory:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pn<span class="w"> </span>codegen<span class="w"> </span>--output<span class="w"> </span>/tmp/pythonnative-contracts
+</span></code></pre></div>
+<p>This command generates contract files only. Native compilation and app
+rebuilding happen as part of the build workflow. See
+<a href="../../guides/native-contracts/">Native contracts</a> for the extension
+workflow and <a href="https://github.com/pythonnative/pythonnative/blob/main/CONTRIBUTING.md#generated-source-and-vendored-dependencies">Generated source and vendored dependencies</a>
+for repository contributor guidance.</p>
+</li>
+<li>
+<p><code>pn --version</code> (<code>-V</code>): print the installed PythonNative version.</p>
+</li>
 </ul>
 
 
