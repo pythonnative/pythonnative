@@ -858,11 +858,11 @@ Measured against "Done means" above:
   modules. The generated validators are gone.
 - **Cold launch:** not measured. The simulator and emulator shared the
   host with parallel builds, so device timings weren't reliable.
-- **End to end:** all 113 iOS Maestro flows pass on the simulator. The
-  Android build launches and renders the suite through the core, and its
-  81 unit tests pass, but its Maestro flows still need a run on a quieter
-  machine or in CI. The browser preview passes its headless Chrome suite
-  and a manual pass over the e2e app.
+- **End to end:** met. The Maestro suite passes on the iOS simulator and
+  the Android emulator in CI's sharded e2e jobs, and locally all 113 iOS
+  flows pass on the simulator. Android's 81 unit tests pass. The browser
+  preview passes its headless Chrome suite and a manual pass over the e2e
+  app.
 - **Flattening:** across the e2e suite's 118 screens, the core mounts
   7,576 views where the logical tree has 10,201, 26% fewer
   (`rfcs/benchmarks/0007-shared-renderer-core.json`).
