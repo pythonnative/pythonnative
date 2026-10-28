@@ -32,6 +32,16 @@ Path placeholders arrive percent-decoded, once, before conversion, so
 a path is a literal plus, unlike in the query string, where it means a
 space. Bytes that don't decode as UTF-8 are left as they arrived.
 Literal segments are matched exactly as written.
+
+A placeholder stands for one non-empty segment when a URL is built:
+a route whose placeholder value is empty or absent yields ``None``
+rather than a URL with an empty segment. Reading is narrower. An
+*interior* empty segment never reaches a screen, so ``org//repo/pn``
+matches nothing instead of shifting its values onto a shorter route. A
+*leading or trailing* empty segment can't be told apart from the
+leading or trailing slash that URLs may always carry, so it is
+discarded with that slash: ``u/`` is read as ``u``, and may still match
+some other route. An empty query value is unaffected.
 """
 
 from __future__ import annotations
@@ -201,6 +211,13 @@ class _Pattern:
         raw: Dict[str, str] = {}
         for pattern, actual in zip(self.segments, parts):
             if isinstance(pattern, _Param):
+                # A placeholder never captures nothing. The split below keeps
+                # interior empty segments, so ``org//repo/pn`` arrives with an
+                # empty capture rather than one segment short, and rejecting it
+                # here stops it reaching a screen with shifted values. Tested
+                # before the decode, because only ``""`` decodes to ``""``.
+                if not actual:
+                    return None
                 # Only captured values are decoded, and only here. Decoding
                 # in the conversion loop below would decode query values a
                 # second time, since ``parse_qsl`` has already decoded them.
@@ -246,6 +263,14 @@ class LinkTable:
     and undecodable bytes are left as-is. Literal segments match exactly
     as the paths declare them, and query values are decoded by
     ``parse_qsl`` alone.
+
+    A path placeholder never captures an empty value. ``url_from_state``
+    returns ``None`` rather than emitting an empty segment, and an
+    interior empty segment in a URL matches nothing. A leading or
+    trailing slash stays optional, so a boundary empty is discarded
+    along with it and the shortened path may still match another route:
+    ``u/`` is read as ``u``. Query values are unconstrained, so an empty
+    one round-trips as ``key=``.
 
     Args:
         navigator: The root navigator.
@@ -301,7 +326,11 @@ class LinkTable:
         if rest is None:
             return None
         split = urlsplit(rest if rest.startswith("/") else "/" + rest)
-        parts = tuple(part for part in split.path.split("/") if part)
+        # Strip the slashes that bound the path, then keep every segment
+        # between them: an interior empty survives for ``match`` to reject,
+        # while a leading or trailing slash stays optional as before.
+        body = split.path.strip("/")
+        parts = tuple(body.split("/")) if body else ()
         query = dict(parse_qsl(split.query, keep_blank_values=True))
         for pattern in self._patterns:
             params = pattern.match(parts, query)
@@ -314,7 +343,18 @@ class LinkTable:
     # ------------------------------------------------------------------
 
     def url_from_state(self, state: NavigationState) -> Optional[str]:
-        """Build a URL for the focused leaf of ``state`` (``None`` if no screen on the way has a path)."""
+        """Build a URL for the focused leaf of ``state``.
+
+        Returns:
+            The URL, or ``None`` when it can't be built: no screen on the
+            way has a path, the route chain isn't in the table, or a path
+            placeholder's value is empty or absent. A placeholder has to
+            become a non-empty segment, since an empty one either shifts
+            the remaining values onto another route or is discarded with a
+            boundary slash. Emptiness is judged on the serialized text, so
+            ``0`` and ``False`` are fine while a value that stringifies to
+            ``""`` is not. An empty *query* value round-trips as ``key=``.
+        """
         chain: List[Route] = []
         cursor: Optional[NavigationState] = state
         while cursor is not None:
@@ -328,7 +368,15 @@ class LinkTable:
         segments: List[str] = []
         for segment in pattern.segments:
             if isinstance(segment, _Param):
-                segments.append(quote(_stringify(params.pop(segment.name, "")), safe=""))
+                # An empty value would collapse into an empty segment, which
+                # reads back as a different route or as nothing at all, so
+                # decline the URL the way an unknown route already does. A
+                # missing key stringifies to the same empty text, and both
+                # answers are ``None``, so they need not be told apart.
+                text = quote(_stringify(params.pop(segment.name, "")), safe="")
+                if not text:
+                    return None
+                segments.append(text)
             else:
                 segments.append(segment)
         path = "/".join(segments)
