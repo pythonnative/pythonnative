@@ -34,7 +34,7 @@ import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
-import androidx.camera.video.Recording
+import androidx.camera.video.VideoRecording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
@@ -57,7 +57,7 @@ import com.pythonnative.generated.PNCameraViewFacing
 import com.pythonnative.generated.PNCameraViewFlash
 import com.pythonnative.generated.PNComponentEvents
 import com.pythonnative.generated.PNPhoto
-import com.pythonnative.generated.PNRecording
+import com.pythonnative.generated.PNVideoRecording
 import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.bridge.MainThread
 import com.pythonnative.runtime.bridge.PNLog
@@ -266,7 +266,7 @@ object CameraModule : CameraImplementation, PNLifecycleHook {
     override fun start_recording(audio: Boolean, tag: Long, completion: (Result<Unit>) -> Unit): (() -> Unit)? =
         withView(tag, completion) { startRecording(audio, completion) }
 
-    override fun stop_recording(tag: Long, completion: (Result<PNRecording>) -> Unit): (() -> Unit)? =
+    override fun stop_recording(tag: Long, completion: (Result<PNVideoRecording>) -> Unit): (() -> Unit)? =
         withView(tag, completion) { stopRecording(completion) }
 }
 
@@ -326,9 +326,9 @@ private class PNCameraView(context: Context) : FrameLayout(context) {
     private var analysis: ImageAnalysis? = null
     private var scanner: BarcodeScanner? = null
     private var videoCapture: VideoCapture<Recorder>? = null
-    private var recording: Recording? = null
+    private var recording: VideoRecording? = null
     private var recordingFile: File? = null
-    private var onStopped: ((Result<PNRecording>) -> Unit)? = null
+    private var onStopped: ((Result<PNVideoRecording>) -> Unit)? = null
     private var facing = PNCameraViewFacing.`back`
     private var flash = PNCameraViewFlash.`off`
     private var zoom = 1.0
@@ -612,7 +612,7 @@ private class PNCameraView(context: Context) : FrameLayout(context) {
                     started = null
                 }
                 is VideoRecordEvent.Finalize -> {
-                    started?.invoke(Result.failure(PNModuleError(event.cause?.message ?: "Recording didn't start", "capture_failed")))
+                    started?.invoke(Result.failure(PNModuleError(event.cause?.message ?: "VideoRecording didn't start", "capture_failed")))
                     started = null
                     recordingFinished(event)
                 }
@@ -628,7 +628,7 @@ private class PNCameraView(context: Context) : FrameLayout(context) {
         onStopped = null
         val saved = file != null && file.length() > 0L && (!event.hasError() || event.error == VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE)
         if (saved) {
-            done?.invoke(Result.success(PNRecording(duration = event.recordingStats.recordedDurationNanos / 1e9, path = file!!.absolutePath)))
+            done?.invoke(Result.success(PNVideoRecording(duration = event.recordingStats.recordedDurationNanos / 1e9, path = file!!.absolutePath)))
         } else {
             file?.delete()
             done?.invoke(Result.failure(PNModuleError(event.cause?.message ?: "No video was saved (error ${event.error})", "capture_failed")))
@@ -637,7 +637,7 @@ private class PNCameraView(context: Context) : FrameLayout(context) {
         if (!shutDown && isAttachedToWindow) rebind()
     }
 
-    fun stopRecording(completion: (Result<PNRecording>) -> Unit) {
+    fun stopRecording(completion: (Result<PNVideoRecording>) -> Unit) {
         val active = recording
         if (active == null) {
             completion(Result.failure(PNModuleError("This CameraView isn't recording", "not_recording")))

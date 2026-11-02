@@ -1,13 +1,19 @@
-"""Native API modules for device capabilities.
+"""Native API modules built into every app.
 
-Cross-platform Python interfaces to common device APIs. Every module
-here is a thin facade over a *native module*: a Swift class in
+Cross-platform Python interfaces to the device APIs every app gets. Every
+module here is a thin facade over a *native module*: a Swift class in
 ``PythonNativeKit`` and a Kotlin class in the ``pythonnative`` Gradle
-module registered under the same name (``"Camera"``, ``"Haptics"``,
+module registered under the same name (``"Clipboard"``, ``"Haptics"``,
 ...). Facades reach them through
 [`native_module`][pythonnative.native_modules.registry.native_module]
 and the bridge described in ``docs/concepts/bridge.md``; there is no
 Python-side Objective-C or JNI anywhere in this package.
+
+The camera, location, notifications, biometrics, and the other device
+features that touch privacy-sensitive APIs aren't here. They're opt-in
+capabilities, subpackages such as ``pythonnative.camera``, compiled into an
+app only when ``[plugins].use`` lists them. Their facades use this same
+registry; see ``docs/guides/capabilities/index.md``.
 
 Off device the same names resolve to plain Python implementations in
 [`pythonnative.native_modules.fallback`][pythonnative.native_modules.fallback]
@@ -17,26 +23,24 @@ preview (``pn start``) implements the modules a browser can honor
 (``Alert``, ``Clipboard``, ``Device``, ``Linking``, ``Share``, ...) in
 the page and falls back to the Python classes for the rest. Third-party
 packages ship their own native modules the same way; see
-``docs/guides/native-modules.md``.
+``docs/guides/native-modules.md`` and ``docs/guides/native-plugins.md``.
 
 Two rules hold across every facade, so you never have to look one up:
 
 1. **Sync or async is decided by what the OS has to do.** A method is
    a plain function when the answer is already on the device and
-   returns on the calling thread (read the pasteboard, check a
-   permission, read the battery level, Keychain get/set, file I/O).
-   It is a coroutine when the OS has to prompt the user, drive
-   hardware, or hand off to another process (camera and gallery
-   pickers, biometric prompts, permission requests, the share sheet,
-   GPS fixes, notification scheduling, remote push registration).
+   returns on the calling thread (read the pasteboard or the battery
+   level, Keychain get/set, file I/O). It is a coroutine when the OS has to prompt the user, drive
+   hardware, or hand off to another process (permission requests and
+   checks, the share sheet). Capabilities follow the same rule.
 2. **Failures raise; "nothing happened" returns a value.** A native
    error (a rejected promise, a missing module, a bad argument) is a
    [`NativeModuleError`][pythonnative.native_modules.NativeModuleError]
    and propagates to the caller like any other Python exception. Outcomes
-   that are not errors, such as the user cancelling a picker, denying a
-   permission, or dismissing the share sheet, come back as ``None``,
-   ``False``, or a status string, and are documented per method. No
-   facade converts an exception into a default value.
+   that are not errors, such as the user denying a permission or
+   dismissing the share sheet, come back as ``None``, ``False``, or a
+   status string, and are documented per method. No facade converts an
+   exception into a default value.
 
 Hardware / media:
 
@@ -73,7 +77,8 @@ System integration:
 - [`Linking`][pythonnative.native_modules.Linking]: open URLs and deep
   links.
 - [`Permissions`][pythonnative.native_modules.Permissions]: runtime
-  permission checks/requests.
+  permission checks/requests, for the names a plugin in the build
+  provides.
 - [`SecureStore`][pythonnative.native_modules.SecureStore]: encrypted
   secret storage.
 

@@ -120,6 +120,9 @@ display_name = "My App"
 version = "1.0.0"
 build = 1
 
+[plugins]
+use = ["camera", "notifications"]
+
 [permissions]
 camera = "Scan receipts with your camera."
 notifications = true
@@ -132,6 +135,12 @@ The build system reads this file for every command, so `pn run`,
 `pn build`, `pn doctor`, and `pn app-id` all stay in sync. See the full
 [Configuration reference](guides/configuration.md) and the
 [Permissions guide](guides/permissions.md).
+
+`[plugins].use` lists the device features to compile into your app. The
+camera, maps, notifications, and the rest are
+[capabilities](guides/capabilities/index.md): opt-in packages you import
+by name, such as `from pythonnative.camera import CameraView`. A capability
+that needs a permission fails the build until `[permissions]` declares it.
 
 ## Start the dev server
 
@@ -198,7 +207,8 @@ Press ++question++ for the other commands, and see the
 
 ## Build your own development app
 
-Go doesn't contain native code your project adds: native plugins, or
+Go carries every [capability](guides/capabilities/index.md) except `push`,
+but it doesn't contain native code your project adds: native plugins, or
 packages with compiled extensions such as `numpy`. Such a project runs in
 its own debug build, which `pn start` builds for you when you press ++i++
 or ++a++. To build it directly, with the dev server still running:
@@ -280,18 +290,22 @@ something will block a build, so it's safe to run in CI.
 
 ## Build for release
 
-When you're ready to ship, `pn build` produces signed, distributable
-artifacts:
+When you're ready to ship, try the release configuration on a simulator
+or emulator, then build signed, distributable artifacts and upload them:
 
 ```bash
-pn build android     # release APK + AAB
-pn build ios         # signed .ipa via xcodebuild archive/export
+pn run ios --release    # the release configuration, with no dev server
+pn build android        # release APK + AAB
+pn build ios            # signed .ipa via xcodebuild archive/export
+pn submit ios           # upload to App Store Connect
+pn submit android       # upload to Google Play's internal track
 ```
 
-Release builds need signing configured in `pythonnative.toml` (a
-keystore for Android, a development team for iOS). See
+Release builds need an icon and signing configured in `pythonnative.toml`
+(a keystore for Android, a development team for iOS), and they stop rather
+than produce something a store would reject. See
 [Building for release](guides/building-for-release.md) for the full
-walkthrough.
+walkthrough, including what hasn't been proven yet.
 
 ## Clean
 

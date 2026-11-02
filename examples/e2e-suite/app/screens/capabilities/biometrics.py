@@ -16,6 +16,7 @@ def BiometricsDemo() -> pn.Node:
     available = Biometrics.is_available()
     return DemoScreen(
         "Biometrics",
+        "Whether a biometric prompt can be attempted.",
         DemoSection(
             "Availability",
             ResultText("Biometrics answered", "yes" if available in (True, False) else "no"),

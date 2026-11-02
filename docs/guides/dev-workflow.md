@@ -224,7 +224,7 @@ Fast Refresh, DevTools, and the debugger work the same over Wi-Fi.
 A debug build has to go through Gradle or Xcode only when a **native
 input** changes:
 
-- `pythonnative.toml` (permissions, app id, requirements, versions)
+- `pythonnative.toml` (`[plugins].use`, permissions, app id, requirements, versions)
 - the bundled native template that ships with your `pythonnative`
   version
 - the `pythonnative` package itself (after `pip install -U`)
@@ -240,7 +240,9 @@ launched. Edits under `app/` never trigger a rebuild; they're synced.
 
 Force the toolchain with `--rebuild`. Stage without building with
 `--prepare-only` (useful for opening the project in Xcode or Android
-Studio).
+Studio). `--release` runs the release configuration on a simulator or
+emulator, with no dev server and no Fast Refresh, which is how to check what
+a [release build](building-for-release.md) does.
 
 If no dev server is running when you `pn run`, the CLI says so and
 builds an app that runs its bundled sources without Fast Refresh.
@@ -260,11 +262,12 @@ The browser preview runs your real Python in the `pn start` process and
 shares Python reconciliation, hooks, and logical navigation with device
 builds. It runs the renderer core as WebAssembly with DOM widgets, and
 implements a subset of native modules (`Alert`, `Clipboard`, `Linking`,
-`Share`, `Haptics`, `NetInfo`, `AppState`, `Device`); everything else
-uses the pure-Python fallbacks in
-[`pythonnative.native_modules.fallback`](../api/native_modules.md),
-so a `Camera` call returns an "unavailable" result rather than a
-photo.
+`Share`, `Haptics`, `NetInfo`, `AppState`, `Device`) and of
+[capabilities](capabilities/index.md) (see
+[Plugins in the preview](browser-preview.md#plugins-in-the-preview));
+everything else uses pure-Python fallbacks, so
+`Notifications.schedule` answers `False` rather than showing a
+notification.
 
 ## Logs and errors
 

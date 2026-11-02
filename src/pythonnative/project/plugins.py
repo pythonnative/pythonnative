@@ -1,8 +1,7 @@
 """Native plugin staging for ``pn build``.
 
-A PyPI package can ship Swift and Kotlin next to its Python facade. It
-declares an entry point in the ``pythonnative.plugins`` group whose
-value is an importable package directory containing:
+A package can ship Swift and Kotlin next to its Python facade, in a
+directory containing:
 
 ```text
 my_blur/native/
@@ -11,8 +10,8 @@ my_blur/native/
     android/com/example/myblur/BlurViewManager.kt
 ```
 
-``pn_plugin.json`` names the plugin and its registration entry on each
-platform:
+``pn_plugin.json`` names the plugin (``name`` is required) and its
+registration entry on each platform:
 
 ```json
 {
@@ -28,18 +27,26 @@ manifest, ``AndroidManifest.xml``, and Gradle plugins, plus C, C++, and
 xcframework sources. [`plugin_config`][pythonnative.project.plugin_config]
 applies those; RFC 0008 describes the format.
 
+A mobile build gathers plugins from three places:
+
+- ``[plugins].use`` names first-party capabilities, which live in
+  ``pythonnative/<name>/native``. Only those it names are bundled.
+- [`discover_target_plugins`][pythonnative.project.plugins.discover_target_plugins]
+  scans the wheels resolved for each device target for ``pn_plugin.json``.
+  Wheels are inspected as data and never imported.
+- ``[plugins].paths`` lists project directories with the same layout.
+
+The ``pythonnative.plugins`` entry point group doesn't drive mobile builds.
+``pn start`` reads it to tell that a project's requirements carry native code,
+and [`discover_plugins`][pythonnative.project.plugins.discover_plugins]
+inspects it only when asked to.
+
 At build time this module copies each plugin's sources into the staged
 native project (``PythonNativeKit/Sources/PythonNativeKit/Plugins/<name>``
-on iOS, ``pythonnative/src/main/java`` on Android) and regenerates the
-registration file that calls every entry's ``register``. SwiftPM and
-Gradle compile whatever lands under those roots, so no project-file
-surgery is needed.
-
-Projects can also bundle plugins that aren't installed as distributions
-by listing directories under ``[plugins].paths`` in ``pythonnative.toml``;
-each path must contain the same ``pn_plugin.json`` layout. First-party
-capabilities live in ``pythonnative/<name>/native`` and are bundled only
-when ``[plugins].use`` names them.
+on iOS, where ``<name>`` is the manifest's ``name``, and
+``pythonnative/src/main/java`` on Android) and regenerates the registration
+file that calls every entry's ``register``. SwiftPM and Gradle compile
+whatever lands under those roots, so no project-file surgery is needed.
 """
 
 from __future__ import annotations
@@ -146,8 +153,8 @@ class NativePlugin:
     """A discovered native plugin.
 
     Attributes:
-        name: Stable identifier (the entry-point name or the directory
-            name for path plugins). Used for the iOS subfolder.
+        name: Stable identifier, from the manifest's ``name``. Used for
+            the iOS subfolder.
         root: Directory containing ``pn_plugin.json``.
         ios_entry: Swift type conforming to ``PNPlugin``, or ``None``
             when the plugin has no iOS side.
@@ -382,7 +389,8 @@ def load_plugin(root: Path, *, name: Optional[str] = None) -> NativePlugin:
 
     Args:
         root: Directory containing the manifest.
-        name: Identifier override (defaults to the directory name).
+        name: Identifier override (defaults to the manifest's ``name``,
+            which is required when this isn't given).
 
     Returns:
         The parsed plugin.
@@ -560,7 +568,8 @@ def discover_plugins(
             ``pythonnative.plugins`` entry points (from
             ``[plugins].paths`` in the project config).
         include_environment: Inspect this interpreter's installed entry points.
-            Mobile builds pass ``False`` and inspect the target wheels instead.
+            Mobile builds pass ``False`` and inspect the target wheels instead,
+            with [`discover_target_plugins`][pythonnative.project.plugins.discover_target_plugins].
         log: Optional progress logger; broken entry points are reported
             here and skipped rather than failing the build.
 

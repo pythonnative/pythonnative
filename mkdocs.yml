@@ -121,6 +121,7 @@ nav:
     - Building for Release: guides/building-for-release.md
   - Examples:
     - Overview: examples.md
+    - Field Notes: examples/fieldnotes.md
     - Hello World: examples/hello-world.md
     - Counter: examples/counter.md
     - Forms: examples/forms.md

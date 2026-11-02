@@ -93,6 +93,7 @@ def generate(destination: str | Path) -> list[Path]:
     for name, component in sorted(COMPONENTS.items()):
         if not name.isidentifier():
             raise ValueError(f"Invalid native component name {name!r}")
+        types.scope = "" if not builtin_components or name in builtin_components else name
         swift.extend(
             [
                 f"public final class {name}Props: PNViewProps, PNNativeProps {{",

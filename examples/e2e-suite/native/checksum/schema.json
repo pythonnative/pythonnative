@@ -1,0 +1,37 @@
+{
+  "components": {},
+  "modules": {
+    "Checksum": {
+      "events": {},
+      "methods": {
+        "adler32": {
+          "arguments": {
+            "text": {
+              "type": "string"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "text"
+          ],
+          "result": {
+            "type": "integer"
+          }
+        },
+        "configured_value": {
+          "arguments": {},
+          "async": false,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "type": "string"
+          }
+        }
+      },
+      "name": "Checksum"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

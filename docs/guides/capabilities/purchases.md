@@ -126,19 +126,22 @@ that on, and `pn run` uses neither:
   `simctl launch` doesn't get it.
 - In an XCTest, create an `SKTestSession` from the file, with `disableDialogs` set to skip the sheets.
 
-The second path is how this plugin was verified on a simulator (see below). Without either, a simulator
-finds no products, and `restore` shows a sign-in sheet that waits until someone answers it.
+Without either, a simulator finds no products, and `restore` shows a sign-in sheet that waits until
+someone answers it.
 
 ## What has been verified
 
-- **iOS simulator, against an `SKTestSession` loaded from a `.storekit` file:** `is_available`,
+- **iOS simulator, against an `SKTestSession` from a `.storekit` file**, created at launch by a throwaway
+  plugin that loaded Xcode's StoreKitTest into the app, with dialogs off: `is_available`,
   `products` for a non-consumable, a consumable, and a subscription, with typed prices. `purchase` of each,
   returning a signed transaction with `verified=True`. `finish`. `restore`, which left out the finished consumable.
-  A `pending` purchase with Ask to Buy, and `on_update`, are covered in the same way.
+  A `pending` result with Ask to Buy on. `on_update` for a purchase the session made itself, including one made
+  before the first subscriber, which waited for it.
 - **Android emulator:** the plugin compiles against Play Billing and reaches Google Play's service, with
   its connection retry. That emulator answers "Billing service unavailable", so `is_available` is `False`
   and the rest raises `unavailable`.
-- **Not verified:** the iOS purchase sheet and a user's cancel, since test sessions skip dialogs. A real App
-  Store sandbox purchase. **Any Play purchase:** the flow can't complete on an emulator or without a
+- **Not verified:** the iOS purchase sheet and a user's cancel, since test sessions skip dialogs. StoreKit replaying
+  an unfinished transaction at the next launch, which a relaunched test session didn't do. A real App Store sandbox
+  purchase. **Any Play purchase:** the flow can't complete on an emulator or without a
   Play-signed build uploaded to a test track, so `products`, `purchase`, `finish`, and `restore` have never
   returned a real answer on Android. Try them on an internal test track before you ship.

@@ -15,7 +15,7 @@
 #     ./scripts/run-e2e.sh android hooks navigation    # two categories, one session
 #
 # Available suites: inbox, full, components, hooks, navigation, layout, styling,
-# animations, gestures, assets, misc. The components and hooks categories also
+# animations, gestures, assets, misc, capabilities. The components and hooks categories also
 # have lettered parts (components-a/b/c, hooks-a/b) that CI's Android shards
 # run separately.
 #

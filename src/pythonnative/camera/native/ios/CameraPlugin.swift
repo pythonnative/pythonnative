@@ -109,7 +109,7 @@ public final class CameraModule: CameraImplementation {
         return nil
     }
 
-    public func stop_recording(tag: Int64, completion: @escaping (Result<PNRecording, Error>) -> Void) -> (() -> Void)? {
+    public func stop_recording(tag: Int64, completion: @escaping (Result<PNVideoRecording, Error>) -> Void) -> (() -> Void)? {
         guard let view = cameraView(tag) else { noView(tag, completion); return nil }
         view.stopRecording(completion: completion)
         return nil
@@ -510,7 +510,7 @@ final class PNCameraView: UIView, AVCaptureMetadataOutputObjectsDelegate {
         movieOutput.startRecording(to: newCaptureFile(extension: "mov"), recordingDelegate: capture)
     }
 
-    func stopRecording(completion: @escaping (Result<PNRecording, Error>) -> Void) {
+    func stopRecording(completion: @escaping (Result<PNVideoRecording, Error>) -> Void) {
         guard movieOutput.isRecording, let capture = movieCapture else {
             completion(.failure(cameraError("not_recording", "This CameraView isn't recording")))
             return
@@ -585,7 +585,7 @@ private final class PNPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
 private final class PNMovieCapture: NSObject, AVCaptureFileOutputRecordingDelegate {
     private var started: ((Result<Void, Error>) -> Void)?
     private let finished: () -> Void
-    var stopped: ((Result<PNRecording, Error>) -> Void)?
+    var stopped: ((Result<PNVideoRecording, Error>) -> Void)?
 
     init(started: @escaping (Result<Void, Error>) -> Void, finished: @escaping () -> Void) {
         self.started = started
@@ -604,11 +604,11 @@ private final class PNMovieCapture: NSObject, AVCaptureFileOutputRecordingDelega
         let duration = output.recordedDuration.seconds
         DispatchQueue.main.async {
             if let started = self.started {
-                started(.failure(cameraError("capture_failed", error?.localizedDescription ?? "Recording didn't start")))
+                started(.failure(cameraError("capture_failed", error?.localizedDescription ?? "VideoRecording didn't start")))
                 self.started = nil
             }
             if succeeded {
-                self.stopped?(.success(PNRecording(duration: duration.isFinite ? duration : 0, path: outputFileURL.path)))
+                self.stopped?(.success(PNVideoRecording(duration: duration.isFinite ? duration : 0, path: outputFileURL.path)))
             } else {
                 self.stopped?(.failure(cameraError("capture_failed", error?.localizedDescription ?? "No video was saved")))
             }

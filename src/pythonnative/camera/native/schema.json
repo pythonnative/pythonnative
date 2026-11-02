@@ -6695,7 +6695,7 @@
               }
             },
             "python_kind": "dataclass",
-            "python_type": "pythonnative.camera:Recording",
+            "python_type": "pythonnative.camera:VideoRecording",
             "required": [
               "duration",
               "path"

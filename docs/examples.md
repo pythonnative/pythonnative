@@ -8,6 +8,7 @@ project scaffolded with `pn init`.
 
 | Page | What it covers |
 |---|---|
+| [Field Notes](examples/fieldnotes.md) | A complete field journal: photos, voice notes, maps, live collaboration, reminders, background sync, video, and a purchase. Start here to see the pieces work together. |
 | [Hello world](examples/hello-world.md) | The smallest possible app and how it boots. |
 | [Counter](examples/counter.md) | `use_state`, event handlers, and basic styling. |
 | [Forms](examples/forms.md) | `TextInput`, controlled inputs, validation, submit. |
@@ -19,9 +20,12 @@ project scaffolded with `pn init`.
 
 The repository also includes runnable projects with their own setup instructions:
 
+- [Field Notes](examples/fieldnotes.md): the reference app, which uses
+  capabilities, networking, deep links, and the release path together.
 - [Inbox](https://github.com/pythonnative/pythonnative/tree/main/examples/inbox):
-  an offline app with variable-height lists, shared state, search, editing,
-  persistence, native navigation, and a generated native extension.
+  the extension SDK's acceptance test, an offline app with variable-height
+  lists, shared state, search, editing, persistence, native navigation, and a
+  generated native extension.
 - [Feature catalog](https://github.com/pythonnative/pythonnative/tree/main/examples/e2e-suite):
   component and API demonstrations used by the mobile E2E suite.
 
@@ -151,6 +155,7 @@ flexbox features.
 
 ## Next steps
 
+- See a complete app: [Field Notes](examples/fieldnotes.md).
 - Walk through the smallest possible app: [Hello world](examples/hello-world.md).
 - Learn the bigger picture: [Mental model](concepts/mental-model.md).
 - See the live API: [Package overview](api/pythonnative.md).

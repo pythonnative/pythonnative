@@ -14,4 +14,7 @@ appId: ${APP_ID}
     visible: "Permission known: yes"
     timeout: 5000
 - assertVisible: "Facade imported: yes"
-- runFlow: ../../helpers/close_demo.yaml
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

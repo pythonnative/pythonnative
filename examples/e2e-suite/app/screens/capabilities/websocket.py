@@ -89,7 +89,8 @@ def WebSocketDemo() -> pn.Node:
 
     pn.use_effect(run, [])
     return DemoScreen(
-        "WebSocket and uploads",
+        "WebSocket",
+        "A real socket and a multipart upload against servers on localhost.",
         DemoSection(
             "Local socket",
             ResultText("Echoed", echoed),

@@ -23,10 +23,10 @@ The entry points you'll use directly:
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | [`pn.run_async(coro)`][pythonnative.run_async]                      | Schedule a coroutine from sync code (a tap handler, a hook setup function). |
 | [`pn.run_blocking(coro)`][pythonnative.runtime.run_blocking]        | Drive a coroutine to completion from a plain script or a test.              |
-| [`pn.runtime.get_loop()`][pythonnative.runtime.get_loop]            | Access the loop directly for interop with other asyncio libraries.          |
-| [`pn.runtime.resolve_future`][pythonnative.runtime.resolve_future]  | Deliver a value to an `asyncio.Future` from any thread.                     |
+| [`runtime.get_loop()`][pythonnative.runtime.get_loop]               | Access the loop directly for interop with other asyncio libraries.          |
+| [`runtime.resolve_future`][pythonnative.runtime.resolve_future]     | Deliver a value to an `asyncio.Future` from any thread.                     |
 
-You'll most often call `pn.run_async` from a sync button handler:
+`runtime` is the `pythonnative.runtime` module, which you import by name. You'll most often call `pn.run_async` from a sync button handler:
 
 ```python
 import pythonnative as pn
@@ -356,7 +356,7 @@ photo_source = await pn.Alert.choose(
     cancel_label="Cancel",
 )
 if photo_source == "Camera":
-    path = await pn.Camera.take_photo()
+    path = await Camera.take_photo()  # from pythonnative.camera import Camera
 ```
 
 For a fire-and-forget single-button notice, use the sync

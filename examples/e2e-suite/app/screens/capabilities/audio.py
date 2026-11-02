@@ -108,8 +108,13 @@ def AudioDemo() -> pn.Node:
                 sound_ref.current = sound
             set_duration("about 1s" if 0.9 < sound.duration < 1.2 else f"{sound.duration:.2f}")
             sound.play()
-            await asyncio.sleep(0.5)
-            set_position("moving" if sound.position > 0 else "stuck")
+            # A simulator's audio output can take a moment to start.
+            for _ in range(50):
+                await asyncio.sleep(0.1)
+                if sound.position > 0:
+                    set_position("moving")
+                    return
+            set_position("stuck")
         except NativeModuleError as error:
             set_failure(error.code or "unknown")
 

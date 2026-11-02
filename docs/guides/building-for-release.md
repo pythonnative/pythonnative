@@ -139,9 +139,10 @@ upgrading your app's NDK can't repair a prebuilt wheel. See Android's
 
 ### Signing
 
-Without signing configured, Gradle emits an **unsigned** release APK
-(`app-release-unsigned.apk`), fine for inspection, not for the store.
-To produce signed artifacts, create a keystore once:
+A release build fails without signing configured. Only `--allow-unsigned`
+produces an **unsigned** release APK (`app-release-unsigned.apk`), which is
+fine for inspection but not for the store. To produce signed artifacts, create
+a keystore once:
 
 ```bash
 keytool -genkeypair -v -keystore release.keystore \
@@ -229,9 +230,11 @@ An app bundle is read-only, so the device can't cache what it compiles.
 Bytecode records bundle-relative file names (`app/main.py`), never paths
 on your build machine. Because bytecode is version-specific, compiling
 needs an interpreter matching `app.python_version`: the one running `pn`,
-or `python3.13` (for example) on your `PATH`. Release builds fail without
-one; debug builds warn and let the device compile at launch. Android uses
-Chaquopy's own compilation and has no such requirement.
+or `python3.13` (for example) on your `PATH`. iOS release builds fail
+without one; debug builds warn and let the device compile at launch.
+Android compiles with Chaquopy, which needs that same matching interpreter
+on the build machine whenever the app has `[requirements]` packages to
+install. `pn doctor` reports whether it found one.
 
 ### Signing
 
@@ -302,9 +305,9 @@ dependency:
 pip install 'pythonnative[build]'
 ```
 
-If Pillow isn't installed the build still succeeds; it just keeps the
-template's default assets. `pn doctor` reports whether Pillow is
-available.
+If Pillow isn't installed, a debug build keeps the template's default
+assets. A release build with an icon fails instead, unless you pass
+`--allow-unsigned`. `pn doctor` reports whether Pillow is available.
 
 ---
 

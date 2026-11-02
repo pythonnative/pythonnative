@@ -5,6 +5,19 @@ Swift and Kotlin props, records, event emitters, and service adapters for
 built-ins and extensions. The separately packaged `examples/inbox-extension`
 contains a complete implementation; `examples/inbox` consumes its wheel.
 
+Contracts live in three places, and each app merges the ones in its build:
+
+| Source | Location | Written by |
+| --- | --- | --- |
+| Built-ins | `src/pythonnative/sdk/_builtin_contracts.json` | `scripts/generate-native-contracts.py` |
+| First-party [capabilities](capabilities/index.md) | `src/pythonnative/<name>/native/schema.json` | `scripts/generate-native-contracts.py` |
+| [Third-party plugins](native-plugins.md) | The file the plugin's `pn_plugin.json` names in `contracts` | The plugin's own script |
+
+`Camera`, `Location`, `Biometrics`, and `Notifications` used to be built-ins.
+They now arrive through their capabilities' contracts, so a build that leaves a
+capability out doesn't contain its contract, and the contract fingerprint
+differs from app to app.
+
 ## Declare Python values
 
 Use ordinary dataclasses, enums, `TypedDict`, `Literal`, optional values, and
@@ -103,11 +116,14 @@ The Inbox extension demonstrates nested records, tuple defaults, a cancellable
 delayed operation, typed module and component events, packaged resources,
 and a real SwiftPM and Maven dependency. Its generation script filters the
 manifest to its own components and services. Build discovery merges those
-contracts with the built-ins without importing target binaries on the host.
+contracts with the built-ins and the capabilities in `[plugins].use`, without
+importing target binaries on the host.
 
 ## Package sources, resources, and dependencies
 
-Include `pn_plugin.json` and its referenced files in the wheel:
+Include `pn_plugin.json` and its referenced files in the wheel. `name` is
+required, and [Native plugins](native-plugins.md) covers the rest of the
+manifest:
 
 ```json
 {
@@ -157,12 +173,13 @@ The protocol separates setting a value from removing a property:
 
 ```python
 import pythonnative as pn
+from pythonnative.sdk import UNSET
 
 # Explicit null is a value when the declared type permits it.
 nullable = pn.Element("Picker", {"value": None})
 
 # Omission or UNSET removes a previously supplied property.
-reset = pn.Element("Text", {"text": "Default size", "font_size": pn.UNSET})
+reset = pn.Element("Text", {"text": "Default size", "font_size": UNSET})
 ```
 
 Generated component facades use `UNSET` for omitted arguments. Built-in
@@ -176,19 +193,18 @@ widget, retaining logical ownership and supported focus/selection state.
 
 `NativeField` also declares layout invalidation, animation, and platform support.
 `Platform.supports("Image", "source")` or
-`Platform.supports("Notifications", "get_device_token")` inspects the compiled
-contract. This checks declared support; a permission grant or attached piece of
-hardware is a separate runtime condition. Android remote push needs a provider
-extension and reports an unsupported operation instead of a successful empty
-token.
+`Platform.supports("Notifications", "set_badge")` inspects the compiled
+contract, which answers `False` for `set_badge` on Android, because the
+`notifications` capability declares it iOS-only. Calling a method on a platform
+its contract excludes raises `NativeModuleError` with the code `unsupported`. A
+plugin's contract is known once its facade is imported, so import
+`pythonnative.notifications` before asking. This checks declared support; a
+permission grant or attached piece of hardware is a separate runtime condition.
 
 `Permissions.check()` is a coroutine, matching asynchronous platform
-settings APIs: use `await pn.Permissions.check("camera")`. Android camera
-editing (`allow_editing=True`) raises an unsupported-operation error; use
-a provider plugin if your application needs an Android image editor.
-`Notifications.get_device_token()` raises
-`NativeModuleError("unsupported")` on Android, where remote push needs a
-provider extension.
+settings APIs: use `await pn.Permissions.check("camera")`. A permission name
+works only when a plugin in the build provides it; see
+[Permission providers](permissions.md#permission-providers).
 
 Only clients that speak the current protocol (7) are supported. Rebuild the
 app after changing declarations, native sources, or native dependencies.
@@ -201,9 +217,10 @@ application changes within that compiled interface.
 
 `scripts/generate-native-contracts.py` also writes the built-in contracts to
 `src/pythonnative/sdk/_builtin_contracts.json`, which `import pythonnative`
-loads instead of evaluating the factories' annotations. Regenerate after
-changing a built-in factory's signature; `tests/test_codegen.py` fails until
-you do.
+loads instead of evaluating the factories' annotations, and each first-party
+capability's `native/schema.json`. Regenerate after changing a built-in
+factory's signature or a capability's declarations; `tests/test_codegen.py`
+fails until you do.
 
 ```sh
 uv run python scripts/generate-native-contracts.py

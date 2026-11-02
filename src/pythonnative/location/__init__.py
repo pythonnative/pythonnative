@@ -27,6 +27,7 @@ Example:
 
 from __future__ import annotations
 
+from contextlib import aclosing
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Dict, Literal, Mapping, Optional, Protocol
 
@@ -153,5 +154,7 @@ class Location:
             accuracy=accuracy,
             distance=distance,
         )
-        async for fix in stream:
-            yield _position(fix, method="watch")
+        # Close the subscription as this iterator closes, not whenever it's collected.
+        async with aclosing(stream):
+            async for fix in stream:
+                yield _position(fix, method="watch")

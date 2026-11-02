@@ -1,0 +1,45 @@
+# The release smoke test for examples/fieldnotes: launch from nothing, write an
+# entry, find it in the journal, and open it. It has to pass on a release build,
+# so it depends on nothing a debug build adds:
+#
+#     cd examples/fieldnotes && pn run <platform> --release --no-logs
+#     maestro test -e APP_ID=dev.pythonnative.fieldnotes tests/e2e/flows/fieldnotes/smoke.yaml
+#
+# Source under test: examples/fieldnotes/app/ui/journal_screen.py, editor_screen.py, entry_screen.py
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "An empty notebook"
+    timeout: 60000
+- assertVisible: "Offline. Your journal stays on this device."
+- tapOn: "New entry"
+- extendedWaitUntil:
+    visible: "Save entry"
+    timeout: 10000
+- tapOn:
+    id: "field-title"
+- inputText: "Heron at the mill"
+- tapOn:
+    id: "field-notes"
+- inputText: "Standing in the shallows"
+- hideKeyboard
+- tapOn: "Save entry"
+# Saving replaces the editor with the entry.
+- extendedWaitUntil:
+    visible: "Attachments"
+    timeout: 10000
+- assertVisible: "Standing in the shallows"
+# Back to the list, where the new entry is first.
+- runFlow: _back.yaml
+- extendedWaitUntil:
+    visible: "Heron at the mill"
+    timeout: 10000
+- tapOn: "Heron at the mill"
+- extendedWaitUntil:
+    visible: "Standing in the shallows"
+    timeout: 10000
+- assertVisible: "Attachments"

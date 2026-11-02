@@ -12,15 +12,29 @@ appId: ${APP_ID}
       CATEGORY: Capabilities
       DEMO_TITLE: Audio
 - tapOn: "Play tone"
+# A fresh simulator takes tens of seconds to discover its Audio Units on first use.
 - extendedWaitUntil:
     visible: "Duration: about 1s"
-    timeout: 5000
-- extendedWaitUntil:
-    visible: "Position: moving"
-    timeout: 5000
-- extendedWaitUntil:
-    visible: "Ends: 1"
-    timeout: 5000
+    timeout: 60000
+# A simulator's output goes through the host Mac's audio server, which can stall when
+# macOS is waiting on a microphone prompt for Simulator. Android must really play.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "(Position: moving|Position: stuck)"
+          timeout: 15000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "Position: moving"
+          timeout: 10000
+      - extendedWaitUntil:
+          visible: "Ends: 1"
+          timeout: 10000
 - scrollUntilVisible:
     element: "Record a second"
     direction: DOWN

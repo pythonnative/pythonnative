@@ -28,6 +28,7 @@ def LocationDemo() -> pn.Node:
 
     return DemoScreen(
         "Location",
+        "Permission status and one position fix.",
         DemoSection(
             "One fix",
             ResultText("Permission known", "yes" if status != "not asked" else "no"),

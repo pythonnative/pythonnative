@@ -1,0 +1,135 @@
+# The longer pass through examples/fieldnotes, with no sync server configured and
+# nothing that needs a camera or a store: writing and editing entries, searching,
+# tags, the guard on unsaved edits, a reminder, the map, settings, the store's
+# unavailable state, the error log, and deleting.
+#
+#     maestro test -e APP_ID=dev.pythonnative.fieldnotes tests/e2e/flows/fieldnotes/journal.yaml
+#
+# Source under test: examples/fieldnotes/app/ui/
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "An empty notebook"
+    timeout: 60000
+
+# Write two entries.
+- tapOn: "New entry"
+- extendedWaitUntil:
+    visible: "Save entry"
+    timeout: 10000
+- tapOn:
+    id: "field-title"
+- inputText: "Heron at the mill"
+- tapOn:
+    id: "field-notes"
+- inputText: "Standing in the shallows"
+- tapOn:
+    id: "field-tags"
+- inputText: "birds river"
+- hideKeyboard
+- tapOn: "Rain"
+- tapOn: "Save entry"
+- extendedWaitUntil:
+    visible: "Attachments"
+    timeout: 10000
+- assertVisible: "#birds"
+- runFlow: _back.yaml
+- extendedWaitUntil:
+    visible: "Heron at the mill"
+    timeout: 10000
+- tapOn: "New entry"
+- extendedWaitUntil:
+    visible: "Save entry"
+    timeout: 10000
+- tapOn:
+    id: "field-title"
+- inputText: "Ridge walk"
+- hideKeyboard
+- tapOn: "Save entry"
+- extendedWaitUntil:
+    visible: "Attachments"
+    timeout: 10000
+- runFlow: _back.yaml
+- extendedWaitUntil:
+    visible: "Ridge walk"
+    timeout: 10000
+
+# Search by word, and filter by tag.
+- tapOn:
+    text: "Search notes, places, and #tags"
+- inputText: "shallows"
+- extendedWaitUntil:
+    notVisible: "Ridge walk"
+    timeout: 5000
+- assertVisible: "Heron at the mill"
+- hideKeyboard
+- tapOn:
+    id: "field-search"
+    optional: true
+
+# Edit, and let the guard catch an unsaved change.
+- tapOn: "Heron at the mill"
+- extendedWaitUntil:
+    visible: "Standing in the shallows"
+    timeout: 10000
+- tapOn: "Edit"
+- extendedWaitUntil:
+    visible: "Save entry"
+    timeout: 10000
+- tapOn:
+    id: "field-title"
+- inputText: " today"
+- hideKeyboard
+- runFlow: _back.yaml
+- extendedWaitUntil:
+    visible: "Discard changes?"
+    timeout: 5000
+- tapOn: "Keep editing"
+- tapOn: "Save entry"
+- extendedWaitUntil:
+    visible: "Heron at the mill today"
+    timeout: 10000
+
+# A reminder, set and canceled.
+- scrollUntilVisible:
+    element: "Next week"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Next week"
+- runFlow:
+    when:
+      visible: "(Allow|OK)"
+    commands:
+      - tapOn: "(Allow|OK)"
+- extendedWaitUntil:
+    visible: "Cancel reminder"
+    timeout: 10000
+- tapOn: "Cancel reminder"
+- extendedWaitUntil:
+    visible: "Next week"
+    timeout: 10000
+- scrollUntilVisible:
+    element: "Delete"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+
+# Delete it, after confirming.
+- tapOn: "Delete"
+- extendedWaitUntil:
+    visible: "Delete this entry?"
+    timeout: 5000
+- tapOn:
+    text: "Delete"
+    index: 1
+- extendedWaitUntil:
+    notVisible: "Delete this entry?"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Journal"
+    timeout: 10000

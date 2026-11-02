@@ -67,7 +67,8 @@ Unsolicited pull requests for issues that are already assigned or already have a
   - `handles.py`: typed imperative handles published on `ref.current`
   - `journal.py`: the undo journal a failed render pass rolls back through
   - `native_views/`: the thin backend accessor (`get_backend` / `set_backend`) and the bridge backend that serializes commits
-  - `native_modules/`: device module facades and their Python fallbacks
+  - `native_modules/`: device module facades every app gets, and their Python fallbacks
+  - `audio/`, `background/`, `biometrics/`, `camera/`, `location/`, `maps/`, `notifications/`, `pickers/`, `purchases/`, `push/`, `sensors/`, `video/`: first-party capabilities (see [Capabilities](#capabilities))
   - `navigation/`: navigator values, screens, container, hooks, deep-link table, and the navigation ref
   - `theme.py`, `style.py`, `store.py`: the app `Theme`, `StyleSheet` namespaces and style resolution, and `Store`
   - `lint.py`: the `pn lint` rules-of-hooks checker
@@ -86,8 +87,9 @@ Unsolicited pull requests for issues that are already assigned or already have a
   - `e2e/`: the comprehensive E2E suite (see [E2E tests](#e2e-tests-maestro) below and `tests/e2e/AGENTS.md`)
 - `examples/`: runnable example apps
   - `e2e-suite/`: comprehensive feature catalog that drives the Maestro E2E suite
-  - `inbox/`: offline reference app with a custom native extension
-- `scripts/`: helper scripts (`check.sh`, `run-e2e.sh`, `check-e2e-coverage.py`)
+  - `fieldnotes/`: the reference app, which uses capabilities, networking, deep links, and the release path together
+  - `inbox/` and `inbox-extension/`: the extension SDK's acceptance test, an offline app with a separately packaged native extension
+- `scripts/`: helper scripts (`check.sh`, `run-e2e.sh`, `check-e2e-coverage.py`, `generate-native-contracts.py`, `check-release-artifacts.py`)
 - `README.md`, `pyproject.toml`: repo docs and packaging
 
 ## Coding guidelines
@@ -119,6 +121,25 @@ uv run --group docs mkdocs serve # preview the docs site locally
 (cd src/pythonnative/native/android && ../../templates/android_template/gradlew testDebugUnitTest)
 ```
 
+## Capabilities
+
+A capability is an opt-in device feature built only with the public plugin format ([RFC 0008](https://github.com/pythonnative/pythonnative/blob/main/rfcs/0008-production-platform.md), [Native plugins](https://pythonnative.com/guides/native-plugins/)). Each one is a subpackage, `src/pythonnative/<name>/`:
+
+- `__init__.py`: the Python facade. It declares the contract with `plugin_module` or `plugin_component` from `pythonnative.sdk.plugin`, and registers a Python `fallback` so tests and the browser preview run the same code.
+- `native/pn_plugin.json`: the manifest. It declares the entries, the `requires.permissions` the build checks, options, and any `Info.plist`, entitlement, privacy, manifest, and Gradle changes.
+- `native/schema.json`: the generated contract. Don't edit it by hand.
+- `native/ios/` and `native/android/`: the Swift and Kotlin sources, compiled only when an app lists the capability in `[plugins].use`.
+- `native/web/`: an optional ES module implementing it in the browser preview.
+
+A `native` directory never reaches an app bundle. To add a capability, add its name to `FIRST_PARTY_PLUGINS` in `project/plugins.py`, and also add:
+
+- unit tests for the facade and its fallback under `tests/plugins/`;
+- a demo under `examples/e2e-suite/app/screens/capabilities/`, a `DemoEntry` in its `registry.py`, and an entry in that app's `[plugins].use`;
+- a Maestro flow at `tests/e2e/flows/capabilities/<name>.yaml`, appended to `tests/e2e/android.yaml`, `tests/e2e/ios.yaml`, and `tests/e2e/suites/capabilities.yaml`;
+- a guide at `docs/guides/capabilities/<name>.md`, an API page at `docs/api/<name>.md`, and their `mkdocs.yml` nav entries.
+
+The core must not reference a privacy-sensitive framework: `scripts/check-release-artifacts.py` checks that a project using no capabilities stays clean. PythonNative Go compiles every capability except those in `NOT_IN_GO`.
+
 ## Generated source and vendored dependencies
 
 Some generated files and third-party distribution files are intentional parts
@@ -129,7 +150,8 @@ of the source tree. Keep these in version control:
   `src/pythonnative/native/android/src/main/java/com/pythonnative/generated/`.
   These support standalone native builds. Regenerate them from the Python
   definitions and generator templates instead of editing them by hand.
-- Example extension schemas, such as `examples/inbox/native/schema.json`.
+- First-party capability contracts, `src/pythonnative/<name>/native/schema.json`,
+  and example extension schemas, such as `examples/inbox/native/schema.json`.
   Commit schema updates alongside their Python definitions and native
   implementations.
 - Dependency locks, including `uv.lock` and example apps' `pn.lock` files.
@@ -141,8 +163,9 @@ of the source tree. Keep these in version control:
   Rebuild it with `python scripts/build-core-wasm.py` (Emscripten 4.0.10)
   whenever the core changes; CI fails when it drifts from the sources.
 
-After changing a built-in factory's signature, the contracts, or their
-generators, regenerate the checked-in files from the repository root:
+After changing a built-in factory's signature, a capability's declarations,
+the contracts, or their generators, regenerate the checked-in files from the
+repository root:
 
 ```bash
 uv run python scripts/generate-native-contracts.py
@@ -151,7 +174,8 @@ uv run pytest tests/test_codegen.py tests/test_performance_budgets.py
 
 The script writes `src/pythonnative/sdk/_builtin_contracts.json` (which
 `import pythonnative` loads instead of evaluating annotations), the generated
-Swift and Kotlin sources, and the native test fixtures. The tests check that
+Swift and Kotlin sources, the native test fixtures, and each capability's
+`native/schema.json`. The tests check that
 the committed files match generation in a clean Python interpreter.
 
 Exclude staged app projects, compiled apps and libraries, package distributions,
@@ -277,7 +301,7 @@ Breaking changes:
 - Use `!` after the type/scope or a `BREAKING CHANGE:` footer.
 
 ```text
-feat(hosts)!: rename create_page to create_screen
+feat(hosts)!: rename the screen host's create event
 
 BREAKING CHANGE: API renamed; update app code and templates.
 ```
@@ -466,6 +490,7 @@ When you add a new public symbol you must also:
 
 - **CI** (`ci.yml`): runs formatter, linter, type checker, and tests on every push and PR.
 - **E2E** (`e2e.yml`): builds `examples/e2e-suite` on Android (Linux emulator) and iOS (macOS simulator), then runs Maestro flows by category. Triggers on pushes to `main`, PRs, and manual dispatch.
+- **Release builds** (`release-builds.yml`): builds `examples/fieldnotes` in the release configuration on Android and iOS with `--allow-unsigned`, checks the artifacts with `scripts/check-release-artifacts.py`, including that a project using no capabilities stays clean, and runs a Maestro smoke flow against `pn run --release`. Triggers on pushes to `main`, PRs, and manual dispatch. It can't hold store credentials, so it doesn't prove a real store upload.
 - **Packages** (`packages.yml`): resolves the PyPI compatibility matrix in `tests/packages/matrix.toml` against the live indexes with `scripts/package-matrix.py --check`, weekly and on changes to the resolver or manifest, and uploads the rendered Markdown table for `docs/guides/pypi-packages.md`.
 - **PR Lint** (`pr-lint.yml`): validates the PR title against Conventional Commits format (protects squash merges) and checks individual commit messages via commitlint (protects rebase merges). Recommended: add the **PR title** job as a required status check in branch-protection settings.
 - **Release** (`release.yml`): runs on merge to `main`; computes version, generates changelog, tags, creates GitHub Release, and (when `DRAFT_RELEASE` is `"false"`) publishes to PyPI.

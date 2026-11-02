@@ -9,7 +9,8 @@ fold into it, and where you can hook in.
 
 A render pass is triggered by:
 
-- Initial mount via [`create_screen`][pythonnative.create_screen].
+- Initial mount, when the platform asks the
+  [`ScreenHost`][pythonnative.hosts.base.ScreenHost] to create a screen.
 - A setter from [`use_state`][pythonnative.use_state] or a `dispatch`
   from [`use_reducer`][pythonnative.use_reducer].
 - A navigation event (`navigate`, `go_back`, `replace`).
@@ -53,7 +54,8 @@ The phases:
    immediately. A flush that keeps re-scheduling itself more than
    fifty times raises `RuntimeError("Too many re-renders")` from the
    component that keeps dirtying itself, routed through the nearest
-   `ErrorBoundary` (or the RedBox in dev mode).
+   `ErrorBoundary` (or the RedBox in dev mode, or the fallback screen in a
+   release build).
 
 ```text
 [render] -> [commit + layout] -> [layout effects] -> [passive effects] -> drain? -> [render] ...
@@ -127,6 +129,22 @@ You can opt into these directly in app code by writing an effect that
 checks the navigation handle's `is_focused()` state, but most apps
 should reach for the [`use_focus_effect`][pythonnative.use_focus_effect]
 hook instead.
+
+Native plugins observe the same events, plus ones that happen with no screen
+at all (a push, a background job, an inbound URL), through
+[lifecycle hooks](../guides/native-plugins.md#lifecycle-hooks). When such an
+event starts the process, Python can start without a surface, and nothing renders
+until the platform asks for a screen.
+
+## When a render fails
+
+An error that no `ErrorBoundary` catches reaches
+[`pn.set_error_handler`][pythonnative.set_error_handler], with its phase
+(`render`, `effect`, `event`, `async`, or `mount`), in every build. What happens on
+screen depends on the build: a development build shows the error screen, and a
+release build replaces the screen with a fallback that offers a retry, which
+[`pn.set_error_fallback`][pythonnative.set_error_fallback] can replace. See
+[Error boundaries](../guides/error-boundaries.md).
 
 ## Putting it together: a subscription
 

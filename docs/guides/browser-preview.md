@@ -229,15 +229,48 @@ Approximated or absent:
   device builds.
 - Device APIs: `Alert`, `Clipboard`, `Linking`, `Share`, `Haptics`
   (`navigator.vibrate`), `NetInfo`, `AppState`, and `Device` are
-  implemented in the page. Everything else (`Camera`, `Location`,
-  `Notifications`, `Biometrics`, `Storage`, ...) uses the pure-Python
-  fallbacks in
-  [`pythonnative.native_modules.fallback`](../api/native_modules.md):
-  in-memory stores, `"unknown"` states, and "unavailable" results.
+  implemented in the page. Some capabilities are too; see
+  [Plugins in the preview](#plugins-in-the-preview). Everything else
+  (`Notifications`, `Biometrics`, `Purchases`, ...) uses pure-Python
+  fallbacks: in-memory stores, `"unknown"` states, and "unavailable"
+  results.
 - Components without a browser implementation render a labeled
   placeholder box so the layout around them stays truthful.
 
 When the chrome matters, verify on device with `pn run`.
+
+## Plugins in the preview
+
+A [native plugin](native-plugins.md) can implement itself in the page by
+declaring a `web` entry in its `pn_plugin.json`:
+
+```json
+{
+  "name": "my_badge",
+  "web": {"entry": "web/index.js"}
+}
+```
+
+The entry is an ES module that exports `components`, element types mapped to
+`ViewManager` subclasses from `/static/renderer.js`, and `modules(host)`, which
+returns module implementations. Pass `browser=True` to `plugin_module` when the
+page implements a module; otherwise, calls go to the Python fallback. The dev
+server serves the entry for each first-party capability, whatever `[plugins].use`
+lists, and for each directory in `[plugins].paths`.
+
+These first-party capabilities have one:
+
+| Capability | In the preview |
+| --- | --- |
+| `audio` | The `Audio` module |
+| `camera` | `CameraView` and the `Camera` module, through `getUserMedia` |
+| `location` | The `Location` module, through the browser's geolocation |
+| `maps` | `MapView` |
+| `pickers` | The `Pickers` module |
+| `sensors` | The `Sensors` module |
+| `video` | `Video` |
+
+The rest keep to their Python fallbacks and labeled placeholders.
 
 ## Sharing the preview
 

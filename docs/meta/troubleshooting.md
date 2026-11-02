@@ -176,6 +176,97 @@ output reaches the launching terminal alongside `NSLog`. If you don't
 see *any* logs, the simulator isn't attached yet; press `Ctrl+C` to
 stop, then re-run with the default flags (no `--no-logs`).
 
+## Capabilities and permissions
+
+### `NativeModuleError` with the code `plugin_not_enabled`
+
+```text
+NativeModuleError: Camera.take_photo: the 'camera' capability isn't in this build. Add 'camera' to
+[plugins].use in pythonnative.toml and rebuild.
+```
+
+Importing a [capability](../guides/capabilities/index.md) always works, but
+calling it on a device needs its native code in the build. Add the name to
+`[plugins].use` and rerun `pn run ios` or `pn run android`; native code can't
+arrive over Fast Refresh. A component does the same with a
+`PluginNotEnabledError`.
+
+`pn.Permissions.check` and `request` raise the same code, with `No plugin in
+this build provides the camera permission`, because a permission name works only
+when a plugin in the build provides it. See
+[Permission providers](../guides/permissions.md#permission-providers).
+
+### `Plugin 'camera' needs 'camera' declared under [permissions]`
+
+A capability in `[plugins].use` needs a permission you haven't declared. iOS
+crashes an app that reaches a protected API without its usage string, so the build
+stops instead. Add the entry, with the reason the system prompt shows:
+
+```toml
+[permissions]
+camera = "Scan receipts with your camera."
+```
+
+Each [capability's guide](../guides/capabilities/index.md) lists what it needs.
+
+### `Plugin 'push' requires 'notifications': add it to [plugins].use`
+
+Naming a plugin in `use` doesn't pull in the plugins it depends on, so list them
+both.
+
+### Pressing i or a builds my project instead of opening PythonNative Go
+
+Go carries every capability except `push`, because a device token belongs to
+your app's own bundle ID. A project that uses `push`, a native plugin, or a package
+with compiled extensions runs in its own debug build. See
+[What runs in Go](../guides/devtools.md#what-runs-in-go).
+
+## Release builds
+
+To reproduce a problem that only shows up in a release build, `pn run ios
+--release` or `pn run android --release` runs the release configuration on a
+simulator or emulator, with no dev server. Physical devices need `pn build`.
+
+### `Android release builds must be signed`
+
+Set `keystore` and `key_alias` under `[android.signing]`, as
+[Signing](../guides/building-for-release.md#signing) describes. For a smoke
+build that won't reach a store, pass `--allow-unsigned`.
+
+### `App Store validation requires an app icon` or `Store listings require an app icon`
+
+Set `[assets].icon` to a 1024x1024 PNG. `--allow-unsigned` skips this check too.
+
+### `Release builds need Pillow to generate the app icon`
+
+Run `pip install 'pythonnative[build]'`.
+
+### `No Python 3.13 interpreter is installed to compile bytecode`
+
+Bytecode is version-specific, so an iOS release build needs an interpreter
+matching `app.python_version`. Install it (`uv python install 3.13`) or run `pn`
+with it. Android needs the same interpreter when the app has
+`[requirements]` packages, and `pn doctor` reports whether it found one.
+
+### `Release dependencies need pn.lock`
+
+Run `pn deps android --lock` and `pn deps ios --lock`, and commit the result. See
+[Frozen dependencies](../guides/building-for-release.md#frozen-dependencies).
+
+### `No .ipa found` or `No release .aab found` from `pn submit`
+
+`pn submit` uploads what `pn build` produced, so build first. On iOS, the `.ipa`
+has to come from `export_method = "app-store"`, and an `--allow-unsigned` build
+stops at the archive. Credentials go in the environment; see
+[Submitting to the stores](../guides/building-for-release.md#submitting-to-the-stores).
+
+### A release app shows "Try again" instead of crashing
+
+A render error reached the default root boundary, or mounting failed twice within a
+minute. Attach [`pn.set_error_handler`][pythonnative.set_error_handler] to see
+the error, and use `pn run <platform> --release` to reproduce it. See
+[Error boundaries](../guides/error-boundaries.md).
+
 ## Renderer
 
 ### `RuntimeError: <hook> called outside a @component function`
@@ -226,7 +317,8 @@ You're either missing keys or using positional keys. See
   one arrives. If it prints "can't run this project" instead, the
   device shows the reason and the command that fixes it (usually `pn go
   <platform>` for an outdated PythonNative Go, or `pn run <platform>
-  --rebuild` for a build that predates a native plugin). If you launched `pn run` with no server up, the app is
+  --rebuild` for a build that predates a native plugin or a change to
+  `[plugins].use`). If you launched `pn run` with no server up, the app is
   running its bundled sources: start the server and relaunch.
 - Is the device on the same network? Simulators and emulators reach
   the server through `localhost` (Android via `adb reverse`), but a

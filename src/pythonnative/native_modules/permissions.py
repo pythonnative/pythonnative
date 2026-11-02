@@ -17,11 +17,11 @@ Permission names are the same words you declare in the
 ``[permissions]`` table of ``pythonnative.toml``, so the string that
 puts ``NSCameraUsageDescription`` in your Info.plist is the string you
 pass here: ``"camera"``, ``"microphone"``, ``"photo_library"``,
-``"location_when_in_use"``, ``"contacts"``, ``"notifications"``. The
-full list is [`RUNTIME_PERMISSIONS`][pythonnative.native_modules.permissions.RUNTIME_PERMISSIONS];
-capabilities that have no runtime prompt (``vibration``,
-``background_fetch``, ...) are declared in the config only. A name
-outside the list raises ``ValueError`` before anything reaches native.
+``"location_when_in_use"``, ``"motion"``, ``"notifications"``. Capabilities
+that have no runtime prompt (``vibration``, ``background_fetch``, ...) are
+declared in the config only. The plugin that uses a permission provides it, so
+a name raises ``NativeModuleError`` with the code ``plugin_not_enabled`` unless
+that plugin is in the build.
 
 Example:
     ```python
@@ -30,7 +30,7 @@ Example:
     async def scan():
         if await pn.Permissions.request("camera") != "granted":
             return
-        await pn.Camera.take_photo()
+        await Camera.take_photo()
     ```
 """
 

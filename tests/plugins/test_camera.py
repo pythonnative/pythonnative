@@ -11,7 +11,7 @@ import pytest
 
 import pythonnative as pn
 import pythonnative.camera as camera
-from pythonnative.camera import Barcode, Camera, CameraError, CameraView, CameraViewHandle, Photo, Recording
+from pythonnative.camera import Barcode, Camera, CameraError, CameraView, CameraViewHandle, Photo, VideoRecording
 from pythonnative.native_modules.registry import native_module
 from pythonnative.project import plugin_config
 from pythonnative.project.config import AppConfig
@@ -98,7 +98,7 @@ def test_handle_runs_against_the_fallback() -> None:
         recording = await handle.stop_recording()
         return photo, recording
 
-    assert asyncio.run(capture()) == (Photo(path="", width=0, height=0), Recording(path="", duration=0.0))
+    assert asyncio.run(capture()) == (Photo(path="", width=0, height=0), VideoRecording(path="", duration=0.0))
 
 
 def test_handle_validates_quality_before_the_bridge() -> None:

@@ -69,7 +69,7 @@ __all__ = [
     "CameraViewHandle",
     "CameraViewProps",
     "Photo",
-    "Recording",
+    "VideoRecording",
 ]
 
 CameraFacing = Literal["back", "front"]
@@ -112,7 +112,7 @@ class Photo:
 
 
 @dataclass(frozen=True)
-class Recording:
+class VideoRecording:
     """A video recorded by a [`CameraView`][pythonnative.camera.CameraView].
 
     Attributes:
@@ -178,7 +178,7 @@ class _CameraService(Protocol):
 
     async def start_recording(self, *, tag: int, audio: bool = True) -> None: ...
 
-    async def stop_recording(self, *, tag: int) -> Recording: ...
+    async def stop_recording(self, *, tag: int) -> VideoRecording: ...
 
 
 class _Fallback:
@@ -193,8 +193,8 @@ class _Fallback:
     def start_recording(self, *, tag: int, audio: bool = True) -> None:
         del tag, audio
 
-    def stop_recording(self, *, tag: int) -> Recording:
-        return Recording(path="", duration=0.0)
+    def stop_recording(self, *, tag: int) -> VideoRecording:
+        return VideoRecording(path="", duration=0.0)
 
 
 plugin_module("Camera", _CameraService, plugin="camera", fallback=_Fallback, browser=True)
@@ -240,7 +240,7 @@ class CameraViewHandle(ViewHandle):
         """
         await native_module("Camera").call_async("start_recording", tag=self.tag, audio=bool(audio))
 
-    async def stop_recording(self) -> Recording:
+    async def stop_recording(self) -> VideoRecording:
         """Stop recording and wait for the file to be finished.
 
         Returns:
@@ -251,7 +251,7 @@ class CameraViewHandle(ViewHandle):
                 being recorded, or ``capture_failed`` when no video was saved
                 (some platforms reject a recording too short to have a frame).
         """
-        result: Recording = await native_module("Camera").call_async("stop_recording", tag=self.tag)
+        result: VideoRecording = await native_module("Camera").call_async("stop_recording", tag=self.tag)
         return result
 
 

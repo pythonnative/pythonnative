@@ -17,8 +17,9 @@ Breakpoint debugging has its own guide: [Debugging](debugging.md).
 ## PythonNative Go
 
 PythonNative Go is to PythonNative what Expo Go is to React Native: an
-app that contains the framework and every built-in native module, and
-loads your project's Python from `pn start`. Go itself is a native app,
+app that contains the framework, every built-in native module, and every
+[capability](capabilities/index.md) except `push`, and loads your project's
+Python from `pn start`. Go itself is a native app,
 built once per PythonNative release; your project is never compiled,
 because `pn start` sends Go its Python sources.
 
@@ -45,12 +46,16 @@ Go runs a project when it adds no native code:
 - **Python dependencies** listed in `[requirements]` are synced from the
   environment `pn start` runs in, as long as they're pure Python. Install
   them there first (`pn start` warns when one is missing).
+- **Capabilities** are all in Go, whatever your `[plugins].use` lists, except
+  `push`: a device token belongs to your app's own bundle ID and Firebase
+  project, so a token issued to Go would be useless. A project that lists `push`
+  runs in its own debug build.
 - **Native plugins** and packages with **compiled extensions** (such as
   `numpy`) aren't in Go. `pn start` notices, and ++i++ and ++a++ build
   the project's own development app with `pn run` instead. A Go that
   connects anyway shows why it can't run the project and which command to
   use.
-- **Permissions** for the built-in modules (camera, photos, location,
+- **Permissions** for the capabilities (camera, microphone, photos, location,
   notifications, biometrics, motion) are declared by Go. Your
   `pythonnative.toml` settings, such as the app name, icon, and URL
   schemes, apply only to your own builds.
@@ -93,8 +98,8 @@ same way as on Android.
 
 ### Your project's development app
 
-A project that adds native code runs in its own debug build, which `pn
-run ios` and `pn run android` build and install. It's a dev client like
+A project that uses `push` or adds native code runs in its own debug build,
+which `pn run ios` and `pn run android` build and install. It's a dev client like
 Go: it connects to `pn start`, syncs every save, and has the same dev
 menu, inspector, and DevTools support. It registers a connect link of
 its own, `pn-<app id>://connect?url=...`, so the QR code reopens it after

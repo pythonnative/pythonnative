@@ -389,6 +389,11 @@ def builtin_component_names() -> frozenset[str]:
     return _builtin_names[0]
 
 
+def builtin_module_names() -> frozenset[str]:
+    """Modules from the package's generated contracts; empty when a checkout derives them instead."""
+    return _builtin_names[1]
+
+
 def native_documents() -> list[str]:
     """The contract documents the renderer core compiles, built-ins first.
 

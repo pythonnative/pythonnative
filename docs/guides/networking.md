@@ -80,7 +80,7 @@ ping goes out every 30 seconds by default (`heartbeat=`), which also detects a d
 
 ## TLS
 
-Both use the platform's certificates by default. Tested on the iOS simulator and an Android emulator; test your own server on a real device, too. `pn.set_default_ssl_context`
+Both use the platform's certificates by default. Tested on the iOS simulator and an Android emulator; test your own server on a real device, too. ``set_default_ssl_context``
 (from `pythonnative.net`) replaces the context, for example to pin a certificate or trust a development CA.
 
 ## What's not here

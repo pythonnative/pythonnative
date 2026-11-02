@@ -4,10 +4,13 @@ PythonNative is a cross-platform toolkit that turns Python ``@component``
 functions into real, native Android and iOS views. The component model
 is React-like (function components plus hooks). Python owns the logical
 component tree and reconciliation on a dedicated asyncio application thread.
-Versioned commits cross into Swift ``PythonNativeKit`` on iOS and the Kotlin
-``pythonnative`` module on Android. Those renderers own widgets, Yoga layout,
-measurement, gestures, and animation frames on the platform UI thread.
-The browser preview uses DOM widgets and Yoga WebAssembly.
+Versioned commits go to a shared C++ renderer core, which every target links.
+The core validates each commit against the native contracts, lays it out with
+Yoga off the UI thread, flattens layout-only views, and runs animation graphs.
+Swift ``PythonNativeKit`` on iOS and the Kotlin ``pythonnative`` module on
+Android mount the result: they own widgets, text drawing, input, and the frame
+clock on the platform UI thread. The browser preview runs the same core as
+WebAssembly and mounts DOM widgets.
 
 Key building blocks:
 
@@ -50,6 +53,18 @@ Key building blocks:
   with [`define_component`][pythonnative.sdk.define_component], which
   returns its element factory (or expose it from a PyPI package via the
   ``pythonnative.handlers`` entry-point group).
+- **Capabilities** are opt-in device features, one subpackage each:
+  ``pythonnative.audio``, ``background``, ``biometrics``, ``camera``,
+  ``location``, ``maps``, ``notifications``, ``pickers``, ``purchases``,
+  ``push``, ``sensors``, and ``video``. They aren't re-exported here. List
+  one in ``[plugins].use`` in ``pythonnative.toml`` to compile it into the
+  app, then import it by name: ``from pythonnative.camera import CameraView``.
+  Calling one that isn't in the build raises ``NativeModuleError`` with the
+  code ``plugin_not_enabled``.
+- **Failures** in a release build reach
+  [`set_error_handler`][pythonnative.set_error_handler], and a render error
+  no boundary catches shows the screen set with
+  [`set_error_fallback`][pythonnative.set_error_fallback].
 
 Example:
     ```python

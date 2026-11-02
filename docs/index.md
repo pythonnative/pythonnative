@@ -88,13 +88,29 @@ Platform controls and fonts supply their own intrinsic sizes.
   Kotlin runtimes speak, so you can iterate on UI, state, and
   navigation in milliseconds (no simulator boot required). See the
   [Browser preview guide](guides/browser-preview.md).
+- **Device features you opt into.** Video, audio, camera, maps, location,
+  notifications, push, pickers, sensors, biometrics, background tasks, and
+  in-app purchases are [capabilities](guides/capabilities/index.md): list
+  one in `[plugins].use` and only then does it compile into your app, so
+  an app never references a privacy-sensitive API it doesn't call.
 - **An extension SDK.** [`pythonnative.sdk`](api/sdk.md) lets you
   wrap any platform widget as a first-class element with
   type-checked props through
-  [`define_component`][pythonnative.sdk.define_component], generates
-  the Swift and Kotlin contract from the same declaration, and PyPI
-  plugins auto-register through the `pythonnative.handlers` entry-point
-  group.
+  [`define_component`][pythonnative.sdk.define_component] and generates
+  the Swift and Kotlin contract from the same declaration.
+  [Native plugins](guides/native-plugins.md) use the same format as the
+  first-party capabilities, and a package in your requirements that ships
+  one is compiled in automatically.
+- **A path to the stores.** `pn build` refuses a release a store would
+  reject, `pn run --release` runs that configuration on a simulator or
+  emulator, and `pn submit` uploads it. CI proves the artifacts and the
+  request flow, but no real store submission has been verified yet. See
+  [Building for release](guides/building-for-release.md).
+- **Production failure handling.**
+  [`pn.set_error_handler`][pythonnative.set_error_handler] reports every
+  uncaught error, and a release build replaces a broken screen with a
+  fallback instead of leaving it stuck. See
+  [Error boundaries](guides/error-boundaries.md).
 - **A small surface.** A handful of element factories, a handful of
   hooks, and three navigators.
 
@@ -104,6 +120,8 @@ Platform controls and fonts supply their own intrinsic sizes.
 - Want to see it run right now? Try the
   [Browser preview](guides/browser-preview.md).
 - Want the bigger picture? Read [Mental model](concepts/mental-model.md).
+- Want to see a real app? Read about [Field Notes](examples/fieldnotes.md).
+- Need a device feature? See [Capabilities](guides/capabilities/index.md).
 - Looking up an API? [Package overview](api/pythonnative.md).
 - Wrapping a custom widget? Read
   [Custom native components](guides/custom-native-components.md).

@@ -10,4 +10,7 @@ appId: ${APP_ID}
       CATEGORY: Capabilities
       DEMO_TITLE: Biometrics
 - assertVisible: "Biometrics answered: yes"
-- runFlow: ../../helpers/close_demo.yaml
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

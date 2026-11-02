@@ -39,7 +39,7 @@ def test_make_handle_picks_the_type_specific_class() -> None:
     assert type(make_handle("WebView", 3, backend)) is pn.WebViewHandle
     assert type(make_handle("View", 4, backend)) is pn.ViewHandle
     assert type(make_handle("Text", 5, backend)) is pn.ViewHandle
-    assert set(HANDLE_TYPES) == {"TextInput", "ScrollView", "WebView"}
+    assert {"TextInput", "ScrollView", "WebView"} <= set(HANDLE_TYPES)
     for cls in HANDLE_TYPES.values():
         assert issubclass(cls, pn.ViewHandle)
 

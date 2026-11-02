@@ -19,4 +19,7 @@ appId: ${APP_ID}
     visible: "Uploaded: 2 parts"
     timeout: 10000
 - assertVisible: "Progress: 100"
-- runFlow: ../../helpers/close_demo.yaml
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

@@ -38,6 +38,13 @@ class NativeTypes:
         self.python: dict[str, str] = {}
         self._names: dict[str, str] = {}
         self._schemas: dict[str, dict[str, Any]] = {}
+        self.scope = ""
+        """The plugin contract being generated; empty for built-ins.
+
+        Identical literals share one native type, named after the first use. Across plugins,
+        "first" would depend on which plugins are in the build, and the Swift and Kotlin a
+        plugin ships names these types. So each plugin's shared within itself only.
+        """
 
     def types(self, schema: dict[str, Any], hint: str) -> tuple[str, str, str]:
         """Return Python, Swift, and Kotlin representations, adding definitions."""
@@ -116,6 +123,8 @@ class NativeTypes:
     def _named(self, schema: dict[str, Any], hint: str) -> str:
         portable = {key: value for key, value in schema.items() if key != "native"}
         signature = json.dumps(portable, sort_keys=True)
+        if "python_type" not in schema:
+            signature = f"{self.scope}|{signature}"
         if signature in self._names:
             return self._names[signature]
         declared = schema.get("python_type", "").partition(":")[2]

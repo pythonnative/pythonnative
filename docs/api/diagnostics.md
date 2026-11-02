@@ -13,10 +13,10 @@ In production builds every check in this module is skipped, so
 shipping apps pay no overhead.
 
 ```python
-import pythonnative as pn
+from pythonnative import diagnostics
 
-if pn.diagnostics.is_dev():
-    pn.diagnostics.warn("fetching from a staging endpoint")
+if diagnostics.is_dev():
+    diagnostics.warn("fetching from a staging endpoint")
 ```
 
 Most apps never call this module directly; it exists so framework

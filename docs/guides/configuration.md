@@ -120,9 +120,10 @@ catalog and how each capability maps to native artifacts.
 
 Asset generation requires [Pillow](https://python-pillow.org/), the
 `pythonnative[build]` optional dependency (`pip install
-'pythonnative[build]'`). If Pillow isn't installed, the template's
-default assets are kept and the build still succeeds; `pn doctor`
-reports whether Pillow is available. See
+'pythonnative[build]'`). If Pillow isn't installed, a debug build keeps
+the template's default assets, and a release build that names an icon
+fails unless you pass `--allow-unsigned`. `pn doctor` reports whether
+Pillow is available. See
 [Building for release](building-for-release.md#app-icon-and-splash).
 
 ---

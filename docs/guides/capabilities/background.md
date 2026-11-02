@@ -143,10 +143,11 @@ emit("Background", "run", {"id": "1", "name": "sync"})
 
 ## What has been verified
 
-- **Android (API 31 emulator):** WorkManager ran scheduled tasks on time. A task forced with
-  `cmd jobscheduler run -f` ran in a process that had been killed, with no activity. A run went
-  through `complete` to the right result, and a task over the time limit was canceled in Python
-  and retried.
+- **Android (API 31 emulator):** WorkManager ran scheduled tasks on time. A job forced with
+  `cmd jobscheduler run -f` after `am crash` started Python in a new process with no activity, and
+  a due task did the same after `am kill`, running through `complete` to `success`. Opening the app
+  afterward rendered normally. A task at the 9-minute limit and one stopped with
+  `cmd jobscheduler timeout` were both canceled in Python and recorded as `expired`.
 - **iOS simulator:** The plist keys, handler registration at launch, and `schedule` raising
   `unavailable`. The debugger command above does nothing on a simulator, since `submit` refuses
   every request. The native path from a launch to `run`, `complete`, and `expired` was driven with a

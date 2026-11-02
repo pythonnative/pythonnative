@@ -39,7 +39,8 @@ def PluginConfigDemo() -> pn.Node:
     """Show a value computed in the plugin's C code and one its manifest configured."""
     module = native_module("Checksum")
     return DemoScreen(
-        "Native plugin configuration",
+        "Plugin config",
+        "A local plugin's C target and the values its manifest configures.",
         DemoSection(
             "Plugin",
             ResultText("Adler-32 of Wikipedia", module.call("adler32", text="Wikipedia")),

@@ -1,0 +1,15 @@
+# Goes back one screen. iOS has no system back, and its button's label comes from
+# the previous screen, so this presses where the button is.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          point: "8%,9%"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back

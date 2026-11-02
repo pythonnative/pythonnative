@@ -255,7 +255,7 @@ def TextInput(
             offsets; ``start == end`` places the caret.
         secure: When ``True``, characters are masked (use for passwords).
         multiline: When ``True``, allows multiple lines of input.
-        keyboard_type: One of the [`KeyboardType`][pythonnative.KeyboardType]
+        keyboard_type: One of the [`KeyboardType`][pythonnative.style.KeyboardType]
             values, e.g. ``"email_address"``, ``"number_pad"``,
             ``"numbers_and_punctuation"``, ``"visible_password"``.
         keyboard_appearance: iOS keyboard theme: ``"default"``,

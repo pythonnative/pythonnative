@@ -12,4 +12,7 @@ appId: ${APP_ID}
       DEMO_TITLE: Plugin config
 - assertVisible: "Adler-32 of Wikipedia: 300286872"
 - assertVisible: "Configured value: configured by a plugin"
-- runFlow: ../../helpers/close_demo.yaml
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: SDK
