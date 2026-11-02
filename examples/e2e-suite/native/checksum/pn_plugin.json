@@ -1,0 +1,15 @@
+{
+  "name": "e2e_checksum",
+  "contracts": "schema.json",
+  "ios": {
+    "entry": "ChecksumPlugin",
+    "c_target": {"sources": "ios/c", "public_headers": "ios/c/include"},
+    "info_plist": {"PNE2EPluginKey": "${greeting}"}
+  },
+  "android": {
+    "entry": "com.pythonnative.e2e.checksum.ChecksumPlugin",
+    "cmake": "android/cpp/CMakeLists.txt",
+    "manifest": {"application": "android/application.xml"}
+  },
+  "options": {"greeting": {"type": "string", "default": "configured by a plugin"}}
+}

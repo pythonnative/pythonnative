@@ -170,15 +170,6 @@ class Platform:
         return default
 
 
-def get_platform() -> str:
-    """Return the active platform name.
-
-    Equivalent to reading ``Platform.OS``, exposed as a function for
-    introspection from non-component code.
-    """
-    return Platform.OS
-
-
 def _set_platform_for_test(name: Optional[str]) -> None:
     """Override ``Platform.OS`` for unit tests.
 

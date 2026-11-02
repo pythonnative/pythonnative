@@ -19,7 +19,7 @@ import itertools
 import time
 import uuid
 import weakref
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from ..bridge import PROTOCOL_VERSION, codec, get_transport
 from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
@@ -74,6 +74,7 @@ class BridgeBackend:
         self._event_sequences: dict[int, dict[str, int]] = {}
         self._edit_revisions: dict[int, int] = {}
         self._failed = False
+        self.on_surface_failed: Optional[Callable[[BaseException], None]] = None
         self._pending: asyncio.Future[None] | None = None
         self._publishing = False
         self._queued_commits: set[asyncio.Task[None]] = set()
@@ -388,7 +389,10 @@ class BridgeBackend:
         error = payload.get("error") if isinstance(payload, dict) else payload
         from .. import diagnostics
 
-        diagnostics.report_error(CommitError(f"Native mount failed: {error}"), phase="native mount")
+        failure = CommitError(f"Native mount failed: {error}")
+        diagnostics.report_error(failure, phase="mount")
+        if self.on_surface_failed is not None:
+            self.on_surface_failed(failure)
 
     def defer_event(self, tag: int, name: str, envelope: Any) -> bool:
         """Keep input ordered until its commit and Python effects publish."""

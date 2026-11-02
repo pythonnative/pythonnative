@@ -387,6 +387,7 @@ cp \"$PROJECT_DIR/ios_template/PrivacyInfo.xcprivacy\" \"$CODESIGNING_FOLDER_PAT
 					"$(inherited)",
 					"$(PROJECT_DIR)/Python.xcframework/ios-arm64_x86_64-simulator",
 				);
+				CODE_SIGN_ENTITLEMENTS = "$(PN_ENTITLEMENTS)";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ios_template/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -433,6 +434,7 @@ cp \"$PROJECT_DIR/ios_template/PrivacyInfo.xcprivacy\" \"$CODESIGNING_FOLDER_PAT
 					"$(inherited)",
 					"$(PROJECT_DIR)/Python.xcframework/ios-arm64_x86_64-simulator",
 				);
+				CODE_SIGN_ENTITLEMENTS = "$(PN_ENTITLEMENTS)";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ios_template/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

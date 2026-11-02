@@ -103,16 +103,6 @@ def test_export_options_manual_with_profile(tmp_path: Path) -> None:
     assert options["provisioningProfiles"] == {"com.acme.cool": "My Profile"}
 
 
-def test_export_options_upload_destination(tmp_path: Path) -> None:
-    cfg = _config(tmp_path, ios={"signing": {"export_method": "app-store"}})
-    dest = ios.write_export_options(cfg, tmp_path / "export.plist", upload=True)
-    options = plistlib.loads(dest.read_bytes())
-    assert options["destination"] == "upload"
-    # A plain export has no destination key at all.
-    dest = ios.write_export_options(cfg, tmp_path / "export2.plist")
-    assert "destination" not in plistlib.loads(dest.read_bytes())
-
-
 def test_info_plist_url_schemes(tmp_path: Path) -> None:
     plist_path = _write_plist(tmp_path)
     cfg = _config(
@@ -142,7 +132,7 @@ def test_write_entitlements_for_remote_notifications(tmp_path: Path) -> None:
     entitlements = plistlib.loads(dest.read_bytes())
     assert entitlements["aps-environment"] == "development"
     # The build settings point code signing at the generated file.
-    assert f"CODE_SIGN_ENTITLEMENTS={ios.ENTITLEMENTS_FILE}" in ios.build_settings(cfg)
+    assert f"PN_ENTITLEMENTS={ios.ENTITLEMENTS_FILE}" in ios.build_settings(cfg)
 
 
 @pytest.mark.parametrize(
@@ -184,4 +174,4 @@ def test_release_info_plist_omits_the_dev_server_local_network_string(tmp_path: 
     cfg = _config(tmp_path, ios={"extra_info_plist": {"NSLocalNetworkUsageDescription": "Find printers"}})
     ios.configure_info_plist(plist_path, cfg, release=True)
     assert plistlib.loads(plist_path.read_bytes())["NSLocalNetworkUsageDescription"] == "Find printers"
-    assert not any(s.startswith("CODE_SIGN_ENTITLEMENTS=") for s in ios.build_settings(cfg))
+    assert not any(s.startswith("PN_ENTITLEMENTS=") for s in ios.build_settings(cfg))

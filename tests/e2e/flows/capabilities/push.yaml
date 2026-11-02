@@ -1,0 +1,35 @@
+# Tests what a build without push credentials does: Android reports
+# not_configured and keeps running. An iOS simulator's APNs answer depends on the
+# host, so the flow only requires that it answers. Delivery needs a device and a
+# server, and isn't covered.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/push.py
+# Source under test: src/pythonnative/push/__init__.py :: Push
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Push
+- assertVisible: "Token: not requested"
+- assertVisible: "Messages: 0"
+- tapOn: "Get device token"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "Token: not_configured"
+          timeout: 10000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "Token: (received|apns)"
+          timeout: 40000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

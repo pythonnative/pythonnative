@@ -810,6 +810,19 @@ def run_project(args: argparse.Namespace) -> None:
     config = _load_config_or_exit()
     builder = builder_mod.Builder(config, log=print)
 
+    if getattr(args, "release", False):
+        try:
+            _run_release(
+                builder,
+                platform,
+                device=device,
+                app_id=config.application_id if platform == "android" else config.bundle_id,
+            )
+        except _BUILD_ERRORS as exc:
+            print(f"Error: {exc}")
+            sys.exit(1)
+        return
+
     # Resolve third-party packages only for the destination being built
     # (device wheels and Simulator wheels differ); prepare-only keeps both
     # slices so the staged project builds for either in Xcode.
@@ -896,6 +909,32 @@ def run_project(args: argparse.Namespace) -> None:
 
     if show_logs and platform == "android":
         _stream_logs_until_interrupt(platform, app_id, device)
+
+
+def _run_release(
+    builder: builder_mod.Builder, platform: str, *, device: Optional[devices_mod.Device], app_id: str
+) -> None:
+    """Build and launch the release configuration, which never talks to a dev server."""
+    if device is not None and device.kind == "device":
+        raise builder_mod.BuildError("'pn run --release' runs on simulators and emulators. Use 'pn build' for devices.")
+    prepared = builder.prepare(platform, release=True, ios_sdks=("iphonesimulator",), allow_unsigned=True)
+    if platform == "android":
+        serial = launch.ensure_android_device(device, print)
+        if serial is None:
+            raise builder_mod.BuildError("No Android device or emulator is available.")
+        os.environ["ANDROID_SERIAL"] = serial
+        builder.install_android_release(prepared)
+        launch.stop_android_app(serial, app_id)
+        subprocess.run(["adb", "shell", "am", "start", "-n", f"{app_id}/.MainActivity"], check=True)
+    else:
+        artifact = builder.build_ios_simulator(prepared, release=True)
+        udid = device.identifier if device is not None else launch.select_ios_simulator()
+        if udid is None:
+            raise builder_mod.BuildError("No available iOS Simulator.")
+        launch.boot_ios_simulator(udid)
+        launch.install_ios_simulator(udid, artifact)
+        launch.launch_ios_simulator(udid, app_id, None, console=False).wait()
+    print(f"Launched the release configuration on {'the emulator' if platform == 'android' else 'the Simulator'}.")
 
 
 def _native_fingerprint(config: AppConfig, platform: str, builder: builder_mod.Builder, *, ios_sdks: tuple) -> str:
@@ -1123,41 +1162,32 @@ def build_project(args: argparse.Namespace) -> None:
     """
     platform: str = args.platform
     debug: bool = getattr(args, "debug", False)
-    upload: bool = getattr(args, "upload", False)
+    allow_unsigned: bool = getattr(args, "allow_unsigned", False)
 
     config = _load_config_or_exit()
     builder = builder_mod.Builder(config, log=print)
-
-    if upload and (platform != "ios" or debug):
-        print("Error: --upload applies to 'pn build ios' release builds only.")
-        sys.exit(1)
-    if upload and config.ios.signing.export_method != "app-store":
-        print('Error: --upload requires [ios.signing] export_method = "app-store" in pythonnative.toml.')
-        sys.exit(1)
 
     try:
         prepared = builder.prepare(
             platform,
             release=not debug,
             ios_sdks=("iphonesimulator",) if debug else ("iphoneos",),
+            allow_unsigned=allow_unsigned,
         )
         if platform == "android":
-            artifacts = builder.build_android(prepared, debug=debug)
+            artifacts = builder.build_android(prepared, debug=debug, allow_unsigned=allow_unsigned)
         else:
             if debug:
                 app_path = builder.build_ios_simulator(prepared)
                 artifacts = builder_mod.BuildArtifacts(paths=[app_path])
             else:
-                artifacts = builder.build_ios_archive(prepared, upload=upload)
+                artifacts = builder.build_ios_archive(prepared, allow_unsigned=allow_unsigned)
     except _BUILD_ERRORS as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 
-    if upload:
-        print("\nUploaded to App Store Connect. Check the build's status at appstoreconnect.apple.com.")
     if not artifacts.paths:
-        if not upload:
-            print("Build completed, but no artifacts were found. Check the build output above.")
+        print("Build completed, but no artifacts were found. Check the build output above.")
         return
     from ..project.artifacts import size_report
 
@@ -1165,6 +1195,45 @@ def build_project(args: argparse.Namespace) -> None:
     for path in artifacts.paths:
         report = size_report(path)
         print(f"  {path}" + (f" ({report})" if report else ""))
+
+
+# ======================================================================
+# submit, links
+# ======================================================================
+
+
+def submit_command(args: argparse.Namespace) -> None:
+    """Upload the latest release build to App Store Connect or Google Play.
+
+    Args:
+        args: Parsed namespace (``platform``, ``path``, ``track``, ``draft``).
+    """
+    from ..project import submit as submit_mod
+
+    config = _load_config_or_exit()
+    build_root = config.project_root / "build"
+    path: Optional[Path] = getattr(args, "path", None)
+    try:
+        if args.platform == "ios":
+            submit_mod.submit_ios(path or submit_mod.find_ios_package(build_root))
+        else:
+            version = submit_mod.submit_android(
+                path or submit_mod.find_android_bundle(build_root),
+                package=config.application_id,
+                track=args.track,
+                draft=args.draft,
+            )
+            print(f"Uploaded version {version} to the {args.track} track.")
+    except submit_mod.SubmitError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+
+def links_command(args: argparse.Namespace) -> None:
+    """Print the files a site hosts so its links open this app."""
+    from ..project.links import render
+
+    print(render(_load_config_or_exit()), end="")
 
 
 # ======================================================================
@@ -1519,6 +1588,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_run.add_argument("--prepare-only", action="store_true", help="Stage + configure without building")
     parser_run.add_argument("--no-logs", action="store_true", help="Don't stream device logs after launch")
     parser_run.add_argument(
+        "--release",
+        action="store_true",
+        help="Run the release configuration on a simulator or emulator, with no dev server",
+    )
+    parser_run.add_argument(
         "--rebuild", action="store_true", help="Run the native toolchain even when no native input changed"
     )
     parser_run.add_argument(
@@ -1547,11 +1621,28 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_build.add_argument("platform", choices=["android", "ios"], help="Target platform")
     parser_build.add_argument("--debug", action="store_true", help="Build the debug variant instead of release")
     parser_build.add_argument(
-        "--upload",
+        "--allow-unsigned",
         action="store_true",
-        help='Upload the iOS release build to App Store Connect (needs export_method = "app-store")',
+        help="Build a release that isn't signed and may have no icon: a smoke build that can't reach a store",
     )
     parser_build.set_defaults(func=build_project)
+
+    parser_submit = subparsers.add_parser("submit", help="Upload the latest release build to a store")
+    parser_submit.add_argument("platform", choices=["android", "ios"], help="Target store")
+    parser_submit.add_argument("--path", type=Path, help="The .ipa or .aab to upload (default: the latest build)")
+    parser_submit.add_argument(
+        "--track",
+        default="internal",
+        choices=["internal", "alpha", "beta", "production"],
+        help="Google Play track (default: internal)",
+    )
+    parser_submit.add_argument(
+        "--draft", action="store_true", help="Leave the Google Play release as a draft (required for a new app)"
+    )
+    parser_submit.set_defaults(func=submit_command)
+
+    parser_links = subparsers.add_parser("links", help="Print the files a site hosts so its links open this app")
+    parser_links.set_defaults(func=links_command)
 
     parser_app_id = subparsers.add_parser("app-id", help="Print the resolved application/bundle id")
     parser_app_id.add_argument("platform", choices=["android", "ios"], help="Target platform")

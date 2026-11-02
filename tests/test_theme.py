@@ -10,6 +10,7 @@ import pytest
 
 import pythonnative as pn
 from pythonnative import appearance, diagnostics
+from pythonnative.style import resolve_style
 from pythonnative.hooks import StateSetter
 from pythonnative.testing import FakeView, render
 
@@ -359,7 +360,7 @@ def test_absolute_fill() -> None:
 
 
 def test_style_lists_compose_with_later_entries_winning() -> None:
-    resolved = pn.resolve_style([Styles.card, None, {"padding": 4, "opacity": 0.5}])
+    resolved = resolve_style([Styles.card, None, {"padding": 4, "opacity": 0.5}])
     assert resolved == {"padding": 4, "border_radius": 12, "opacity": 0.5}
     assert Styles.card == {"padding": 16, "border_radius": 12}  # inputs aren't mutated
 

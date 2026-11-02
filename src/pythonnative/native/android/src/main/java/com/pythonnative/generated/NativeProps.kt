@@ -1044,30 +1044,6 @@ class TextInputProps(values: JSONObject, partial: Boolean = true): PNViewProps(v
 }
 
 // The renderer core validated these values before they were mounted.
-class TouchableOpacityProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
-    val has_flex: Boolean get() = values.has("flex")
-    val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
-    val has_background_color: Boolean get() = values.has("background_color")
-    val `background_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("background_color"))) null else PNValues.decodeOrRecord("background_color") { PNViewBorderColor.decode(values.get("background_color")) } }
-    val has_color: Boolean get() = values.has("color")
-    val `color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { PNViewBorderColor.decode(values.get("color")) } }
-    val has_placeholder_color: Boolean get() = values.has("placeholder_color")
-    val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNViewBorderColor.decode(values.get("placeholder_color")) } }
-    val has_tint_color: Boolean get() = values.has("tint_color")
-    val `tint_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { PNViewBorderColor.decode(values.get("tint_color")) } }
-    val has_on_press: Boolean get() = values.has("on_press")
-    val `on_press`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_press"))) null else PNValues.decodeOrRecord("on_press") { if (PNValues.isNull(values.get("on_press"))) null else PNValues.boolean(values.get("on_press")) } }
-    val has_on_long_press: Boolean get() = values.has("on_long_press")
-    val `on_long_press`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_long_press"))) null else PNValues.decodeOrRecord("on_long_press") { if (PNValues.isNull(values.get("on_long_press"))) null else PNValues.boolean(values.get("on_long_press")) } }
-    val has_active_opacity: Boolean get() = values.has("active_opacity")
-    val `active_opacity`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("active_opacity"))) null else PNValues.decodeOrRecord("active_opacity") { PNValues.number(values.get("active_opacity")) } }
-    val has_disabled: Boolean get() = values.has("disabled")
-    val `disabled`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("disabled"))) null else PNValues.decodeOrRecord("disabled") { PNValues.boolean(values.get("disabled")) } }
-    val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
-}
-
-// The renderer core validated these values before they were mounted.
 class ViewProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
@@ -1292,12 +1268,6 @@ object PNComponentEvents {
         fun `on_content_size_change`(view: android.view.View, argument0: PNContentSizeEvent): Boolean = PNEvents.fire(view, "on_content_size_change", PNValues.encode(argument0))
         fun `on_focus`(view: android.view.View): Boolean = PNEvents.fire(view, "on_focus")
         fun `on_blur`(view: android.view.View): Boolean = PNEvents.fire(view, "on_blur")
-        fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
-    }
-    object TouchableOpacity {
-        fun `on_press`(view: android.view.View): Boolean = PNEvents.fire(view, "on_press")
-        fun `on_long_press`(view: android.view.View): Boolean = PNEvents.fire(view, "on_long_press")
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }

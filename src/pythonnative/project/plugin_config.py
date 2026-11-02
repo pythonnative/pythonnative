@@ -99,7 +99,7 @@ def _coerce(plugin: NativePlugin, name: str, spec: Dict[str, Any], value: Any, c
     if not isinstance(value, expected[kind]) or (kind == "integer" and isinstance(value, bool)):
         raise PluginError(f"[plugins.{plugin.name}].{name} must be a {kind}, got {value!r}.")
     if kind == "path":
-        resolved = config.resolve_path(value)
+        resolved = config.resolve_path(str(value))
         if not Path(resolved).exists():
             raise PluginError(f"[plugins.{plugin.name}].{name}: {value!r} doesn't exist.")
         return str(resolved)
@@ -205,7 +205,10 @@ def merge(
     for key, value in source.items():
         location = f"{path}{key}"
         current = target.get(key)
-        if key not in target:
+        if key not in target and isinstance(value, dict):
+            target[key] = {}
+            merge(target[key], value, owner=owner, owners=owners, path=f"{location}.")
+        elif key not in target:
             target[key] = _copy(value)
             owners.setdefault(location, owner)
         elif isinstance(current, dict) and isinstance(value, dict):

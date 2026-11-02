@@ -329,7 +329,7 @@ def test_sdk_component_renders_through_the_reconciler() -> None:
 def test_top_level_reexports() -> None:
     assert pn.Props is Props
     assert pn.define_component is define_component
-    assert pn.element_factory is element_factory
+    assert not hasattr(pn, "element_factory")
     for removed in ("ViewHandler", "native_component", "register_component"):
         assert not hasattr(pn, removed), removed
         assert not hasattr(pn.sdk, removed), removed

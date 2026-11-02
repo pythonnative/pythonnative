@@ -56,6 +56,7 @@ __all__ = [
     "ENTRY_POINT_GROUP",
     "FIRST_PARTY_PLUGINS",
     "MANIFEST_NAME",
+    "NOT_IN_GO",
     "NativePlugin",
     "PluginError",
     "discover_plugins",
@@ -86,6 +87,14 @@ FIRST_PARTY_PLUGINS = (
     "video",
 )
 """Capabilities ``[plugins].use`` accepts: subpackages of ``pythonnative`` holding a ``native`` plugin."""
+
+NOT_IN_GO = ("push",)
+"""Capabilities PythonNative Go leaves out.
+
+A device token belongs to the app's own bundle ID and Firebase project, so a token
+issued to Go would be useless, and the push entitlement stops Go building for
+free Apple accounts. Projects using these run in their own debug build.
+"""
 
 _OPTION_TYPES = ("string", "integer", "boolean", "path", "list")
 _MANIFEST_KEYS = frozenset({"name", "contracts", "requires", "options", "ios", "android", "web"})

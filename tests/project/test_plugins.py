@@ -24,7 +24,7 @@ from pythonnative.project.plugins import (
 
 def _write_plugin(root: Path, *, ios: bool = True, android: bool = True, name: str = "blur") -> Path:
     root.mkdir(parents=True, exist_ok=True)
-    manifest = {}
+    manifest: dict[str, object] = {"name": name}
     if ios:
         manifest["ios"] = {"entry": "BlurPlugin"}
         (root / "ios").mkdir(exist_ok=True)
@@ -164,17 +164,17 @@ def test_load_plugin_rejects_missing_manifest(tmp_path: Path) -> None:
 def test_load_plugin_rejects_entry_without_sources(tmp_path: Path) -> None:
     root = tmp_path / "empty"
     root.mkdir()
-    (root / "pn_plugin.json").write_text(json.dumps({"ios": {"entry": "Nope"}}), encoding="utf-8")
+    (root / "pn_plugin.json").write_text(json.dumps({"name": "x", "ios": {"entry": "Nope"}}), encoding="utf-8")
     with pytest.raises(PluginError, match="no .swift files"):
         load_plugin(root)
 
 
 def test_load_plugin_rejects_bad_entry_names(tmp_path: Path) -> None:
     root = _write_plugin(tmp_path / "bad")
-    (root / "pn_plugin.json").write_text(json.dumps({"ios": {"entry": "Not A Type"}}), encoding="utf-8")
+    (root / "pn_plugin.json").write_text(json.dumps({"name": "x", "ios": {"entry": "Not A Type"}}), encoding="utf-8")
     with pytest.raises(PluginError, match="Swift type name"):
         load_plugin(root)
-    (root / "pn_plugin.json").write_text(json.dumps({"android": {"entry": "NoPackage"}}), encoding="utf-8")
+    (root / "pn_plugin.json").write_text(json.dumps({"name": "x", "android": {"entry": "NoPackage"}}), encoding="utf-8")
     with pytest.raises(PluginError, match="fully qualified"):
         load_plugin(root)
 
@@ -182,7 +182,7 @@ def test_load_plugin_rejects_bad_entry_names(tmp_path: Path) -> None:
 def test_load_plugin_rejects_no_platforms(tmp_path: Path) -> None:
     root = tmp_path / "none"
     root.mkdir()
-    (root / "pn_plugin.json").write_text("{}", encoding="utf-8")
+    (root / "pn_plugin.json").write_text('{"name": "x"}', encoding="utf-8")
     with pytest.raises(PluginError, match="neither"):
         load_plugin(root)
 
@@ -194,7 +194,7 @@ def test_load_plugin_rejects_no_platforms(tmp_path: Path) -> None:
 
 def test_discover_plugins_merges_entry_points_and_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ep_root = _write_plugin(tmp_path / "from_ep", android=False)
-    local_root = _write_plugin(tmp_path / "local", ios=False)
+    local_root = _write_plugin(tmp_path / "local", ios=False, name="local")
     monkeypatch.setattr(plugins_mod, "_entry_points", lambda: {"ep_blur": "some.module"})
     monkeypatch.setattr(plugins_mod, "_resolve_entry_point", lambda target: ep_root)
 

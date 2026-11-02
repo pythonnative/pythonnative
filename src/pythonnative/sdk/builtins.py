@@ -56,7 +56,6 @@ ADOPTERS = frozenset(
         "Row",
         "Column",
         "Pressable",
-        "TouchableOpacity",
         "SafeAreaView",
         "KeyboardAvoidingView",
         "Screen",
@@ -333,8 +332,12 @@ def write_builtin_contracts(path: Any = None) -> Path:
     return destination
 
 
-def write_plugin_contracts() -> None:
-    """Write each first-party capability's ``native/schema.json`` from its facade's declarations."""
+def write_plugin_contracts(names: Any = None) -> None:
+    """Write first-party capabilities' ``native/schema.json`` from their facades' declarations.
+
+    Args:
+        names: The capabilities to write; every one when ``None``.
+    """
     import importlib
     import json
 
@@ -343,7 +346,7 @@ def write_plugin_contracts() -> None:
 
     root = Path(__file__).resolve().parents[1]
     known_components, known_modules = set(COMPONENTS), set(MODULES)
-    for name in FIRST_PARTY_PLUGINS:
+    for name in FIRST_PARTY_PLUGINS if names is None else names:
         native = root / name / "native"
         if not (native / "pn_plugin.json").is_file():
             continue

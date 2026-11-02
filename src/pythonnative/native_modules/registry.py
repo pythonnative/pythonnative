@@ -86,20 +86,29 @@ class NativeModuleError(RuntimeError):
 
 
 _plugin_owners: Dict[str, str] = {}
+_plugin_fallbacks: Dict[str, Any] = {}
 _page_modules: set[str] = set()
 
 
-def declare_plugin_module(name: str, plugin: str, *, browser: bool = False) -> None:
+def declare_plugin_module(name: str, plugin: str, *, browser: bool = False, fallback: Any = None) -> None:
     """Record that ``plugin`` implements module ``name``, so a build without it can say what to do.
+
+    A declaration lasts for the process, as importing the facade does, so a
+    registry reset in tests leaves it in place. A module registered with
+    [`register_python_module`][pythonnative.native_modules.registry.register_python_module]
+    takes precedence over ``fallback``.
 
     Args:
         name: The module's name.
         plugin: The plugin's name.
         browser: The plugin's browser entry implements the module in the preview page.
+        fallback: The off-device implementation: a class or an instance.
     """
     _plugin_owners[name] = plugin
     if browser:
         _page_modules.add(name)
+    if fallback is not None:
+        _plugin_fallbacks[name] = fallback
 
 
 def is_page_module(name: str) -> bool:
@@ -448,6 +457,8 @@ def _resolve_python_impl(name: str) -> Any:
     _discover_entry_points()
     with _registry_lock:
         impl = _python_impls.get(name)
+    if impl is None:
+        impl = _plugin_fallbacks.get(name)
     if impl is None:
         from . import fallback
 

@@ -44,9 +44,8 @@ from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 from .. import assets
 from . import android as android_config
-from . import artifacts, bytecode, deps, runtime_assets
+from . import artifacts, bytecode, deps, plugin_config, runtime_assets
 from . import ios as ios_config
-from . import plugin_config
 from . import plugins as native_plugins
 from .android import AndroidLayout
 from .bundle import copy_library
@@ -407,17 +406,18 @@ class Builder:
         plugins = self._discover_plugins(targets)
 
         if platform == "android":
-            layout = android_config.configure(
-                project_dir,
-                self.config,
-                dev_lib_root=self.dev_lib_root,
-                release=release,
-                log=self.log,
-            )
             try:
+                layout = android_config.configure(
+                    project_dir,
+                    self.config,
+                    dev_lib_root=self.dev_lib_root,
+                    release=release,
+                    allow_unsigned=allow_unsigned,
+                    log=self.log,
+                )
                 plugin_config.apply_android(project_dir, self.config, plugins, log=self.log)
                 native_plugins.stage_android_plugins(project_dir, plugins, log=self.log)
-            except native_plugins.PluginError as exc:
+            except (ValueError, native_plugins.PluginError) as exc:
                 raise BuildError(str(exc)) from exc
             self._stage_contracts(project_dir, platform, plugins, [layout.python_root / "pythonnative"])
             if not release:
@@ -582,6 +582,8 @@ class Builder:
                     deps.install(self.config, target, packages_dir, runner=self.runner)
                 except deps.DependencyError as exc:
                     raise BuildError(str(exc)) from exc
+                if release:
+                    _prune_wheel_payload(packages_dir)
 
         self._compile_ios_bytecode(
             [(app_dir, "app"), *((slice_dir, "app_packages") for slice_dir in slices)], release=release
@@ -644,6 +646,10 @@ class Builder:
             BuildError: If the Gradle build fails.
         """
         self._gradlew(prepared, ["installDebug"])
+
+    def install_android_release(self, prepared: PreparedProject) -> None:
+        """Install the release configuration, signed with the debug key, for release-mode e2e runs."""
+        self._gradlew(prepared, ["installRelease", "-PpnDebugSigning=true"])
 
     def android_debug_apk(self, prepared: PreparedProject) -> Optional[Path]:
         """The debug APK produced by the last Gradle build, if it exists."""
@@ -721,7 +727,7 @@ class Builder:
 
     # -- iOS builds -----------------------------------------------------
 
-    def build_ios_simulator(self, prepared: PreparedProject) -> Path:
+    def build_ios_simulator(self, prepared: PreparedProject, *, release: bool = False) -> Path:
         """Build the iOS app for the simulator.
 
         The Xcode build produces a complete, runnable ``.app``: the
@@ -730,6 +736,7 @@ class Builder:
 
         Args:
             prepared: A prepared iOS project.
+            release: Use the Release configuration, for release-mode e2e runs.
 
         Returns:
             Path to the built ``.app``.
@@ -738,6 +745,7 @@ class Builder:
             BuildError: If the build fails.
         """
         derived = prepared.project_dir / "build"
+        configuration = "Release" if release else "Debug"
         settings = ios_config.build_settings(self.config, project_dir=prepared.project_dir)
         # The simulator runs on the host CPU, and BeeWare's runtime
         # install script requires a single-architecture build (its
@@ -752,7 +760,7 @@ class Builder:
                 "-scheme",
                 ios_config.PROJECT_NAME,
                 "-configuration",
-                "Debug",
+                configuration,
                 "-destination",
                 "generic/platform=iOS Simulator",
                 "-derivedDataPath",
@@ -765,7 +773,7 @@ class Builder:
         if not result.ok:
             raise BuildError("xcodebuild (simulator) failed. See output above.")
 
-        app_path = derived / "Build" / "Products" / "Debug-iphonesimulator" / ios_config.APP_BUNDLE_NAME
+        app_path = derived / "Build" / "Products" / f"{configuration}-iphonesimulator" / ios_config.APP_BUNDLE_NAME
         if not app_path.is_dir():
             raise BuildError(f"Built app not found at {app_path}.")
         return app_path
@@ -818,17 +826,13 @@ class Builder:
             raise BuildError(f"Built app not found at {app_path}.")
         return app_path
 
-    def build_ios_archive(
-        self, prepared: PreparedProject, *, upload: bool = False, allow_unsigned: bool = False
-    ) -> BuildArtifacts:
-        """Archive the iOS app and export a signed IPA (or upload it).
+    def build_ios_archive(self, prepared: PreparedProject, *, allow_unsigned: bool = False) -> BuildArtifacts:
+        """Archive the iOS app and export a signed IPA.
 
         Args:
             prepared: A prepared iOS project (use ``release=True``).
-            upload: Upload directly to App Store Connect instead of
-                exporting a local ``.ipa`` (requires
-                ``export_method = "app-store"`` and stored ASC
-                credentials in Xcode).
+            allow_unsigned: Sign ad hoc and stop at the archive, for a smoke
+                build that never leaves the machine.
 
         Returns:
             The produced ``.ipa`` (and ``.xcarchive``) paths.
@@ -878,9 +882,7 @@ class Builder:
             return BuildArtifacts(paths=_existing([archive_path]))
 
         export_dir = prepared.build_dir / "export"
-        options = ios_config.write_export_options(
-            self.config, prepared.build_dir / "exportOptions.plist", upload=upload
-        )
+        options = ios_config.write_export_options(self.config, prepared.build_dir / "exportOptions.plist")
         result = self.runner.run(
             [
                 "xcodebuild",
@@ -927,6 +929,14 @@ def config_has_android_signing(config: AppConfig) -> bool:
         ``True`` if a keystore and alias are configured.
     """
     return config.android.signing.is_configured
+
+
+def _prune_wheel_payload(packages_dir: Path) -> None:
+    """Drop what wheels ship for development: scripts with a build-machine shebang, and test suites."""
+    shutil.rmtree(packages_dir / "bin", ignore_errors=True)
+    for directory in sorted(packages_dir.rglob("*"), reverse=True):
+        if directory.is_dir() and directory.name in ("tests", "test") and directory.parent != packages_dir:
+            shutil.rmtree(directory, ignore_errors=True)
 
 
 def _asc_authentication() -> List[str]:

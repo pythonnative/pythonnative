@@ -790,6 +790,12 @@ entry_point = "app/main.py"
 # icon = "assets/icon.png"
 # splash = "assets/splash.png"
 
+# First-party capabilities to compile into this app, for example
+# use = ["camera", "location", "notifications"]. An app only links what it lists.
+# Docs: https://pythonnative.com/guides/capabilities/
+[plugins]
+# use = []
+
 # Third-party pip packages bundled into the app. Pure-Python packages
 # always work; packages with C extensions need a wheel for each device
 # platform. Run `pn deps` to see what resolves before you build.

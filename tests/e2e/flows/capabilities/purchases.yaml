@@ -1,0 +1,24 @@
+# Tests that Purchases reaches the store and survives its answer. A simulator
+# has nothing to sell, so the flow asserts only that the lookup finishes: an iOS
+# simulator with no StoreKit configuration finds 0 products, and an Android emulator
+# without a signed-in Google Play reports "unavailable". No purchase is attempted.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/purchases.py
+# Source under test: src/pythonnative/purchases/__init__.py :: Purchases
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Purchases
+- extendedWaitUntil:
+    visible: "Lookup finished: yes"
+    timeout: 30000
+- assertVisible: "Available: (yes|no)"
+- assertVisible: "Products: (0|unavailable|store_error)"
+- assertVisible: "Price: none"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

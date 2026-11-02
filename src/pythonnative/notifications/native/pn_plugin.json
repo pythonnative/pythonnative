@@ -1,0 +1,34 @@
+{
+  "name": "notifications",
+  "contracts": "schema.json",
+  "requires": {
+    "permissions": [
+      "notifications"
+    ]
+  },
+  "options": {
+    "android_icon": {
+      "type": "path",
+      "default": null
+    }
+  },
+  "ios": {
+    "entry": "NotificationsPlugin"
+  },
+  "android": {
+    "entry": "com.pythonnative.plugins.notifications.NotificationsPlugin",
+    "manifest": {
+      "application": "android/application.xml"
+    },
+    "when": {
+      "android_icon": {
+        "files": [
+          {
+            "from": "${android_icon}",
+            "to": "app/src/main/res/drawable-nodpi/pn_notification_icon.png"
+          }
+        ]
+      }
+    }
+  }
+}

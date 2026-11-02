@@ -1,0 +1,18 @@
+{
+  "name": "sensors",
+  "contracts": "schema.json",
+  "requires": {
+    "permissions": [
+      "motion"
+    ]
+  },
+  "ios": {
+    "entry": "SensorsPlugin"
+  },
+  "android": {
+    "entry": "com.pythonnative.plugins.sensors.SensorsPlugin"
+  },
+  "web": {
+    "entry": "web/index.js"
+  }
+}

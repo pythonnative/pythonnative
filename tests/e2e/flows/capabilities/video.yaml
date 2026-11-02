@@ -1,0 +1,52 @@
+# Tests the Video view's events and its typed handle against a clip embedded in
+# the demo, so no network is involved. Muted, because a simulator's audio output
+# can't be asserted anyway.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/video.py
+# Source under test: src/pythonnative/video/__init__.py :: Video, VideoHandle
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Video
+- tapOn: "Play"
+- scrollUntilVisible:
+    element: "Ready: 96x54"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- extendedWaitUntil:
+    visible: "Progressing: yes"
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "Ended: 1"
+    timeout: 10000
+- scrollUntilVisible:
+    element: "Seek and ask"
+    direction: UP
+    timeout: 15000
+    centerElement: false
+- tapOn: "Seek and ask"
+- scrollUntilVisible:
+    element: "Asked position: 1.0"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- assertVisible: "Video error: none"
+- scrollUntilVisible:
+    element: "Load a missing file"
+    direction: UP
+    timeout: 15000
+    centerElement: false
+- tapOn: "Load a missing file"
+- scrollUntilVisible:
+    element: "Video error: some"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

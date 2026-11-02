@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paths the camera plugin's FileProvider serves. Camera.take_photo hands the
+     system camera a URI under the app's cache directory. -->
+<paths>
+    <cache-path name="pn_camera" path="pn-camera/" />
+</paths>

@@ -48,7 +48,7 @@ PermissionName = Literal[
     "microphone",
     "photo_library",
     "location_when_in_use",
-    "contacts",
+    "motion",
     "notifications",
 ]
 """A capability that has a runtime prompt; the same names as ``[permissions]`` in ``pythonnative.toml``."""

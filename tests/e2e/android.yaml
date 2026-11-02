@@ -43,7 +43,6 @@ env:
 - runFlow: flows/components/section_list.yaml
 - runFlow: flows/components/web_view.yaml
 - runFlow: flows/components/web_view_handle.yaml
-- runFlow: flows/components/touchable_opacity.yaml
 - runFlow: flows/components/image_background.yaml
 - runFlow: flows/components/checkbox.yaml
 - runFlow: flows/components/segmented_control.yaml
@@ -128,3 +127,17 @@ env:
 - runFlow: flows/packages/pypi_packages.yaml
 - runFlow: flows/sdk/custom_component.yaml
 - runFlow: flows/sdk/define_component.yaml
+- runFlow: flows/capabilities/audio.yaml
+- runFlow: flows/capabilities/background.yaml
+- runFlow: flows/capabilities/biometrics.yaml
+- runFlow: flows/capabilities/camera.yaml
+- runFlow: flows/capabilities/location.yaml
+- runFlow: flows/capabilities/maps.yaml
+- runFlow: flows/capabilities/notifications.yaml
+- runFlow: flows/capabilities/pickers.yaml
+- runFlow: flows/capabilities/purchases.yaml
+- runFlow: flows/capabilities/push.yaml
+- runFlow: flows/capabilities/sensors.yaml
+- runFlow: flows/capabilities/video.yaml
+- runFlow: flows/capabilities/websocket.yaml
+- runFlow: flows/sdk/plugin_config.yaml

@@ -69,6 +69,7 @@ _GO_PERMISSIONS = {
     "notifications": True,
     "vibration": True,
 }
+"""What the capabilities Go carries need declared, in words that make sense for a host app."""
 
 Logger = Callable[[str], None]
 Fetch = Callable[[str], bytes]
@@ -148,6 +149,7 @@ def go_config(work_dir: Path, *, development_team: Optional[str] = None) -> AppC
     """
     from ..devclient import go_main_source
     from ..project.config import DEFAULT_PYTHON_VERSION
+    from .plugins import FIRST_PARTY_PLUGINS, NOT_IN_GO
 
     work_dir.mkdir(parents=True, exist_ok=True)
     app_dir = work_dir / "app"
@@ -162,6 +164,8 @@ def go_config(work_dir: Path, *, development_team: Optional[str] = None) -> AppC
         f"{key} = {'true' if value is True else json.dumps(value)}" for key, value in _GO_PERMISSIONS.items()
     )
     toml = toml.replace("[permissions]\n", f"[permissions]\n{permissions}\n", 1)
+    capabilities = sorted(set(FIRST_PARTY_PLUGINS) - set(NOT_IN_GO))
+    toml = toml.replace("[plugins]\n# use = []\n", f"[plugins]\nuse = {json.dumps(capabilities)}\n", 1)
     if development_team:
         toml = toml.replace('# development_team = "ABCDE12345"', f'development_team = "{development_team}"')
     (work_dir / "pythonnative.toml").write_text(toml, encoding="utf-8")

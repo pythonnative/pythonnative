@@ -61,6 +61,8 @@ jobs:
             suites: animations assets
           - name: misc
             suites: misc
+          - name: capabilities
+            suites: capabilities
           - name: inbox
             suites: inbox
 
@@ -178,6 +180,8 @@ jobs:
             suites: navigation gestures layout styling
           - name: anim-misc
             suites: animations assets misc
+          - name: capabilities
+            suites: capabilities
           - name: inbox
             suites: inbox
 

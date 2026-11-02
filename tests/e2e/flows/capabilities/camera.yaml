@@ -1,0 +1,93 @@
+# Tests CameraView and its handle as far as each simulator allows. The Android
+# emulator has virtual cameras, so a real picture and video are taken there, on
+# the front one: the API 31 image's camera HAL crashes on a CameraX still from its
+# back camera. The iOS simulator has no camera, so the flow checks the placeholder
+# state: on_error reports `unavailable`, the handle raises, and the app stays up.
+# Barcode scanning isn't asserted: no flow can put a barcode in front of a lens.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/camera.py
+# Source under test: src/pythonnative/camera/__init__.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Camera
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "Camera error: unavailable"
+          timeout: 10000
+      - assertVisible: "Camera ready: no"
+      - assertVisible: "Camera unavailable"
+      - scrollUntilVisible:
+          element: "Take picture"
+          direction: DOWN
+          timeout: 15000
+          centerElement: false
+      - tapOn: "Take picture"
+      - extendedWaitUntil:
+          visible: "Last result: error not_ready"
+          timeout: 5000
+      - tapOn: "Stop recording"
+      - extendedWaitUntil:
+          visible: "Last result: error not_recording"
+          timeout: 5000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - runFlow:
+          when:
+            visible: "While using the app"
+          commands:
+            - tapOn: "While using the app"
+      - extendedWaitUntil:
+          visible: "Camera ready: yes"
+          timeout: 30000
+      - scrollUntilVisible:
+          element: "Flip camera"
+          direction: DOWN
+          timeout: 15000
+          centerElement: false
+      - tapOn: "Flip camera"
+      - extendedWaitUntil:
+          visible: "Facing: front"
+          timeout: 5000
+      - scrollUntilVisible:
+          element: "Take picture"
+          direction: UP
+          timeout: 15000
+          centerElement: false
+      - extendedWaitUntil:
+          visible: "Camera ready: yes"
+          timeout: 30000
+      - tapOn: "Take picture"
+      - extendedWaitUntil:
+          visible: "Last result: picture saved.*"
+          timeout: 30000
+      - tapOn: "Start recording"
+      - extendedWaitUntil:
+          visible: "Last result: recording"
+          timeout: 30000
+      - tapOn: "Stop recording"
+      - extendedWaitUntil:
+          visible: "Last result: video saved"
+          timeout: 30000
+- scrollUntilVisible:
+    element: "Toggle zoom"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- assertVisible: "Zoom: 1.0"
+- tapOn: "Toggle zoom"
+- extendedWaitUntil:
+    visible: "Zoom: 2.0"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

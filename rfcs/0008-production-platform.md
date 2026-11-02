@@ -339,7 +339,7 @@ and signing team.
   export isn't signed, or when a required usage string is missing.
   `--allow-unsigned` keeps the old behavior for CI smoke builds.
 - `app_packages` drops `bin/`, `tests/`, and `test/` from wheels in release
-  builds, and the staged `CFBundleName` is the app's name.
+  builds on iOS.
 - `[ios.signing].provisioning_profile` also applies to the archive, with
   `CODE_SIGN_STYLE=Manual`.
 - App Store Connect API key arguments are read from `PN_ASC_KEY_PATH`,

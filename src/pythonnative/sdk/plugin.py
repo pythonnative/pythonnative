@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import Any, Callable, Mapping, Optional, Sequence
 
 from ..element import Element
-from ..native_modules.registry import declare_plugin_module, register_python_module
+from ..native_modules.registry import declare_plugin_module
 from . import schema
 from ._components import define_component
 
@@ -55,14 +55,12 @@ def plugin_module(
         browser: The plugin's ``web`` entry implements this module in the
             preview page, so calls go there instead of to ``fallback``.
     """
-    declare_plugin_module(name, plugin, browser=browser)
+    declare_plugin_module(name, plugin, browser=browser, fallback=fallback)
     if name not in schema.MODULES:
         contract = schema.ModuleSchema.from_protocol(name, protocol, events=events)
         for method, names in (platforms or {}).items():
             contract.methods[method]["platforms"] = list(names)
         schema.register_schema(contract)
-    if fallback is not None:
-        register_python_module(name, fallback)
 
 
 def plugin_component(

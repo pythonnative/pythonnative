@@ -1,14 +1,9 @@
 """Haptic feedback and raw vibration.
 
-Two interfaces live here, both backed by the native ``Haptics`` module:
-
-- [`Haptics`][pythonnative.Haptics]: semantic, iOS-style feedback
-  (impact / notification / selection) backed by
-  ``UIFeedbackGenerator`` on iOS and ``VibrationEffect`` patterns on
-  Android.
-- [`Vibration`][pythonnative.Vibration]: a blunt "buzz for N
-  milliseconds" interface for cases where you want an explicit
-  duration.
+[`Haptics`][pythonnative.Haptics] offers semantic, iOS-style feedback
+(impact, notification, selection) backed by ``UIFeedbackGenerator`` on
+iOS and ``VibrationEffect`` patterns on Android, and a blunt "buzz for N
+milliseconds" for cases where you want an explicit duration.
 
 Every method is synchronous (the OS queues the effect and returns).
 Missing hardware is not an error: on a device without a Taptic Engine
@@ -50,14 +45,6 @@ class Haptics:
     def selection() -> None:
         """Play the light "selection changed" tick."""
         _call("selection")
-
-
-class Vibration:
-    """Raw vibration control (synchronous).
-
-    Raises:
-        NativeModuleError: If the native module fails.
-    """
 
     @staticmethod
     def vibrate(duration_ms: int = 400) -> None:

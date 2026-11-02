@@ -3,6 +3,7 @@ package com.pythonnative.runtime.modules
 import android.app.Activity
 import android.app.Application
 import android.content.Intent
+import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.bridge.PNRegistry
 
 /**
@@ -56,6 +57,8 @@ object PNHeadless {
 
     /** Start Python if it isn't up, importing the app's entry module so its registrations run. */
     fun ensureStarted() {
+        // Python's bridge opens the renderer core at startup, with or without a screen.
+        com.pythonnative.runtime.core.PNCore.install(PNBridge.context())
         starter?.invoke()
     }
 }

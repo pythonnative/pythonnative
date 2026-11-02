@@ -1,0 +1,73 @@
+# Tests permission, scheduling, cancellation, and the foreground event. A
+# notification delivered right away reaches on_received on both platforms, and the
+# badge shows the platform difference. Taps aren't covered: they go through the
+# system's shade, and the guide lists how they were verified.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/notifications.py
+# Source under test: src/pythonnative/notifications/__init__.py :: Notifications
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Notifications
+- assertVisible: "Permission: unknown"
+- tapOn: "Request permission"
+# iOS and Android 13+ prompt the first time.
+- runFlow:
+    when:
+      visible: "(Allow|OK)"
+    commands:
+      - tapOn: "(Allow|OK)"
+- extendedWaitUntil:
+    visible: "Permission: granted"
+    timeout: 10000
+- tapOn: "Schedule now"
+- extendedWaitUntil:
+    visible: "Scheduled: now"
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Received: 1"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- assertVisible: "Last data: now"
+- assertVisible: "Launched by a tap: no"
+- scrollUntilVisible:
+    element: "Schedule in ten minutes"
+    direction: UP
+    timeout: 15000
+    centerElement: false
+- tapOn: "Schedule in ten minutes"
+- extendedWaitUntil:
+    visible: "Scheduled: later"
+    timeout: 5000
+- tapOn: "Cancel all"
+- extendedWaitUntil:
+    visible: "Scheduled: canceled"
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Set badge"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Set badge"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "Badge: set"
+          timeout: 5000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "Badge: unsupported"
+          timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

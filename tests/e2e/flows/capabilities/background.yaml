@@ -1,0 +1,52 @@
+# Tests @background.task, run_now, schedule, cancel, and status. A simulator can't
+# show the system starting a task, so this asserts the Python function runs in-process
+# and that the scheduler answers: Android accepts, and an iOS simulator always
+# refuses with "unavailable".
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/background.py
+# Source under test: src/pythonnative/background/__init__.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Background
+- assertVisible: "Every: 15 minutes"
+- assertVisible: "Run now result: none"
+- tapOn: "Run now"
+- extendedWaitUntil:
+    visible: "Run now result: success"
+    timeout: 5000
+- assertVisible: "Runs: 1"
+- scrollUntilVisible:
+    element: "Schedule"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Schedule"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "Schedule answer: accepted"
+          timeout: 5000
+      - assertVisible: "Scheduled: yes"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "Schedule answer: unavailable"
+          timeout: 5000
+      - assertVisible: "Scheduled: no"
+- tapOn: "Cancel task"
+- extendedWaitUntil:
+    visible: "Schedule answer: canceled"
+    timeout: 5000
+- assertVisible: "Scheduled: no"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

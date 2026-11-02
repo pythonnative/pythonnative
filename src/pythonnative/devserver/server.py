@@ -490,7 +490,6 @@ class DevServer:
 
         return _remove
 
-    @property
     def _web_plugins(self) -> List[Any]:
         """Plugins with a browser entry: every first-party capability, plus the project's own."""
         from ..project import plugins as native_plugins
@@ -522,6 +521,7 @@ class DevServer:
             return
         _respond_file(writer, candidate)
 
+    @property
     def project_runtime(self) -> Any:
         """What the project needs from a dev client (computed once, on first use)."""
         if self._runtime is None:

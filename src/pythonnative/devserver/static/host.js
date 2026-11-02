@@ -156,6 +156,13 @@ export class Screen {
  * it: strings as-is, `null` and `undefined` as `""`, and everything else in
  * its JSON spelling.
  */
+/** A module call's error envelope, keeping the code a plugin's module throws with. */
+function failure(err) {
+  const envelope = { ok: false, error: String(err && err.message ? err.message : err) };
+  if (err && err.code != null) envelope.code = String(err.code);
+  return envelope;
+}
+
 export function scriptResult(value) {
   if (value === undefined || value === null) return "";
   if (typeof value === "string") return value;
@@ -348,7 +355,7 @@ export class PreviewHost {
     try {
       result = fn.call(impl, args);
     } catch (err) {
-      return JSON.stringify({ ok: false, error: String(err && err.message ? err.message : err) });
+      return JSON.stringify(failure(err));
     }
     if (result && typeof result.then === "function") {
       if (callId === 0) {
@@ -357,12 +364,12 @@ export class PreviewHost {
         try {
           return JSON.stringify({ ok: true, value: nullish(await result) });
         } catch (err) {
-          return JSON.stringify({ ok: false, error: String(err && err.message ? err.message : err) });
+          return JSON.stringify(failure(err));
         }
       }
       result
         .then((value) => this.moduleMessage(module, { call_id: callId, ok: true, value: nullish(value) }))
-        .catch((err) => this.moduleMessage(module, { call_id: callId, ok: false, error: String(err && err.message ? err.message : err) }));
+        .catch((err) => this.moduleMessage(module, { call_id: callId, ...failure(err) }));
       return JSON.stringify({ pending: true });
     }
     return JSON.stringify({ ok: true, value: nullish(result) });

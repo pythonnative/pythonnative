@@ -62,15 +62,29 @@ public final class PNAppLifecycle {
     }
 
     public func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any], completion: @escaping (UIBackgroundFetchResult) -> Void) {
+        // UIKit allows one completion, but several hooks may handle one push: the
+        // first to finish decides, and the rest are ignored.
+        var finished = false
+        let once: (UIBackgroundFetchResult) -> Void = { result in
+            if finished { return }
+            finished = true
+            completion(result)
+        }
         var handled = false
-        for hook in registered where hook.didReceiveRemoteNotification(userInfo, completion: completion) { handled = true }
-        if !handled { completion(.noData) }
+        for hook in registered where hook.didReceiveRemoteNotification(userInfo, completion: once) { handled = true }
+        if !handled { once(.noData) }
     }
 
     public func handleEventsForBackgroundSession(identifier: String, completion: @escaping () -> Void) {
+        var finished = false
+        let once: () -> Void = {
+            if finished { return }
+            finished = true
+            completion()
+        }
         var handled = false
-        for hook in registered where hook.handleEventsForBackgroundSession(identifier: identifier, completion: completion) { handled = true }
-        if !handled { completion() }
+        for hook in registered where hook.handleEventsForBackgroundSession(identifier: identifier, completion: once) { handled = true }
+        if !handled { once() }
     }
 
     /// Whether a hook consumed `url`; otherwise it reaches `Linking`.

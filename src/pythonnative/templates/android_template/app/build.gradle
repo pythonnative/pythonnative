@@ -45,6 +45,8 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // `pn run --release`: the release configuration on a local device.
+            if (project.hasProperty('pnDebugSigning')) signingConfig signingConfigs.debug
         }
     }
     compileOptions {

@@ -10,6 +10,47 @@ from typing import Any, Callable, Dict, Optional
 
 from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element, Node
 
+_error_fallback: Optional[Callable[..., Element]] = None
+
+
+def set_error_fallback(fallback: Optional[Callable[..., Element]]) -> None:
+    """Replace the screen a release build shows after an uncaught render error.
+
+    Release builds wrap each screen in a boundary, so an error no boundary of
+    yours catches doesn't leave a broken screen. ``fallback`` takes the same
+    forms as [`ErrorBoundary`][pythonnative.ErrorBoundary]'s: ``fallback(error)``
+    or ``fallback(error, reset)``, where ``reset`` remounts the screen with fresh
+    state. Development builds keep the error screen.
+
+    Args:
+        fallback: The renderer, or ``None`` to restore the default, which offers
+            a "Try again" button.
+    """
+    global _error_fallback
+    _error_fallback = fallback
+
+
+def root_error_fallback(error: BaseException, reset: Callable[[], None]) -> Element:
+    """What the release root boundary shows: the app's fallback, or a plain retry screen."""
+    if _error_fallback is not None:
+        import inspect
+
+        positional = [
+            parameter
+            for parameter in inspect.signature(_error_fallback).parameters.values()
+            if parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+        ]
+        return _error_fallback(error, reset) if len(positional) >= 2 else _error_fallback(error)
+    from ..style import style
+    from .layout import Column
+    from .text import Button, Text
+
+    return Column(
+        Text("Something went wrong", style=style(font_size=20, bold=True)),
+        Button("Try again", on_press=reset),
+        style=style(flex=1, gap=16, align_items="center", justify_content="center", padding=24),
+    )
+
 
 def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element:
     """Group children without adding a wrapping native view.

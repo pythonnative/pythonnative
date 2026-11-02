@@ -1,0 +1,45 @@
+# Tests sensor availability and the stream's lifecycle. The iOS simulator has
+# no sensors, so starting must fail with `unavailable`. The Android emulator's
+# virtual sensors stream readings; the values themselves aren't asserted here
+# because Maestro can't set them. Set them by hand with `adb emu sensor set`.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/sensors.py
+# Source under test: src/pythonnative/sensors/__init__.py :: Accelerometer
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Sensors
+- assertVisible: "Readings: none"
+- scrollUntilVisible:
+    element: "Start readings"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Start readings"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: "Accelerometer: no"
+      - extendedWaitUntil:
+          visible: "Stream error: unavailable"
+          timeout: 5000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: "Accelerometer: yes"
+      - extendedWaitUntil:
+          visible: "Readings: some"
+          timeout: 10000
+      - tapOn: "Stop readings"
+      - extendedWaitUntil:
+          visible: "Running: no"
+          timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

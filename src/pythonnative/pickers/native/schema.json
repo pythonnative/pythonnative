@@ -1,0 +1,157 @@
+{
+  "components": {},
+  "modules": {
+    "Pickers": {
+      "events": {},
+      "methods": {
+        "pick_documents": {
+          "arguments": {
+            "multiple": {
+              "type": "boolean"
+            },
+            "types": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "async": true,
+          "defaults": {
+            "multiple": false,
+            "types": null
+          },
+          "required": [],
+          "result": {
+            "items": {
+              "additionalProperties": false,
+              "defaults": {},
+              "properties": {
+                "mime_type": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer"
+                }
+              },
+              "python_kind": "dataclass",
+              "python_type": "pythonnative.pickers:PickedFile",
+              "required": [
+                "mime_type",
+                "name",
+                "path",
+                "size"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "pick_images": {
+          "arguments": {
+            "limit": {
+              "type": "integer"
+            },
+            "quality": {
+              "type": "number"
+            }
+          },
+          "async": true,
+          "defaults": {
+            "limit": 1,
+            "quality": 0.9
+          },
+          "required": [],
+          "result": {
+            "items": {
+              "additionalProperties": false,
+              "defaults": {},
+              "properties": {
+                "mime_type": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer"
+                }
+              },
+              "python_kind": "dataclass",
+              "python_type": "pythonnative.pickers:PickedFile",
+              "required": [
+                "mime_type",
+                "name",
+                "path",
+                "size"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "pick_videos": {
+          "arguments": {
+            "limit": {
+              "type": "integer"
+            }
+          },
+          "async": true,
+          "defaults": {
+            "limit": 1
+          },
+          "required": [],
+          "result": {
+            "items": {
+              "additionalProperties": false,
+              "defaults": {},
+              "properties": {
+                "mime_type": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer"
+                }
+              },
+              "python_kind": "dataclass",
+              "python_type": "pythonnative.pickers:PickedFile",
+              "required": [
+                "mime_type",
+                "name",
+                "path",
+                "size"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      },
+      "name": "Pickers"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

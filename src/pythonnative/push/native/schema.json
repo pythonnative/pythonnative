@@ -1,0 +1,61 @@
+{
+  "components": {},
+  "modules": {
+    "Push": {
+      "events": {
+        "message": {
+          "additionalProperties": {
+            "type": "json"
+          },
+          "type": "object"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "methods": {
+        "get_device_token": {
+          "arguments": {},
+          "async": true,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "set_listening": {
+          "arguments": {
+            "event": {
+              "enum": [
+                "token",
+                "message"
+              ]
+            },
+            "listening": {
+              "type": "boolean"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "event",
+            "listening"
+          ],
+          "result": {
+            "type": "null"
+          }
+        }
+      },
+      "name": "Push"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

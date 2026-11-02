@@ -351,16 +351,21 @@ def test_render_error_shows_redbox_and_dismiss_restores_tree(
     host.on_destroy()
 
 
-def test_mount_error_propagates_outside_dev_mode(monkeypatch: pytest.MonkeyPatch, backend: FakeBackend) -> None:
+def test_mount_error_shows_the_fallback_outside_dev_mode(monkeypatch: pytest.MonkeyPatch, backend: FakeBackend) -> None:
     monkeypatch.setattr(diagnostics, "_dev_mode", False)
 
     @component
     def Root() -> Element:
         raise RuntimeError("kaboom")
 
+    seen: list[str] = []
+    diagnostics.set_error_handler(lambda error, phase: seen.append(f"{phase}: {error}"))
     host = create_screen(_install_app_module(monkeypatch, "redbox_off_app", Root))
-    with pytest.raises(RuntimeError, match="kaboom"):
+    try:
         host.on_create()
+    finally:
+        diagnostics.set_error_handler(None)
+    assert seen == ["render: kaboom"]
     assert not host._redbox_visible
     host.on_destroy()
 

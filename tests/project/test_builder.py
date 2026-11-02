@@ -168,7 +168,7 @@ def test_prepare_ios_release_compiles_bytecode_when_versions_match(
     # Pretend the host interpreter matches the configured version so the
     # bytecode path runs regardless of the interpreter running the tests.
     cfg.python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
-    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True)
+    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True, allow_unsigned=True)
 
     app_dir = prepared.project_dir / "app"
     assert (app_dir / "main.pyc").is_file()
@@ -227,7 +227,7 @@ def test_debug_prepare_warns_about_a_stale_lock_and_resolves_unlocked(
     assert len(pip_cmds) == 2
     assert all("httpx==0.27.0" in cmd and "--no-deps" not in cmd for cmd in pip_cmds)
     with pytest.raises(BuildError, match="doesn't match"):
-        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True)
+        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True, allow_unsigned=True)
 
 
 def test_prepare_ios_release_requires_a_matching_interpreter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -235,7 +235,7 @@ def test_prepare_ios_release_requires_a_matching_interpreter(tmp_path: Path, mon
     monkeypatch.setattr(builder_mod.bytecode, "compiler_for", lambda version: None)
     cfg = AppConfig.load(_project(tmp_path, _TOML))
     with pytest.raises(BuildError, match="No Python .* interpreter is installed to compile bytecode"):
-        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True)
+        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True, allow_unsigned=True)
 
 
 def test_prepare_ios_debug_compiles_beside_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -281,7 +281,7 @@ def test_build_android_release_artifacts(tmp_path: Path) -> None:
     runner = RecordingRunner()
     builder = Builder(cfg, runner=runner, log=lambda _m: None)
     prepared = builder.prepare("android")
-    artifacts = builder.build_android(prepared, debug=False)
+    artifacts = builder.build_android(prepared, debug=False, allow_unsigned=True)
 
     names = {p.name for p in artifacts.paths}
     assert "app-release-unsigned.apk" in names
@@ -332,12 +332,12 @@ def test_release_preflight_requires_current_target_and_frozen_dependencies(tmp_p
     config = AppConfig.load(root)
     builder = Builder(config, runner=RecordingRunner(), log=lambda _: None)
     with pytest.raises(BuildError, match="target_sdk"):
-        builder.prepare("android", release=True)
+        builder.prepare("android", release=True, allow_unsigned=True)
     assert not (root / "build/android/android_template").exists()
     config.android.target_sdk = 36
     config.requirements = ["example==1.0"]
     with pytest.raises(BuildError, match="pn.lock"):
-        builder.prepare("android", release=True)
+        builder.prepare("android", release=True, allow_unsigned=True)
     assert not (root / "build/android/android_template").exists()
 
 
@@ -359,7 +359,7 @@ def test_prepare_ios_release_omits_development_modules(tmp_path: Path, monkeypat
     assert debug.ios is not None
     assert "NSLocalNetworkUsageDescription" in plistlib.loads(debug.ios.info_plist.read_bytes())
 
-    release = builder.prepare("ios", release=True, ios_sdks=("iphoneos",))
+    release = builder.prepare("ios", release=True, ios_sdks=("iphoneos",), allow_unsigned=True)
     lib = release.project_dir / "app_packages.iphoneos" / "pythonnative"
     assert (lib / "bootstrap.py").exists() or (lib / "bootstrap.pyc").exists()
     for name in (*_DEV_ONLY, "sdk/codegen.py"):
@@ -377,7 +377,7 @@ def test_prepare_android_release_omits_development_modules(tmp_path: Path) -> No
     builder.prepare("android")
     assert all((lib / name).exists() for name in _DEV_ONLY)
     # A release build staged over a debug build doesn't inherit its dev modules.
-    builder.prepare("android", release=True)
+    builder.prepare("android", release=True, allow_unsigned=True)
     assert (lib / "bootstrap.py").exists()
     contracts = json.loads((lib / "_native_contracts.json").read_text(encoding="utf-8"))
     # Built-in contracts load from the package; the app only bundles plugins'
@@ -387,3 +387,18 @@ def test_prepare_android_release_omits_development_modules(tmp_path: Path) -> No
     assert (lib / "sdk" / "_builtin_contracts.json").is_file()
     for name in (*_DEV_ONLY, "sdk/codegen.py", "sdk/builtins.py"):
         assert not (lib / name).exists(), name
+
+
+def test_store_builds_refuse_an_unsigned_android_release(tmp_path: Path) -> None:
+    cfg = AppConfig.load(_project(tmp_path, _TOML.replace("target_sdk = 34", "target_sdk = 36")))
+    builder = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None)
+    prepared = builder.prepare("android", release=True, allow_unsigned=True)
+    with pytest.raises(BuildError, match="must be signed"):
+        builder.build_android(prepared)
+
+
+@pytest.mark.parametrize("platform", ["ios", "android"])
+def test_store_builds_require_an_icon(tmp_path: Path, platform: str) -> None:
+    cfg = AppConfig.load(_project(tmp_path, _TOML.replace("target_sdk = 34", "target_sdk = 36")))
+    with pytest.raises(BuildError, match="app icon"):
+        Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare(platform, release=True)

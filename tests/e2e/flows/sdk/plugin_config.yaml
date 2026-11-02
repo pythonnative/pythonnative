@@ -1,0 +1,15 @@
+# A plugin's C target (SwiftPM on iOS, CMake on Android) and its declarative
+# Info.plist and AndroidManifest entries.
+#
+# Demo screen: examples/e2e-suite/app/screens/sdk/plugin_config.py
+# Source under test: src/pythonnative/project/plugin_config.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: SDK
+      DEMO_TITLE: Plugin config
+- assertVisible: "Adler-32 of Wikipedia: 300286872"
+- assertVisible: "Configured value: configured by a plugin"
+- runFlow: ../../helpers/close_demo.yaml

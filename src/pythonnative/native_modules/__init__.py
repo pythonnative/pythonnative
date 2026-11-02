@@ -40,14 +40,8 @@ Two rules hold across every facade, so you never have to look one up:
 
 Hardware / media:
 
-- [`Camera`][pythonnative.native_modules.Camera]: photo capture and
-  gallery picking.
-- [`Location`][pythonnative.native_modules.Location]: GPS and location.
 - [`Battery`][pythonnative.native_modules.Battery]: charge level/state.
-- [`Haptics`][pythonnative.native_modules.Haptics] /
-  [`Vibration`][pythonnative.native_modules.Vibration]: tactile feedback.
-- [`Biometrics`][pythonnative.native_modules.Biometrics]: Face ID /
-  Touch ID / fingerprint auth.
+- [`Haptics`][pythonnative.native_modules.Haptics]: tactile feedback and vibration.
 
 Device and environment:
 
@@ -72,8 +66,7 @@ System integration:
   file I/O.
 - [`Images`][pythonnative.native_modules.Images]: measure, prefetch,
   and clear cached images (bundled, local, or remote).
-- [`Notifications`][pythonnative.native_modules.Notifications]: local
-  push notifications.
+
 - [`Clipboard`][pythonnative.native_modules.Clipboard]: pasteboard
   read/write.
 - [`Share`][pythonnative.native_modules.Share]: system share sheet.
@@ -100,7 +93,7 @@ from .clipboard import Clipboard
 from .device import Device, DeviceInfo
 from .dimensions import Dimensions, DimensionsEvent, PixelRatio
 from .file_system import FileSystem
-from .haptics import Haptics, Vibration
+from .haptics import Haptics
 from .images import Images, ImageSize
 from .keyboard import Keyboard, KeyboardEvent
 from .linking import Linking
@@ -146,7 +139,6 @@ __all__ = [
     "PythonModule",
     "SecureStore",
     "Share",
-    "Vibration",
     "native_module",
     "register_python_module",
     "use_app_state",

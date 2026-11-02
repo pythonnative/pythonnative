@@ -1,0 +1,358 @@
+{
+  "components": {},
+  "modules": {
+    "Audio": {
+      "events": {
+        "sound_ended": {
+          "additionalProperties": {
+            "type": "json"
+          },
+          "type": "object"
+        }
+      },
+      "methods": {
+        "load_sound": {
+          "arguments": {
+            "looping": {
+              "type": "boolean"
+            },
+            "rate": {
+              "type": "number"
+            },
+            "source": {
+              "type": "string"
+            },
+            "volume": {
+              "type": "number"
+            }
+          },
+          "async": true,
+          "defaults": {
+            "looping": false,
+            "rate": 1.0,
+            "volume": 1.0
+          },
+          "required": [
+            "source"
+          ],
+          "result": {
+            "type": "integer"
+          }
+        },
+        "pause_recording": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "pause_sound": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "play_sound": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "recording_metering": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "number"
+          }
+        },
+        "resume_recording": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "seek_sound": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            },
+            "seconds": {
+              "type": "number"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id",
+            "seconds"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "set_mode": {
+          "arguments": {
+            "allow_bluetooth": {
+              "type": "boolean"
+            },
+            "category": {
+              "enum": [
+                "ambient",
+                "solo_ambient",
+                "playback",
+                "record",
+                "play_and_record",
+                "multi_route"
+              ]
+            },
+            "default_to_speaker": {
+              "type": "boolean"
+            },
+            "duck_others": {
+              "type": "boolean"
+            },
+            "mix_with_others": {
+              "type": "boolean"
+            }
+          },
+          "async": false,
+          "defaults": {
+            "allow_bluetooth": false,
+            "category": "playback",
+            "default_to_speaker": false,
+            "duck_others": false,
+            "mix_with_others": false
+          },
+          "required": [],
+          "result": {
+            "type": "null"
+          }
+        },
+        "set_sound_looping": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            },
+            "looping": {
+              "type": "boolean"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id",
+            "looping"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "set_sound_rate": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            },
+            "rate": {
+              "type": "number"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id",
+            "rate"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "set_sound_volume": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            },
+            "volume": {
+              "type": "number"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id",
+            "volume"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "sound_duration": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "number"
+          }
+        },
+        "sound_position": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "number"
+          }
+        },
+        "start_recording": {
+          "arguments": {
+            "path": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "quality": {
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
+          },
+          "async": true,
+          "defaults": {
+            "path": null,
+            "quality": "high"
+          },
+          "required": [],
+          "result": {
+            "type": "integer"
+          }
+        },
+        "stop_recording": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": true,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "additionalProperties": false,
+            "defaults": {},
+            "properties": {
+              "duration": {
+                "type": "number"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "python_kind": "dataclass",
+            "python_type": "pythonnative.audio:Recording",
+            "required": [
+              "duration",
+              "path"
+            ],
+            "type": "object"
+          }
+        },
+        "stop_sound": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "unload_sound": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "null"
+          }
+        }
+      },
+      "name": "Audio"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

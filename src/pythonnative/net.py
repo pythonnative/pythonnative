@@ -4,10 +4,10 @@ A small, dependency-free coroutine wrapper around
 :mod:`urllib.request`. Operates on bytes internally and exposes a
 :class:`Response` with `text()`, `json()`, and `bytes` accessors.
 
-The implementation is deliberately minimal; it covers the
-"call a JSON API" path that's overwhelmingly the use case for mobile
-apps. For streaming, multipart uploads, or HTTP/2, integrate
-``httpx`` / ``aiohttp`` directly; this module won't try to compete.
+It covers what a mobile app reaches for: JSON APIs, multipart uploads
+(``files=``) with progress, and streamed downloads (``stream=True``). For
+HTTP/2 or connection pooling, integrate ``httpx`` or ``aiohttp`` directly.
+WebSockets are in [`pythonnative.websocket`][pythonnative.websocket].
 
 Example:
     ```python
@@ -21,6 +21,24 @@ Example:
         )
         resp.raise_for_status()
         return resp.json()
+
+
+    async def upload_photo(path):
+        resp = await pn.fetch(
+            "https://api.example.com/photos",
+            method="POST",
+            body={"caption": "Trailhead"},
+            files={"photo": Path(path)},
+            on_upload_progress=lambda sent, total: print(sent, "of", total),
+        )
+        resp.raise_for_status()
+
+
+    async def download(url, destination):
+        resp = await pn.fetch(url, stream=True)
+        with open(destination, "wb") as out:
+            async for chunk in resp.chunks():
+                out.write(chunk)
     ```
 """
 
@@ -29,13 +47,16 @@ from __future__ import annotations
 import asyncio
 import itertools
 import json
+import mimetypes
+import os
 import ssl
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Mapping, Optional, Union
+from pathlib import Path
+from typing import Any, AsyncIterator, Callable, Dict, Iterator, List, Mapping, Optional, Tuple, Union
 
 # A package-level SSL context lets callers (or tests) override TLS
 # verification globally without monkeypatching the stdlib. Defaults
@@ -53,6 +74,11 @@ def set_default_ssl_context(context: Optional[ssl.SSLContext]) -> None:
     _default_ssl_context = context
 
 
+def default_ssl_context() -> ssl.SSLContext:
+    """The TLS context [`fetch`][pythonnative.fetch] and ``WebSocket`` connect with."""
+    return _default_ssl_context or ssl.create_default_context()
+
+
 # ======================================================================
 # Response object
 # ======================================================================
@@ -66,13 +92,15 @@ class Response:
         status: HTTP status code (e.g. ``200``).
         url: Final URL after any redirects.
         headers: Response headers, case-insensitive.
-        content: Raw response body.
+        content: Raw response body. With ``stream=True``, it stays empty until
+            [`read`][pythonnative.net.Response.read] fills it.
     """
 
     status: int
     url: str
     headers: Mapping[str, str] = field(default_factory=dict)
     content: bytes = b""
+    _stream: Any = field(default=None, repr=False, compare=False)
 
     @property
     def ok(self) -> bool:
@@ -82,6 +110,41 @@ class Response:
     def __repr__(self) -> str:
         cls = type(self).__name__
         return f"{cls}(status={self.status}, url={self.url!r}, ok={self.ok}, content={len(self.content)} bytes)"
+
+    async def chunks(self, size: int = 64 * 1024) -> AsyncIterator[bytes]:
+        """Yield a ``stream=True`` response's body as it arrives, then close it.
+
+        Args:
+            size: The largest chunk to yield, in bytes.
+
+        Raises:
+            RuntimeError: If the response wasn't requested with ``stream=True``,
+                or its body was already read.
+        """
+        stream = self._stream
+        if stream is None:
+            raise RuntimeError("chunks() needs a response from fetch(..., stream=True) that hasn't been read yet.")
+        self._stream = None
+        try:
+            while True:
+                chunk = await asyncio.to_thread(stream.read, size)
+                if not chunk:
+                    return
+                yield chunk
+        finally:
+            await asyncio.to_thread(stream.close)
+
+    async def read(self) -> bytes:
+        """Read the rest of a ``stream=True`` response into ``content`` and return it."""
+        if self._stream is not None:
+            self.content = b"".join([chunk async for chunk in self.chunks()])
+        return self.content
+
+    async def close(self) -> None:
+        """Abandon a ``stream=True`` response's unread body. Safe to call on any response."""
+        stream, self._stream = self._stream, None
+        if stream is not None:
+            await asyncio.to_thread(stream.close)
 
     def text(self, encoding: Optional[str] = None) -> str:
         """Decode ``content`` to ``str``.
@@ -136,6 +199,10 @@ def _charset_from_headers(headers: Mapping[str, str]) -> Optional[str]:
 # ======================================================================
 
 
+UploadFile = Union[Path, bytes, Tuple[str, Union[Path, bytes], str]]
+"""A file for ``fetch(files=...)``: a path, raw bytes, or ``(filename, content, content_type)``."""
+
+
 async def fetch(
     url: str,
     *,
@@ -144,6 +211,9 @@ async def fetch(
     body: Union[bytes, str, Mapping[str, Any], None] = None,
     params: Optional[Mapping[str, Any]] = None,
     timeout: float = 30.0,
+    files: Optional[Mapping[str, UploadFile]] = None,
+    stream: bool = False,
+    on_upload_progress: Optional[Callable[[int, int], None]] = None,
 ) -> Response:
     """Make an HTTP request and return a [`Response`][pythonnative.net.Response].
 
@@ -159,6 +229,15 @@ async def fetch(
             to ``url`` (urlencoded).
         timeout: Seconds to wait for the response (excluding the
             time spent on DNS / connect).
+        files: Files to send as a ``multipart/form-data`` body, by field name.
+            Each value is a ``Path``, raw ``bytes``, or a
+            ``(filename, Path | bytes, content_type)`` tuple. ``body``, when a
+            mapping, then supplies the form's other fields.
+        stream: Return as soon as the headers arrive, and read the body with
+            [`Response.chunks`][pythonnative.net.Response.chunks] or
+            [`Response.read`][pythonnative.net.Response.read].
+        on_upload_progress: Called on the application thread with
+            ``(bytes_sent, bytes_total)`` as the body goes out.
 
     Returns:
         A [`Response`][pythonnative.net.Response].
@@ -179,10 +258,29 @@ async def fetch(
         resp.raise_for_status()
         ```
     """
-    request = _build_request(url=url, method=method, headers=headers, body=body, params=params)
+    request = _build_request(url=url, method=method, headers=headers, body=body, params=params, files=files)
+    if on_upload_progress is not None and isinstance(request.data, bytes):
+        request.data = _ProgressBody(request.data, on_upload_progress, asyncio.get_running_loop())
     if not _observers:
-        return await asyncio.to_thread(_dispatch_request, request, timeout)
-    return await _observed(request, timeout)
+        return await asyncio.to_thread(_dispatch_request, request, timeout, stream)
+    return await _observed(request, timeout, stream)
+
+
+class _ProgressBody:
+    """A request body urllib sends in pieces, reporting each one to the application thread."""
+
+    CHUNK = 64 * 1024
+
+    def __init__(self, data: bytes, callback: Callable[[int, int], None], loop: asyncio.AbstractEventLoop) -> None:
+        self.data = data
+        self.callback = callback
+        self.loop = loop
+
+    def __iter__(self) -> Iterator[bytes]:
+        total = len(self.data)
+        for start in range(0, total, self.CHUNK):
+            yield self.data[start : start + self.CHUNK]
+            self.loop.call_soon_threadsafe(self.callback, min(start + self.CHUNK, total), total)
 
 
 # ======================================================================
@@ -235,10 +333,11 @@ def _notify(record: Dict[str, Any]) -> None:
             pass
 
 
-async def _observed(request: urllib.request.Request, timeout: float) -> Response:
+async def _observed(request: urllib.request.Request, timeout: float, stream: bool = False) -> Response:
     request_id = next(_request_ids)
     started = time.time()
-    body = request.data if isinstance(request.data, bytes) else None
+    data = request.data
+    body = data.data if isinstance(data, _ProgressBody) else data if isinstance(data, bytes) else None
     _notify(
         {
             "id": request_id,
@@ -252,7 +351,7 @@ async def _observed(request: urllib.request.Request, timeout: float) -> Response
         }
     )
     try:
-        response = await asyncio.to_thread(_dispatch_request, request, timeout)
+        response = await asyncio.to_thread(_dispatch_request, request, timeout, stream)
     except BaseException as exc:
         _notify(
             {
@@ -285,6 +384,7 @@ def _build_request(
     headers: Optional[Mapping[str, str]],
     body: Union[bytes, str, Mapping[str, Any], None],
     params: Optional[Mapping[str, Any]],
+    files: Optional[Mapping[str, UploadFile]] = None,
 ) -> urllib.request.Request:
     if params:
         sep = "&" if "?" in url else "?"
@@ -292,7 +392,12 @@ def _build_request(
 
     header_dict: Dict[str, str] = dict(headers or {})
     payload: Optional[bytes] = None
-    if body is None:
+    if files:
+        if body is not None and not isinstance(body, Mapping):
+            raise TypeError("With files=, body must be a mapping of form fields.")
+        payload, content_type = _encode_multipart(body or {}, files)
+        header_dict["Content-Type"] = content_type
+    elif body is None:
         pass
     elif isinstance(body, (bytes, bytearray)):
         payload = bytes(body)
@@ -313,9 +418,55 @@ def _build_request(
     )
 
 
-def _dispatch_request(request: urllib.request.Request, timeout: float) -> Response:
+def _encode_multipart(fields: Mapping[str, Any], files: Mapping[str, UploadFile]) -> Tuple[bytes, str]:
+    """Encode a ``multipart/form-data`` body, returning it and its ``Content-Type``."""
+    boundary = f"pythonnative{os.urandom(16).hex()}"
+
+    def escaped(value: str) -> str:
+        return value.replace("\\", "\\\\").replace('"', '\\"').replace("\r", "%0D").replace("\n", "%0A")
+
+    parts: List[bytes] = []
+    for name, value in fields.items():
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{escaped(name)}"\r\n\r\n'.encode()
+            + str(value).encode("utf-8")
+            + b"\r\n"
+        )
+    for name, file in files.items():
+        if isinstance(file, tuple):
+            filename, content, content_type = file
+        else:
+            content = file
+            filename = file.name if isinstance(file, Path) else name
+            content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        data = content.read_bytes() if isinstance(content, Path) else bytes(content)
+        parts.append(
+            (
+                f'--{boundary}\r\nContent-Disposition: form-data; name="{escaped(name)}"; '
+                f'filename="{escaped(filename)}"\r\nContent-Type: {content_type}\r\n\r\n'
+            ).encode()
+            + data
+            + b"\r\n"
+        )
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
+def _dispatch_request(request: urllib.request.Request, timeout: float, stream: bool = False) -> Response:
     context = _default_ssl_context
+    data = request.data
+    if isinstance(data, _ProgressBody):
+        # urllib would chunk an iterable body with no declared length.
+        request.add_unredirected_header("Content-Length", str(len(data.data)))
     try:
+        if stream:
+            resp = urllib.request.urlopen(request, timeout=timeout, context=context)
+            return Response(
+                status=resp.status,
+                url=resp.geturl(),
+                headers={k: v for k, v in resp.headers.items()},
+                _stream=resp,
+            )
         with urllib.request.urlopen(request, timeout=timeout, context=context) as resp:
             content = resp.read()
             return Response(
@@ -343,4 +494,4 @@ def _dispatch_request(request: urllib.request.Request, timeout: float) -> Respon
         raise OSError(str(reason)) from exc
 
 
-__all__ = ["fetch", "Response", "HTTPError", "set_default_ssl_context"]
+__all__ = ["fetch", "default_ssl_context", "Response", "HTTPError", "UploadFile", "set_default_ssl_context"]

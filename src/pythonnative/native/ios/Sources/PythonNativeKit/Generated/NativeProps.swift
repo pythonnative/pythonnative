@@ -1132,33 +1132,6 @@ public final class TextInputProps: PNViewProps, PNNativeProps {
     public private(set) lazy var `accessibility_role`: String? = { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "accessibility_role") }()
 }
 
-public final class TouchableOpacityProps: PNViewProps, PNNativeProps {
-    // The renderer core validated these values before they were mounted.
-    public init(_ values: [String: Any], partial: Bool = true) {
-        super.init(values)
-    }
-    public var has_flex: Bool { values["flex"] != nil }
-    public private(set) lazy var `flex`: Double? = { guard let value = values["flex"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Double.self, value, field: "flex") }()
-    public var has_background_color: Bool { values["background_color"] != nil }
-    public private(set) lazy var `background_color`: PNViewBorderColor? = { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "background_color") }()
-    public var has_color: Bool { values["color"] != nil }
-    public private(set) lazy var `color`: PNViewBorderColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "color") }()
-    public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
-    public var has_tint_color: Bool { values["tint_color"] != nil }
-    public private(set) lazy var `tint_color`: PNViewBorderColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "tint_color") }()
-    public var has_on_press: Bool { values["on_press"] != nil }
-    public private(set) lazy var `on_press`: Bool? = { guard let value = values["on_press"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "on_press") }()
-    public var has_on_long_press: Bool { values["on_long_press"] != nil }
-    public private(set) lazy var `on_long_press`: Bool? = { guard let value = values["on_long_press"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "on_long_press") }()
-    public var has_active_opacity: Bool { values["active_opacity"] != nil }
-    public private(set) lazy var `active_opacity`: Double? = { guard let value = values["active_opacity"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Double.self, value, field: "active_opacity") }()
-    public var has_disabled: Bool { values["disabled"] != nil }
-    public private(set) lazy var `disabled`: Bool? = { guard let value = values["disabled"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "disabled") }()
-    public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
-    public private(set) lazy var `accessibility_role`: String? = { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "accessibility_role") }()
-}
-
 public final class ViewProps: PNViewProps, PNNativeProps {
     // The renderer core validated these values before they were mounted.
     public init(_ values: [String: Any], partial: Bool = true) {
@@ -1393,12 +1366,6 @@ public enum PNComponentEvents {
         public static func `on_content_size_change`(_ view: UIView, _ argument0: PNContentSizeEvent) { PNEvents.emitIfWired(view, "on_content_size_change", [PNValues.encode(argument0)]) }
         public static func `on_focus`(_ view: UIView) { PNEvents.emitIfWired(view, "on_focus", []) }
         public static func `on_blur`(_ view: UIView) { PNEvents.emitIfWired(view, "on_blur", []) }
-        public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
-        public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
-    }
-    public enum TouchableOpacity {
-        public static func `on_press`(_ view: UIView) { PNEvents.emitIfWired(view, "on_press", []) }
-        public static func `on_long_press`(_ view: UIView) { PNEvents.emitIfWired(view, "on_long_press", []) }
         public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }

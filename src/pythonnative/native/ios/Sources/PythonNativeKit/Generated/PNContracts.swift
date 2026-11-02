@@ -5,7 +5,7 @@ import PNCore
 /// the same contracts and validates every commit, command, and module call;
 /// nothing on the Swift side interprets them.
 public enum PNContracts {
-    public static let fingerprint = "4f3c6c610fd0f6b21949e7ed16e03fd100dd347c3e29be0dedd509b0fdb386dc"
+    public static let fingerprint = "d0f4503111acbb6117870bb5bdd997964a29ec05d3190445e2c12ce446b18c4d"
     public static let protocolVersion = 7
     public static let yogaVersion = "3.2.1"
 

@@ -1,0 +1,109 @@
+name: Release builds
+
+# Proves what mocks can't: a project builds in the release configuration, its
+# artifacts pass the checks stores apply, and the result runs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  release-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          python-version: '3.13'
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install PythonNative
+        run: uv sync --locked
+
+      - name: Build the release artifacts
+        working-directory: examples/fieldnotes
+        run: uv run pn build android --allow-unsigned
+
+      - name: Check a project that uses no capabilities stays clean
+        run: uv run python scripts/check-release-artifacts.py android
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the release configuration
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          arch: x86_64
+          script: bash -lc "cd examples/fieldnotes && uv run pn run android --release --no-logs && maestro test -e APP_ID=dev.pythonnative.fieldnotes ../../tests/e2e/flows/fieldnotes/smoke.yaml"
+
+  release-ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          python-version: '3.13'
+
+      - name: Install PythonNative
+        run: uv sync --locked
+
+      - name: Build the release archive
+        working-directory: examples/fieldnotes
+        run: uv run pn build ios --allow-unsigned
+
+      - name: Check a project that uses no capabilities stays clean
+        run: uv run python scripts/check-release-artifacts.py ios
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Run the release configuration
+        run: |
+          UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          phones = [
+              d for runtime, devices in sorted(data.items()) if "iOS" in runtime
+              for d in devices if d.get("isAvailable") and d["name"].startswith("iPhone")
+          ]
+          if not phones:
+              sys.exit("no available iPhone simulator on this runner")
+          print(phones[-1]["udid"])
+          ')"
+          xcrun simctl boot "$UDID"
+          cd examples/fieldnotes
+          uv run pn run ios --release --no-logs --device "$UDID"
+          maestro --platform ios test -e APP_ID=dev.pythonnative.fieldnotes ../../tests/e2e/flows/fieldnotes/smoke.yaml

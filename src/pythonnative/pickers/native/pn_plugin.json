@@ -1,0 +1,7 @@
+{
+  "name": "pickers",
+  "contracts": "schema.json",
+  "ios": {"entry": "PickersPlugin"},
+  "android": {"entry": "com.pythonnative.plugins.pickers.PickersPlugin"},
+  "web": {"entry": "web/index.js"}
+}

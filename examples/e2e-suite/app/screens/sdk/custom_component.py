@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pythonnative as pn
+from pythonnative.sdk import UNSET
 from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 
@@ -31,7 +32,7 @@ def CustomComponentDemo() -> pn.Node:
         "SDK surface check: Props subclass + registry inspection.",
         DemoSection(
             "SDK status",
-            pn.Element("Text", {"text": "Contract reset target", "font_size": pn.UNSET if removed else 24}),
+            pn.Element("Text", {"text": "Contract reset target", "font_size": UNSET if removed else 24}),
             pn.Button("Reset native property", on_press=lambda: set_removed(True)),
             ResultText("Property removed", "yes" if removed else "no"),
             ResultText("Native text supported", "yes" if pn.Platform.supports("Text", "text") else "no"),

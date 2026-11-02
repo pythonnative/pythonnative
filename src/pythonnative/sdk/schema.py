@@ -384,6 +384,11 @@ def load_builtin_contracts() -> bool:
 _bundled_components: frozenset[str] = frozenset()
 
 
+def builtin_component_names() -> frozenset[str]:
+    """Components from the package's generated contracts; empty when a checkout derives them instead."""
+    return _builtin_names[0]
+
+
 def native_documents() -> list[str]:
     """The contract documents the renderer core compiles, built-ins first.
 

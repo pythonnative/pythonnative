@@ -69,7 +69,9 @@ class ProjectRuntime:
     @property
     def go_compatible(self) -> bool:
         """Whether PythonNative Go can run this project."""
-        return not self.plugins and not self.native_packages
+        from ..project.plugins import NOT_IN_GO
+
+        return not self.plugins and not self.native_packages and not set(self.capabilities) & set(NOT_IN_GO)
 
 
 def _framework_version() -> str:
@@ -152,6 +154,14 @@ def check(hello: Dict[str, Any], project: ProjectRuntime) -> Optional[Incompatib
             rebuild,
         )
     if kind == "go":
+        from ..project.plugins import NOT_IN_GO
+
+        own_build = sorted(set(project.capabilities) & set(NOT_IN_GO))
+        if own_build:
+            return Incompatibility(
+                f"PythonNative Go doesn't include {', '.join(own_build)}, which only works in the app's own build.",
+                f"Build its development app with `pn run {platform}`.",
+            )
         if project.plugins:
             return Incompatibility(
                 f"This project adds native code ({', '.join(project.plugins)}), which PythonNative Go doesn't "

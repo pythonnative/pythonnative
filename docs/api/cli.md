@@ -65,9 +65,12 @@ the documented behavior never drifts from the code.
   or name, same as `pn run`). Physical iOS devices aren't supported for
   log streaming; use Console.app or Xcode > Devices and Simulators.
 - `pn build android|ios`: build distributable artifacts (release by
-  default). Flags: `--debug` for the debug variant, `--upload` to send
-  an iOS release build to App Store Connect. See
+  default). Flags: `--debug` for the debug variant, `--allow-unsigned` for
+  a smoke build that can't reach a store. See
   [Building for release](../guides/building-for-release.md).
+- `pn submit android|ios`: upload the latest release build. Flags: `--path`
+  for another artifact, and for Google Play, `--track` and `--draft`.
+- `pn links`: print the files a site hosts so its links open this app.
 - `pn app-id android|ios`: print the resolved application id (Android)
   or bundle id (iOS), handy for scripts and CI. Flag: `--json` to print
   a `{"platform": "...", "app_id": "..."}` object to stdout for

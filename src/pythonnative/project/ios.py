@@ -29,7 +29,6 @@ Python sources into the project before invoking ``xcodebuild``.
 from __future__ import annotations
 
 import plistlib
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -120,7 +119,7 @@ def configure(
     if config.ios.privacy_manifest:
         source = config.resolve_path(config.ios.privacy_manifest)
         privacy_manifest(source)
-        shutil.copy2(source, manifest_path)
+        _merge_privacy_manifest(manifest_path, source)
     privacy_manifest(manifest_path)
     configure_info_plist(info_plist, config, release=release)
     write_entitlements(project_dir, config, release=release)
@@ -128,6 +127,30 @@ def configure(
 
     emit(f"Configured iOS project ({config.bundle_id}).")
     return IOSLayout(project_dir=project_dir, info_plist=info_plist, bundle_id=config.bundle_id)
+
+
+def _merge_privacy_manifest(manifest_path: Path, source: Path) -> None:
+    """Add the app's own declarations to the template's, which cover the embedded runtime."""
+    with open(manifest_path, "rb") as handle:
+        merged = plistlib.load(handle)
+    with open(source, "rb") as handle:
+        own = plistlib.load(handle)
+    types = merged.setdefault("NSPrivacyAccessedAPITypes", [])
+    for entry in own.get("NSPrivacyAccessedAPITypes", ()):
+        name = entry.get("NSPrivacyAccessedAPIType")
+        existing = next((item for item in types if item.get("NSPrivacyAccessedAPIType") == name), None)
+        if existing is None:
+            types.append(entry)
+            continue
+        reasons = existing["NSPrivacyAccessedAPITypeReasons"]
+        reasons.extend(reason for reason in entry.get("NSPrivacyAccessedAPITypeReasons", ()) if reason not in reasons)
+    for key in ("NSPrivacyCollectedDataTypes", "NSPrivacyTrackingDomains"):
+        if key in own:
+            values = merged.setdefault(key, [])
+            values.extend(item for item in own[key] if item not in values)
+    merged["NSPrivacyTracking"] = bool(merged.get("NSPrivacyTracking") or own.get("NSPrivacyTracking"))
+    with open(manifest_path, "wb") as handle:
+        plistlib.dump(merged, handle)
 
 
 # ======================================================================
@@ -277,7 +300,10 @@ def build_settings(
         else bool(config.resolved_permissions().ios_entitlements or config.associated_domains)
     )
     if has_entitlements:
-        settings.append(f"CODE_SIGN_ENTITLEMENTS={ENTITLEMENTS_FILE}")
+        # A command-line setting reaches every target, packages included, so the
+        # template's app target alone refers to this variable. Staging rewrites the
+        # file before each build, which Xcode otherwise takes for tampering.
+        settings += [f"PN_ENTITLEMENTS={ENTITLEMENTS_FILE}", "CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES"]
     if for_archive:
         if allow_unsigned:
             # BeeWare's framework step refuses to run with no identity at
@@ -298,15 +324,12 @@ def build_settings(
     return settings
 
 
-def write_export_options(config: AppConfig, dest: Path, *, upload: bool = False) -> Path:
+def write_export_options(config: AppConfig, dest: Path) -> Path:
     """Write an ``exportOptions.plist`` for ``xcodebuild -exportArchive``.
 
     Args:
         config: The validated app configuration.
         dest: Destination plist path.
-        upload: When ``True``, ask ``xcodebuild`` to upload the build to
-            App Store Connect instead of exporting a local ``.ipa``
-            (requires ``export_method = "app-store"``).
 
     Returns:
         ``dest``.
@@ -317,8 +340,6 @@ def write_export_options(config: AppConfig, dest: Path, *, upload: bool = False)
         "compileBitcode": False,
         "stripSwiftSymbols": True,
     }
-    if upload:
-        options["destination"] = "upload"
     if config.ios.development_team:
         options["teamID"] = config.ios.development_team
     if signing.provisioning_profile:

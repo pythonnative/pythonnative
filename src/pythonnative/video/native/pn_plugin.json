@@ -1,0 +1,17 @@
+{
+  "name": "video",
+  "contracts": "schema.json",
+  "ios": {
+    "entry": "VideoPlugin"
+  },
+  "android": {
+    "entry": "com.pythonnative.plugins.video.VideoPlugin",
+    "dependencies": [
+      "androidx.media3:media3-exoplayer:1.5.1",
+      "androidx.media3:media3-ui:1.5.1"
+    ]
+  },
+  "web": {
+    "entry": "web/index.js"
+  }
+}

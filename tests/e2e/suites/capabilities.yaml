@@ -1,0 +1,16 @@
+# First-party capabilities category suite (RFC 0008).
+appId: ${APP_ID}
+---
+- runFlow: ../flows/capabilities/audio.yaml
+- runFlow: ../flows/capabilities/background.yaml
+- runFlow: ../flows/capabilities/biometrics.yaml
+- runFlow: ../flows/capabilities/camera.yaml
+- runFlow: ../flows/capabilities/location.yaml
+- runFlow: ../flows/capabilities/maps.yaml
+- runFlow: ../flows/capabilities/notifications.yaml
+- runFlow: ../flows/capabilities/pickers.yaml
+- runFlow: ../flows/capabilities/purchases.yaml
+- runFlow: ../flows/capabilities/push.yaml
+- runFlow: ../flows/capabilities/sensors.yaml
+- runFlow: ../flows/capabilities/video.yaml
+- runFlow: ../flows/capabilities/websocket.yaml

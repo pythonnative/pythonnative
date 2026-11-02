@@ -84,6 +84,7 @@ def configure(
     *,
     dev_lib_root: Optional[Path] = None,
     release: bool = False,
+    allow_unsigned: bool = False,
     log: Optional[Logger] = None,
 ) -> AndroidLayout:
     """Fully configure a staged Android template for ``config``.
@@ -98,6 +99,8 @@ def configure(
             ``pythonnative.project.bundle``). Debug builds keep the
             ``.py`` sources in the APK so tracebacks show code and the dev
             client can tell what the app already runs.
+        allow_unsigned: A smoke build that never reaches a store, so
+            release checks such as the required icon don't apply.
         log: Optional progress logger.
 
     Returns:
@@ -114,7 +117,7 @@ def configure(
     configure_manifest(project_dir, config, release=release)
     write_requirements(project_dir, config)
 
-    _apply_branding(project_dir, config, emit)
+    _apply_branding(project_dir, config, emit, required=release and not allow_unsigned)
 
     python_root = stage_python_sources(project_dir, config, dev_lib_root=dev_lib_root, release=release)
     emit(f"Configured Android project ({config.application_id}).")
@@ -396,7 +399,7 @@ def write_requirements(project_dir: Path, config: AppConfig) -> None:
 # ======================================================================
 
 
-def _apply_branding(project_dir: Path, config: AppConfig, emit: Logger) -> None:
+def _apply_branding(project_dir: Path, config: AppConfig, emit: Logger, *, required: bool = False) -> None:
     res_dir = project_dir / "app" / "src" / "main" / "res"
     icon_path = config.resolve_path(config.icon) if config.icon else None
     splash_path = config.resolve_path(config.splash) if config.splash else None
@@ -404,8 +407,12 @@ def _apply_branding(project_dir: Path, config: AppConfig, emit: Logger) -> None:
     if icon_path and icons.has_source(icon_path):
         if icons.generate_android_icons(icon_path, res_dir):
             emit("Generated Android launcher icons.")
+        elif required:
+            raise ValueError("Release builds need Pillow to generate the app icon: pip install 'pythonnative[build]'.")
         else:
             emit("Skipping Android icons: Pillow not installed (pip install 'pythonnative[build]').")
+    elif required:
+        raise ValueError("Store listings require an app icon. Set [assets].icon to a 1024x1024 PNG.")
 
     if splash_path and icons.has_source(splash_path):
         if icons.pillow_available():

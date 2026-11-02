@@ -1,0 +1,40 @@
+# Tests that MapView mounts and reports what it can on a simulator. Map tiles,
+# gestures on them, and marker presses aren't asserted: they depend on the
+# network, on an API key on Android, and on coordinates no flow can know.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/maps.py
+# Source under test: src/pythonnative/maps/__init__.py :: MapView
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Maps
+- assertVisible: "Map type: standard"
+# Press targets sit below the map, whichever way it starts up.
+- scrollUntilVisible:
+    element: "Use satellite"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Use satellite"
+- extendedWaitUntil:
+    visible: "Map type: satellite"
+    timeout: 5000
+# Android's result depends on the build's key, so only iOS is asserted further.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "Map ready: yes"
+          timeout: 30000
+      - tapOn: "Fly to Bergen"
+      - extendedWaitUntil:
+          visible: "Center: 60.4, 5.3"
+          timeout: 15000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities
