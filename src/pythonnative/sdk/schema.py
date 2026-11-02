@@ -381,6 +381,9 @@ def load_builtin_contracts() -> bool:
     return True
 
 
+_bundled_components: frozenset[str] = frozenset()
+
+
 def native_documents() -> list[str]:
     """The contract documents the renderer core compiles, built-ins first.
 
@@ -406,6 +409,20 @@ def native_documents() -> list[str]:
     return documents
 
 
+def in_build(*, component: str) -> bool:
+    """Whether this process's native library has a manager for ``component``.
+
+    Off device every declared component counts; the renderer is Python's own.
+    On a device, a plugin's component is in the build only when the build
+    compiled the plugin's contract in.
+    """
+    from ..bridge import get_transport, has_transport
+
+    if not has_transport() or getattr(get_transport(), "name", "") not in {"ios", "android"}:
+        return True
+    return component in _bundled_components
+
+
 def load_bundled_contracts() -> None:
     """Install the plugin contracts compiled into this embedded application.
 
@@ -413,7 +430,7 @@ def load_bundled_contracts() -> None:
     fingerprint of everything the native library was generated from, so
     the startup handshake doesn't hash the manifest again.
     """
-    global _fingerprint_cache
+    global _fingerprint_cache, _bundled_components
     from importlib.resources import files
 
     path = files("pythonnative").joinpath("_native_contracts.json")
@@ -421,6 +438,7 @@ def load_bundled_contracts() -> None:
         return
     document = json.loads(path.read_text(encoding="utf-8"))
     load_manifest(document)
+    _bundled_components = frozenset(document.get("components", ()))
     if isinstance(document.get("fingerprint"), str):
         _fingerprint_cache = (_registry_identity(), document["fingerprint"])
 

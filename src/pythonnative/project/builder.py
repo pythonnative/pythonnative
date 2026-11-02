@@ -46,6 +46,7 @@ from .. import assets
 from . import android as android_config
 from . import artifacts, bytecode, deps, runtime_assets
 from . import ios as ios_config
+from . import plugin_config
 from . import plugins as native_plugins
 from .android import AndroidLayout
 from .bundle import copy_library
@@ -339,6 +340,7 @@ class Builder:
         release: bool = False,
         ios_sdks: Sequence[str] = deps.IOS_SDKS,
         dev_client: str = "app",
+        allow_unsigned: bool = False,
     ) -> PreparedProject:
         """Stage and configure the native project for ``platform``.
 
@@ -360,6 +362,8 @@ class Builder:
                 ``"app"`` (the project's own) or ``"go"`` (PythonNative
                 Go). Recorded in the bundled package's
                 ``_dev_client.json``; release builds aren't dev clients.
+            allow_unsigned: Keep a release build that isn't signed or has
+                no icon, for smoke builds that never reach a store.
 
         Returns:
             A [`PreparedProject`][pythonnative.project.builder.PreparedProject].
@@ -410,7 +414,11 @@ class Builder:
                 release=release,
                 log=self.log,
             )
-            native_plugins.stage_android_plugins(project_dir, plugins, log=self.log)
+            try:
+                plugin_config.apply_android(project_dir, self.config, plugins, log=self.log)
+                native_plugins.stage_android_plugins(project_dir, plugins, log=self.log)
+            except native_plugins.PluginError as exc:
+                raise BuildError(str(exc)) from exc
             self._stage_contracts(project_dir, platform, plugins, [layout.python_root / "pythonnative"])
             if not release:
                 self._stage_dev_client([layout.python_root / "pythonnative"], plugins, dev_client)
@@ -422,8 +430,14 @@ class Builder:
                 android=layout,
             )
 
-        ios_layout = ios_config.configure(project_dir, self.config, release=release, log=self.log)
-        native_plugins.stage_ios_plugins(project_dir, plugins, log=self.log)
+        try:
+            ios_layout = ios_config.configure(
+                project_dir, self.config, release=release, allow_unsigned=allow_unsigned, log=self.log
+            )
+            plugin_config.apply_ios(project_dir, self.config, plugins, log=self.log)
+            native_plugins.stage_ios_plugins(project_dir, plugins, log=self.log)
+        except (ValueError, native_plugins.PluginError) as exc:
+            raise BuildError(str(exc)) from exc
         self._stage_ios_python(project_dir, release=release, sdks=ios_sdks)
         roots = [project_dir / target.slice_name / "pythonnative" for target in targets]
         self._stage_contracts(project_dir, platform, plugins, roots)
@@ -485,33 +499,39 @@ class Builder:
         """Record what kind of dev client a debug build is (see ``pythonnative.devclient.client_info``)."""
         from ..devclient import CLIENT_INFO_FILE, dev_scheme
 
+        first_party = set(self.config.plugin_use)
         info = {
             "kind": kind,
             "app_id": self.config.app_id,
             "scheme": dev_scheme(self.config.app_id),
-            "plugins": sorted(plugin.name for plugin in plugins),
+            "plugins": sorted(plugin.name for plugin in plugins if plugin.name not in first_party),
+            "capabilities": sorted(first_party),
         }
         for root in roots:
             root.mkdir(parents=True, exist_ok=True)
             (root / CLIENT_INFO_FILE).write_text(json.dumps(info, sort_keys=True), encoding="utf-8")
 
     def _discover_plugins(self, targets: Sequence[deps.Target] = ()) -> List[native_plugins.NativePlugin]:
-        """Collect native plugins from entry points and ``[plugins].paths``.
+        """Collect ``[plugins].use``, target wheels' plugins, and ``[plugins].paths``.
 
         Raises:
-            BuildError: If a project-local plugin directory is invalid.
+            BuildError: If a plugin is unknown or invalid, or two share a name.
         """
         try:
+            first_party = native_plugins.first_party_plugins(self.config.plugin_use)
             installed = native_plugins.discover_target_plugins(self.config, targets, self.runner)
             local = native_plugins.discover_plugins(
                 include_environment=False,
                 extra_paths=[self.config.resolve_path(p) for p in self.config.plugin_paths],
                 log=self.log,
             )
-            names = {plugin.name for plugin in installed}
-            if any(plugin.name in names for plugin in local):
-                raise native_plugins.PluginError("A plugin appears in both target requirements and [plugins].paths")
-            return installed + local
+            plugins = first_party + installed + local
+            seen: set[str] = set()
+            for plugin in plugins:
+                if plugin.name in seen:
+                    raise native_plugins.PluginError(f"Two native plugins are named {plugin.name!r}.")
+                seen.add(plugin.name)
+            return plugins
         except native_plugins.PluginError as exc:
             raise BuildError(f"Invalid native plugin: {exc}") from exc
 
@@ -631,24 +651,33 @@ class Builder:
         candidates = _existing(outputs.rglob("*-debug.apk"))
         return candidates[0] if candidates else None
 
-    def build_android(self, prepared: PreparedProject, *, debug: bool = False) -> BuildArtifacts:
+    def build_android(
+        self, prepared: PreparedProject, *, debug: bool = False, allow_unsigned: bool = False
+    ) -> BuildArtifacts:
         """Assemble standalone Android artifacts (APK + AAB).
 
         Args:
             prepared: A prepared Android project.
             debug: Build the debug variant instead of release.
+            allow_unsigned: Build a release that isn't signed, for a smoke
+                build; otherwise a release without a key fails before Gradle runs.
 
         Returns:
             The produced artifact paths.
 
         Raises:
-            BuildError: If the Gradle build fails.
+            BuildError: If the Gradle build fails or a store build isn't signed.
         """
         if debug:
             self._gradlew(prepared, ["assembleDebug"])
             outputs = prepared.project_dir / "app" / "build" / "outputs"
             return BuildArtifacts(paths=_existing(outputs.rglob("*-debug.apk")))
 
+        if not allow_unsigned and not config_has_android_signing(self.config):
+            raise BuildError(
+                "Android release builds must be signed. Set [android.signing] keystore and key_alias, "
+                "or pass --allow-unsigned for a build that won't reach a store."
+            )
         self._gradlew(prepared, ["assembleRelease", "bundleRelease"])
         outputs = prepared.project_dir / "app" / "build" / "outputs"
         candidates = list(outputs.rglob("*-release.apk")) + list(outputs.rglob("*-release.aab"))
@@ -709,7 +738,7 @@ class Builder:
             BuildError: If the build fails.
         """
         derived = prepared.project_dir / "build"
-        settings = ios_config.build_settings(self.config)
+        settings = ios_config.build_settings(self.config, project_dir=prepared.project_dir)
         # The simulator runs on the host CPU, and BeeWare's runtime
         # install script requires a single-architecture build (its
         # stdlib layout is per-arch), so pin ARCHS to the host.
@@ -761,7 +790,7 @@ class Builder:
                 "Set [ios].development_team in pythonnative.toml."
             )
         derived = prepared.project_dir / "build"
-        settings = ios_config.build_settings(self.config)
+        settings = ios_config.build_settings(self.config, project_dir=prepared.project_dir)
         settings.append("-allowProvisioningUpdates")
         result = self.runner.run(
             [
@@ -789,7 +818,9 @@ class Builder:
             raise BuildError(f"Built app not found at {app_path}.")
         return app_path
 
-    def build_ios_archive(self, prepared: PreparedProject, *, upload: bool = False) -> BuildArtifacts:
+    def build_ios_archive(
+        self, prepared: PreparedProject, *, upload: bool = False, allow_unsigned: bool = False
+    ) -> BuildArtifacts:
         """Archive the iOS app and export a signed IPA (or upload it).
 
         Args:
@@ -810,7 +841,11 @@ class Builder:
         if not version.ok or major is None or int(major.group(1)) < 26:
             raise BuildError("iOS release archives require Xcode 26 or later. Run 'pn doctor ios'.")
         archive_path = prepared.build_dir / "ios_template.xcarchive"
-        settings = ios_config.build_settings(self.config, for_archive=True)
+        settings = ios_config.build_settings(
+            self.config, for_archive=True, project_dir=prepared.project_dir, allow_unsigned=allow_unsigned
+        )
+        authentication = [] if allow_unsigned else _asc_authentication()
+        provisioning = [] if allow_unsigned else ["-allowProvisioningUpdates"]
         result = self.runner.run(
             [
                 "xcodebuild",
@@ -824,7 +859,8 @@ class Builder:
                 "generic/platform=iOS",
                 "-archivePath",
                 str(archive_path),
-                "-allowProvisioningUpdates",
+                *provisioning,
+                *authentication,
                 "archive",
                 *settings,
             ],
@@ -838,6 +874,8 @@ class Builder:
             self.log(f"Verified {count} bundled privacy manifests.")
         except artifacts.ArtifactError as exc:
             raise BuildError(str(exc)) from exc
+        if allow_unsigned:
+            return BuildArtifacts(paths=_existing([archive_path]))
 
         export_dir = prepared.build_dir / "export"
         options = ios_config.write_export_options(
@@ -854,6 +892,7 @@ class Builder:
                 "-exportPath",
                 str(export_dir),
                 "-allowProvisioningUpdates",
+                *authentication,
             ],
             cwd=prepared.project_dir,
         )
@@ -888,6 +927,14 @@ def config_has_android_signing(config: AppConfig) -> bool:
         ``True`` if a keystore and alias are configured.
     """
     return config.android.signing.is_configured
+
+
+def _asc_authentication() -> List[str]:
+    """``xcodebuild`` flags for an App Store Connect API key, when the environment has one."""
+    path, key, issuer = (os.environ.get(name) for name in ("PN_ASC_KEY_PATH", "PN_ASC_KEY_ID", "PN_ASC_ISSUER_ID"))
+    if not (path and key and issuer):
+        return []
+    return ["-authenticationKeyPath", path, "-authenticationKeyID", key, "-authenticationKeyIssuerID", issuer]
 
 
 def _existing(paths: Union[Sequence[Path], object]) -> List[Path]:

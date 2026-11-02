@@ -96,8 +96,6 @@ Reactive state (with hooks):
 from .accessibility_info import AccessibilityEvent, AccessibilityInfo, use_reduce_motion, use_screen_reader_enabled
 from .app_state import AppState, use_app_state
 from .battery import Battery
-from .biometrics import Biometrics
-from .camera import Camera
 from .clipboard import Clipboard
 from .device import Device, DeviceInfo
 from .dimensions import Dimensions, DimensionsEvent, PixelRatio
@@ -107,9 +105,7 @@ from .images import Images, ImageSize
 from .keyboard import Keyboard, KeyboardEvent
 from .linking import Linking
 from .localization import Locale, Localization, use_locales
-from .location import Location
 from .net_info import NetInfo, use_net_info
-from .notifications import Notifications
 from .permissions import Permissions
 from .registry import (
     BridgeModule,
@@ -127,9 +123,7 @@ __all__ = [
     "AccessibilityInfo",
     "AppState",
     "Battery",
-    "Biometrics",
     "BridgeModule",
-    "Camera",
     "Clipboard",
     "Device",
     "DeviceInfo",
@@ -144,11 +138,9 @@ __all__ = [
     "Linking",
     "Locale",
     "Localization",
-    "Location",
     "NativeModule",
     "NativeModuleError",
     "NetInfo",
-    "Notifications",
     "Permissions",
     "PixelRatio",
     "PythonModule",

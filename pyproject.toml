@@ -101,6 +101,7 @@ license-files = ["LICENSE*"]
 pythonnative = [
   "py.typed",
   "templates/**", "native/**", "sdk/templates/**",
+  "*/native/**",
   "devserver/static/**",
   "icons/_lucide.json", "icons/LICENSE-lucide.txt",
   "sdk/_builtin_contracts.json",

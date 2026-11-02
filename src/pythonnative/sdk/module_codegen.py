@@ -168,7 +168,7 @@ def generate_modules(types: NativeTypes) -> dict[str, str]:
                 kotlin.append(
                     "                        result.fold({ value -> promise.resolve("
                     + ("null" if void else "PNValues.encode(value)")
-                    + ') }, { error -> promise.reject(error.message ?: "Native call failed") })'
+                    + ") }, { error -> promise.reject(error) })"
                 )
                 kotlin.extend(
                     [
@@ -198,7 +198,7 @@ def generate_modules(types: NativeTypes) -> dict[str, str]:
             [
                 "                else -> promise.rejectUnknownMethod(method)",
                 "            }",
-                '        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }',
+                "        } catch (error: Exception) { promise.reject(error) }",
                 "    }",
                 "}",
                 "",

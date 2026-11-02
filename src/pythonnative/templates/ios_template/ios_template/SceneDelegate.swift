@@ -23,7 +23,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Python is running; LinkingModule buffers it until the bridge
         // callback is registered so Linking.get_initial_url() sees it.
         for context in connectionOptions.urlContexts {
-            LinkingModule.deliver(url: context.url.absoluteString)
+            deliver(url: context.url)
+        }
+        for activity in connectionOptions.userActivities {
+            deliver(activity: activity)
         }
         // PNWindow opens the dev menu (shake, Cmd+D) once Python enables
         // development support; release builds never enable it.
@@ -37,7 +40,25 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         for context in URLContexts {
-            LinkingModule.deliver(url: context.url.absoluteString)
+            deliver(url: context.url)
+        }
+    }
+
+    // A universal link, or any other activity handed to the app.
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        deliver(activity: userActivity)
+    }
+
+    private func deliver(url: URL) {
+        if !PNAppLifecycle.shared.openURL(url) {
+            LinkingModule.deliver(url: url.absoluteString)
+        }
+    }
+
+    private func deliver(activity: NSUserActivity) {
+        if PNAppLifecycle.shared.continueUserActivity(activity) { return }
+        if activity.activityType == NSUserActivityTypeBrowsingWeb, let url = activity.webpageURL {
+            LinkingModule.deliver(url: url.absoluteString)
         }
     }
 
@@ -53,10 +74,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneWillEnterForeground(_ scene: UIScene) {
         AppStateModule.dispatch("inactive")
+        PNAppLifecycle.shared.willEnterForeground()
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
         AppStateModule.dispatch("background")
+        PNAppLifecycle.shared.didEnterBackground()
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}

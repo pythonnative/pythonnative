@@ -125,6 +125,9 @@ class Promise(val callId: Long, val module: String, private val dispatch: (Runna
     }
 
     /** Reject because the module has no method named `method`. */
+    /** Settle from an exception, keeping a [PNModuleError]'s machine-readable code. */
+    fun reject(error: Throwable) = reject(error.message ?: "Native call failed", (error as? PNModuleError)?.code)
+
     fun rejectUnknownMethod(method: String) = reject("$module has no method '$method'", "unknown_method")
 
     /**
@@ -156,3 +159,6 @@ object ModuleEvents {
         MainThread.runOnMain { PNBridge.callPython("module", 0, module, json) }
     }
 }
+
+/** A native module failure with a code Python's `NativeModuleError.code` carries. */
+class PNModuleError(message: String, val code: String) : Exception(message)

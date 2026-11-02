@@ -2160,8 +2160,3 @@ public struct PNImageSize: Codable {
         try container.encode(`height`, forKey: .`height`)
     }
 }
-
-public enum PNLocationGetCurrentAccuracy: String, Codable {
-    case `balanced` = "balanced"
-    case `high` = "high"
-}

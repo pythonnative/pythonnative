@@ -5,7 +5,7 @@
 # ruff: noqa: D101, D102
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol
 
 from ..assets import AssetManifest
 from ..native_modules.images import ImageSize
@@ -145,36 +145,6 @@ class PermissionsService(Protocol):
     async def request(self, permission: str) -> str: ...
 
 
-class NotificationsService(Protocol):
-    async def request_permission(self) -> bool: ...
-
-    async def schedule(
-        self, title: str, body: str = "", delay_seconds: float = 0, identifier: str = "default"
-    ) -> bool: ...
-
-    async def cancel(self, identifier: str = "default") -> None: ...
-
-    async def get_device_token(self) -> Optional[str]: ...
-
-
-class CameraService(Protocol):
-    async def take_photo(self, *, quality: float = 0.9, allow_editing: bool = False) -> Optional[str]: ...
-
-    async def pick_from_gallery(self, *, quality: float = 0.9, allow_editing: bool = False) -> Optional[str]: ...
-
-
-class LocationService(Protocol):
-    async def get_current(
-        self, *, accuracy: Literal["balanced", "high"] = "balanced", timeout: float = 10.0
-    ) -> Optional[Dict[str, float]]: ...
-
-
-class BiometricsService(Protocol):
-    def is_available(self) -> bool: ...
-
-    async def authenticate(self, reason: str = "Authenticate") -> bool: ...
-
-
 class AssetsService(Protocol):
     """Bundled-asset access: the dev overlay manifest, raw reads, existence checks."""
 
@@ -220,12 +190,6 @@ def install_services() -> None:
     register_schema(ModuleSchema.from_protocol("Battery", BatteryService, events={"change": Dict[str, Any]}))
     register_schema(ModuleSchema.from_protocol("NetInfo", NetInfoService, events={"change": Dict[str, Any]}))
     register_schema(ModuleSchema.from_protocol("Permissions", PermissionsService))
-    notifications = ModuleSchema.from_protocol("Notifications", NotificationsService)
-    notifications.methods["get_device_token"]["platforms"] = ["ios"]
-    register_schema(notifications)
-    register_schema(ModuleSchema.from_protocol("Camera", CameraService))
-    register_schema(ModuleSchema.from_protocol("Location", LocationService))
-    register_schema(ModuleSchema.from_protocol("Biometrics", BiometricsService))
     register_schema(ModuleSchema.from_protocol("Assets", AssetsService))
     register_schema(ModuleSchema.from_protocol("Images", ImagesService))
     register_schema(ModuleSchema.from_protocol("WebViews", WebViewsService))

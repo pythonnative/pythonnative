@@ -331,3 +331,26 @@ def write_builtin_contracts(path: Any = None) -> Path:
     destination = Path(path) if path is not None else Path(__file__).with_name(BUILTIN_CONTRACTS)
     destination.write_text(encode_builtin_contracts(derive()), encoding="utf-8")
     return destination
+
+
+def write_plugin_contracts() -> None:
+    """Write each first-party capability's ``native/schema.json`` from its facade's declarations."""
+    import importlib
+    import json
+
+    from ..project.plugins import FIRST_PARTY_PLUGINS
+    from .schema import MODULES, manifest
+
+    root = Path(__file__).resolve().parents[1]
+    known_components, known_modules = set(COMPONENTS), set(MODULES)
+    for name in FIRST_PARTY_PLUGINS:
+        native = root / name / "native"
+        if not (native / "pn_plugin.json").is_file():
+            continue
+        importlib.import_module(f"pythonnative.{name}")
+        document = manifest()
+        document["components"] = {k: v for k, v in document["components"].items() if k not in known_components}
+        document["modules"] = {k: v for k, v in document["modules"].items() if k not in known_modules}
+        known_components |= set(document["components"])
+        known_modules |= set(document["modules"])
+        (native / "schema.json").write_text(json.dumps(document, indent=2, sort_keys=True, default=str) + "\n")

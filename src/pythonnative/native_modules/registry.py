@@ -41,7 +41,7 @@ import asyncio
 import inspect
 import itertools
 import threading
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 from ..bridge import codec
 
@@ -51,8 +51,11 @@ __all__ = [
     "NativeModule",
     "NativeModuleError",
     "PythonModule",
+    "declare_plugin_module",
     "dispatch_module_message",
     "emit",
+    "event_stream",
+    "is_page_module",
     "native_module",
     "on_event",
     "register_python_module",
@@ -80,6 +83,41 @@ class NativeModuleError(RuntimeError):
         self.method = method
         self.message = message
         self.code = code
+
+
+_plugin_owners: Dict[str, str] = {}
+_page_modules: set[str] = set()
+
+
+def declare_plugin_module(name: str, plugin: str, *, browser: bool = False) -> None:
+    """Record that ``plugin`` implements module ``name``, so a build without it can say what to do.
+
+    Args:
+        name: The module's name.
+        plugin: The plugin's name.
+        browser: The plugin's browser entry implements the module in the preview page.
+    """
+    _plugin_owners[name] = plugin
+    if browser:
+        _page_modules.add(name)
+
+
+def is_page_module(name: str) -> bool:
+    """Whether the browser preview's page implements plugin module ``name``."""
+    return name in _page_modules
+
+
+def _call_error(module: str, method: str, result: Dict[str, Any]) -> NativeModuleError:
+    code = result.get("code")
+    message = str(result.get("error", "unknown error"))
+    plugin = _plugin_owners.get(module)
+    if code == "unknown_module" and plugin is not None:
+        code = "plugin_not_enabled"
+        message = (
+            f"the {plugin!r} capability isn't in this build. Add {plugin!r} to [plugins].use in "
+            "pythonnative.toml and rebuild."
+        )
+    return NativeModuleError(module, method, message, code)
 
 
 class NativeModule:
@@ -207,7 +245,7 @@ class BridgeModule(NativeModule):
             raise RuntimeError(f"{self.name}.{method} completes asynchronously; use call_async()")
         if result.get("ok", True):
             return self._checked_result(method, result.get("value"))
-        raise NativeModuleError(self.name, method, str(result.get("error", "unknown error")), result.get("code"))
+        raise _call_error(self.name, method, result)
 
     async def call_async(self, method: str, **args: Any) -> Any:
         """Invoke ``method`` and await its result."""
@@ -230,7 +268,7 @@ class BridgeModule(NativeModule):
                 _pending_meta.pop(call_id, None)
             if result.get("ok", True):
                 return self._checked_result(method, result.get("value"))
-            raise NativeModuleError(self.name, method, str(result.get("error", "unknown error")), result.get("code"))
+            raise _call_error(self.name, method, result)
         try:
             return self._checked_result(method, await future)
         except asyncio.CancelledError:
@@ -451,6 +489,67 @@ def _discover_entry_points() -> None:
                 print(f"[pythonnative.native_modules] entry point {ep.name!r} raised: {exc!r}", file=sys.stderr)
             continue
         _python_impls.setdefault(str(module_name), loaded)
+
+
+# ======================================================================
+# Streams
+# ======================================================================
+
+
+async def event_stream(
+    module: NativeModule,
+    event: str,
+    *,
+    start: str,
+    stop: str,
+    **args: Any,
+) -> AsyncIterator[Any]:
+    """Yield ``module``'s ``event`` payloads while a native subscription is open.
+
+    The building block for ``async for`` APIs such as ``Location.watch`` and
+    ``Accelerometer.readings``: it calls method ``start`` with ``args``, which
+    returns a subscription id, and calls ``stop`` with that id when the
+    iteration ends for any reason. Each event's payload carries the id, so
+    two streams on one module don't see each other's values.
+
+    Args:
+        module: The native module.
+        event: The event carrying ``{"id": subscription, "value": payload}``.
+        start: Method that begins delivery and returns the subscription id.
+        stop: Method taking ``id=`` that ends delivery.
+        **args: Arguments for ``start``.
+    """
+    loop = asyncio.get_running_loop()
+    queue: "asyncio.Queue[Any]" = asyncio.Queue()
+    subscription: Dict[str, Any] = {"id": None, "early": []}
+
+    def deliver(payload: Any) -> None:
+        def enqueue() -> None:
+            if subscription["id"] is None:
+                subscription["early"].append(payload)
+            elif payload.get("id") == subscription["id"]:
+                queue.put_nowait(payload.get("value"))
+
+        loop.call_soon_threadsafe(enqueue)
+
+    remove = module.add_listener(event, deliver)
+    try:
+        subscription["id"] = await module.call_async(start, **args)
+        for payload in subscription["early"]:
+            if payload.get("id") == subscription["id"]:
+                queue.put_nowait(payload.get("value"))
+        subscription["early"].clear()
+        while True:
+            yield await queue.get()
+    finally:
+        remove()
+        if subscription["id"] is not None:
+            try:
+                module.call(stop, id=subscription["id"])
+            except Exception:
+                from .. import diagnostics
+
+                diagnostics.swallowed(f"native_modules.{module.name}.{stop}")
 
 
 # ======================================================================

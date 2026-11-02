@@ -14,10 +14,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
-import com.chaquo.python.Python
-import com.chaquo.python.android.AndroidPlatform
 import com.pythonnative.runtime.PNBridge
-import com.pythonnative.runtime.PythonHost
 import com.pythonnative.runtime.modules.BuiltinModules
 
 /**
@@ -61,37 +58,10 @@ class MainActivity : AppCompatActivity() {
         // The NavHost loads the initial screen from nav_graph's startDestination.
         setContentView(R.layout.activity_main)
 
-        val entry = getString(R.string.pn_entry_module)
         startup.execute {
-            val failure = runCatching { startPython(entry) }.exceptionOrNull()
+            val failure = runCatching { PythonStartup.start(application) }.exceptionOrNull()
             runOnUiThread { pythonStarted(failure) }
         }
-    }
-
-    /** Runs on the startup thread: everything here may take a while. */
-    private fun startPython(entry: String) {
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(applicationContext))
-        }
-        val py = Python.getInstance()
-        if (BuildConfig.DEBUG) {
-            // Dev-only: the writable source overlay the dev client syncs
-            // into. The dev server arrives as a connect link
-            // (`pn-<app id>://connect?url=...`) through `Linking`.
-            py.getModule("pythonnative.hot_reload").callAttr("configure_dev_environment", filesDir.absolutePath)
-        }
-        // Handshake with the runtime library (raises on a protocol
-        // mismatch, before any screen is created), enable dev mode in
-        // debug builds, warm the asyncio runtime, and import the entry
-        // module so a broken app fails here with a full traceback.
-        py.getModule("pythonnative.bootstrap").callAttr("start", BuildConfig.DEBUG, true, entry)
-        // Installing the host delivers the messages screens queued meanwhile.
-        val bridge = py.getModule("pythonnative.bridge")
-        PNBridge.setHost(object : PythonHost {
-            override fun callback(kind: String, tag: Long, name: String, payloadJson: String) {
-                bridge.callAttr("native_callback", kind, tag, name, payloadJson)
-            }
-        })
     }
 
     private fun pythonStarted(failure: Throwable?) {

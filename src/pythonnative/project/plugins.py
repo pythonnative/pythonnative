@@ -11,11 +11,22 @@ my_blur/native/
     android/com/example/myblur/BlurViewManager.kt
 ```
 
-``pn_plugin.json`` names the registration entry on each platform:
+``pn_plugin.json`` names the plugin and its registration entry on each
+platform:
 
 ```json
-{"ios": {"entry": "MyBlurPlugin"}, "android": {"entry": "com.example.myblur.MyBlurPlugin"}}
+{
+  "name": "my_blur",
+  "ios": {"entry": "MyBlurPlugin"},
+  "android": {"entry": "com.example.myblur.MyBlurPlugin"}
+}
 ```
+
+The manifest may also declare options, the permissions and plugins it
+requires, and changes to the app's ``Info.plist``, entitlements, privacy
+manifest, ``AndroidManifest.xml``, and Gradle plugins, plus C, C++, and
+xcframework sources. [`plugin_config`][pythonnative.project.plugin_config]
+applies those; RFC 0008 describes the format.
 
 At build time this module copies each plugin's sources into the staged
 native project (``PythonNativeKit/Sources/PythonNativeKit/Plugins/<name>``
@@ -26,7 +37,9 @@ surgery is needed.
 
 Projects can also bundle plugins that aren't installed as distributions
 by listing directories under ``[plugins].paths`` in ``pythonnative.toml``;
-each path must contain the same ``pn_plugin.json`` layout.
+each path must contain the same ``pn_plugin.json`` layout. First-party
+capabilities live in ``pythonnative/<name>/native`` and are bundled only
+when ``[plugins].use`` names them.
 """
 
 from __future__ import annotations
@@ -41,10 +54,12 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
 
 __all__ = [
     "ENTRY_POINT_GROUP",
+    "FIRST_PARTY_PLUGINS",
     "MANIFEST_NAME",
     "NativePlugin",
     "PluginError",
     "discover_plugins",
+    "first_party_plugins",
     "load_plugin",
     "stage_android_plugins",
     "stage_ios_plugins",
@@ -55,6 +70,52 @@ ENTRY_POINT_GROUP = "pythonnative.plugins"
 
 MANIFEST_NAME = "pn_plugin.json"
 """File name of the per-plugin manifest."""
+
+FIRST_PARTY_PLUGINS = (
+    "audio",
+    "background",
+    "biometrics",
+    "camera",
+    "location",
+    "maps",
+    "notifications",
+    "pickers",
+    "purchases",
+    "push",
+    "sensors",
+    "video",
+)
+"""Capabilities ``[plugins].use`` accepts: subpackages of ``pythonnative`` holding a ``native`` plugin."""
+
+_OPTION_TYPES = ("string", "integer", "boolean", "path", "list")
+_MANIFEST_KEYS = frozenset({"name", "contracts", "requires", "options", "ios", "android", "web"})
+_IOS_KEYS = frozenset(
+    {
+        "entry",
+        "resources",
+        "dependencies",
+        "info_plist",
+        "entitlements",
+        "privacy",
+        "binary_targets",
+        "c_target",
+        "when",
+    }
+)
+_ANDROID_KEYS = frozenset(
+    {
+        "entry",
+        "resources",
+        "assets",
+        "dependencies",
+        "permissions",
+        "manifest",
+        "cmake",
+        "gradle_plugins",
+        "files",
+        "when",
+    }
+)
 
 Logger = Callable[[str], None]
 
@@ -100,6 +161,23 @@ class NativePlugin:
     contracts: Optional[Path] = None
     swift_dependencies: tuple[SwiftDependency, ...] = ()
     maven_dependencies: tuple[str, ...] = ()
+    manifest: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def requires_plugins(self) -> tuple[str, ...]:
+        """Plugins that must also be in this app's build."""
+        return tuple((self.manifest.get("requires") or {}).get("plugins", ()))
+
+    @property
+    def requires_permissions(self) -> tuple[str, ...]:
+        """``[permissions]`` entries this plugin needs the app to declare."""
+        return tuple((self.manifest.get("requires") or {}).get("permissions", ()))
+
+    @property
+    def web_entry(self) -> Optional[str]:
+        """The browser preview's ES module, relative to the plugin root."""
+        web = self.manifest.get("web")
+        return str(web["entry"]) if isinstance(web, dict) else None
 
     @property
     def has_ios(self) -> bool:
@@ -183,6 +261,48 @@ def _dependency_block(content: str, name: str, lines: Sequence[str]) -> str:
     return re.sub(pattern, lambda _: marker + "\n" + "\n".join(lines) + "\n    " + end, content, flags=re.DOTALL)
 
 
+def _has_local_targets(plugin: NativePlugin) -> bool:
+    section = plugin.manifest.get("ios") or {}
+    return bool(section.get("binary_targets") or section.get("c_target"))
+
+
+def _ios_local_targets(plugin: NativePlugin, project_dir: Path) -> tuple[List[str], List[str]]:
+    """Copy a plugin's xcframeworks and C sources, returning its target names and declarations."""
+    section = plugin.manifest.get("ios") or {}
+    package_root = project_dir / "PythonNativeKit"
+    names: List[str] = []
+    lines: List[str] = []
+    for relative in section.get("binary_targets", ()):
+        source = (plugin.root / relative).resolve()
+        if not source.is_relative_to(plugin.root) or not source.is_dir() or source.suffix != ".xcframework":
+            raise PluginError(f"{plugin.name}: binary target {relative!r} must be an .xcframework inside the plugin")
+        destination = package_root / "PluginBinaries" / plugin.name / source.name
+        shutil.copytree(source, destination, dirs_exist_ok=True)
+        names.append(source.stem)
+        lines.append(
+            f"        .binaryTarget(name: {json.dumps(source.stem)}, "
+            f"path: {json.dumps(str(destination.relative_to(package_root)))}),"
+        )
+    c_target = section.get("c_target")
+    if c_target is not None:
+        if not isinstance(c_target, dict) or not {"sources", "public_headers"} <= set(c_target):
+            raise PluginError(f"{plugin.name}: ios.c_target needs 'sources' and 'public_headers'")
+        source = (plugin.root / c_target["sources"]).resolve()
+        if not source.is_relative_to(plugin.root) or not source.is_dir():
+            raise PluginError(f"{plugin.name}: ios.c_target.sources must be a directory inside the plugin")
+        destination = package_root / "PluginC" / plugin.name
+        shutil.copytree(source, destination, dirs_exist_ok=True)
+        headers = (plugin.root / c_target["public_headers"]).resolve().relative_to(source)
+        target = f"PNC_{plugin.name}"
+        names.append(target)
+        lines.append(
+            f"        .target(name: {json.dumps(target)}, "
+            f"path: {json.dumps(str(destination.relative_to(package_root)))}, "
+            f"publicHeadersPath: {json.dumps(str(headers))}),"
+        )
+    return names, lines
+
+
 def _stage_dependencies(project_dir: Path, plugins: Sequence[NativePlugin], platform: str) -> None:
     """Resolve declarations deterministically and reject cross-plugin conflicts."""
     if platform == "ios":
@@ -196,9 +316,11 @@ def _stage_dependencies(project_dir: Path, plugins: Sequence[NativePlugin], plat
                 packages[item.identity] = SwiftDependency(item.url, item.version, products)
         path = project_dir / "PythonNativeKit/Package.swift"
         if not path.exists():
-            if packages:
+            if packages or any(_has_local_targets(plugin) for plugin in plugins):
                 raise PluginError("PythonNativeKit/Package.swift is missing")
             return
+        for leftover in ("PluginBinaries", "PluginC"):
+            shutil.rmtree(project_dir / "PythonNativeKit" / leftover, ignore_errors=True)
         content = path.read_text(encoding="utf-8")
         ordered = [packages[name] for name in sorted(packages)]
         content = _dependency_block(
@@ -206,15 +328,20 @@ def _stage_dependencies(project_dir: Path, plugins: Sequence[NativePlugin], plat
             "packages",
             [f"        .package(url: {json.dumps(item.url)}, exact: {json.dumps(item.version)})," for item in ordered],
         )
+        local_targets = [_ios_local_targets(plugin, project_dir) for plugin in plugins]
         content = _dependency_block(
             content,
             "products",
             [
-                f"                .product(name: {json.dumps(product)}, package: {json.dumps(item.identity)}),"
-                for item in ordered
-                for product in item.products
+                *(
+                    f"                .product(name: {json.dumps(product)}, package: {json.dumps(item.identity)}),"
+                    for item in ordered
+                    for product in item.products
+                ),
+                *(f"                {json.dumps(name)}," for names, _ in local_targets for name in names),
             ],
         )
+        content = _dependency_block(content, "targets", [line for _, lines in local_targets for line in lines])
     else:
         modules: dict[str, str] = {}
         for plugin in plugins:
@@ -265,8 +392,11 @@ def load_plugin(root: Path, *, name: Optional[str] = None) -> NativePlugin:
         raise PluginError(f"Could not parse {manifest_path}: {exc}") from exc
     if not isinstance(manifest, dict):
         raise PluginError(f"{manifest_path} must contain a JSON object.")
+    _validate_manifest(manifest, manifest_path)
 
-    plugin_name = name or manifest.get("name") or root.name
+    plugin_name = name or manifest.get("name")
+    if not plugin_name:
+        raise PluginError(f"{manifest_path} must declare a 'name'.")
     if not _SWIFT_IDENT.match(str(plugin_name).replace("-", "_")):
         raise PluginError(f"Plugin name {plugin_name!r} must be an identifier.")
     plugin_name = str(plugin_name).replace("-", "_")
@@ -281,7 +411,12 @@ def load_plugin(root: Path, *, name: Optional[str] = None) -> NativePlugin:
     if ios_entry is not None:
         if not _SWIFT_IDENT.match(ios_entry):
             raise PluginError(f"{manifest_path}: ios.entry {ios_entry!r} is not a Swift type name.")
-        ios_sources = sorted(p.relative_to(root) for p in (root / "ios").rglob("*.swift") if p.is_file())
+        vendored = tuple(root / item for item in (manifest.get("ios") or {}).get("binary_targets", ()))
+        ios_sources = sorted(
+            p.relative_to(root)
+            for p in (root / "ios").rglob("*.swift")
+            if p.is_file() and not any(p.is_relative_to(target) for target in vendored)
+        )
         if not ios_sources:
             raise PluginError(f"{root} declares an iOS entry but ios/ contains no .swift files.")
     if android_entry is not None:
@@ -328,7 +463,70 @@ def load_plugin(root: Path, *, name: Optional[str] = None) -> NativePlugin:
         contracts=contract_path,
         swift_dependencies=swift_dependencies,
         maven_dependencies=maven_dependencies,
+        manifest=manifest,
     )
+
+
+def _validate_manifest(manifest: Dict[str, Any], path: Path) -> None:
+    """Reject unknown keys and malformed declarations before anything is staged."""
+
+    def unknown(section: Dict[str, Any], allowed: frozenset[str], label: str) -> None:
+        extra = sorted(set(section) - allowed)
+        if extra:
+            raise PluginError(f"{path}: unknown {label} key(s): {', '.join(extra)}")
+
+    unknown(manifest, _MANIFEST_KEYS, "manifest")
+    requires = manifest.get("requires", {})
+    if not isinstance(requires, dict) or set(requires) - {"plugins", "permissions"}:
+        raise PluginError(f"{path}: 'requires' may only name 'plugins' and 'permissions'")
+    for key, value in requires.items():
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise PluginError(f"{path}: requires.{key} must be a list of strings")
+    options = manifest.get("options", {})
+    if not isinstance(options, dict):
+        raise PluginError(f"{path}: 'options' must be an object")
+    for option, spec in options.items():
+        if not isinstance(spec, dict) or spec.get("type") not in _OPTION_TYPES:
+            raise PluginError(f"{path}: option {option!r} needs a type, one of {', '.join(_OPTION_TYPES)}")
+        if set(spec) - {"type", "default", "required", "env"}:
+            raise PluginError(f"{path}: option {option!r} has unknown keys")
+    for platform, allowed in (("ios", _IOS_KEYS), ("android", _ANDROID_KEYS)):
+        section = manifest.get(platform)
+        if section is None:
+            continue
+        if not isinstance(section, dict):
+            raise PluginError(f"{path}: '{platform}' must be an object")
+        unknown(section, allowed, f"{platform}")
+        when = section.get("when", {})
+        if not isinstance(when, dict):
+            raise PluginError(f"{path}: {platform}.when must be an object")
+        for option, nested in when.items():
+            if option not in options:
+                raise PluginError(f"{path}: {platform}.when names unknown option {option!r}")
+            if not isinstance(nested, dict):
+                raise PluginError(f"{path}: {platform}.when.{option} must be an object")
+            unknown(nested, allowed - {"entry", "when"}, f"{platform}.when.{option}")
+    web = manifest.get("web")
+    if web is not None and (not isinstance(web, dict) or not isinstance(web.get("entry"), str)):
+        raise PluginError(f"{path}: 'web' must be an object with a string 'entry'")
+
+
+def first_party_plugins(names: Iterable[str]) -> List[NativePlugin]:
+    """Load the first-party capabilities listed in ``[plugins].use``.
+
+    Raises:
+        PluginError: If a name isn't a first-party capability.
+    """
+    package_root = Path(__file__).resolve().parents[1]
+    plugins = []
+    for name in names:
+        if name not in FIRST_PARTY_PLUGINS:
+            raise PluginError(
+                f"Unknown capability {name!r} in [plugins].use. Available: {', '.join(FIRST_PARTY_PLUGINS)}. "
+                "Third-party plugins are found through requirements and [plugins].paths."
+            )
+        plugins.append(load_plugin(package_root / name / "native"))
+    return plugins
 
 
 def _entry(manifest: Dict[str, object], platform: str, manifest_path: Path) -> Optional[str]:
@@ -505,6 +703,26 @@ def stage_android_plugins(project_dir: Path, plugins: Sequence[NativePlugin], *,
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(plugin.root / rel, target)
                 managed.append(str(target.relative_to(project_dir)))
+    cpp_root = native_root / "cpp"
+    shutil.rmtree(cpp_root / "plugins", ignore_errors=True)
+    includes = []
+    for plugin in bundled:
+        cmake = (plugin.manifest.get("android") or {}).get("cmake")
+        if cmake is None:
+            continue
+        source = (plugin.root / cmake).resolve()
+        if not source.is_relative_to(plugin.root) or source.name != "CMakeLists.txt" or not source.is_file():
+            raise PluginError(f"{plugin.name}: android.cmake must name a CMakeLists.txt inside the plugin")
+        shutil.copytree(source.parent, cpp_root / "plugins" / plugin.name, dirs_exist_ok=True)
+        includes.append(
+            f"add_subdirectory(plugins/{plugin.name} ${{CMAKE_CURRENT_BINARY_DIR}}/plugins/{plugin.name})\n"
+        )
+    if cpp_root.is_dir():
+        (cpp_root / "plugins.cmake").write_text(
+            "# Generated by `pn build`: one add_subdirectory per plugin with native C or C++ sources.\n"
+            + "".join(includes),
+            encoding="utf-8",
+        )
     registration.parent.mkdir(parents=True, exist_ok=True)
     _stage_dependencies(Path(project_dir), bundled, "android")
     registration.write_text(_render_kotlin_registration(bundled), encoding="utf-8")

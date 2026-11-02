@@ -376,6 +376,11 @@ export class PreviewHost {
     this.moduleMessage(module, { event, payload });
   }
 
+  /** Add a plugin's module implementations: `{ModuleName: {method(args) {...}}}`. */
+  registerModules(implementations) {
+    Object.assign(this.modules(), implementations);
+  }
+
   modules() {
     if (this._modules) return this._modules;
     const host = this;

@@ -1712,13 +1712,3 @@ data class PNImageSize(
         }
     }
 }
-
-enum class PNLocationGetCurrentAccuracy(val rawValue: String) : PNNativeValue {
-    `balanced`("balanced"),
-    `high`("high");
-    override fun nativeValue(): Any = rawValue
-    companion object {
-        fun decode(value: Any?): PNLocationGetCurrentAccuracy = entries.firstOrNull { it.rawValue == value }
-            ?: throw IllegalArgumentException("Invalid PNLocationGetCurrentAccuracy")
-    }
-}

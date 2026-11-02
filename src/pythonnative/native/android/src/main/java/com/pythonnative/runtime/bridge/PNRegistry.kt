@@ -47,6 +47,11 @@ object PNRegistry {
         modules[module.name] = module
     }
 
+    /** Add an observer of application events. Plugins call this from `register`. */
+    fun registerLifecycleHook(hook: com.pythonnative.runtime.modules.PNLifecycleHook) {
+        com.pythonnative.runtime.modules.PNLifecycle.add(hook)
+    }
+
     /** The manager for element type `name`, or `null` when unknown. */
     @Synchronized
     fun managerFor(name: String): ComponentManager? {

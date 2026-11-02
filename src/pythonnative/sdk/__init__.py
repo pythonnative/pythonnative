@@ -67,6 +67,7 @@ Example:
 from ..element import Element
 from ..mutations import UNSET, UnsetType
 from ..native_modules.registry import (
+    event_stream,
     NativeModule,
     NativeModuleError,
     PythonModule,
@@ -98,6 +99,7 @@ from ._components import (
     list_components,
     unregister_component,
 )
+from .plugin import PluginNotEnabledError, plugin_component, plugin_module
 from .schema import ComponentSchema, ModuleSchema, NativeField, register_schema
 
 __all__ = [
@@ -132,7 +134,12 @@ __all__ = [
     "get_props_type",
     "list_components",
     "unregister_component",
+    # Native-plugin SDK
+    "PluginNotEnabledError",
+    "plugin_component",
+    "plugin_module",
     # Native-module SDK
+    "event_stream",
     "NativeModule",
     "NativeModuleError",
     "PythonModule",

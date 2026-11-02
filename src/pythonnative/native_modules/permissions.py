@@ -60,37 +60,27 @@ UNDETERMINED: PermissionStatus = "undetermined"
 
 _STATUSES = (GRANTED, DENIED, BLOCKED, UNDETERMINED)
 
-RUNTIME_PERMISSIONS = (
-    "camera",
-    "microphone",
-    "photo_library",
-    "location_when_in_use",
-    "contacts",
-    "notifications",
-)
-"""Every permission name ``check`` / ``request`` accept, in the ``[permissions]`` vocabulary."""
-
-
 def _coerce(value: object) -> PermissionStatus:
     status = str(value) if value is not None else UNDETERMINED
     return status if status in _STATUSES else UNDETERMINED
 
 
 def _validate(permission: str) -> str:
-    if permission not in RUNTIME_PERMISSIONS:
-        raise ValueError(
-            f"Unknown permission {permission!r}. Use one of {', '.join(RUNTIME_PERMISSIONS)} "
-            "(the same names as [permissions] in pythonnative.toml)."
-        )
+    if not permission.isidentifier():
+        raise ValueError(f"Invalid permission name {permission!r}: use a [permissions] key from pythonnative.toml.")
     return permission
 
 
 class Permissions:
     """Runtime permission interface.
 
+    The plugin that uses a permission provides it, so a name works only when
+    that plugin is in the build: ``camera`` needs ``camera`` in
+    ``[plugins].use``. Otherwise the call raises ``NativeModuleError`` with the
+    code ``plugin_not_enabled``.
+
     Raises:
-        ValueError: For a permission name outside
-            [`RUNTIME_PERMISSIONS`][pythonnative.native_modules.permissions.RUNTIME_PERMISSIONS].
+        ValueError: For a name that can't be a ``[permissions]`` key.
         NativeModuleError: If the native module fails.
     """
 

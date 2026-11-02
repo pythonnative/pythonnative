@@ -39,6 +39,11 @@ public final class PNRegistry {
         moduleInstances.removeValue(forKey: type.name)
     }
 
+    /// Add an observer of application events. Plugins call this from `register(into:)`.
+    public func registerLifecycleHook(_ hook: PNAppLifecycleHook) {
+        PNAppLifecycle.shared.add(hook)
+    }
+
     /// Element type names currently registered.
     public var componentNames: [String] {
         ensureBuiltins()
@@ -136,10 +141,6 @@ enum PNBuiltins {
         registry.registerModule(NetInfoModuleAdapter<NetInfoModule>.self)
         registry.registerModule(AppStateModuleAdapter<AppStateModule>.self)
         registry.registerModule(PermissionsModuleAdapter<PermissionsModule>.self)
-        registry.registerModule(NotificationsModuleAdapter<NotificationsModule>.self)
-        registry.registerModule(CameraModuleAdapter<CameraModule>.self)
-        registry.registerModule(LocationModuleAdapter<LocationModule>.self)
-        registry.registerModule(BiometricsModuleAdapter<BiometricsModule>.self)
         registry.registerModule(AssetsModuleAdapter<AssetsModule>.self)
         registry.registerModule(ImagesModuleAdapter<ImagesModule>.self)
         registry.registerModule(WebViewsModuleAdapter<WebViewsModule>.self)

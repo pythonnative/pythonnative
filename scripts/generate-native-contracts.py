@@ -20,7 +20,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 import pythonnative  # noqa: F401  # Import the factories in a clean process.
 from pythonnative.bridge import contract_document
 from pythonnative.bridge.core import PROTOCOL_VERSION, Platform, decode_transaction, load_core
-from pythonnative.sdk.builtins import write_builtin_contracts
+from pythonnative.sdk.builtins import write_builtin_contracts, write_plugin_contracts
 from pythonnative.sdk.codegen import generate
 from pythonnative.sdk.native_types import NativeTypes
 from pythonnative.sdk.types import type_schema
@@ -169,6 +169,8 @@ def main() -> None:
     for path, content in (record_fixtures() | core_fixtures()).items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
+    # Last: importing a capability registers its contract, which mustn't reach the files above.
+    write_plugin_contracts()
 
 
 if __name__ == "__main__":

@@ -345,6 +345,18 @@ def configure_manifest(project_dir: Path, config: AppConfig, *, release: bool = 
             "            </intent-filter>\n"
         )
         content = content.replace("        </activity>", f"{deep_link_filter}        </activity>", 1)
+    if config.associated_domains:
+        hosts = "".join(f'                <data android:host="{domain}" />\n' for domain in config.associated_domains)
+        app_links_filter = (
+            '            <intent-filter android:autoVerify="true">\n'
+            '                <action android:name="android.intent.action.VIEW" />\n'
+            '                <category android:name="android.intent.category.DEFAULT" />\n'
+            '                <category android:name="android.intent.category.BROWSABLE" />\n'
+            '                <data android:scheme="https" />\n'
+            f"{hosts}"
+            "            </intent-filter>\n"
+        )
+        content = content.replace("        </activity>", f"{app_links_filter}        </activity>", 1)
 
     manifest_path.write_text(content, encoding="utf-8")
 

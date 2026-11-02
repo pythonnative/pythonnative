@@ -33,7 +33,7 @@ class AccessibilityInfoModuleAdapter(private val implementation: AccessibilityIn
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -59,7 +59,7 @@ class AlertModuleAdapter(private val implementation: AlertImplementation): Nativ
                     val `style` = PNValues.string((args.opt("style")))
                     val cancellation = implementation.`present`(`title`, `message`, `buttons`, `style`) { result ->
                         try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error) })
                         } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
                     }
                     if (cancellation != null) promise.onCancel(cancellation)
@@ -73,7 +73,7 @@ class AlertModuleAdapter(private val implementation: AlertImplementation): Nativ
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -92,7 +92,7 @@ class AppStateModuleAdapter(private val implementation: AppStateImplementation):
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -127,7 +127,7 @@ class AssetsModuleAdapter(private val implementation: AssetsImplementation): Nat
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -150,78 +150,12 @@ class BatteryModuleAdapter(private val implementation: BatteryImplementation): N
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
 object BatteryEvents {
     fun `change`(payload: Map<String, PNJSONValue>) = com.pythonnative.runtime.modules.ModuleEvents.emit("Battery", "change", PNValues.encode(payload))
-}
-
-interface BiometricsImplementation {
-    fun `authenticate`(`reason`: String, completion: (Result<Boolean>) -> Unit): (() -> Unit)?
-    fun `is_available`(): Boolean
-}
-
-class BiometricsModuleAdapter(private val implementation: BiometricsImplementation): NativeModule {
-    override val name = "Biometrics"
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        try {
-            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
-            when (method) {
-                "authenticate" -> {
-                    val `reason` = PNValues.string((if (args.has("reason")) args.opt("reason") else PNValues.defaultValue("\"Authenticate\"")))
-                    val cancellation = implementation.`authenticate`(`reason`) { result ->
-                        try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
-                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
-                    }
-                    if (cancellation != null) promise.onCancel(cancellation)
-                }
-                "is_available" -> {
-                    promise.resolve(PNValues.encode(implementation.`is_available`()))
-                }
-                else -> promise.rejectUnknownMethod(method)
-            }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
-    }
-}
-
-interface CameraImplementation {
-    fun `pick_from_gallery`(`quality`: Double, `allow_editing`: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)?
-    fun `take_photo`(`quality`: Double, `allow_editing`: Boolean, completion: (Result<String?>) -> Unit): (() -> Unit)?
-}
-
-class CameraModuleAdapter(private val implementation: CameraImplementation): NativeModule {
-    override val name = "Camera"
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        try {
-            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
-            when (method) {
-                "pick_from_gallery" -> {
-                    val `quality` = PNValues.number((if (args.has("quality")) args.opt("quality") else PNValues.defaultValue("0.9")))
-                    val `allow_editing` = PNValues.boolean((if (args.has("allow_editing")) args.opt("allow_editing") else PNValues.defaultValue("false")))
-                    val cancellation = implementation.`pick_from_gallery`(`quality`, `allow_editing`) { result ->
-                        try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
-                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
-                    }
-                    if (cancellation != null) promise.onCancel(cancellation)
-                }
-                "take_photo" -> {
-                    val `quality` = PNValues.number((if (args.has("quality")) args.opt("quality") else PNValues.defaultValue("0.9")))
-                    val `allow_editing` = PNValues.boolean((if (args.has("allow_editing")) args.opt("allow_editing") else PNValues.defaultValue("false")))
-                    val cancellation = implementation.`take_photo`(`quality`, `allow_editing`) { result ->
-                        try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
-                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
-                    }
-                    if (cancellation != null) promise.onCancel(cancellation)
-                }
-                else -> promise.rejectUnknownMethod(method)
-            }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
-    }
 }
 
 interface ClipboardImplementation {
@@ -244,7 +178,7 @@ class ClipboardModuleAdapter(private val implementation: ClipboardImplementation
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -263,7 +197,7 @@ class DeviceModuleAdapter(private val implementation: DeviceImplementation): Nat
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -301,7 +235,7 @@ class HapticsModuleAdapter(private val implementation: HapticsImplementation): N
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -324,7 +258,7 @@ class ImagesModuleAdapter(private val implementation: ImagesImplementation): Nat
                     val `uri` = PNValues.string((args.opt("uri")))
                     val cancellation = implementation.`get_size`(`uri`) { result ->
                         try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error) })
                         } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
                     }
                     if (cancellation != null) promise.onCancel(cancellation)
@@ -333,14 +267,14 @@ class ImagesModuleAdapter(private val implementation: ImagesImplementation): Nat
                     val `uri` = PNValues.string((args.opt("uri")))
                     val cancellation = implementation.`prefetch`(`uri`) { result ->
                         try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error) })
                         } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
                     }
                     if (cancellation != null) promise.onCancel(cancellation)
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -363,7 +297,7 @@ class KeyboardModuleAdapter(private val implementation: KeyboardImplementation):
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -396,7 +330,7 @@ class LinkingModuleAdapter(private val implementation: LinkingImplementation): N
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -423,38 +357,12 @@ class LocalizationModuleAdapter(private val implementation: LocalizationImplemen
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
 object LocalizationEvents {
     fun `change`(payload: Map<String, PNJSONValue>) = com.pythonnative.runtime.modules.ModuleEvents.emit("Localization", "change", PNValues.encode(payload))
-}
-
-interface LocationImplementation {
-    fun `get_current`(`accuracy`: PNLocationGetCurrentAccuracy, `timeout`: Double, completion: (Result<Map<String, Double>?>) -> Unit): (() -> Unit)?
-}
-
-class LocationModuleAdapter(private val implementation: LocationImplementation): NativeModule {
-    override val name = "Location"
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        try {
-            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
-            when (method) {
-                "get_current" -> {
-                    val `accuracy` = PNLocationGetCurrentAccuracy.decode((if (args.has("accuracy")) args.opt("accuracy") else PNValues.defaultValue("\"balanced\"")))
-                    val `timeout` = PNValues.number((if (args.has("timeout")) args.opt("timeout") else PNValues.defaultValue("10.0")))
-                    val cancellation = implementation.`get_current`(`accuracy`, `timeout`) { result ->
-                        try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
-                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
-                    }
-                    if (cancellation != null) promise.onCancel(cancellation)
-                }
-                else -> promise.rejectUnknownMethod(method)
-            }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
-    }
 }
 
 interface NetInfoImplementation {
@@ -472,68 +380,12 @@ class NetInfoModuleAdapter(private val implementation: NetInfoImplementation): N
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
 object NetInfoEvents {
     fun `change`(payload: Map<String, PNJSONValue>) = com.pythonnative.runtime.modules.ModuleEvents.emit("NetInfo", "change", PNValues.encode(payload))
-}
-
-interface NotificationsImplementation {
-    fun `cancel`(`identifier`: String, completion: (Result<Unit>) -> Unit): (() -> Unit)?
-    fun `get_device_token`(completion: (Result<String?>) -> Unit): (() -> Unit)?
-    fun `request_permission`(completion: (Result<Boolean>) -> Unit): (() -> Unit)?
-    fun `schedule`(`title`: String, `body`: String, `delay_seconds`: Double, `identifier`: String, completion: (Result<Boolean>) -> Unit): (() -> Unit)?
-}
-
-class NotificationsModuleAdapter(private val implementation: NotificationsImplementation): NativeModule {
-    override val name = "Notifications"
-    override fun call(method: String, args: JSONObject, promise: Promise) {
-        try {
-            require(PNContracts.validateModule(name, method, args)) { "Invalid native arguments" }
-            when (method) {
-                "cancel" -> {
-                    val `identifier` = PNValues.string((if (args.has("identifier")) args.opt("identifier") else PNValues.defaultValue("\"default\"")))
-                    val cancellation = implementation.`cancel`(`identifier`) { result ->
-                        try {
-                        result.fold({ value -> promise.resolve(null) }, { error -> promise.reject(error.message ?: "Native call failed") })
-                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
-                    }
-                    if (cancellation != null) promise.onCancel(cancellation)
-                }
-                "get_device_token" -> {
-                    val cancellation = implementation.`get_device_token`() { result ->
-                        try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
-                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
-                    }
-                    if (cancellation != null) promise.onCancel(cancellation)
-                }
-                "request_permission" -> {
-                    val cancellation = implementation.`request_permission`() { result ->
-                        try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
-                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
-                    }
-                    if (cancellation != null) promise.onCancel(cancellation)
-                }
-                "schedule" -> {
-                    val `title` = PNValues.string((args.opt("title")))
-                    val `body` = PNValues.string((if (args.has("body")) args.opt("body") else PNValues.defaultValue("\"\"")))
-                    val `delay_seconds` = PNValues.number((if (args.has("delay_seconds")) args.opt("delay_seconds") else PNValues.defaultValue("0")))
-                    val `identifier` = PNValues.string((if (args.has("identifier")) args.opt("identifier") else PNValues.defaultValue("\"default\"")))
-                    val cancellation = implementation.`schedule`(`title`, `body`, `delay_seconds`, `identifier`) { result ->
-                        try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
-                        } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
-                    }
-                    if (cancellation != null) promise.onCancel(cancellation)
-                }
-                else -> promise.rejectUnknownMethod(method)
-            }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
-    }
 }
 
 interface PermissionsImplementation {
@@ -551,7 +403,7 @@ class PermissionsModuleAdapter(private val implementation: PermissionsImplementa
                     val `permission` = PNValues.string((args.opt("permission")))
                     val cancellation = implementation.`check`(`permission`) { result ->
                         try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error) })
                         } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
                     }
                     if (cancellation != null) promise.onCancel(cancellation)
@@ -560,14 +412,14 @@ class PermissionsModuleAdapter(private val implementation: PermissionsImplementa
                     val `permission` = PNValues.string((args.opt("permission")))
                     val cancellation = implementation.`request`(`permission`) { result ->
                         try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error) })
                         } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
                     }
                     if (cancellation != null) promise.onCancel(cancellation)
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -602,7 +454,7 @@ class SecureStoreModuleAdapter(private val implementation: SecureStoreImplementa
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -622,14 +474,14 @@ class ShareModuleAdapter(private val implementation: ShareImplementation): Nativ
                     val `title` = if (PNValues.isNull((if (args.has("title")) args.opt("title") else PNValues.defaultValue("null")))) null else PNValues.string((if (args.has("title")) args.opt("title") else PNValues.defaultValue("null")))
                     val cancellation = implementation.`share`(`message`, `url`, `title`) { result ->
                         try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error) })
                         } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
                     }
                     if (cancellation != null) promise.onCancel(cancellation)
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -668,7 +520,7 @@ class StorageModuleAdapter(private val implementation: StorageImplementation): N
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }
 
@@ -687,13 +539,13 @@ class WebViewsModuleAdapter(private val implementation: WebViewsImplementation):
                     val `script` = PNValues.string((args.opt("script")))
                     val cancellation = implementation.`eval_js`(`tag`, `script`) { result ->
                         try {
-                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error.message ?: "Native call failed") })
+                        result.fold({ value -> promise.resolve(PNValues.encode(value)) }, { error -> promise.reject(error) })
                         } catch (error: Exception) { promise.reject(error.message ?: "Invalid native result") }
                     }
                     if (cancellation != null) promise.onCancel(cancellation)
                 }
                 else -> promise.rejectUnknownMethod(method)
             }
-        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }
+        } catch (error: Exception) { promise.reject(error) }
     }
 }

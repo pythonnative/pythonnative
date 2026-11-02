@@ -15,20 +15,5 @@
          when no PythonNative callback is enabled; see PNScreenFragment. -->
     <application
         android:enableOnBackInvokedCallback="true"
-        tools:targetApi="tiramisu">
-        <receiver android:name="com.pythonnative.runtime.modules.NotificationReceiver" android:exported="false" />
-
-        <!-- Camera.take_photo writes the full-resolution capture through
-             this provider (`EXTRA_OUTPUT`); `${applicationId}` resolves to
-             the consuming app's id at manifest-merge time. -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.pythonnative.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/pn_file_paths" />
-        </provider>
-    </application>
+        tools:targetApi="tiramisu" />
 </manifest>
