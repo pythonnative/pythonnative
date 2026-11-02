@@ -3,7 +3,7 @@
 - Status: Implemented
 - Author(s): Owen Carey, with Claude (Claude Code)
 - Created: 2026-11-01
-- Implemented in: (pull request link, once shipped)
+- Implemented in: [#117](https://github.com/pythonnative/pythonnative/pull/117)
 - Supersedes / Superseded by: replaces the built-in `Camera`, `Location`,
   `Biometrics`, and `Notifications` modules and the `pn_plugin.json` format
   from RFC 0002 and RFC 0003. Takes on the export trimming that RFC 0006
