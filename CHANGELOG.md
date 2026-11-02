@@ -1,6 +1,39 @@
 # CHANGELOG
 
 
+## v0.52.2 (2026-11-02)
+
+### Bug Fixes
+
+- **project**: Report malformed lockfiles with actionable errors
+  ([#99](https://github.com/pythonnative/pythonnative/pull/99),
+  [`a238a6e`](https://github.com/pythonnative/pythonnative/commit/a238a6e901d4a623b0ff8a8cc7b3ce227d717330))
+
+Refs: #90
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+### Documentation
+
+- **cli**: Document codegen options in the CLI reference
+  ([#100](https://github.com/pythonnative/pythonnative/pull/100),
+  [`8e57430`](https://github.com/pythonnative/pythonnative/commit/8e5743083327e0aa29451d877df80895b94fb97a))
+
+Refs: #96
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+### Testing
+
+- **equality**: Cover identity and nonboolean comparison results
+  ([#108](https://github.com/pythonnative/pythonnative/pull/108),
+  [`5533566`](https://github.com/pythonnative/pythonnative/commit/55335669e85a45430d42e19e8caf6588e3ae86aa))
+
+Refs: #92
+
+Co-authored-by: Owen Carey <37121709+owenthcarey@users.noreply.github.com>
+
+
 ## v0.52.1 (2026-10-28)
 
 ### Bug Fixes
