@@ -89,3 +89,4 @@ ceremony.
 | [0005](0005-fast-and-small.md) | Fast and small | Implemented |
 | [0006](0006-dev-client-and-devtools.md) | Dev client and DevTools | Implemented |
 | [0007](0007-shared-renderer-core.md) | Shared renderer core | Implemented |
+| [0008](0008-production-platform.md) | Production platform | Accepted |
