@@ -52,3 +52,22 @@ def test_lock_rejects_missing_hashes_and_differing_abi_versions(tmp_path: Path) 
     )
     with pytest.raises(deps.DependencyError, match="different versions"):
         lockfile.requirements(app, targets)
+
+
+@pytest.mark.parametrize("contents", ["{", "[]", "null", '"pn.lock"'])
+def test_lock_reports_malformed_json_and_can_be_regenerated(tmp_path: Path, contents: str) -> None:
+    app = config(tmp_path)
+    path = tmp_path / lockfile.NAME
+    path.write_text(contents, encoding="utf-8")
+    with pytest.raises(deps.DependencyError, match=r"pn\.lock .*Run 'pn deps --lock'"):
+        lockfile.read(app)
+    assert path.read_text(encoding="utf-8") == contents
+    target = deps.android_targets(app)[0]
+    lockfile.write(app, [deps.Resolution(target=target, packages=[package()])])
+    document = lockfile.read(app)
+    assert document is not None
+    assert list(document["targets"]) == [lockfile.target_key(target)]
+
+
+def test_lock_read_returns_none_without_a_lock(tmp_path: Path) -> None:
+    assert lockfile.read(config(tmp_path)) is None
