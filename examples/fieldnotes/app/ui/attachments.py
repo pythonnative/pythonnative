@@ -279,7 +279,8 @@ def VoiceNotePlayer(attachment: Attachment) -> pn.Node:
 
     return pn.View(
         pn.Pressable(
-            pn.Icon("pause" if playing else "play", size=22, color=styles.colors.primary),
+            pn.Icon("pause" if playing else "play", size=18, color=styles.colors.primary),
+            pn.Text("Pause" if playing else "Play", style=styles.label),
             on_press=toggle,
             accessibility_label=f"{'Pause' if playing else 'Play'} voice note",
             accessibility_role="button",

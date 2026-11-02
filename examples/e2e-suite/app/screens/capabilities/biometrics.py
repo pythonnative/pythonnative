@@ -5,8 +5,9 @@ A simulator has no enrolled face, so the flow only asserts the capability answer
 
 from __future__ import annotations
 
-import pythonnative as pn
 from app.screens.scaffold import DemoScreen, DemoSection, ResultText
+
+import pythonnative as pn
 from pythonnative.biometrics import Biometrics
 
 

@@ -55,6 +55,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Dict, Iterator, List, Mapping, Optional, Tuple, Union
 
@@ -258,7 +259,9 @@ async def fetch(
         resp.raise_for_status()
         ```
     """
-    request = _build_request(url=url, method=method, headers=headers, body=body, params=params, files=files)
+    # Building an upload reads its files, which mustn't block the render loop.
+    build = partial(_build_request, url=url, method=method, headers=headers, body=body, params=params, files=files)
+    request = await asyncio.to_thread(build) if files else build()
     if on_upload_progress is not None and isinstance(request.data, bytes):
         request.data = _ProgressBody(request.data, on_upload_progress, asyncio.get_running_loop())
     if not _observers:

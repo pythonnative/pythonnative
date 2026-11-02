@@ -2,19 +2,17 @@
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Union, Unpack, cast
+from typing import Any, Callable, Dict, List, Optional, Union, Unpack
 
 from ..component import component
 from ..element import Element, Node
 from ..hooks import Ref, use_state
 from ..style import (
     Color,
-    Style,
     StyleProp,
-    resolve_style,
 )
 from ._base import _make_element
-from .props import AccessibilityProps, ViewProps
+from .props import ViewProps
 
 
 @dataclass(frozen=True, slots=True)

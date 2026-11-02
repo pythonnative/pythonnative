@@ -86,12 +86,11 @@ __version__ = "0.52.2"
 import importlib
 from typing import TYPE_CHECKING, Any
 
-from . import appearance, diagnostics, runtime, sdk, svg
+from . import appearance, sdk, svg
 from .alerts import Alert
 from .assets import Asset, asset
 from .component import Component, component, memo
 from .components import (
-    set_error_fallback,
     ActivityIndicator,
     BlurView,
     Button,
@@ -137,9 +136,10 @@ from .components import (
     View,
     WebNavigationEvent,
     WebView,
+    set_error_fallback,
 )
 from .components.props import AccessibilityProps, ViewProps
-from .diagnostics import HookOrderError
+from .diagnostics import HookOrderError, set_error_handler
 from .element import Element, Node
 from .handles import ScrollOffset, ScrollViewHandle, TextInputHandle, ViewHandle, WebViewHandle
 from .hooks import (
@@ -202,7 +202,6 @@ from .native_modules import (
     use_reduce_motion,
     use_screen_reader_enabled,
 )
-from .diagnostics import set_error_handler
 from .platform import Platform
 from .platform_metrics import WindowDimensions
 from .runtime import run_async, run_blocking

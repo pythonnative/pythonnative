@@ -10,8 +10,8 @@ instead of silently falling back, which the demo also checks.
 from __future__ import annotations
 
 import pythonnative as pn
-from pythonnative.animated import ANIMATABLE_PROPS
 from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
+from pythonnative.animated import ANIMATABLE_PROPS
 
 _CURVES: list[tuple[str, pn.EasingSpec]] = [
     ("linear", pn.Easing.linear),

@@ -1,6 +1,6 @@
 # RFC 0008: Production platform
 
-- Status: Accepted
+- Status: Implemented
 - Author(s): Owen Carey, with Claude (Claude Code)
 - Created: 2026-11-01
 - Implemented in: (pull request link, once shipped)
@@ -113,16 +113,18 @@ from pythonnative.maps import MapView, Marker
   facade and a `native/` plugin directory. `native` directories never reach an
   app bundle (`project/bundle.py` already ignores that name at any depth).
 - `pn build` stages only the plugins in `use`. So an app that doesn't enable
-  `camera` doesn't compile a line that references `AVCaptureDevice`.
+  `camera` doesn't compile a line that references `AVCaptureDevice`. Other
+  plugins' Python packages still ship, since they're small and importable.
 - Importing a facade whose plugin isn't in the build still works. Calling it
   raises `NativeModuleError` with code `plugin_not_enabled` and the message
   names the `[plugins].use` entry to add. A component whose manager isn't
   registered reports the same thing at commit time.
 - Off device, each facade registers a Python fallback, so tests and the browser
   preview run the same code.
-- PythonNative Go compiles every first-party plugin. A project that only uses
-  first-party plugins stays Go-compatible; a project with third-party native
-  code still needs `pn run`.
+- PythonNative Go compiles every first-party plugin except `push`, whose tokens
+  belong to the app's own bundle ID and Firebase project, and whose entitlement
+  stops Go building for free Apple accounts. A project that uses `push` or
+  third-party native code needs `pn run`; `pn start` says so.
 
 ### Plugin manifest v2
 
@@ -132,15 +134,14 @@ from pythonnative.maps import MapView, Marker
 {
   "name": "push",
   "contracts": "schema.json",
-  "requires": {"plugins": ["notifications"], "permissions": ["notifications"]},
+  "requires": {"plugins": ["notifications"], "permissions": ["remote_notifications"]},
   "options": {
-    "google_services_file": {"type": "path", "default": null},
-    "aps_environment": {"type": "string", "default": "production"}
+    "google_services_file": {"type": "path"}
   },
   "ios": {
     "entry": "PushPlugin",
     "info_plist": {"UIBackgroundModes": ["remote-notification"]},
-    "entitlements": {"aps-environment": "${aps_environment}"},
+    "entitlements": {"com.apple.developer.example": true},
     "privacy": {"accessed_api_types": [{"type": "NSPrivacyAccessedAPICategoryUserDefaults", "reasons": ["CA92.1"]}]},
     "binary_targets": ["ios/vendor/Foo.xcframework"],
     "c_target": {"sources": "ios/c", "public_headers": "ios/c/include"}
@@ -150,10 +151,10 @@ from pythonnative.maps import MapView, Marker
     "permissions": ["android.permission.POST_NOTIFICATIONS"],
     "manifest": {"application": "android/application.xml", "root": "android/manifest.xml"},
     "cmake": "android/cpp/CMakeLists.txt",
-    "gradle_plugins": [{"id": "com.google.gms.google-services", "version": "4.4.2"}],
     "dependencies": ["com.google.firebase:firebase-messaging:24.1.0"],
     "when": {
       "google_services_file": {
+        "gradle_plugins": [{"id": "com.google.gms.google-services", "version": "4.4.2"}],
         "files": [{"from": "${google_services_file}", "to": "app/google-services.json"}]
       }
     }
@@ -184,6 +185,11 @@ Rules:
 - Only manifest, plist, entitlement, privacy, dependency, and file changes are
   possible. There's no arbitrary code at build time, which keeps wheels safe to
   inspect as data.
+- `name` is required, and a plugin's records and generated enums have to stay
+  predictable across builds. Identical literals share a native type only inside
+  one plugin, so a plugin's Swift and Kotlin name the same types whichever other
+  plugins are in the build. Record names are global, so they must be
+  distinctive: `camera` calls its record `VideoRecording` for that reason.
 
 Staging keeps the existing shape: `stage_ios_plugins` and
 `stage_android_plugins` copy sources, and a new `project/plugin_config.py`
@@ -235,12 +241,15 @@ interface PNLifecycleHook {
 The Android template gains `PNApplication`, because push and background work
 start the process with no `Activity`.
 
-**Headless Python.** `PythonHost` (Android) and `PythonRuntime` (iOS) start
-Python without a screen. A plugin that needs Python while there's no UI calls
-`PNHeadless.deliver(module, event, payload)`, which starts the runtime if it
-isn't up, imports the app's entry module so its registrations run, and then
-delivers through the normal module event path. Rendering is unaffected: no
-surface exists until an activity or scene asks for one.
+**Headless Python.** On iOS, Python starts on every launch, background launches
+included. On Android, a plugin running with no activity calls
+`PNHeadless.ensureStarted()`, which opens the renderer core, starts Python if it
+isn't up, and imports the app's entry module so its registrations run. Events
+then go through the normal module path. Rendering is unaffected: no surface
+exists until an activity or scene asks for one.
+
+iOS hooks all see each event, as Android's do. UIKit allows one completion per
+push, though, so the first hook to finish a remote notification decides.
 
 ### Permissions
 
@@ -268,7 +277,7 @@ a Maestro flow where a simulator can run it.
 | --- | --- | --- | --- | --- |
 | `pythonnative.location` | `Location.get_current`, `Location.watch` (async iterator) | CoreLocation | `LocationManager` | Moved, `watch` new |
 | `pythonnative.biometrics` | `Biometrics.authenticate`, `Biometrics.available` | LocalAuthentication | `androidx.biometric` | Moved |
-| `pythonnative.camera` | `Camera.take_photo`, `CameraView` with `take_picture`, `start_recording`, `stop_recording`, barcode scanning | AVFoundation | CameraX | Moved, `CameraView` new |
+| `pythonnative.camera` | `Camera.take_photo`, `CameraView` with `take_picture`, `start_recording`, `stop_recording`, barcode scanning | AVFoundation | CameraX, ML Kit | Moved, `CameraView` new |
 | `pythonnative.pickers` | `pick_images`, `pick_videos`, `pick_documents` | PHPicker, `UIDocumentPicker` | Photo picker, `ACTION_OPEN_DOCUMENT` | `pick_from_gallery` moved, rest new |
 | `pythonnative.notifications` | `schedule`, `cancel`, `set_badge`, `on_received`, `on_response`, `last_response` | UserNotifications | `NotificationManager`, `AlarmManager` | Moved, handlers new |
 | `pythonnative.push` | `get_device_token`, `on_token`, `on_message` | APNs | FCM | Token moved, FCM new |
@@ -276,7 +285,7 @@ a Maestro flow where a simulator can run it.
 | `pythonnative.audio` | `Sound`, `Recorder` | AVAudioPlayer, AVAudioRecorder | Media3, `MediaRecorder` | New |
 | `pythonnative.maps` | `MapView`, `Marker`, `Region`, `Polyline` | MapKit | Google Maps SDK | New |
 | `pythonnative.sensors` | `Accelerometer`, `Gyroscope`, `Magnetometer`, `Barometer` (async iterators) | CoreMotion | `SensorManager` | New |
-| `pythonnative.background` | `@background.task(name, every=...)`, `background.schedule` | BGTaskScheduler | WorkManager | New |
+| `pythonnative.background` | `@background.task(name, every=...)`, `schedule`, `cancel`, `status`, `run_now` | BGTaskScheduler | WorkManager | New |
 | `pythonnative.purchases` | `Purchases.products`, `purchase`, `restore`, `on_update` | StoreKit 2 | Play Billing | New |
 
 ```python
@@ -324,9 +333,8 @@ async with pn.WebSocket("wss://example.com/feed") as socket:
 `[app].associated_domains = ["example.com"]` writes the `applinks:` entitlement
 on iOS and an `android:autoVerify` `https` intent filter on Android.
 `SceneDelegate` forwards `NSUserActivity` to `Linking`. Navigation's existing
-deep-link matching takes the `https` URL's path. `pn doctor` prints the files the
-site must host, and `pn links` prints their exact contents for the app's bundle ID
-and signing team.
+deep-link matching takes the `https` URL's path. `pn doctor` points at `pn links`,
+which prints the files' exact contents for the app's bundle ID and signing team.
 
 ### Store release
 
@@ -344,6 +352,11 @@ and signing team.
   `CODE_SIGN_STYLE=Manual`.
 - App Store Connect API key arguments are read from `PN_ASC_KEY_PATH`,
   `PN_ASC_KEY_ID`, and `PN_ASC_ISSUER_ID`, so CI doesn't need an Xcode account.
+- Entitlements go through a `PN_ENTITLEMENTS` setting only the app target reads.
+  `CODE_SIGN_ENTITLEMENTS` on the command line reached every target, packages
+  included, which broke any app with an entitlement.
+- An app's `[ios].privacy_manifest` merges with the template's rather than replacing
+  it, so it can't drop the runtime's declared reasons.
 
 New commands and flags:
 
@@ -424,6 +437,8 @@ removes a component from the built-in contract.
 - `TouchableOpacity` from Python, the contract, Swift, Kotlin, and the preview.
 - The exports listed above. `check-e2e-coverage.py` tracks the smaller list.
 - `AppDelegate` and `MainActivity` calls into specific modules, in favor of hooks.
+- `pn build ios --upload` and the `destination: upload` export option, replaced by
+  `pn submit ios`, so one command uploads on both platforms.
 - The narrower `pn_plugin.json` validation: the old format still parses because
   every new key is optional, but the sample in `project/plugins.py` that omits
   `name` is corrected, and `name` becomes required so two plugins can't collide
@@ -459,6 +474,9 @@ removes a component from the built-in contract.
 - R8 or ABI splits for Android. R8 can strip classes Chaquopy reaches by reflection,
   and AAB already delivers per-ABI splits.
 - A `State` object and a typed `use_mutation`, from the same audit.
+- `CFBundleName`. It stays `ios_template`, because Xcode's generated keys overwrite the
+  value, and setting it from a build phase races the step that writes the file. Nothing
+  user-facing reads it: `CFBundleDisplayName` is set.
 - Contacts, calendar, Bluetooth, NFC, and Apple Pay. Each is a plugin anyone can
   now write; none is on the shortest path to shipping most apps.
 - Publishing Go to a store.
@@ -492,3 +510,61 @@ Limits of what a simulator proves, stated here so nobody assumes otherwise:
 
 Migration: nobody depends on the removed names yet, so there are no shims. The
 templates, `pn init`, examples, and docs change in the same pull request.
+
+## Results
+
+The reference app found four framework bugs that no
+per-feature test had caught, which is what it was for. All four are fixed in this pull
+request and have regression tests:
+
+- An Android build with an app icon failed, because generated PNGs sat beside the
+  template's `.webp` files under the same resource names.
+- Every Android `Icon` and tab bar icon drew nothing, because codegen turned
+  `Optional[Union[...]]` into a non-optional union with a JSON null case, so
+  `shape.fill ?: root.fill` never inherited. Unions containing `None` are now optional
+  natively.
+- After process death on Android, restored screens were blank. A fragment restored before
+  Python mounted inflated a placeholder, and repeating tags then matched it to the new
+  screen. It's now replaced.
+- `KeyboardAvoidingView` on Android below API 35 subtracted the keyboard twice, because the
+  window had already resized. Android now reports how much of the keyboard still covers the
+  content, as `overlap` beside `height`, and the view avoids only that.
+
+Verified on an iOS 26.2 simulator and an API 31 Android emulator:
+
+- All 12 capabilities compile into one app, and the `capabilities` Maestro suite and the
+  `plugin_config` flow pass on both platforms.
+- Field Notes builds in release with the checked-in icon, with no manual patching.
+- The Field Notes flows, the artifact check on both platforms, the XCTest and Android unit
+  suites, and the browser acceptance tests.
+- PythonNative Go builds with 11 capabilities on both platforms and runs a capability
+  project on iOS.
+
+Not verified, because it needs hardware, credentials, or accounts this work didn't have:
+
+- Any real App Store or Play upload. `pn submit` ran against a fake Play server and a stubbed
+  `altool`.
+- Real APNs or FCM delivery, and every physical device.
+- iOS camera capture, since a simulator has no camera. Barcode scanning through a lens.
+  The emulator's back camera crashed in its HAL on stills, which surfaced as `capture_failed`.
+- iOS audio recording. `AVAudioRecorder` hung in Core Audio on this host's simulator, which
+  times out as `recording_failed` after 20 seconds, as designed.
+- Purchase sheets, and Play Billing past "service unavailable".
+- A real `BGTaskScheduler` launch on iOS.
+- Android map rendering, which needs an API key.
+- Universal link and app link verification against a real domain.
+- `ACTION_PICK_IMAGES`, and audible output.
+- `KeyboardAvoidingView` on API 35 or later, where windows are edge-to-edge. Only an API 31
+  emulator was available, so that path is reasoned from the platform's behavior.
+
+Known rough edges, left for later because each is a change of its own:
+
+- `None` children are dropped before diffing, so a conditional child shifts its siblings,
+  which remount, lose state, and cancel running async handlers. Field Notes works around it
+  with keys. This differs from React, which keeps a hole.
+- iOS `TextInput` has no placeholder when `multiline`. Android `TextInput` ignores padding
+  and always shows its clear button. The iOS 26 `Switch` overflows its box.
+- `AVAudioRecorder` is referenced by every app using `audio`, so App Store review might
+  flag a playback-only app for a missing microphone purpose string.
+- PythonNative Go once showed a stale overlay from another project on a red "could not start"
+  screen, then recovered on the next launch. The cause wasn't found.

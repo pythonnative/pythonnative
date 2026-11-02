@@ -11,11 +11,6 @@ from .theme import Styles
 from .widgets import ActionButton, EmptyState
 
 
-def report_text(records: tuple[ErrorRecord, ...]) -> str:
-    """Format the log for pasting into a bug report."""
-    return "\n\n".join(f"{format_moment(item.at)} [{item.phase}]\n{item.trace}" for item in records)
-
-
 def record_key(record: ErrorRecord, index: int) -> str:
     return f"{record.at}-{index}"
 
@@ -46,17 +41,11 @@ def ErrorLogScreen() -> pn.Node:
     styles = pn.use_styles(Styles)
     count = pn.use_store(journal.store, lambda state: state.logged_errors)
     records = pn.use_memo(journal.errors.read, [count])
-    copied, set_copied = pn.use_state(False)
 
     pn.use_screen_options(title="Error log")
 
-    def copy() -> None:
-        pn.Clipboard.set_string(report_text(records))
-        set_copied(True)
-
     return pn.Column(
         pn.View(
-            ActionButton("Copied" if copied else "Copy all", "clipboard", copy, disabled=not records),
             ActionButton("Clear", "trash", journal.errors.clear, disabled=not records),
             style=[styles.wrap, {"padding": 16}],
         ),

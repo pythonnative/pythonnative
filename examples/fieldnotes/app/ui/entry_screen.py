@@ -36,7 +36,7 @@ def ReminderSection(entry: Entry) -> pn.Node:
     async def remind(preset: Preset) -> None:
         set_notice("")
         try:
-            allowed = await schedule_reminder(journal, entry, preset.delay(datetime.now()))
+            allowed = await schedule_reminder(journal, entry, preset[1](datetime.now()))
         except NativeModuleError as error:
             set_notice(f"Couldn't set a reminder: {error.message}")
             return
@@ -54,7 +54,7 @@ def ReminderSection(entry: Entry) -> pn.Node:
         )
     else:
         current = pn.View(
-            *(Chip(preset.label, on_press=partial(remind, preset)).with_key(preset.label) for preset in PRESETS),
+            *(Chip(preset[0], on_press=partial(remind, preset)).with_key(preset[0]) for preset in PRESETS),
             style=styles.wrap,
         )
     return Section("Remind me", current, Banner(notice, "warning") if notice else None)

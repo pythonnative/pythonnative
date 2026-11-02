@@ -60,6 +60,7 @@ UNDETERMINED: PermissionStatus = "undetermined"
 
 _STATUSES = (GRANTED, DENIED, BLOCKED, UNDETERMINED)
 
+
 def _coerce(value: object) -> PermissionStatus:
     status = str(value) if value is not None else UNDETERMINED
     return status if status in _STATUSES else UNDETERMINED

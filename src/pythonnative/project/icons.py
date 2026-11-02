@@ -138,6 +138,10 @@ def generate_android_icons(source: Path, res_dir: Path) -> bool:
     for density, size in ANDROID_LAUNCHER_DENSITIES.items():
         mip_dir = res_dir / f"mipmap-{density}"
         mip_dir.mkdir(parents=True, exist_ok=True)
+        # The template ships .webp launcher icons, and aapt fails on two files
+        # for one resource name.
+        for stale in mip_dir.glob("ic_launcher*"):
+            stale.unlink()
         square = _resized(img, size)
         square.save(mip_dir / "ic_launcher.png", format="PNG")
         round_icon = _circular(square)

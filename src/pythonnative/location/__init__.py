@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from contextlib import aclosing
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, Literal, Mapping, Optional, Protocol
+from typing import Any, AsyncGenerator, Dict, Literal, Mapping, Optional, Protocol
 
 from ..native_modules.registry import NativeModuleError, event_stream, native_module
 from ..sdk.plugin import plugin_module
@@ -131,7 +131,7 @@ class Location:
         return _position(result, method="get_current") if isinstance(result, dict) else None
 
     @staticmethod
-    async def watch(*, accuracy: Accuracy = "balanced", distance: float = 0.0) -> AsyncIterator[Position]:
+    async def watch(*, accuracy: Accuracy = "balanced", distance: float = 0.0) -> AsyncGenerator[Position, None]:
         """Yield positions as the device moves, until the iteration ends.
 
         Prompts for permission when needed. Leaving the ``async for`` (or

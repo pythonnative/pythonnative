@@ -127,6 +127,29 @@ def test_on_layout_never_reaches_native_props() -> None:
 # ======================================================================
 
 
+def test_keyboard_avoiding_leaves_alone_a_window_that_resized_itself() -> None:
+    from pythonnative import platform_metrics
+
+    platform_metrics.reset_keyboard_height()
+    try:
+        _, rec, backend = _mount(View(KeyboardAvoidingView(Text("hi"), style={"height": 300})))
+
+        # Below API 35, adjustResize already made room for the keyboard.
+        platform_metrics.set_keyboard_height(120.0, overlap=0.0)
+        rec.flush_dirty()
+        view = next(v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView")
+        assert not view.props.get("padding_bottom")
+        assert platform_metrics.get_keyboard_height() == 120.0
+
+        # An edge-to-edge window didn't, so the keyboard still covers the content.
+        platform_metrics.set_keyboard_height(120.0, overlap=120.0)
+        rec.flush_dirty()
+        view = next(v for v in backend.views.values() if v.type_name == "KeyboardAvoidingView")
+        assert view.props.get("padding_bottom") == 120.0
+    finally:
+        platform_metrics.reset_keyboard_height()
+
+
 def test_keyboard_avoiding_height_shrinks_by_keyboard_overlap() -> None:
     from pythonnative import platform_metrics
 

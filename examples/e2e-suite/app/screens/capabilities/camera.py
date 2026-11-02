@@ -11,8 +11,9 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable
 
-import pythonnative as pn
 from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
+
+import pythonnative as pn
 from pythonnative.camera import Barcode, Camera, CameraError, CameraView
 from pythonnative.native_modules.registry import NativeModuleError
 

@@ -172,14 +172,3 @@ def EmptyState(icon: pn.IconName, title: str, message: str, action: Optional[pn.
         action,
         style=styles.empty,
     )
-
-
-@pn.component
-def InfoRow(label: str, value: str) -> pn.Node:
-    """A label on the left and its value on the right."""
-    styles = pn.use_styles(Styles)
-    return pn.View(
-        pn.Text(label, style=styles.label),
-        pn.Text(value, style=[styles.caption, {"flex_shrink": 1, "text_align": "right"}]),
-        style=styles.spread,
-    )

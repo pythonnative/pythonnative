@@ -9,8 +9,9 @@ and ``on_error`` reports the same thing.
 
 from __future__ import annotations
 
-import pythonnative as pn
 from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
+
+import pythonnative as pn
 from pythonnative.maps import Coordinate, MapView, Marker, Polyline, Region
 
 OSLO = Coordinate(59.9139, 10.7522)

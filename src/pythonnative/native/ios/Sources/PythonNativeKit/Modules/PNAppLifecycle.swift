@@ -87,14 +87,14 @@ public final class PNAppLifecycle {
         if !handled { once() }
     }
 
-    /// Whether a hook consumed `url`; otherwise it reaches `Linking`.
+    /// Whether a hook consumed `url`; otherwise it reaches `Linking`. Every hook sees it, as on Android.
     public func openURL(_ url: URL) -> Bool {
-        registered.contains { $0.openURL(url) }
+        registered.map { $0.openURL(url) }.contains(true)
     }
 
     /// Whether a hook consumed `activity`; otherwise a web link reaches `Linking`.
     public func continueUserActivity(_ activity: NSUserActivity) -> Bool {
-        registered.contains { $0.continueUserActivity(activity) }
+        registered.map { $0.continueUserActivity(activity) }.contains(true)
     }
 
     public func didEnterBackground() {

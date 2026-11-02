@@ -21,15 +21,7 @@ MAX_RECORDS = 200
 
 @dataclass(frozen=True)
 class ErrorRecord:
-    """One logged error.
-
-    Attributes:
-        at: When it happened.
-        phase: Where the framework caught it, such as ``render`` or ``event``.
-        kind: The exception's type.
-        message: The exception's message.
-        trace: The formatted traceback.
-    """
+    """One logged error: when, where the framework caught it, its type and message, and its traceback."""
 
     at: float
     phase: str

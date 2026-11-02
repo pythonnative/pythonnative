@@ -121,6 +121,7 @@ def JournalScreen() -> pn.Node:
                 placeholder="Search notes, places, and #tags",
                 placeholder_color=styles.colors.text_secondary,
                 accessibility_label="Search the journal",
+                test_id="journal-search",
                 return_key_type="search",
                 auto_capitalize="none",
                 clear_button=True,

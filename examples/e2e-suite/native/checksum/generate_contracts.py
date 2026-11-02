@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Protocol
 
-from pythonnative.sdk.schema import ModuleSchema, register_schema, manifest, MODULES
+from pythonnative.sdk.schema import MODULES, ModuleSchema, manifest, register_schema
 
 
 class ChecksumService(Protocol):

@@ -10,8 +10,8 @@ import pytest
 
 import pythonnative as pn
 from pythonnative import appearance, diagnostics
-from pythonnative.style import resolve_style
 from pythonnative.hooks import StateSetter
+from pythonnative.style import resolve_style
 from pythonnative.testing import FakeView, render
 
 

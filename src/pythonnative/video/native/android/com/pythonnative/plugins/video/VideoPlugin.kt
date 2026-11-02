@@ -145,6 +145,9 @@ class PNVideoView(context: Context) : FrameLayout(context) {
                 PNComponentEvents.Video.`on_ready`(this@PNVideoView, info(active))
             }
             if (state == Player.STATE_ENDED) {
+                // ExoPlayer stays armed at the end, so a later seek would resume
+                // playback. AVPlayer stops, and the handle means the same on both.
+                player?.playWhenReady = false
                 reportProgress()
                 PNComponentEvents.Video.`on_end`(this@PNVideoView)
             }

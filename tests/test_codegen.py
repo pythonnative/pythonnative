@@ -83,6 +83,19 @@ def test_example_extension_contracts_match_the_builtins(tmp_path: Path) -> None:
         assert (copy / "src" / relative).read_text() == (source / "src" / relative).read_text(), relative
 
 
+def test_optional_unions_stay_optional_natively() -> None:
+    types = NativeTypes()
+    color = {"anyOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}, {"type": "null"}]}
+
+    python, swift, kotlin = types.types(color, "ShapeFill")
+
+    assert python.endswith(" | None")
+    assert swift == "PNShapeFill?"
+    assert kotlin == "PNShapeFill?"
+    assert types.kotlin_decode(color, "raw", "ShapeFill").startswith("if (PNValues.isNull(raw)) null else ")
+    assert not any("JSON" in line for line in types.kotlin if "Option" in line)
+
+
 def test_generated_literals_preserve_interpolation_and_control_characters() -> None:
     value = '$total "quoted" \\path\n\x00\b'
     assert quoted(value) == r'"$total \"quoted\" \\path\n\u{0}\u{8}"'

@@ -110,12 +110,7 @@ class Styles:
             border_radius=radii.full,
             background_color=theme.chip,
         )
-        self.chip_active = pn.style(
-            padding_horizontal=12,
-            padding_vertical=6,
-            border_radius=radii.full,
-            background_color=colors.primary,
-        )
+        self.chip_active: pn.Style = {**self.chip, "background_color": colors.primary}
         self.chip_text: pn.Style = {**text.caption, "color": colors.text}
         self.chip_text_active: pn.Style = {**text.caption, "color": colors.surface}
         self.action = pn.style(
@@ -138,7 +133,6 @@ class Styles:
             background_color=colors.primary,
         )
         self.primary_text: pn.Style = {**text.label, "color": colors.surface}
-        self.danger_text: pn.Style = {**text.label, "color": colors.error}
         self.banner = pn.style(
             flex_direction="row", align_items="center", gap=space.sm, padding=12, border_radius=radii.md
         )
@@ -165,13 +159,7 @@ class Styles:
             border_bottom_width=1,
             border_color=colors.border,
         )
-        self.entry_row_column = pn.style(
-            gap=4,
-            padding=space.md,
-            background_color=colors.surface,
-            border_bottom_width=1,
-            border_color=colors.border,
-        )
+        self.entry_row_column: pn.Style = {**self.entry_row, "flex_direction": "column", "gap": 4}
         self.empty = pn.style(padding=space.xl, gap=space.sm, align_items="center")
         self.center = pn.style(flex=1, align_items="center", justify_content="center", gap=space.md, padding=space.lg)
         self.center_text: pn.Style = {**text.body, "color": colors.text_secondary, "text_align": "center"}

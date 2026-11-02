@@ -34,7 +34,7 @@ import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
-import androidx.camera.video.VideoRecording
+import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
@@ -326,7 +326,7 @@ private class PNCameraView(context: Context) : FrameLayout(context) {
     private var analysis: ImageAnalysis? = null
     private var scanner: BarcodeScanner? = null
     private var videoCapture: VideoCapture<Recorder>? = null
-    private var recording: VideoRecording? = null
+    private var recording: Recording? = null
     private var recordingFile: File? = null
     private var onStopped: ((Result<PNVideoRecording>) -> Unit)? = null
     private var facing = PNCameraViewFacing.`back`
@@ -612,7 +612,7 @@ private class PNCameraView(context: Context) : FrameLayout(context) {
                     started = null
                 }
                 is VideoRecordEvent.Finalize -> {
-                    started?.invoke(Result.failure(PNModuleError(event.cause?.message ?: "VideoRecording didn't start", "capture_failed")))
+                    started?.invoke(Result.failure(PNModuleError(event.cause?.message ?: "Recording didn't start", "capture_failed")))
                     started = null
                     recordingFinished(event)
                 }

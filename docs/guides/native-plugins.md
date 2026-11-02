@@ -138,6 +138,10 @@ keeping a whole-value reference's type. `${app_id}` and `${display_name}` are al
 
 ## Native code
 
+Generated record types share one namespace across every plugin in a build, so a record
+named `Recording` in two plugins is a compile error. Give a record a name specific to
+your plugin, as `camera` does with `VideoRecording`.
+
 Your sources compile inside the runtime's own module, so don't import `PythonNativeKit` in Swift.
 
 ```swift

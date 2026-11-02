@@ -56,15 +56,17 @@ def apply_background_setting(enabled: bool) -> None:
     """
     if not enabled:
         background.cancel(TASK_NAME)
-        journal.set_background_note("")
+        journal.publish(background_note="")
         return
     try:
         background.schedule(TASK_NAME)
     except NativeModuleError as error:
-        journal.set_background_note(
-            "This device won't run background work, so sync happens while the app is open."
-            if error.code == "unavailable"
-            else str(error)
+        journal.publish(
+            background_note=(
+                "This device won't run background work, so sync happens while the app is open."
+                if error.code == "unavailable"
+                else str(error)
+            )
         )
     else:
-        journal.set_background_note("")
+        journal.publish(background_note="")

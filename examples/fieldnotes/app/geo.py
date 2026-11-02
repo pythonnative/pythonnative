@@ -21,13 +21,18 @@ _MINIMUM_SPAN = 0.02
 async def locate() -> Optional[Position]:
     """Get one position fix, for a new entry.
 
+    A balanced fix usually comes first and costs little. Out of range of the cell
+    towers and Wi-Fi it relies on, which is where a field journal gets used, it
+    comes back empty, so GPS gets a turn before giving up.
+
     Returns:
         The position, or ``None`` when the permission was refused, location
         services are off, or no fix came in time. A journal entry doesn't depend on
         any of those, so none is an error here.
     """
     try:
-        return await Location.get_current(accuracy="balanced", timeout=8)
+        position = await Location.get_current(accuracy="balanced", timeout=5)
+        return position or await Location.get_current(accuracy="high", timeout=10)
     except NativeModuleError:
         return None
 

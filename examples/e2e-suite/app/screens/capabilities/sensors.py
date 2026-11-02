@@ -8,8 +8,9 @@ error; the Android emulator's virtual sensors stream real values.
 
 from __future__ import annotations
 
-import pythonnative as pn
 from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
+
+import pythonnative as pn
 from pythonnative.native_modules.registry import NativeModuleError
 from pythonnative.sensors import Accelerometer, Barometer, Gyroscope, Magnetometer
 

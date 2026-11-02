@@ -27,12 +27,7 @@ _LIKE_SPECIALS = re.compile(r"([\\%_])")
 
 @dataclass(frozen=True)
 class Merge:
-    """What merging a version from the server did.
-
-    Attributes:
-        changed: Whether anything this device shows changed.
-        orphaned: Files, relative to the data directory, of attachments it removed.
-    """
+    """What merging a server version did: whether the screen changes, and the files of attachments it removed."""
 
     changed: bool = False
     orphaned: tuple[str, ...] = ()
@@ -40,12 +35,7 @@ class Merge:
 
 @dataclass(frozen=True)
 class SearchQuery:
-    """What someone typed into the search field, understood.
-
-    Attributes:
-        terms: Words that must all appear, already case-folded.
-        tags: Tags, written ``#birds``, that the entry must all have.
-    """
+    """What someone typed into the search field: words that must all appear, and ``#tags`` the entry must have."""
 
     terms: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
@@ -76,19 +66,7 @@ def _like(term: str) -> str:
 
 
 def _attachment(row: sqlite3.Row) -> Attachment:
-    return Attachment(
-        id=row["id"],
-        entry_id=row["entry_id"],
-        kind=row["kind"],
-        path=row["path"],
-        mime_type=row["mime_type"],
-        name=row["name"],
-        size=row["size"],
-        duration=row["duration"],
-        created_at=row["created_at"],
-        remote_path=row["remote_path"],
-        deleted_at=row["deleted_at"],
-    )
+    return Attachment(**dict(row))
 
 
 def _place(row: sqlite3.Row) -> Optional[Place]:
@@ -281,20 +259,6 @@ class Repository:
                     (draft.title, draft.body, draft.conditions, *_place_columns(draft.place), now, device, entry_id),
                 )
                 _write_tags(connection, entry_id, draft.tags)
-
-        await self.database.run(write)
-        return await self._require(entry_id)
-
-    async def set_place(self, entry_id: str, place: Optional[Place], *, now: float, device: str) -> Entry:
-        """Set or clear where an entry was written, and mark it for the next sync."""
-
-        def write(connection: sqlite3.Connection) -> None:
-            with connection:
-                connection.execute(
-                    "UPDATE entries SET latitude = ?, longitude = ?, accuracy = ?, place_name = ?, updated_at = ?, "
-                    "device = ?, dirty = dirty + 1 WHERE id = ?",
-                    (*_place_columns(place), now, device, entry_id),
-                )
 
         await self.database.run(write)
         return await self._require(entry_id)

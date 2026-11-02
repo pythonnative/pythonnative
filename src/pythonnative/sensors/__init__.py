@@ -42,7 +42,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, AsyncIterator, Dict, Literal, Mapping, Protocol, cast
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, Literal, Mapping, Protocol
 
 from ..native_modules.registry import NativeModuleError, event_stream, native_module
 from ..sdk.plugin import plugin_module
@@ -139,8 +139,7 @@ def _pressure(payload: Mapping[str, Any]) -> Pressure:
 def _stream(sensor: str, hz: float) -> AsyncGenerator[Any, None]:
     if not 0 < hz <= _MAX_HZ:
         raise ValueError(f"hz must be above 0 and at most {_MAX_HZ:g}, got {hz!r}")
-    stream = event_stream(native_module("Sensors"), "reading", start="start", stop="stop", sensor=sensor, hz=float(hz))
-    return cast("AsyncGenerator[Any, None]", stream)
+    return event_stream(native_module("Sensors"), "reading", start="start", stop="stop", sensor=sensor, hz=float(hz))
 
 
 class _VectorSensor:

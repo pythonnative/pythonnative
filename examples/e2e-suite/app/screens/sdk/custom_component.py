@@ -9,8 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pythonnative as pn
-from pythonnative.sdk import UNSET
 from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
+from pythonnative.sdk import UNSET
 
 
 @dataclass(frozen=True)

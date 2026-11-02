@@ -108,7 +108,7 @@ def test_events_arrive_as_typed_values() -> None:
 
 
 def test_ref_publishes_the_typed_handle_and_clears_on_unmount() -> None:
-    ref = pn.Ref()
+    ref: pn.Ref[Any] = pn.Ref()
     result = render(Video("a.mp4", ref=ref))
     assert isinstance(ref.current, VideoHandle)
     assert ref.current.type_name == "Video"
@@ -118,7 +118,7 @@ def test_ref_publishes_the_typed_handle_and_clears_on_unmount() -> None:
 
 
 def test_handle_commands_cross_the_contract() -> None:
-    ref = pn.Ref()
+    ref: pn.Ref[Any] = pn.Ref()
     result = render(Video("a.mp4", ref=ref))
     handle = ref.current
     handle.play()

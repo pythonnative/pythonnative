@@ -6,7 +6,6 @@ from typing import Generator
 
 import pytest
 
-import pythonnative as pn
 from pythonnative.platform import Platform, _set_platform_for_test
 
 

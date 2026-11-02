@@ -18,7 +18,7 @@ library script, so it has its own copy of these rules.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Literal, Mapping, Optional, cast
 from urllib.parse import urlsplit, urlunsplit
 
@@ -45,17 +45,7 @@ class WireAttachment:
 
     def to_json(self) -> dict[str, Any]:
         """Return the JSON form."""
-        return {
-            "id": self.id,
-            "kind": self.kind,
-            "mime_type": self.mime_type,
-            "name": self.name,
-            "size": self.size,
-            "duration": self.duration,
-            "created_at": self.created_at,
-            "remote_path": self.remote_path,
-            "deleted_at": self.deleted_at,
-        }
+        return asdict(self)
 
     @staticmethod
     def from_json(value: Mapping[str, Any]) -> "WireAttachment":
@@ -106,23 +96,7 @@ class WireEntry:
 
     def to_json(self) -> dict[str, Any]:
         """Return the JSON form."""
-        return {
-            "id": self.id,
-            "title": self.title,
-            "body": self.body,
-            "tags": list(self.tags),
-            "conditions": self.conditions,
-            "latitude": self.latitude,
-            "longitude": self.longitude,
-            "accuracy": self.accuracy,
-            "place_name": self.place_name,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "device": self.device,
-            "deleted_at": self.deleted_at,
-            "attachments": [attachment.to_json() for attachment in self.attachments],
-            "change": self.change,
-        }
+        return asdict(self)
 
     @staticmethod
     def from_json(value: Mapping[str, Any]) -> "WireEntry":

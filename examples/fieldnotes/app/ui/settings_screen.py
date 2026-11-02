@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pythonnative as pn
 from pythonnative import background
 
 from ..journal import journal
 from ..models import Appearance, Settings, SyncStatus, format_moment
 from ..protocol import normalize_server_url
-from ..services import TASK_NAME, apply_background_setting, sync_client, transfers
+from ..services import TASK_NAME, apply_background_setting, sync_client
 from .errors_screen import ErrorLogScreen
 from .lock_screen import biometrics_available
 from .pro_screen import ProScreen
 from .theme import Styles
-from .widgets import ActionButton, Banner, Field, InfoRow, ScreenHeader, Section, slots
+from .widgets import ActionButton, Banner, Field, ScreenHeader, Section, slots
 
 APPEARANCES: tuple[Appearance, ...] = ("system", "light", "dark")
 
@@ -61,10 +59,6 @@ def SyncSection(settings: Settings) -> pn.Node:
         set_address(url)
         await journal.update_settings(server_url=url)
 
-    async def upload_now() -> None:
-        if settings.server_url:
-            await transfers.run(settings.server_url)
-
     changed = address.strip() != settings.server_url
     return Section(
         "Sync server",
@@ -97,7 +91,6 @@ def SyncSection(settings: Settings) -> pn.Node:
                         if status.phase == "waiting"
                         else None
                     ),
-                    send=ActionButton("Send attachments", "cloud", upload_now) if status.phase == "connected" else None,
                 ),
                 style=styles.wrap,
             ),
@@ -173,6 +166,7 @@ def SecuritySection(settings: Settings) -> pn.Node:
 @pn.component
 def AppearanceSection(settings: Settings) -> pn.Node:
     """Follow the system, or force light or dark."""
+    styles = pn.use_styles(Styles)
 
     async def choose(index: int) -> None:
         choice = APPEARANCES[index]
@@ -185,26 +179,21 @@ def AppearanceSection(settings: Settings) -> pn.Node:
             segments=["System", "Light", "Dark"],
             selected_index=APPEARANCES.index(settings.appearance),
             on_change=choose,
+            tint_color=styles.colors.primary,
             accessibility_label="Appearance",
         ),
     )
 
 
-@dataclass(frozen=True)
 class TestError(Exception):
     """Raised on purpose by the diagnostics section, to check the error screen."""
-
-    detail: str = "This is a test of the error screen."
-
-    def __str__(self) -> str:
-        return self.detail
 
 
 @pn.component
 def Tripwire(armed: bool) -> pn.Node:
     """Raise during render when armed. An error here is what a real bug looks like to the app."""
     if armed:
-        raise TestError()
+        raise TestError("This is a test of the error screen.")
     return None
 
 
@@ -212,6 +201,7 @@ def Tripwire(armed: bool) -> pn.Node:
 def DiagnosticsSection() -> pn.Node:
     """The error log, and a way to see what a crash looks like."""
     navigation = pn.use_navigation()
+    styles = pn.use_styles(Styles)
     count = pn.use_store(journal.store, lambda state: state.logged_errors)
     armed, set_armed = pn.use_state(False)
 
@@ -220,7 +210,7 @@ def DiagnosticsSection() -> pn.Node:
 
     return Section(
         "Diagnostics",
-        InfoRow("Errors logged", str(count)),
+        pn.Text(f"Errors logged: {count}", style=styles.label),
         pn.View(
             ActionButton("Error log", "file-text", lambda: navigation.push(ErrorLogScreen())),
             ActionButton("Log a test error", "circle-alert", fail_in_handler),
@@ -256,7 +246,6 @@ def SettingsScreen() -> pn.Node:
                 SecuritySection(settings=settings),
                 AppearanceSection(settings=settings),
                 DiagnosticsSection(),
-                pn.Text(f"Field Notes on {pn.Platform.OS}.", style=styles.caption),
                 style=styles.content,
             ),
             style=styles.grow,

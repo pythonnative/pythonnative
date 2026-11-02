@@ -963,12 +963,10 @@ public struct PNAccessibilityValue: Codable {
 public enum PNViewAccessibilityValue: Codable {
     case option0(String)
     case option1(PNAccessibilityValue)
-    case option2(PNJSONValue)
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if let value = try? container.decode(String.self) { self = .option0(value); return }
         if let value = try? container.decode(PNAccessibilityValue.self) { self = .option1(value); return }
-        if let value = try? container.decode(PNJSONValue.self) { self = .option2(value); return }
         throw NativeDecodeError.invalid("PNViewAccessibilityValue")
     }
     public func encode(to encoder: Encoder) throws {
@@ -976,7 +974,6 @@ public enum PNViewAccessibilityValue: Codable {
         switch self {
         case .option0(let value): try container.encode(value)
         case .option1(let value): try container.encode(value)
-        case .option2(let value): try container.encode(value)
         }
     }
 }
@@ -1017,12 +1014,10 @@ public enum PNViewImportantForAccessibility: String, Codable {
 public enum PNViewHitSlop: Codable {
     case option0(Double)
     case option1([String: Double])
-    case option2(PNJSONValue)
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if let value = try? container.decode(Double.self) { self = .option0(value); return }
         if let value = try? container.decode([String: Double].self) { self = .option1(value); return }
-        if let value = try? container.decode(PNJSONValue.self) { self = .option2(value); return }
         throw NativeDecodeError.invalid("PNViewHitSlop")
     }
     public func encode(to encoder: Encoder) throws {
@@ -1030,7 +1025,6 @@ public enum PNViewHitSlop: Codable {
         switch self {
         case .option0(let value): try container.encode(value)
         case .option1(let value): try container.encode(value)
-        case .option2(let value): try container.encode(value)
         }
     }
 }
@@ -1038,27 +1032,6 @@ public enum PNViewHitSlop: Codable {
 public enum PNViewPnHeaderSlot: String, Codable {
     case `left` = "left"
     case `right` = "right"
-}
-
-public enum PNActivityIndicatorColor: Codable {
-    case option0(String)
-    case option1(PNDynamicColor)
-    case option2(PNJSONValue)
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if let value = try? container.decode(String.self) { self = .option0(value); return }
-        if let value = try? container.decode(PNDynamicColor.self) { self = .option1(value); return }
-        if let value = try? container.decode(PNJSONValue.self) { self = .option2(value); return }
-        throw NativeDecodeError.invalid("PNActivityIndicatorColor")
-    }
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .option0(let value): try container.encode(value)
-        case .option1(let value): try container.encode(value)
-        case .option2(let value): try container.encode(value)
-        }
-    }
 }
 
 public enum PNActivityIndicatorSize: String, Codable {
@@ -1280,7 +1253,7 @@ public struct PNScrollViewRefreshControl: Codable {
     public let `color`: PNViewBorderColor?
     public let `border_color`: PNViewBorderColor?
     public let `placeholder_color`: PNViewBorderColor?
-    public let `tint_color`: PNActivityIndicatorColor?
+    public let `tint_color`: PNPresence<PNViewBorderColor?>
     public let `border_width`: Double?
     public let `border_style`: PNViewBorderStyle?
     public let `border_radius`: Double?
@@ -1324,7 +1297,7 @@ public struct PNScrollViewRefreshControl: Codable {
     public let `accessibility_role`: String?
     public let `ref`: PNJSONValue?
     public let `on_layout`: Bool?
-    public init(`width`: PNViewWidth?, `height`: PNViewWidth?, `min_width`: PNViewWidth?, `max_width`: PNViewWidth?, `min_height`: PNViewWidth?, `max_height`: PNViewWidth?, `aspect_ratio`: Double?, `flex`: Double?, `flex_grow`: Double?, `flex_shrink`: Double?, `flex_basis`: PNViewWidth?, `flex_direction`: PNViewFlexDirection?, `flex_wrap`: PNViewFlexWrap?, `justify_content`: PNViewJustifyContent?, `align_items`: PNViewAlignItems?, `align_self`: PNViewAlignItems?, `align_content`: PNViewAlignContent?, `direction`: PNViewDirection?, `display`: PNViewDisplay?, `position`: PNViewPosition?, `top`: PNViewWidth?, `right`: PNViewWidth?, `bottom`: PNViewWidth?, `left`: PNViewWidth?, `start`: PNViewWidth?, `end`: PNViewWidth?, `padding`: PNViewPadding?, `padding_top`: PNViewWidth?, `padding_bottom`: PNViewWidth?, `padding_left`: PNViewWidth?, `padding_right`: PNViewWidth?, `padding_start`: PNViewWidth?, `padding_end`: PNViewWidth?, `padding_horizontal`: PNViewWidth?, `padding_vertical`: PNViewWidth?, `margin`: PNViewMargin?, `margin_top`: PNViewMarginTop?, `margin_bottom`: PNViewMarginTop?, `margin_left`: PNViewMarginTop?, `margin_right`: PNViewMarginTop?, `margin_start`: PNViewMarginTop?, `margin_end`: PNViewMarginTop?, `margin_horizontal`: PNViewMarginTop?, `margin_vertical`: PNViewMarginTop?, `gap`: Double?, `row_gap`: Double?, `column_gap`: Double?, `overflow`: PNViewOverflow?, `background_color`: PNViewBorderColor?, `color`: PNViewBorderColor?, `border_color`: PNViewBorderColor?, `placeholder_color`: PNViewBorderColor?, `tint_color`: PNActivityIndicatorColor?, `border_width`: Double?, `border_style`: PNViewBorderStyle?, `border_radius`: Double?, `border_top_left_radius`: Double?, `border_top_right_radius`: Double?, `border_bottom_left_radius`: Double?, `border_bottom_right_radius`: Double?, `border_top_width`: Double?, `border_right_width`: Double?, `border_bottom_width`: Double?, `border_left_width`: Double?, `border_top_color`: PNViewBorderColor?, `border_right_color`: PNViewBorderColor?, `border_bottom_color`: PNViewBorderColor?, `border_left_color`: PNViewBorderColor?, `font_size`: Double?, `font_family`: String?, `font_weight`: PNViewFontWeight?, `bold`: Bool?, `italic`: Bool?, `text_align`: PNViewTextAlign?, `text_decoration`: PNViewTextDecoration?, `text_transform`: PNViewTextTransform?, `line_height`: Double?, `letter_spacing`: Double?, `max_lines`: Int64?, `text_shadow_color`: PNViewBorderColor?, `text_shadow_offset`: PNViewTextShadowOffset?, `text_shadow_radius`: Double?, `shadow_color`: PNViewBorderColor?, `shadow_offset`: PNViewTextShadowOffset?, `shadow_opacity`: Double?, `shadow_radius`: Double?, `elevation`: Double?, `opacity`: Double?, `transform`: PNViewTransform?, `z_index`: Int64?, `pointer_events`: PNViewPointerEvents?, `refreshing`: Bool?, `on_refresh`: PNPresence<Bool?>, `accessibility_role`: String?, `ref`: PNJSONValue?, `on_layout`: Bool?) {
+    public init(`width`: PNViewWidth?, `height`: PNViewWidth?, `min_width`: PNViewWidth?, `max_width`: PNViewWidth?, `min_height`: PNViewWidth?, `max_height`: PNViewWidth?, `aspect_ratio`: Double?, `flex`: Double?, `flex_grow`: Double?, `flex_shrink`: Double?, `flex_basis`: PNViewWidth?, `flex_direction`: PNViewFlexDirection?, `flex_wrap`: PNViewFlexWrap?, `justify_content`: PNViewJustifyContent?, `align_items`: PNViewAlignItems?, `align_self`: PNViewAlignItems?, `align_content`: PNViewAlignContent?, `direction`: PNViewDirection?, `display`: PNViewDisplay?, `position`: PNViewPosition?, `top`: PNViewWidth?, `right`: PNViewWidth?, `bottom`: PNViewWidth?, `left`: PNViewWidth?, `start`: PNViewWidth?, `end`: PNViewWidth?, `padding`: PNViewPadding?, `padding_top`: PNViewWidth?, `padding_bottom`: PNViewWidth?, `padding_left`: PNViewWidth?, `padding_right`: PNViewWidth?, `padding_start`: PNViewWidth?, `padding_end`: PNViewWidth?, `padding_horizontal`: PNViewWidth?, `padding_vertical`: PNViewWidth?, `margin`: PNViewMargin?, `margin_top`: PNViewMarginTop?, `margin_bottom`: PNViewMarginTop?, `margin_left`: PNViewMarginTop?, `margin_right`: PNViewMarginTop?, `margin_start`: PNViewMarginTop?, `margin_end`: PNViewMarginTop?, `margin_horizontal`: PNViewMarginTop?, `margin_vertical`: PNViewMarginTop?, `gap`: Double?, `row_gap`: Double?, `column_gap`: Double?, `overflow`: PNViewOverflow?, `background_color`: PNViewBorderColor?, `color`: PNViewBorderColor?, `border_color`: PNViewBorderColor?, `placeholder_color`: PNViewBorderColor?, `tint_color`: PNPresence<PNViewBorderColor?>, `border_width`: Double?, `border_style`: PNViewBorderStyle?, `border_radius`: Double?, `border_top_left_radius`: Double?, `border_top_right_radius`: Double?, `border_bottom_left_radius`: Double?, `border_bottom_right_radius`: Double?, `border_top_width`: Double?, `border_right_width`: Double?, `border_bottom_width`: Double?, `border_left_width`: Double?, `border_top_color`: PNViewBorderColor?, `border_right_color`: PNViewBorderColor?, `border_bottom_color`: PNViewBorderColor?, `border_left_color`: PNViewBorderColor?, `font_size`: Double?, `font_family`: String?, `font_weight`: PNViewFontWeight?, `bold`: Bool?, `italic`: Bool?, `text_align`: PNViewTextAlign?, `text_decoration`: PNViewTextDecoration?, `text_transform`: PNViewTextTransform?, `line_height`: Double?, `letter_spacing`: Double?, `max_lines`: Int64?, `text_shadow_color`: PNViewBorderColor?, `text_shadow_offset`: PNViewTextShadowOffset?, `text_shadow_radius`: Double?, `shadow_color`: PNViewBorderColor?, `shadow_offset`: PNViewTextShadowOffset?, `shadow_opacity`: Double?, `shadow_radius`: Double?, `elevation`: Double?, `opacity`: Double?, `transform`: PNViewTransform?, `z_index`: Int64?, `pointer_events`: PNViewPointerEvents?, `refreshing`: Bool?, `on_refresh`: PNPresence<Bool?>, `accessibility_role`: String?, `ref`: PNJSONValue?, `on_layout`: Bool?) {
         self.`width` = `width`
         self.`height` = `height`
         self.`min_width` = `min_width`
@@ -1477,7 +1450,7 @@ public struct PNScrollViewRefreshControl: Codable {
         self.`color` = try container.decodeIfPresent(PNViewBorderColor.self, forKey: .`color`)
         self.`border_color` = try container.decodeIfPresent(PNViewBorderColor.self, forKey: .`border_color`)
         self.`placeholder_color` = try container.decodeIfPresent(PNViewBorderColor.self, forKey: .`placeholder_color`)
-        self.`tint_color` = try container.decodeIfPresent(PNActivityIndicatorColor.self, forKey: .`tint_color`)
+        self.`tint_color` = container.contains(.`tint_color`) ? .present(try container.decode(PNViewBorderColor?.self, forKey: .`tint_color`)) : .absent
         self.`border_width` = try container.decodeIfPresent(Double.self, forKey: .`border_width`)
         self.`border_style` = try container.decodeIfPresent(PNViewBorderStyle.self, forKey: .`border_style`)
         self.`border_radius` = try container.decodeIfPresent(Double.self, forKey: .`border_radius`)
@@ -1576,7 +1549,7 @@ public struct PNScrollViewRefreshControl: Codable {
         try container.encodeIfPresent(`color`, forKey: .`color`)
         try container.encodeIfPresent(`border_color`, forKey: .`border_color`)
         try container.encodeIfPresent(`placeholder_color`, forKey: .`placeholder_color`)
-        try container.encodeIfPresent(`tint_color`, forKey: .`tint_color`)
+        if case .present(let value) = `tint_color` { try container.encode(value, forKey: .`tint_color`) }
         try container.encodeIfPresent(`border_width`, forKey: .`border_width`)
         try container.encodeIfPresent(`border_style`, forKey: .`border_style`)
         try container.encodeIfPresent(`border_radius`, forKey: .`border_radius`)
@@ -1750,10 +1723,10 @@ public struct PNSvgShape: Codable {
     public let `x2`: Double?
     public let `y2`: Double?
     public let `points`: String?
-    public let `fill`: PNActivityIndicatorColor
+    public let `fill`: PNViewBorderColor?
     public let `fill_opacity`: Double?
     public let `fill_rule`: PNPNSvgShapeFillRule?
-    public let `stroke`: PNActivityIndicatorColor
+    public let `stroke`: PNViewBorderColor?
     public let `stroke_width`: Double?
     public let `stroke_opacity`: Double?
     public let `stroke_linecap`: PNPNSvgShapeStrokeLinecap?
@@ -1761,7 +1734,7 @@ public struct PNSvgShape: Codable {
     public let `stroke_dasharray`: [Double]?
     public let `opacity`: Double?
     public let `transform`: String?
-    public init(`kind`: PNPNSvgShapeKind, `d`: String?, `cx`: Double?, `cy`: Double?, `r`: Double?, `rx`: Double?, `ry`: Double?, `x`: Double?, `y`: Double?, `width`: Double?, `height`: Double?, `x1`: Double?, `y1`: Double?, `x2`: Double?, `y2`: Double?, `points`: String?, `fill`: PNActivityIndicatorColor, `fill_opacity`: Double?, `fill_rule`: PNPNSvgShapeFillRule?, `stroke`: PNActivityIndicatorColor, `stroke_width`: Double?, `stroke_opacity`: Double?, `stroke_linecap`: PNPNSvgShapeStrokeLinecap?, `stroke_linejoin`: PNPNSvgShapeStrokeLinejoin?, `stroke_dasharray`: [Double]?, `opacity`: Double?, `transform`: String?) {
+    public init(`kind`: PNPNSvgShapeKind, `d`: String?, `cx`: Double?, `cy`: Double?, `r`: Double?, `rx`: Double?, `ry`: Double?, `x`: Double?, `y`: Double?, `width`: Double?, `height`: Double?, `x1`: Double?, `y1`: Double?, `x2`: Double?, `y2`: Double?, `points`: String?, `fill`: PNViewBorderColor?, `fill_opacity`: Double?, `fill_rule`: PNPNSvgShapeFillRule?, `stroke`: PNViewBorderColor?, `stroke_width`: Double?, `stroke_opacity`: Double?, `stroke_linecap`: PNPNSvgShapeStrokeLinecap?, `stroke_linejoin`: PNPNSvgShapeStrokeLinejoin?, `stroke_dasharray`: [Double]?, `opacity`: Double?, `transform`: String?) {
         self.`kind` = `kind`
         self.`d` = `d`
         self.`cx` = `cx`
@@ -1809,10 +1782,10 @@ public struct PNSvgShape: Codable {
         self.`x2` = container.contains(.`x2`) ? (try container.decode(Double?.self, forKey: .`x2`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
         self.`y2` = container.contains(.`y2`) ? (try container.decode(Double?.self, forKey: .`y2`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
         self.`points` = container.contains(.`points`) ? (try container.decode(String?.self, forKey: .`points`)) : (try PNValues.decode(String?.self, PNValues.defaultValue("null")))
-        self.`fill` = container.contains(.`fill`) ? (try container.decode(PNActivityIndicatorColor.self, forKey: .`fill`)) : (try PNValues.decode(PNActivityIndicatorColor.self, PNValues.defaultValue("null")))
+        self.`fill` = container.contains(.`fill`) ? (try container.decode(PNViewBorderColor?.self, forKey: .`fill`)) : (try PNValues.decode(PNViewBorderColor?.self, PNValues.defaultValue("null")))
         self.`fill_opacity` = container.contains(.`fill_opacity`) ? (try container.decode(Double?.self, forKey: .`fill_opacity`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
         self.`fill_rule` = container.contains(.`fill_rule`) ? (try container.decode(PNPNSvgShapeFillRule?.self, forKey: .`fill_rule`)) : (try PNValues.decode(PNPNSvgShapeFillRule?.self, PNValues.defaultValue("null")))
-        self.`stroke` = container.contains(.`stroke`) ? (try container.decode(PNActivityIndicatorColor.self, forKey: .`stroke`)) : (try PNValues.decode(PNActivityIndicatorColor.self, PNValues.defaultValue("null")))
+        self.`stroke` = container.contains(.`stroke`) ? (try container.decode(PNViewBorderColor?.self, forKey: .`stroke`)) : (try PNValues.decode(PNViewBorderColor?.self, PNValues.defaultValue("null")))
         self.`stroke_width` = container.contains(.`stroke_width`) ? (try container.decode(Double?.self, forKey: .`stroke_width`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
         self.`stroke_opacity` = container.contains(.`stroke_opacity`) ? (try container.decode(Double?.self, forKey: .`stroke_opacity`)) : (try PNValues.decode(Double?.self, PNValues.defaultValue("null")))
         self.`stroke_linecap` = container.contains(.`stroke_linecap`) ? (try container.decode(PNPNSvgShapeStrokeLinecap?.self, forKey: .`stroke_linecap`)) : (try PNValues.decode(PNPNSvgShapeStrokeLinecap?.self, PNValues.defaultValue("null")))

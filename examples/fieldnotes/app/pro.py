@@ -32,7 +32,7 @@ class ProUnlock:
         self.journal = journal
 
     def _publish(self, **changes: object) -> None:
-        self.journal.set_pro_state(replace(self.journal.snapshot.pro, **changes))  # type: ignore[arg-type]
+        self.journal.publish(pro=replace(self.journal.snapshot.pro, **changes))  # type: ignore[arg-type]
 
     async def refresh(self) -> None:
         """Ask whether the unlock is on sale here, and for how much."""

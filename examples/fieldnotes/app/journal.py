@@ -9,6 +9,7 @@ show something that wasn't saved.
 from __future__ import annotations
 
 import asyncio
+import mimetypes
 import os
 import shutil
 import time
@@ -27,28 +28,14 @@ from .models import (
     Entry,
     EntryDraft,
     Place,
-    ProState,
     Settings,
     Snapshot,
-    SyncStatus,
 )
 from .protocol import WireEntry
 from .repository import Repository, SearchQuery, parse_search
 
 FREE_ATTACHMENTS = 3
 """How many attachments an entry can hold without Pro."""
-
-_EXTENSIONS = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/heic": ".heic",
-    "image/gif": ".gif",
-    "audio/mp4": ".m4a",
-    "audio/m4a": ".m4a",
-    "audio/aac": ".m4a",
-    "video/mp4": ".mp4",
-    "video/quicktime": ".mov",
-}
 
 
 class AttachmentLimitReached(Exception):
@@ -62,7 +49,7 @@ def data_directory() -> Path:
 
 def extension_for(mime_type: str, source: str) -> str:
     """Pick a file extension for an attachment, preferring the one its type implies."""
-    return _EXTENSIONS.get(mime_type.lower()) or os.path.splitext(source)[1].lower() or ".bin"
+    return mimetypes.guess_extension(mime_type.lower()) or os.path.splitext(source)[1].lower() or ".bin"
 
 
 class Journal:
@@ -103,12 +90,13 @@ class Journal:
         self._listeners.append(listener)
         return lambda: self._listeners.remove(listener)
 
-    def _changed_locally(self) -> None:
+    def announce_change(self) -> None:
+        """Tell the listeners that something here changed that the server hasn't heard."""
         for listener in list(self._listeners):
             listener()
 
     def _errors_changed(self, count: int) -> None:
-        self.store.update(lambda state: replace(state, logged_errors=count))
+        self.publish(logged_errors=count)
 
     # -- loading -------------------------------------------------------
 
@@ -184,7 +172,7 @@ class Journal:
         now = time.time()
         entry = await self.repository.create(uuid.uuid4().hex, draft, now=now, device=self.snapshot.settings.device_id)
         await self.refresh()
-        self._changed_locally()
+        self.announce_change()
         return entry
 
     async def update_entry(self, entry_id: str, draft: EntryDraft) -> Entry:
@@ -199,14 +187,14 @@ class Journal:
         """
         entry = await self.repository.update(entry_id, draft, now=time.time(), device=self.snapshot.settings.device_id)
         await self.refresh()
-        self._changed_locally()
+        self.announce_change()
         return entry
 
     async def set_place(self, entry_id: str, place: Optional[Place]) -> None:
         """Set or clear where an entry was written."""
-        await self.repository.set_place(entry_id, place, now=time.time(), device=self.snapshot.settings.device_id)
-        await self.refresh()
-        self._changed_locally()
+        entry = self.snapshot.find(entry_id)
+        if entry is not None:
+            await self.update_entry(entry_id, EntryDraft(entry.title, entry.body, entry.tags, entry.conditions, place))
 
     async def delete_entry(self, entry_id: str) -> None:
         """Delete an entry and its files. The sync server hears about it on the next push."""
@@ -217,7 +205,7 @@ class Journal:
                 await self.repository.remove_attachment(attachment.id, now=time.time())
                 self._delete_file(attachment.path)
         await self.refresh()
-        self._changed_locally()
+        self.announce_change()
 
     async def merge_remote(self, remote: WireEntry) -> None:
         """Merge a version from the sync server, and show it if anything changed.
@@ -300,7 +288,7 @@ class Journal:
         )
         await self.repository.add_attachment(attachment)
         await self.refresh()
-        self._changed_locally()
+        self.announce_change()
         return attachment
 
     async def remove_attachment(self, attachment: Attachment) -> None:
@@ -309,7 +297,7 @@ class Journal:
         if path:
             self._delete_file(path)
         await self.refresh()
-        self._changed_locally()
+        self.announce_change()
 
     def _delete_file(self, relative: str) -> None:
         if relative:
@@ -345,25 +333,13 @@ class Journal:
 
     # -- other state ---------------------------------------------------
 
-    def set_sync_status(self, status: SyncStatus) -> None:
-        """Publish what the live connection is doing."""
-        self.store.update(lambda state: replace(state, sync=status))
+    def publish(self, **changes: Any) -> None:
+        """Replace some fields of the snapshot.
 
-    def set_pro_state(self, pro: ProState) -> None:
-        """Publish the state of the Pro unlock."""
-        self.store.update(lambda state: replace(state, pro=pro))
-
-    def set_locked(self, locked: bool) -> None:
-        """Show or hide the lock screen."""
-        self.store.update(lambda state: replace(state, locked=locked))
-
-    def set_background_note(self, note: str) -> None:
-        """Publish why the background task isn't scheduled."""
-        self.store.update(lambda state: replace(state, background_note=note))
-
-    def set_error(self, message: str) -> None:
-        """Publish the last failed operation, or clear it with an empty string."""
-        self.store.update(lambda state: replace(state, error=message))
+        Args:
+            **changes: Fields of [`Snapshot`][app.models.Snapshot].
+        """
+        self.store.update(lambda state: replace(state, **changes))
 
     def set_transfer(self, attachment_id: str, fraction: Optional[float]) -> None:
         """Publish an upload or download's progress, or remove it with ``None``."""
@@ -377,10 +353,6 @@ class Journal:
             return replace(state, transfers=transfers)
 
         self.store.update(change)
-
-    def set_transfer_error(self, message: str) -> None:
-        """Publish why the last transfer stopped, or clear it with an empty string."""
-        self.store.update(lambda state: replace(state, transfer_error=message))
 
 
 journal = Journal()

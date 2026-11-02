@@ -61,7 +61,7 @@ def LevelBadge(tilt: float) -> pn.Node:
             padding_horizontal=12,
             padding_vertical=4,
             border_radius=999,
-            background_color=styles.colors.success if level else "#00000099",
+            background_color=styles.colors.success if level else "#99000000",
         ),
     )
 
@@ -152,6 +152,7 @@ def CaptureScreen(entry_id: str) -> pn.Node:
                     selected_index=mode,
                     on_change=set_mode,
                     disabled=recording,
+                    tint_color=styles.colors.primary,
                     accessibility_label="Capture mode",
                 ),
                 saved=pn.Text(

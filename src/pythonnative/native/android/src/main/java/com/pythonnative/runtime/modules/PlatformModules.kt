@@ -44,7 +44,7 @@ class KeyboardModule : KeyboardImplementation {
     fun attach() {
         if (unsubscribe != null) return
         unsubscribe = PNKeyboard.addListener { height, visible, durationMs ->
-            KeyboardEvents.change(payload(height, visible, durationMs))
+            KeyboardEvents.change(payload(height, visible, durationMs, PNKeyboard.overlapDp))
         }
     }
 
@@ -55,8 +55,9 @@ class KeyboardModule : KeyboardImplementation {
 
     companion object {
         /** The `change` payload for a keyboard transition. */
-        fun payload(heightDp: Double, visible: Boolean, durationMs: Long): Map<String, PNJSONValue> = mapOf(
+        fun payload(heightDp: Double, visible: Boolean, durationMs: Long, overlapDp: Double = heightDp): Map<String, PNJSONValue> = mapOf(
             "height" to PNJSONValue(heightDp),
+            "overlap" to PNJSONValue(overlapDp),
             "visible" to PNJSONValue(visible),
             "duration_ms" to PNJSONValue(durationMs.toDouble()),
         )

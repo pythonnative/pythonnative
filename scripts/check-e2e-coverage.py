@@ -239,6 +239,9 @@ def _flow_files() -> Set[str]:
     """Return the set of demo ids that have a flow file."""
     ids: Set[str] = set()
     for path in FLOWS_DIR.rglob("*.yaml"):
+        # Field Notes has its own flows; it isn't a demo in the e2e app.
+        if path.parent.name == "fieldnotes":
+            continue
         # Flow filename is the demo id (e.g. ``use_state.yaml``).
         ids.add(path.stem)
     return ids

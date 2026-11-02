@@ -284,8 +284,8 @@ class AppConfig:
         plugin_use: First-party capabilities compiled into this app
             (``[plugins].use``).
         plugin_paths: Project-local native plugin directories
-            (``[plugins].paths``); installed packages contribute plugins
-            through the ``pythonnative.plugins`` entry point group instead.
+            (``[plugins].paths``); packages in ``[requirements]`` that ship a
+            ``pn_plugin.json`` contribute plugins automatically.
         plugin_options: Options per plugin, by plugin name
             (``[plugins.<name>]`` tables).
         associated_domains: Domains whose ``https`` links open this app

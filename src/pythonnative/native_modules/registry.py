@@ -41,7 +41,7 @@ import asyncio
 import inspect
 import itertools
 import threading
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
 from ..bridge import codec
 
@@ -514,7 +514,7 @@ async def event_stream(
     start: str,
     stop: str,
     **args: Any,
-) -> AsyncIterator[Any]:
+) -> AsyncGenerator[Any, None]:
     """Yield ``module``'s ``event`` payloads while a native subscription is open.
 
     The building block for ``async for`` APIs such as ``Location.watch`` and

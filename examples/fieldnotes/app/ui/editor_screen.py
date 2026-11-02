@@ -59,8 +59,6 @@ def EditorScreen(entry_id: Optional[str] = None) -> pn.Node:
     problem, set_problem = pn.use_state("")
     finished = pn.use_ref(False)
 
-    pn.use_screen_options(title="Edit entry" if entry_id else "New entry")
-
     async def find_location() -> None:
         if not locating_attempt:
             return
@@ -114,6 +112,9 @@ def EditorScreen(entry_id: Optional[str] = None) -> pn.Node:
 
     async def save() -> None:
         set_problem("")
+        if pn.Platform.OS == "android":
+            # UIKit does this as the screen goes. Android leaves the keyboard over the next one.
+            pn.Keyboard.dismiss()
         try:
             if entry_id is None:
                 saved = await journal.create_entry(draft)
@@ -129,6 +130,12 @@ def EditorScreen(entry_id: Optional[str] = None) -> pn.Node:
             navigation.replace(entry_screen.EntryScreen(id=saved.id))
         else:
             navigation.go_back()
+
+    # In the header too, since the keyboard covers the one at the bottom while writing.
+    pn.use_screen_options(
+        title="Edit entry" if entry_id else "New entry",
+        header_right=pn.Button("Save", on_press=save, disabled=draft.is_empty),
+    )
 
     def use_latest() -> None:
         if entry is None:
@@ -177,6 +184,7 @@ def EditorScreen(entry_id: Optional[str] = None) -> pn.Node:
                             segments=list(CONDITIONS),
                             selected_index=CONDITIONS.index(conditions) if conditions in CONDITIONS else 0,
                             on_change=lambda index: set_conditions(CONDITIONS[index]),
+                            tint_color=styles.colors.primary,
                             accessibility_label="Conditions",
                         ),
                         style=pn.style(gap=4),

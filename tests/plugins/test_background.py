@@ -153,7 +153,7 @@ def test_an_exception_completes_as_failure() -> None:
 
 
 def test_a_nonsense_result_completes_as_failure() -> None:
-    background.task("odd", every=EVERY)(lambda: "maybe")  # type: ignore[arg-type,return-value]
+    background.task("odd", every=EVERY)(lambda: "maybe")  # type: ignore[type-var]
     _emit_run("a", "odd")
     assert _impl().completed == {"a": "failure"}
 

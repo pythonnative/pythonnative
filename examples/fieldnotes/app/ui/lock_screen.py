@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Callable
 
 import pythonnative as pn
@@ -11,6 +12,9 @@ from pythonnative.native_modules import NativeModuleError
 from ..journal import journal
 from .theme import Styles
 from .widgets import PrimaryButton, slots
+
+GRACE_SECONDS = 30.0
+"""How long the app can be away before it asks again."""
 
 
 def biometrics_available() -> bool:
@@ -29,7 +33,7 @@ async def authenticate() -> str:
     """
     try:
         if await Biometrics.authenticate("Unlock your field journal"):
-            journal.set_locked(False)
+            journal.publish(locked=False)
             return ""
     except NativeModuleError as error:
         return f"The prompt didn't open: {error.message}"
@@ -67,7 +71,7 @@ def LockScreen() -> pn.Node:
                 # would strand the journal, and the device's own passcode still guards it.
                 else pn.Column(
                     pn.Text("This device no longer has biometrics set up.", style=styles.center_text),
-                    PrimaryButton("Open anyway", lambda: journal.set_locked(False)),
+                    PrimaryButton("Open anyway", lambda: journal.publish(locked=False)),
                     style=pn.style(gap=12),
                 )
             ),
@@ -77,18 +81,27 @@ def LockScreen() -> pn.Node:
 
 
 def use_app_lock() -> bool:
-    """Lock the journal each time the app leaves the foreground, if the setting is on.
+    """Lock the journal when the app comes back from the background, if the setting is on.
+
+    A short trip doesn't count. On Android, a photo picker or the system camera is
+    another activity, so this app goes to the background whenever someone attaches a
+    photo, and a prompt on every return would be its own kind of broken.
 
     Returns:
         Whether the lock screen should cover the app right now.
     """
     lock_enabled = pn.use_store(journal.store, lambda state: state.settings.lock_enabled)
     locked = pn.use_store(journal.store, lambda state: state.locked)
+    left_at = pn.use_ref(0.0)
 
     def watch() -> Callable[[], None]:
         def changed(state: str) -> None:
-            if state == "background" and lock_enabled:
-                journal.set_locked(True)
+            if state == "background":
+                left_at.current = time.monotonic()
+            elif state == "active" and lock_enabled and left_at.current:
+                if time.monotonic() - left_at.current >= GRACE_SECONDS:
+                    journal.publish(locked=True)
+                left_at.current = 0.0
 
         return pn.AppState.add_listener(changed)
 

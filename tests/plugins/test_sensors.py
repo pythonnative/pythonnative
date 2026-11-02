@@ -102,7 +102,7 @@ def test_vector_stream_yields_frozen_records_and_stops_the_sensor() -> None:
     assert module.started == [{"sensor": "accelerometer", "hz": 10.0}]
     assert module.stopped == [1]
     with pytest.raises(AttributeError):
-        readings[0].x = 0.0  # type: ignore[misc]
+        readings[0].x = 0.0
 
 
 def test_each_sensor_starts_its_own_hardware() -> None:

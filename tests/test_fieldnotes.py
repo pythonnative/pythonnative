@@ -376,7 +376,8 @@ def test_paths_resolve_to_screens(fieldnotes: Modules) -> None:
     state = links.state_from_url("fieldnotes://entries/abc123")
     assert state is not None
     assert (state.current.name, state.current.params) == ("EntryScreen", {"id": "abc123"})
-    assert links.state_from_url("fieldnotes://new").current.name == "EditorScreen"
+    new = links.state_from_url("fieldnotes://new")
+    assert new is not None and new.current.name == "EditorScreen"
     assert links.state_from_url("elsewhere://entries/abc123") is None
 
 
@@ -434,7 +435,7 @@ class _FakeNotifications:
         pass
 
 
-def test_a_cold_start_tap_opens_the_entry_first(fieldnotes: Modules) -> None:
+def test_a_cold_start_tap_opens_the_entry(fieldnotes: Modules) -> None:
     journal = open_journal(fieldnotes)
     entry = pn.run_blocking(journal.create_entry(draft(fieldnotes, title="Come back to me", body="The notes")))
     register_python_module("Notifications", _FakeNotifications(_response(f"fieldnotes://entries/{entry.id}")))
@@ -997,6 +998,35 @@ def test_uploads_report_progress_and_reach_another_device(
     assert attachment.remote_path.startswith("/attachments/") and not attachment.needs_upload
 
 
+def test_a_new_attachment_uploads_while_connected(fieldnotes: Modules, server: ServerThread, tmp_path: Path) -> None:
+    journal = open_journal(fieldnotes)
+    queue = fieldnotes.services.TransferQueue(journal)
+    backoff = fieldnotes.syncing.Backoff(initial=0.05, jitter=0.0)
+    client = fieldnotes.syncing.SyncClient(journal, backoff=backoff, heartbeat=None, after_connect=queue.run)
+
+    async def scenario() -> None:
+        task = asyncio.create_task(client.run(server.url))
+        try:
+            await _until(lambda: journal.snapshot.sync.phase == "connected")
+            entry = await journal.create_entry(draft(fieldnotes, title="Live"))
+            attachment = await journal.add_attachment(
+                entry.id, "photo", write_file(tmp_path / "live.jpg"), mime_type="image/jpeg"
+            )
+
+            def on_server() -> bool:
+                stored = server.server.store.entries.get(entry.id, {}).get("attachments", ())
+                return bool(stored and stored[0]["remote_path"])
+
+            await _until(on_server)
+            assert server.server.store.attachment_path(attachment.id).read_bytes() == b"\xff\xd8sample"
+            await _until(lambda: not journal.snapshot.find(entry.id).dirty)
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    pn.run_blocking(scenario())
+
+
 def test_a_failed_upload_stays_queued_and_says_why(fieldnotes: Modules, tmp_path: Path) -> None:
     journal = open_journal(fieldnotes)
     entry = pn.run_blocking(journal.create_entry(draft(fieldnotes, title="Stranded")))
@@ -1188,7 +1218,7 @@ def test_an_event_error_reaches_the_log_and_the_screen(fieldnotes: Modules, tmp_
         go_to_tab(result, fieldnotes, "Settings")
         result.press(wait_for(lambda: result.get_by_label("Log a test error")))
         result.settle()
-        assert wait_for(lambda: result.get_by_text("1"))
+        assert wait_for(lambda: result.get_by_text("Errors logged: 1"))
 
         [record] = _error_lines(tmp_path)
         assert record["kind"] == "TestError"
@@ -1224,7 +1254,7 @@ def test_the_fallback_explains_and_recovers(fieldnotes: Modules) -> None:
     @pn.component
     def Page() -> pn.Node:
         if state["fail"]:
-            raise fieldnotes.settings_screen.TestError()
+            raise fieldnotes.settings_screen.TestError("This is a test of the error screen.")
         return pn.Text("Back to normal")
 
     assert fieldnotes.main.error_fallback is not None
@@ -1265,7 +1295,7 @@ class _FakeBiometrics:
 def test_the_lock_covers_the_app_until_biometrics_succeed(fieldnotes: Modules) -> None:
     journal = open_journal(fieldnotes)
     pn.run_blocking(journal.update_settings(lock_enabled=True))
-    journal.set_locked(True)
+    journal.publish(locked=True)
     native = _FakeBiometrics(answers=(False, True))
     register_python_module("Biometrics", native)
     try:
@@ -1279,17 +1309,26 @@ def test_the_lock_covers_the_app_until_biometrics_succeed(fieldnotes: Modules) -
         unregister_python_module("Biometrics")
 
 
-def test_going_to_the_background_locks_again(fieldnotes: Modules) -> None:
+def test_coming_back_from_the_background_locks_again(fieldnotes: Modules, monkeypatch: pytest.MonkeyPatch) -> None:
     journal = open_journal(fieldnotes)
     pn.run_blocking(journal.update_settings(lock_enabled=True))
     native = _FakeBiometrics(answers=(False,))
     register_python_module("Biometrics", native)
+    lock_screen = sys.modules[f"{PACKAGE}.ui.lock_screen"]
     try:
         with render(fieldnotes.main.App()) as result:
             result.act(lambda: dispatch_app_state("active"))
             assert not journal.snapshot.locked
             assert native.asked == 0, "A hidden lock screen doesn't prompt."
+
+            # A trip to the system's photo picker isn't leaving.
             result.act(lambda: dispatch_app_state("background"))
+            result.act(lambda: dispatch_app_state("active"))
+            assert not journal.snapshot.locked
+
+            monkeypatch.setattr(lock_screen, "GRACE_SECONDS", 0.0)
+            result.act(lambda: dispatch_app_state("background"))
+            result.act(lambda: dispatch_app_state("active"))
             assert wait_for(lambda: result.get_by_text("Field Notes is locked"))
             assert journal.snapshot.locked and native.asked == 1
     finally:
@@ -1299,7 +1338,7 @@ def test_going_to_the_background_locks_again(fieldnotes: Modules) -> None:
 def test_a_lost_enrollment_doesnt_strand_the_journal(fieldnotes: Modules) -> None:
     journal = open_journal(fieldnotes)
     pn.run_blocking(journal.update_settings(lock_enabled=True))
-    journal.set_locked(True)
+    journal.publish(locked=True)
     register_python_module("Biometrics", _FakeBiometrics(available=False))
     try:
         with render(fieldnotes.main.App()) as result:

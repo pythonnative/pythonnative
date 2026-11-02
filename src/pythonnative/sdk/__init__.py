@@ -33,10 +33,12 @@ that calls ``native_module(name).call(...)``, and optionally a Python
 implementation registered with ``register_python_module`` for the
 browser preview and tests.
 
-PyPI packages can ship both without users importing them explicitly
-by declaring entry points in the ``pythonnative.handlers`` (Python
-side) and ``pythonnative.plugins`` (native source) groups; ``pn build``
-compiles the native sources into the app.
+PyPI packages ship both with a ``pn_plugin.json`` beside the native sources.
+``pn build`` finds it in the wheels resolved for each device, without importing
+them, and compiles the sources into the app; see the Native plugins guide. A
+``pythonnative.handlers`` entry point registers a package's Python side for apps
+that don't import it. [`plugin_module`][pythonnative.sdk.plugin.plugin_module]
+and [`plugin_component`][pythonnative.sdk.plugin.plugin_component] declare a plugin's Python side.
 
 Example:
     ```python
@@ -67,11 +69,11 @@ Example:
 from ..element import Element
 from ..mutations import UNSET, UnsetType
 from ..native_modules.registry import (
-    event_stream,
     NativeModule,
     NativeModuleError,
     PythonModule,
     emit,
+    event_stream,
     native_module,
     register_python_module,
 )

@@ -51,7 +51,7 @@ def test_map_view_sends_markers_and_polylines_as_typed_data() -> None:
 
 def test_invalid_map_type_is_rejected() -> None:
     with pytest.raises(Exception, match="map_type"):
-        render(MapView(map_type="terrain"))
+        render(MapView(map_type="terrain"))  # type: ignore[arg-type]
 
 
 def test_events_arrive_as_records() -> None:

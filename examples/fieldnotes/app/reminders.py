@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Callable, Optional
 
@@ -16,17 +15,8 @@ from .models import Entry
 _ENTRY_URL = re.compile(r"^fieldnotes://entries/([0-9A-Za-z_-]{1,64})$")
 
 
-@dataclass(frozen=True)
-class Preset:
-    """A reminder time someone can choose without a date picker.
-
-    Attributes:
-        label: The button's title.
-        delay: Returns how many seconds away the time is, given the current moment.
-    """
-
-    label: str
-    delay: Callable[[datetime], float]
+Preset = tuple[str, Callable[[datetime], float]]
+"""A reminder time someone can choose: its title, and how many seconds away it is from a given moment."""
 
 
 def _tomorrow_morning(now: datetime) -> float:
@@ -35,10 +25,10 @@ def _tomorrow_morning(now: datetime) -> float:
 
 
 PRESETS: tuple[Preset, ...] = (
-    Preset("In 1 minute", lambda now: 60.0),
-    Preset("In 1 hour", lambda now: 3600.0),
-    Preset("Tomorrow morning", _tomorrow_morning),
-    Preset("Next week", lambda now: 7 * 86400.0),
+    ("In 1 minute", lambda now: 60.0),
+    ("In 1 hour", lambda now: 3600.0),
+    ("Tomorrow morning", _tomorrow_morning),
+    ("Next week", lambda now: 7 * 86400.0),
 )
 
 

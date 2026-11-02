@@ -80,7 +80,7 @@ def test_children_draw_on_top_of_the_preview() -> None:
 
 
 def test_ref_publishes_the_typed_handle() -> None:
-    ref = pn.Ref()
+    ref: pn.Ref[Any] = pn.Ref()
     result = render(CameraView(ref=ref))
     handle = ref.current
     assert isinstance(handle, CameraViewHandle)
@@ -88,7 +88,7 @@ def test_ref_publishes_the_typed_handle() -> None:
 
 
 def test_handle_runs_against_the_fallback() -> None:
-    ref = pn.Ref()
+    ref: pn.Ref[Any] = pn.Ref()
     render(CameraView(ref=ref))
     handle = ref.current
 
@@ -102,14 +102,14 @@ def test_handle_runs_against_the_fallback() -> None:
 
 
 def test_handle_validates_quality_before_the_bridge() -> None:
-    ref = pn.Ref()
+    ref: pn.Ref[Any] = pn.Ref()
     render(CameraView(ref=ref))
     with pytest.raises(ValueError, match="quality"):
         asyncio.run(ref.current.take_picture(quality=-0.1))
 
 
 def test_the_handle_addresses_the_module_by_tag(monkeypatch: pytest.MonkeyPatch) -> None:
-    ref = pn.Ref()
+    ref: pn.Ref[Any] = pn.Ref()
     render(CameraView(ref=ref))
     handle = ref.current
     module = native_module("Camera")

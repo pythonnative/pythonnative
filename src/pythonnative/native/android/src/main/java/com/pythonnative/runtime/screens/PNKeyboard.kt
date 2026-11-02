@@ -33,12 +33,21 @@ object PNKeyboard {
     var heightDp: Double = 0.0
         private set
 
+    /**
+     * How much of [heightDp] still covers the content, in dp. The window resizes
+     * for the keyboard itself below API 35, so this is `0` there. Edge-to-edge
+     * windows don't resize, and this is the whole height.
+     */
+    var overlapDp: Double = 0.0
+        private set
+
     /** Whether the keyboard is showing. */
     var isVisible: Boolean = false
         private set
 
     private val listeners = ArrayList<Listener>()
     private var observed: View? = null
+    private var observedContent: View? = null
     private var pendingDurationMs = 0L
 
     /** Register `listener`; returns a function that removes it. */
@@ -60,10 +69,20 @@ object PNKeyboard {
         val root = activity.window?.decorView ?: return
         if (observed === root) return
         observed?.let { detachView(it) }
+        observedContent?.let { ViewCompat.setOnApplyWindowInsetsListener(it, null) }
         observed = root
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             update(insets)
             ViewCompat.onApplyWindowInsets(view, insets)
+        }
+        // What the window fit for the content is gone from the insets the content
+        // sees, so the keyboard left in them is the part nothing has avoided yet.
+        activity.findViewById<View>(android.R.id.content)?.let { content ->
+            observedContent = content
+            ViewCompat.setOnApplyWindowInsetsListener(content) { view, insets ->
+                updateOverlap(insets)
+                ViewCompat.onApplyWindowInsets(view, insets)
+            }
         }
         ViewCompat.setWindowInsetsAnimationCallback(root, object : WindowInsetsAnimationCompat.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
             override fun onPrepare(animation: WindowInsetsAnimationCompat) {
@@ -86,6 +105,8 @@ object PNKeyboard {
         val root = observed ?: return
         if (root !== activity.window?.decorView) return
         detachView(root)
+        observedContent?.let { ViewCompat.setOnApplyWindowInsetsListener(it, null) }
+        observedContent = null
         observed = null
     }
 
@@ -99,10 +120,24 @@ object PNKeyboard {
         if (height == heightDp && visible == isVisible) return
         heightDp = height
         isVisible = visible
+        notifyListeners()
+    }
+
+    /** Read how much keyboard the content view's own `insets` still carry. */
+    private fun updateOverlap(insets: WindowInsetsCompat) {
+        val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+        val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+        val overlap = max(0, ime - bars) / PNBridge.density().toDouble()
+        if (overlap == overlapDp) return
+        overlapDp = overlap
+        notifyListeners()
+    }
+
+    private fun notifyListeners() {
         val duration = pendingDurationMs
         for (listener in ArrayList(listeners)) {
             try {
-                listener.onKeyboardChanged(height, visible, duration)
+                listener.onKeyboardChanged(heightDp, isVisible, duration)
             } catch (error: Exception) {
                 PNLog.swallowed("PNKeyboard.listener", error)
             }

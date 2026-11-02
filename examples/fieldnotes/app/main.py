@@ -190,12 +190,9 @@ def App() -> pn.Node:
 
     pn.use_effect(load, [])
 
+    starting = snapshot.loading or bool(snapshot.error and not snapshot.settings.device_id)
     return pn.ThemeProvider(
-        (
-            Startup(snapshot=snapshot)
-            if snapshot.loading or (snapshot.error and not snapshot.settings.device_id)
-            else Shell()
-        ),
+        Startup(snapshot=snapshot) if starting else Shell(),
         light=LIGHT,
         dark=DARK,
     )

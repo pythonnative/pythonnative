@@ -12,15 +12,18 @@ import hashlib
 import struct
 from typing import Any
 
-import pythonnative as pn
 from app.screens.scaffold import DemoScreen, DemoSection, ResultText
+
+import pythonnative as pn
 
 _GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
 async def _echo(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     head = (await reader.readuntil(b"\r\n\r\n")).decode()
-    key = next(line.split(":", 1)[1].strip() for line in head.split("\r\n") if line.lower().startswith("sec-websocket-key"))
+    key = next(
+        line.split(":", 1)[1].strip() for line in head.split("\r\n") if line.lower().startswith("sec-websocket-key")
+    )
     accept = base64.b64encode(hashlib.sha1(key.encode() + _GUID).digest()).decode()  # noqa: S324
     writer.write(f"HTTP/1.1 101 Switching Protocols\r\nSec-WebSocket-Accept: {accept}\r\n\r\n".encode())
     await writer.drain()
@@ -33,7 +36,11 @@ async def _echo(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> N
             mask = await reader.readexactly(4)
             data = bytes(byte ^ mask[index % 4] for index, byte in enumerate(await reader.readexactly(length)))
             opcode = first & 0x0F
-            header = bytes([0x80 | opcode, length]) if length < 126 else bytes([0x80 | opcode, 126]) + struct.pack("!H", length)
+            header = (
+                bytes([0x80 | opcode, length])
+                if length < 126
+                else bytes([0x80 | opcode, 126]) + struct.pack("!H", length)
+            )
             writer.write(header + data)
             await writer.drain()
             if opcode == 0x8:

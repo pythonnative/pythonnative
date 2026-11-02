@@ -168,7 +168,9 @@ def test_prepare_ios_release_compiles_bytecode_when_versions_match(
     # Pretend the host interpreter matches the configured version so the
     # bytecode path runs regardless of the interpreter running the tests.
     cfg.python_version = f"{sys.version_info[0]}.{sys.version_info[1]}"
-    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare("ios", release=True, allow_unsigned=True)
+    prepared = Builder(cfg, runner=RecordingRunner(), log=lambda _m: None).prepare(
+        "ios", release=True, allow_unsigned=True
+    )
 
     app_dir = prepared.project_dir / "app"
     assert (app_dir / "main.pyc").is_file()

@@ -6,8 +6,9 @@ none is set, so the flow asserts the outcome was reported rather than where it i
 
 from __future__ import annotations
 
-import pythonnative as pn
 from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, ResultText
+
+import pythonnative as pn
 from pythonnative.location import Location, Position
 
 

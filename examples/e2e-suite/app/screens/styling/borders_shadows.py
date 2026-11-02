@@ -9,8 +9,8 @@ element renders with its label.
 from __future__ import annotations
 
 import pythonnative as pn
-from pythonnative.style import BorderStyle
 from app.screens.scaffold import DemoScreen, DemoSection, Hint
+from pythonnative.style import BorderStyle
 
 
 def _styled_box(label: str, border_style: BorderStyle) -> pn.Element:

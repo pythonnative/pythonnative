@@ -159,7 +159,7 @@ def test_recorder_start_surfaces_a_missing_usage_string() -> None:
 
 def test_stop_accepts_a_plain_mapping_from_the_page() -> None:
     class Page(audio._Fallback):
-        def stop_recording(self, *, id: int) -> Dict[str, Any]:
+        def stop_recording(self, *, id: int) -> Dict[str, Any]:  # type: ignore[override]
             return {"path": "blob:x", "duration": 1.5}
 
     register_python_module("Audio", Page)

@@ -54,13 +54,15 @@ class TransferQueue:
         base = http_base(url)
         uploads, downloads = await self.journal.repository.transfers_pending()
         moved = 0
-        self.journal.set_transfer_error("")
+        self.journal.publish(transfer_error="")
         for attachment in uploads:
             moved += await self._attempt(attachment, self.upload, base)
         for attachment in downloads:
             moved += await self._attempt(attachment, self.download, base)
         if moved:
             await self.journal.refresh()
+            # Other devices need to hear where the new files are.
+            self.journal.announce_change()
         return moved
 
     async def _attempt(
@@ -70,7 +72,7 @@ class TransferQueue:
         try:
             await transfer(base, attachment)
         except _TRANSFER_ERRORS as error:
-            self.journal.set_transfer_error(f"{attachment.name} didn't transfer: {error}")
+            self.journal.publish(transfer_error=f"{attachment.name} didn't transfer: {error}")
             return 0
         finally:
             self.journal.set_transfer(attachment.id, None)

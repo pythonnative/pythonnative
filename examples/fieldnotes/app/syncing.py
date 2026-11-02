@@ -71,8 +71,8 @@ class SyncClient:
         backoff: The reconnection policy.
         heartbeat: Seconds between pings, which notice a dead connection.
         open_timeout: Seconds to wait for a connection and handshake.
-        after_connect: Called whenever a connection is up and has exchanged
-            changes. The app starts its attachment transfers from this.
+        after_connect: Called with the URL whenever a connection is up and has
+            exchanged changes. The app starts its attachment transfers from this.
     """
 
     def __init__(
@@ -155,9 +155,8 @@ class SyncClient:
                     # Only a server that answered proves the connection works.
                     self.backoff.reset()
                     self._publish(SyncStatus(phase="connected", last_synced=time.time()))
-                    pushing = asyncio.create_task(self._push_loop(socket))
-                    if self.after_connect is not None:
-                        pn.run_async(self.after_connect(url))
+                    pushing = asyncio.create_task(self._push_loop(socket, url))
+                    self._start_transfers(url)
                 else:
                     await self._handle(message)
         finally:
@@ -166,7 +165,7 @@ class SyncClient:
                 with suppress(asyncio.CancelledError):
                     await pushing
 
-    async def _push_loop(self, socket: pn.WebSocket) -> None:
+    async def _push_loop(self, socket: pn.WebSocket, url: str) -> None:
         assert self._dirty is not None
         self._dirty.set()
         with suppress(pn.WebSocketClosed):
@@ -174,6 +173,12 @@ class SyncClient:
                 await self._dirty.wait()
                 self._dirty.clear()
                 await self._push(socket)
+                # A change here may be a new attachment, whose file goes separately.
+                self._start_transfers(url)
+
+    def _start_transfers(self, url: str) -> None:
+        if self.after_connect is not None:
+            pn.run_async(self.after_connect(url))
 
     async def _push(self, socket: pn.WebSocket) -> int:
         entries = await self.journal.repository.dirty_wire_entries()
@@ -242,9 +247,8 @@ class SyncClient:
         if kind == "changed":
             await self.journal.merge_remote(WireEntry.from_json(message["entry"]))
             await self._advance_cursor(message)
-            if self.after_connect is not None and self.journal.settings.server_url:
-                # A new attachment may have arrived along with the entry.
-                pn.run_async(self.after_connect(self.journal.settings.server_url))
+            # A new attachment may have arrived along with the entry.
+            self._start_transfers(self.journal.settings.server_url)
         elif kind == "ack":
             for item in message.get("entries") or ():
                 await self.journal.repository.mark_synced(str(item["id"]), int(item["change"]))
@@ -263,7 +267,7 @@ class SyncClient:
         previous = self.journal.snapshot.sync
         if status.last_synced is None and previous.last_synced is not None:
             status = SyncStatus(status.phase, status.detail, status.attempt, status.retry_in, previous.last_synced)
-        self.journal.set_sync_status(status)
+        self.journal.publish(sync=status)
 
 
 def _decode(raw: Any) -> dict[str, Any]:

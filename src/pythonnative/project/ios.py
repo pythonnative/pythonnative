@@ -306,13 +306,12 @@ def build_settings(
         settings += [f"PN_ENTITLEMENTS={ENTITLEMENTS_FILE}", "CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES"]
     if for_archive:
         if allow_unsigned:
-            # BeeWare's framework step refuses to run with no identity at
-            # all, so a smoke build signs ad hoc instead of disabling signing.
+            # Xcode can't sign a device build without a team, so it doesn't. BeeWare's
+            # framework step signs for itself and needs an identity, even an ad hoc one.
             settings += [
-                "CODE_SIGN_IDENTITY=-",
-                "CODE_SIGN_STYLE=Manual",
-                "DEVELOPMENT_TEAM=",
-                "PROVISIONING_PROFILE_SPECIFIER=",
+                "CODE_SIGNING_ALLOWED=NO",
+                "EXPANDED_CODE_SIGN_IDENTITY=-",
+                "EXPANDED_CODE_SIGN_IDENTITY_NAME=-",
             ]
         elif config.ios.signing.provisioning_profile:
             settings += [

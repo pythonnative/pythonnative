@@ -12,27 +12,30 @@ appId: ${APP_ID}
     clearState: true
     permissions:
       all: allow
+      location: inuse
 - extendedWaitUntil:
     visible: "An empty notebook"
     timeout: 60000
 
 # Write two entries.
 - tapOn: "New entry"
-- extendedWaitUntil:
-    visible: "Save entry"
-    timeout: 10000
+# Maestro can't pre-grant "while in use" on Android, so the real prompt appears.
 - tapOn:
-    id: "field-title"
-- inputText: "Heron at the mill"
+    text: "While using the app"
+    optional: true
+- extendedWaitUntil:
+    visible: "Save"
+    timeout: 10000
 - tapOn:
     id: "field-notes"
 - inputText: "Standing in the shallows"
 - tapOn:
+    id: "field-title"
+- inputText: "Heron at the mill"
+- tapOn:
     id: "field-tags"
 - inputText: "birds river"
-- hideKeyboard
-- tapOn: "Rain"
-- tapOn: "Save entry"
+- tapOn: "Save"
 - extendedWaitUntil:
     visible: "Attachments"
     timeout: 10000
@@ -42,14 +45,17 @@ appId: ${APP_ID}
     visible: "Heron at the mill"
     timeout: 10000
 - tapOn: "New entry"
+# Maestro can't pre-grant "while in use" on Android, so the real prompt appears.
+- tapOn:
+    text: "While using the app"
+    optional: true
 - extendedWaitUntil:
-    visible: "Save entry"
+    visible: "Save"
     timeout: 10000
 - tapOn:
     id: "field-title"
 - inputText: "Ridge walk"
-- hideKeyboard
-- tapOn: "Save entry"
+- tapOn: "Save"
 - extendedWaitUntil:
     visible: "Attachments"
     timeout: 10000
@@ -60,16 +66,12 @@ appId: ${APP_ID}
 
 # Search by word, and filter by tag.
 - tapOn:
-    text: "Search notes, places, and #tags"
+    id: "journal-search"
 - inputText: "shallows"
 - extendedWaitUntil:
     notVisible: "Ridge walk"
     timeout: 5000
 - assertVisible: "Heron at the mill"
-- hideKeyboard
-- tapOn:
-    id: "field-search"
-    optional: true
 
 # Edit, and let the guard catch an unsaved change.
 - tapOn: "Heron at the mill"
@@ -78,18 +80,23 @@ appId: ${APP_ID}
     timeout: 10000
 - tapOn: "Edit"
 - extendedWaitUntil:
-    visible: "Save entry"
+    visible: "Save"
     timeout: 10000
 - tapOn:
     id: "field-title"
 - inputText: " today"
-- hideKeyboard
+# On Android, the first back only closes the keyboard.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
 - runFlow: _back.yaml
 - extendedWaitUntil:
     visible: "Discard changes?"
     timeout: 5000
 - tapOn: "Keep editing"
-- tapOn: "Save entry"
+- tapOn: "Save"
 - extendedWaitUntil:
     visible: "Heron at the mill today"
     timeout: 10000
@@ -101,11 +108,6 @@ appId: ${APP_ID}
     timeout: 15000
     centerElement: false
 - tapOn: "Next week"
-- runFlow:
-    when:
-      visible: "(Allow|OK)"
-    commands:
-      - tapOn: "(Allow|OK)"
 - extendedWaitUntil:
     visible: "Cancel reminder"
     timeout: 10000
@@ -124,12 +126,65 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Delete this entry?"
     timeout: 5000
-- tapOn:
-    text: "Delete"
-    index: 1
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: "Delete"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: "DELETE"
+# The search is still in the field, and its one match is gone.
 - extendedWaitUntil:
-    notVisible: "Delete this entry?"
-    timeout: 5000
-- extendedWaitUntil:
-    visible: "Journal"
+    visible: "No matches"
     timeout: 10000
+- tapOn:
+    id: "journal-search"
+- eraseText
+- extendedWaitUntil:
+    visible: "Ridge walk"
+    timeout: 10000
+- pressKey: Enter
+- assertNotVisible: "Heron at the mill today"
+
+# The map tab counts what it can show. Android has no Maps key here, and says so.
+- tapOn: "Map"
+- extendedWaitUntil:
+    visible: ".* of 1 entries have a location."
+    timeout: 10000
+
+# Settings: offline, the store's state, and the error log.
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "Offline. No sync server is set, so your journal stays on this device."
+    timeout: 10000
+- tapOn: "See Pro"
+- extendedWaitUntil:
+    visible: "One purchase, no subscription."
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "(The store isn't available.*|Pro isn't on sale.*|Couldn't reach the store.*|Unlock Pro for .*)"
+    timeout: 30000
+- runFlow: _back.yaml
+- scrollUntilVisible:
+    element: "Log a test error"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Log a test error"
+# A debug build shows the error screen over the app. A release build goes straight on.
+- runFlow:
+    when:
+      visible: "Dismiss"
+    commands:
+      - tapOn: "Dismiss"
+- tapOn: "Error log"
+- extendedWaitUntil:
+    visible: "TestError: This is a test of the error log."
+    timeout: 10000
+- tapOn: "Clear"
+- extendedWaitUntil:
+    visible: "No errors"
+    timeout: 5000

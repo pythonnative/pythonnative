@@ -12,22 +12,26 @@ appId: ${APP_ID}
     clearState: true
     permissions:
       all: allow
+      location: inuse
 - extendedWaitUntil:
     visible: "An empty notebook"
     timeout: 60000
 - assertVisible: "Offline. Your journal stays on this device."
 - tapOn: "New entry"
-- extendedWaitUntil:
-    visible: "Save entry"
-    timeout: 10000
+# Maestro can't pre-grant "while in use" on Android, so the real prompt appears.
 - tapOn:
-    id: "field-title"
-- inputText: "Heron at the mill"
+    text: "While using the app"
+    optional: true
+- extendedWaitUntil:
+    visible: "Save"
+    timeout: 10000
 - tapOn:
     id: "field-notes"
 - inputText: "Standing in the shallows"
-- hideKeyboard
-- tapOn: "Save entry"
+- tapOn:
+    id: "field-title"
+- inputText: "Heron at the mill"
+- tapOn: "Save"
 # Saving replaces the editor with the entry.
 - extendedWaitUntil:
     visible: "Attachments"

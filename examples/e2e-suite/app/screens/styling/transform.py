@@ -10,8 +10,8 @@ without error on every renderer.
 from __future__ import annotations
 
 import pythonnative as pn
-from pythonnative.style import TransformSpec
 from app.screens.scaffold import DemoScreen, DemoSection, Hint
+from pythonnative.style import TransformSpec
 
 
 def _box(label: str, color: str, transform: TransformSpec) -> pn.Element:

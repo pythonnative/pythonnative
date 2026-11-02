@@ -51,8 +51,10 @@ class NativeTypes:
         alternatives = schema.get("anyOf")
         if alternatives is not None:
             nonnull = [item for item in alternatives if item.get("type") != "null"]
-            if len(nonnull) == 1 and len(nonnull) < len(alternatives):
-                py, sw, kt = self.types(nonnull[0], hint)
+            if len(nonnull) < len(alternatives):
+                # `None` means "unset", never a union case: a case for it would make
+                # the field non-optional natively, and `fill ?? root.fill` never inherits.
+                py, sw, kt = self.types(self._without_null(schema, nonnull), hint)
                 return py + " | None", sw.rstrip("?") + "?", kt.rstrip("?") + "?"
         if "enum" in schema or alternatives is not None or "properties" in schema or "prefixItems" in schema:
             name = self._named(schema, hint)
@@ -97,8 +99,8 @@ class NativeTypes:
         alternatives = schema.get("anyOf")
         if alternatives is not None:
             nonnull = [item for item in alternatives if item.get("type") != "null"]
-            if len(nonnull) == 1 and len(nonnull) < len(alternatives):
-                inner = self.kotlin_decode(nonnull[0], value, hint)
+            if len(nonnull) < len(alternatives):
+                inner = self.kotlin_decode(self._without_null(schema, nonnull), value, hint)
                 return f"if (PNValues.isNull({value})) null else {inner}"
         if "enum" in schema or alternatives is not None or "properties" in schema or "prefixItems" in schema:
             return f"{kt}.decode({value})"
@@ -119,6 +121,10 @@ class NativeTypes:
             inner = self.kotlin_decode(schema.get("additionalProperties", {}), "objectValue.get(key)", hint + "Value")
             return f"PNValues.objectValue({value}).let {{ objectValue -> objectValue.keys().asSequence().associateWith {{ key -> {inner} }} }}"  # noqa: E501
         return f"PNJSONValue({value} ?: JSONObject.NULL)"
+
+    @staticmethod
+    def _without_null(schema: dict[str, Any], nonnull: list[dict[str, Any]]) -> dict[str, Any]:
+        return nonnull[0] if len(nonnull) == 1 else {**schema, "anyOf": nonnull}
 
     def _named(self, schema: dict[str, Any], hint: str) -> str:
         portable = {key: value for key, value in schema.items() if key != "native"}

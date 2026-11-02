@@ -104,7 +104,7 @@ class EventRegistry:
         except Exception as exc:
             from . import diagnostics
 
-            if not diagnostics.report_error(exc, phase=f"event {name!r}"):
+            if not diagnostics.report_error(exc, phase="event"):
                 import traceback
 
                 traceback.print_exc()
