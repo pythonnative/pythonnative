@@ -1,6 +1,7 @@
 # Tests the Video view's events and its typed handle against a clip embedded in
 # the demo, so no network is involved. Muted, because a simulator's audio output
-# can't be asserted anyway.
+# can't be asserted anyway. The events sit below the player and its buttons, so
+# each one is scrolled to: a small screen (CI's 320x640) cuts them off.
 #
 # Demo screen: examples/e2e-suite/app/screens/capabilities/video.py
 # Source under test: src/pythonnative/video/__init__.py :: Video, VideoHandle
@@ -17,12 +18,16 @@ appId: ${APP_ID}
     direction: DOWN
     timeout: 15000
     centerElement: false
-- extendedWaitUntil:
-    visible: "Progressing: yes"
-    timeout: 10000
-- extendedWaitUntil:
-    visible: "Ended: 1"
-    timeout: 10000
+- scrollUntilVisible:
+    element: "Progressing: yes"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- scrollUntilVisible:
+    element: "Ended: 1"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - scrollUntilVisible:
     element: "Seek and ask"
     direction: UP
@@ -34,7 +39,11 @@ appId: ${APP_ID}
     direction: DOWN
     timeout: 15000
     centerElement: false
-- assertVisible: "Video error: none"
+- scrollUntilVisible:
+    element: "Video error: none"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - scrollUntilVisible:
     element: "Load a missing file"
     direction: UP

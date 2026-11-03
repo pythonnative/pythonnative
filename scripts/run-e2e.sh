@@ -118,6 +118,14 @@ pushd examples/e2e-suite > /dev/null
 pn run "$PLATFORM" --no-logs
 popd > /dev/null
 
+# CameraView asks for the camera when it mounts, and Android's prompt then
+# covers the demo before open_demo can see its title. A retry relaunches
+# through Maestro's launchApp, which grants permissions, so grant the camera
+# up front to make the first attempt start from the same state.
+if [[ "$PLATFORM" == "android" ]]; then
+  adb shell pm grant "$APP_ID" android.permission.CAMERA
+fi
+
 run_maestro() {
   if [[ "$PLATFORM" == "ios" ]]; then
     maestro --platform ios test -e "APP_ID=$APP_ID" "${MAESTRO_TARGETS[@]}"

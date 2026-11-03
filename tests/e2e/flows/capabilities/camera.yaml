@@ -2,8 +2,9 @@
 # emulator has virtual cameras, so a real picture and video are taken there, on
 # the front one: the API 31 image's camera HAL crashes on a CameraX still from its
 # back camera. The emulator needs a front camera (`-camera-front emulated`, as the
-# CI workflow passes); without one, flipping reports `unavailable`. The iOS simulator has no camera, so the flow checks the placeholder
-# state: on_error reports `unavailable`, the handle raises, and the app stays up.
+# CI workflow passes); without one, flipping reports `unavailable`. The iOS
+# simulator has no camera, so the flow checks the placeholder state: on_error
+# reports `unavailable`, the handle raises, and the app stays up.
 # Barcode scanning isn't asserted: no flow can put a barcode in front of a lens.
 #
 # Demo screen: examples/e2e-suite/app/screens/capabilities/camera.py
