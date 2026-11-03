@@ -11,7 +11,13 @@ appId: ${APP_ID}
     env:
       CATEGORY: Capabilities
       DEMO_TITLE: Maps
-- assertVisible: "Map type: standard"
+# Without an API key, Android's error text can push this below the fold on a
+# small screen, so scroll to it rather than assert it in place.
+- scrollUntilVisible:
+    element: "Map type: standard"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 # Press targets sit below the map, whichever way it starts up.
 - scrollUntilVisible:
     element: "Use satellite"

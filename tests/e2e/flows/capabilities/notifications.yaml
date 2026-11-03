@@ -1,7 +1,9 @@
 # Tests permission, scheduling, cancellation, and the foreground event. A
 # notification delivered right away reaches on_received on both platforms, and the
 # badge shows the platform difference. Taps aren't covered: they go through the
-# system's shade, and the guide lists how they were verified.
+# system's shade, and the guide lists how they were verified. Results are
+# scrolled to, since they sit below the buttons and a small screen (CI's
+# 320x640) cuts them off.
 #
 # Demo screen: examples/e2e-suite/app/screens/capabilities/notifications.py
 # Source under test: src/pythonnative/notifications/__init__.py :: Notifications
@@ -24,29 +26,48 @@ appId: ${APP_ID}
     visible: "Permission: granted"
     timeout: 10000
 - tapOn: "Schedule now"
-- extendedWaitUntil:
-    visible: "Scheduled: now"
-    timeout: 5000
+- scrollUntilVisible:
+    element: "Scheduled: now"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - scrollUntilVisible:
     element: "Received: 1"
     direction: DOWN
     timeout: 15000
     centerElement: false
-- assertVisible: "Last data: now"
-- assertVisible: "Launched by a tap: no"
+- scrollUntilVisible:
+    element: "Last data: now"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- scrollUntilVisible:
+    element: "Launched by a tap: no"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - scrollUntilVisible:
     element: "Schedule in ten minutes"
     direction: UP
     timeout: 15000
     centerElement: false
 - tapOn: "Schedule in ten minutes"
-- extendedWaitUntil:
-    visible: "Scheduled: later"
-    timeout: 5000
+- scrollUntilVisible:
+    element: "Scheduled: later"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- scrollUntilVisible:
+    element: "Cancel all"
+    direction: UP
+    timeout: 15000
+    centerElement: false
 - tapOn: "Cancel all"
-- extendedWaitUntil:
-    visible: "Scheduled: canceled"
-    timeout: 5000
+- scrollUntilVisible:
+    element: "Scheduled: canceled"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
 - scrollUntilVisible:
     element: "Set badge"
     direction: DOWN
