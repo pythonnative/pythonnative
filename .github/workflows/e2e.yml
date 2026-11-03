@@ -116,6 +116,10 @@ jobs:
         with:
           api-level: 31
           arch: x86_64
+          # The runner's defaults plus an emulated front camera: the default
+          # AVD has only a back camera, and the camera flow takes its picture
+          # and video on the front one (see tests/e2e/flows/capabilities/camera.yaml).
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated
           script: bash -lc "uv run ./scripts/run-e2e.sh android ${{ matrix.suites }}"
 
       # Maestro writes per-flow debug output (command log, view-hierarchy

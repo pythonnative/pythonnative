@@ -79,7 +79,8 @@ def WebSocketDemo() -> pn.Node:
             socket = await pn.WebSocket(f"ws://127.0.0.1:{port}/").open()
             await socket.send("hello from Python")
             await socket.send_json({"value": 42})
-            set_echoed(f"{await socket.recv()} / {await socket.recv()}")
+            first, second = await socket.recv(), await socket.recv()
+            set_echoed(f"{first!s} / {second!s}")
             await socket.close()
             set_close_code(str(socket.close_code))
             response = await pn.fetch(

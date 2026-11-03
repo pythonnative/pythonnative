@@ -9,13 +9,16 @@ reports ``unavailable``, and the handle raises ``not_ready``.
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Literal
 
 from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 import pythonnative as pn
 from pythonnative.camera import Barcode, Camera, CameraError, CameraView
 from pythonnative.native_modules.registry import NativeModuleError
+
+_INITIAL_FACING: Literal["back", "front"] = "back"
+_INITIAL_FLASH: Literal["off", "on", "auto", "torch"] = "off"
 
 
 @pn.component
@@ -26,8 +29,8 @@ def CameraDemo() -> pn.Node:
     error, set_error = pn.use_state("none")
     barcode, set_barcode = pn.use_state("none")
     result, set_result = pn.use_state("none")
-    facing, set_facing = pn.use_state("back")
-    flash, set_flash = pn.use_state("off")
+    facing, set_facing = pn.use_state(_INITIAL_FACING)
+    flash, set_flash = pn.use_state(_INITIAL_FLASH)
     zoom, set_zoom = pn.use_state(1.0)
 
     def guarded(work: Callable[[], Awaitable[Any]]) -> Callable[[], Awaitable[None]]:

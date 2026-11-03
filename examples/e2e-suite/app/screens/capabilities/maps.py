@@ -9,6 +9,8 @@ and ``on_error`` reports the same thing.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from app.screens.scaffold import DemoScreen, DemoSection, Hint, ResultText
 
 import pythonnative as pn
@@ -17,6 +19,7 @@ from pythonnative.maps import Coordinate, MapView, Marker, Polyline, Region
 OSLO = Coordinate(59.9139, 10.7522)
 BERGEN = Coordinate(60.3913, 5.3221)
 START = Region(OSLO, 0.2, 0.2)
+_INITIAL_MAP_TYPE: Literal["standard", "satellite", "hybrid"] = "standard"
 
 
 @pn.component
@@ -29,7 +32,7 @@ def MapsDemo() -> pn.Node:
     regions, set_regions = pn.use_state(0)
     center, set_center = pn.use_state("unknown")
     error, set_error = pn.use_state("none")
-    map_type, set_map_type = pn.use_state("standard")
+    map_type, set_map_type = pn.use_state(_INITIAL_MAP_TYPE)
 
     def on_region_change(region: Region) -> None:
         set_regions(lambda count: count + 1)
