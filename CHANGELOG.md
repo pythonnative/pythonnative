@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.53.1 (2026-11-04)
+
+### Bug Fixes
+
+- **navigation**: Reject empty path params in deep links
+  ([#116](https://github.com/pythonnative/pythonnative/pull/116),
+  [`123455d`](https://github.com/pythonnative/pythonnative/commit/123455d39495dae945a64fd544a1a88fa2740b37))
+
+Refs: #105
+
+
 ## v0.53.0 (2026-11-04)
 
 ### Features
