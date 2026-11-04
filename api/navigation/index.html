@@ -9102,6 +9102,15 @@ matches nothing.</p>
 a path is a literal plus, unlike in the query string, where it means a
 space. Bytes that don't decode as UTF-8 are left as they arrived.
 Literal segments are matched exactly as written.</p>
+<p>A placeholder stands for one non-empty segment when a URL is built:
+a route whose placeholder value is empty or absent yields <code>None</code>
+rather than a URL with an empty segment. Reading is narrower. An
+<em>interior</em> empty segment never reaches a screen, so <code>org//repo/pn</code>
+matches nothing instead of shifting its values onto a shorter route. A
+<em>leading or trailing</em> empty segment can't be told apart from the
+leading or trailing slash that URLs may always carry, so it is
+discarded with that slash: <code>u/</code> is read as <code>u</code>, and may still match
+some other route. An empty query value is unaffected.</p>
 
 
 
@@ -9170,6 +9179,13 @@ captured and before conversion; <code>+</code> in a path stays a literal plus,
 and undecodable bytes are left as-is. Literal segments match exactly
 as the paths declare them, and query values are decoded by
 <code>parse_qsl</code> alone.</p>
+<p>A path placeholder never captures an empty value. <code>url_from_state</code>
+returns <code>None</code> rather than emitting an empty segment, and an
+interior empty segment in a URL matches nothing. A leading or
+trailing slash stays optional, so a boundary empty is discarded
+along with it and the shortened path may still match another route:
+<code>u/</code> is read as <code>u</code>. Query values are unconstrained, so an empty
+one round-trips as <code>key=</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -9284,7 +9300,7 @@ accept, or a segment mixes literal text with a placeholder.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;url_from_state&lt;/span&gt; (&lt;code&gt;pythonnative.navigation.linking.LinkTable.url_from_state&lt;/code&gt;)" href="#pythonnative.navigation.linking.LinkTable.url_from_state">url_from_state</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Build a URL for the focused leaf of <code>state</code> (<code>None</code> if no screen on the way has a path).</p>
+                  <p>Build a URL for the focused leaf of <code>state</code>.</p>
                 </div>
               </td>
             </tr>
@@ -9360,7 +9376,100 @@ accept, or a segment mixes literal text with a placeholder.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Build a URL for the focused leaf of <code>state</code> (<code>None</code> if no screen on the way has a path).</p>
+        <p>Build a URL for the focused leaf of <code>state</code>.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The URL, or <code>None</code> when it can't be built: no screen on the</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>way has a path, the route chain isn't in the table, or a path</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>placeholder's value is empty or absent. A placeholder has to</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>become a non-empty segment, since an empty one either shifts</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the remaining values onto another route or is discarded with a</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>boundary slash. Emptiness is judged on the serialized text, so</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>0</code> and <code>False</code> are fine while a value that stringifies to</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>""</code> is not. An empty <em>query</em> value round-trips as <code>key=</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
