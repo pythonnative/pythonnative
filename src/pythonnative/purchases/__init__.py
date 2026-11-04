@@ -233,11 +233,15 @@ class FakeStore:
         return list(self._owned.values())
 
     def finish(self, id: str, token: str, consume: bool = False) -> None:
-        """Record the id in ``finished``, and consume it if it should be."""
+        """Record the id in ``finished``, and consume it only with ``consume=True``.
+
+        That's Google Play's rule, the stricter one: the App Store also
+        consumes consumables by itself, so code that passes ``consume`` here
+        works with both.
+        """
         del token
         self.finished.append(id)
-        product = self._products.get(self._owned[id]["product_id"]) if id in self._owned else None
-        if consume or (product is not None and product.kind == "consumable"):
+        if consume:
             self._owned.pop(id, None)
 
     def listen(self) -> None:
@@ -398,7 +402,14 @@ class Purchases:
             first = not _listening
             _listening = True
         if first:
-            native_module("Purchases").call("listen")
+            try:
+                native_module("Purchases").call("listen")
+            except BaseException:
+                # Let the next subscriber ask again; until then, nothing is released.
+                with _listeners_lock:
+                    _listening = False
+                    _listeners.remove(callback)
+                raise
 
         def unsubscribe() -> None:
             with _listeners_lock:

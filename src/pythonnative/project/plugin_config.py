@@ -354,11 +354,27 @@ def _apply_gradle_plugins(project_dir: Path, resolved: Sequence[ResolvedPlugin])
     app.write_text(content.replace("plugins {\n", "plugins {\n" + lines, 1), encoding="utf-8")
 
 
+def _app_paths(item: ResolvedPlugin) -> set[Path]:
+    """The files the app itself chose through this plugin's ``path`` options."""
+    declared: Dict[str, Dict[str, Any]] = item.plugin.manifest.get("options", {})
+    return {
+        Path(str(item.options[name])).resolve()
+        for name, spec in declared.items()
+        if spec.get("type") == "path" and item.options.get(name) is not None
+    }
+
+
 def _apply_files(project_dir: Path, resolved: Sequence[ResolvedPlugin]) -> None:
     for item in resolved:
+        allowed = _app_paths(item)
         for entry in item.android.get("files", ()):
-            source = Path(entry["from"])
-            source = source if source.is_absolute() else item.plugin.root / source
+            source = (item.plugin.root / entry["from"]).resolve()
+            # A plugin may copy its own files, or a file the app named in one of
+            # its path options; never anything else on the build machine.
+            if not source.is_relative_to(item.plugin.root) and source not in allowed:
+                raise PluginError(
+                    f"{item.plugin.name}: file {entry['from']!r} must be inside the plugin or come from a path option"
+                )
             target = (project_dir / entry["to"]).resolve()
             if not target.is_relative_to(project_dir.resolve()):
                 raise PluginError(f"{item.plugin.name}: file target {entry['to']!r} escapes the project")

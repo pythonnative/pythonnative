@@ -182,6 +182,8 @@ Rules:
 - `requires.plugins` is checked, not implied: naming a plugin in `use` doesn't
   silently pull another in.
 - `when.<option>` applies its nested keys only if that option has a value.
+- A `files` entry copies from inside the plugin, or from a file the app named in
+  one of the plugin's `path` options. Any other source is a build error.
 - Only manifest, plist, entitlement, privacy, dependency, and file changes are
   possible. There's no arbitrary code at build time, which keeps wheels safe to
   inspect as data.
@@ -383,7 +385,7 @@ runs a smoke flow against the release configuration.
   existing error screen.
 - **Mount recovery.** `surface_failed` now schedules a full remount of the
   surface, once. A second failure inside a minute shows the fallback, so a broken
-  tree can't loop forever.
+  tree can't loop forever. If the fallback can't mount either, recovery stops.
 
 ### Exports
 

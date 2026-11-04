@@ -89,6 +89,9 @@ def test_restore_returns_what_is_owned_until_consumed() -> None:
     run_blocking(Purchases.finish(pro))
     run_blocking(Purchases.finish(coins))
     assert fake_store.finished == [pro.id, coins.id]
+    # As on Google Play, finishing a consumable without consume=True leaves it owned.
+    assert {item.id for item in run_blocking(Purchases.restore())} == {pro.id, coins.id}
+    run_blocking(Purchases.finish(coins, consume=True))
     assert [item.id for item in run_blocking(Purchases.restore())] == [pro.id]
     run_blocking(Purchases.finish(pro, consume=True))
     assert run_blocking(Purchases.restore()) == []
@@ -142,6 +145,23 @@ def test_the_first_subscriber_tells_native_to_release_held_updates(monkeypatch: 
     Purchases.on_update(lambda _: None)
     Purchases.on_update(lambda _: None)
     assert calls == [True]
+
+
+def test_a_failed_listen_is_retried_by_the_next_subscriber(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: List[bool] = []
+
+    def listen() -> None:
+        calls.append(True)
+        if len(calls) == 1:
+            raise NativeModuleError("Purchases", "listen", "not ready", "unavailable")
+
+    monkeypatch.setattr(fake_store, "listen", listen)
+    monkeypatch.setattr(purchases, "_listening", False)
+    with pytest.raises(NativeModuleError):
+        Purchases.on_update(lambda _: None)
+    Purchases.on_update(lambda _: None)
+    Purchases.on_update(lambda _: None)
+    assert calls == [True, True]
 
 
 def test_the_contract_lists_the_events_and_methods() -> None:

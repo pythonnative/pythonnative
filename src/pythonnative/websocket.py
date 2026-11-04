@@ -113,7 +113,7 @@ class WebSocket:
         self._background: list["asyncio.Task[None]"] = []
         self._write_lock = asyncio.Lock()
         self._close_reason = ""
-        self._pong_waiter: Optional["asyncio.Future[None]"] = None
+        self._pong_waiters: list["asyncio.Future[None]"] = []
 
     # -- connection -----------------------------------------------------
 
@@ -128,9 +128,16 @@ class WebSocket:
             OSError: For network errors.
             TimeoutError: If ``open_timeout`` elapses.
         """
-        async with asyncio.timeout(self._open_timeout):
-            await self._connect()
-            await self._handshake()
+        try:
+            async with asyncio.timeout(self._open_timeout):
+                await self._connect()
+                await self._handshake()
+        except BaseException:
+            # `async with` never reaches __aexit__ when opening fails, so close
+            # the half-open connection here; close() would speak WebSocket to it.
+            self._teardown()
+            self._writer = self._reader = None
+            raise
         self._background.append(asyncio.create_task(self._read_loop()))
         if self._heartbeat:
             self._background.append(asyncio.create_task(self._heartbeat_loop(self._heartbeat)))
@@ -157,6 +164,9 @@ class WebSocket:
         if self._parts.query:
             path = f"{path}?{self._parts.query}"
         host = self._parts.hostname or ""
+        if ":" in host:
+            # urlsplit strips an IPv6 literal's brackets, which Host needs back.
+            host = f"[{host}]"
         if self._parts.port:
             host = f"{host}:{self._parts.port}"
         headers = {
@@ -245,11 +255,17 @@ class WebSocket:
             TimeoutError: If no pong arrives in time.
             WebSocketClosed: If the connection is closed.
         """
-        loop = asyncio.get_running_loop()
-        self._pong_waiter = loop.create_future()
-        await self._send_frame(_PING, b"")
-        async with asyncio.timeout(timeout):
-            await self._pong_waiter
+        waiter: "asyncio.Future[None]" = asyncio.get_running_loop().create_future()
+        # A pong answers every ping sent before it, so a heartbeat and a ping of
+        # the app's own can overlap without one taking the other's answer.
+        self._pong_waiters.append(waiter)
+        try:
+            await self._send_frame(_PING, b"")
+            async with asyncio.timeout(timeout):
+                await waiter
+        finally:
+            if waiter in self._pong_waiters:
+                self._pong_waiters.remove(waiter)
 
     async def close(self, code: int = _NORMAL_CLOSURE, reason: str = "") -> None:
         """Close the connection. Safe to call more than once."""
@@ -323,8 +339,10 @@ class WebSocket:
                 if opcode == _PING:
                     await self._send_frame(_PONG, payload)
                 elif opcode == _PONG:
-                    if self._pong_waiter is not None and not self._pong_waiter.done():
-                        self._pong_waiter.set_result(None)
+                    waiters, self._pong_waiters = self._pong_waiters, []
+                    for waiter in waiters:
+                        if not waiter.done():
+                            waiter.set_result(None)
                 elif opcode == _CLOSE:
                     self._on_close_frame(payload)
                     return
@@ -384,8 +402,10 @@ class WebSocket:
         self.close_code = code
         self._close_reason = reason
         self._messages.put_nowait(WebSocketClosed(code, reason))
-        if self._pong_waiter is not None and not self._pong_waiter.done():
-            self._pong_waiter.set_exception(WebSocketClosed(code, reason))
+        waiters, self._pong_waiters = self._pong_waiters, []
+        for waiter in waiters:
+            if not waiter.done():
+                waiter.set_exception(WebSocketClosed(code, reason))
 
     def _teardown(self) -> None:
         writer = self._writer

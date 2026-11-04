@@ -91,7 +91,9 @@ For anything worth protecting, check `token` on your server on both platforms.
 
 Off device, [`fake_store`][pythonnative.purchases.fake_store] answers every call. It isn't a simulator
 of either real store: it answers immediately, charges nothing, and sells only what you tell it to.
-On a device, calls never reach it, so setting it up there does nothing.
+On a device, calls never reach it, so setting it up there does nothing. Like Google Play, it consumes a
+purchase only when `finish` passes `consume=True`, so a consumable your tests can buy twice can be bought
+twice on both stores.
 
 ```python
 from decimal import Decimal

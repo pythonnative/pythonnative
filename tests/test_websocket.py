@@ -139,6 +139,22 @@ async def test_handshake_rejection_and_bad_accept() -> None:
             await WebSocket(url(server)).open()
 
 
+async def test_a_refused_handshake_closes_its_connection() -> None:
+    closed = asyncio.Event()
+
+    async def until_closed(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        if await reader.read() == b"":
+            closed.set()
+
+    async with await serve(until_closed, status="401 Unauthorized") as server:
+        socket = WebSocket(url(server))
+        with pytest.raises(WebSocketError, match="401"):
+            await socket.open()
+        await asyncio.wait_for(closed.wait(), 5)
+        # Nothing is left for close() to write a close frame to.
+        await socket.close()
+
+
 async def test_protocol_query_and_headers_reach_the_server() -> None:
     seen: dict[str, str] = {}
 
@@ -239,6 +255,29 @@ async def test_ping_waits_for_pong_and_heartbeat_detects_a_dead_peer() -> None:
             await socket.recv()
         assert info.value.code == 1006
         await socket.close()
+
+
+async def test_overlapping_pings_each_get_an_answer(echo_server: Any) -> None:
+    async with WebSocket(url(echo_server)) as socket:
+        await asyncio.gather(socket.ping(timeout=2), socket.ping(timeout=2))
+
+
+async def test_an_ipv6_host_keeps_its_brackets() -> None:
+    seen: dict[str, str] = {}
+
+    async def connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        seen["head"] = (await reader.readuntil(b"\r\n\r\n")).decode()
+        writer.close()
+
+    try:
+        server = await asyncio.start_server(connection, "::1", 0)
+    except OSError:
+        pytest.skip("no IPv6 loopback")
+    async with server:
+        port = server.sockets[0].getsockname()[1]
+        with pytest.raises((WebSocketError, asyncio.IncompleteReadError)):
+            await WebSocket(f"ws://[::1]:{port}/").open()
+    assert f"Host: [::1]:{port}\r\n" in seen["head"]
 
 
 async def test_close_is_clean_and_repeatable(echo_server: Any) -> None:

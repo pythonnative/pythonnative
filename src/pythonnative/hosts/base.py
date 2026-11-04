@@ -340,12 +340,17 @@ class ScreenHost:
 
         The first failure gets a fresh tree. A second within a minute means the
         tree itself is what breaks mounting, so the retry mounts the fallback
-        screen instead of looping. Development builds show the error screen.
+        screen instead of looping. If the fallback can't mount either, nothing
+        a remount would build can, so it stops there. Development builds show
+        the error screen.
         """
         if diagnostics.is_dev() or self._recovering or self.reconciler is None:
             return
         now = time.monotonic()
-        if self._last_recovery is not None and now - self._last_recovery < _RECOVERY_WINDOW_SECONDS:
+        recent = self._last_recovery is not None and now - self._last_recovery < _RECOVERY_WINDOW_SECONDS
+        if recent and self._gave_up is not None:
+            return
+        if recent:
             self._gave_up = error
         self._last_recovery = now
         self._recovering = True

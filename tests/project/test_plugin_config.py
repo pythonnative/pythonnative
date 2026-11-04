@@ -371,6 +371,15 @@ def test_android_conflicting_gradle_plugins_and_escaping_paths(tmp_path: Path) -
     with pytest.raises(PluginError, match="escapes the project"):
         plugin_config.apply_android(project, config_for(tmp_path), [load_plugin(folder)])
 
+    (tmp_path / "secret").write_text("key")
+    for number, source in (("5", str(tmp_path / "secret")), ("6", "../secret")):
+        reaching = make_plugin(
+            tmp_path / number, name=f"reach{number}", android={"files": [{"from": source, "to": "app/x"}]}
+        )
+        with pytest.raises(PluginError, match="must be inside the plugin or come from a path option"):
+            plugin_config.apply_android(project, config_for(tmp_path), [load_plugin(reaching)])
+    assert not (project / "app" / "x").exists()
+
     fragment = make_plugin(tmp_path / "4", name="four", android={"manifest": {"root": "../outside.xml"}})
     with pytest.raises(PluginError, match="must be a file inside"):
         plugin_config.apply_android(project, config_for(tmp_path), [load_plugin(fragment)])

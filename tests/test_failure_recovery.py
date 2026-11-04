@@ -49,20 +49,30 @@ def test_no_handler_is_fine() -> None:
     diagnostics.handle_error(RuntimeError("boom"), "render")
 
 
+def _fallback(reset: Callable[[], None] = lambda: None) -> pn.Element:
+    element = structural.root_error_fallback(RuntimeError("a"), reset)
+    assert isinstance(element, pn.Element)
+    return element
+
+
 def test_default_fallback_offers_a_retry() -> None:
     calls: List[int] = []
-    element = structural.root_error_fallback(RuntimeError("boom"), lambda: calls.append(1))
+    element = _fallback(lambda: calls.append(1))
     assert element.type == "Column"
     text, button = element.children
     assert text.props["text"] == "Something went wrong"
     assert button.props["title"] == "Try again"
 
 
-def test_custom_fallback_takes_one_or_two_arguments() -> None:
+def test_custom_fallback_takes_every_error_boundary_form() -> None:
     pn.set_error_fallback(lambda error: pn.Text(f"sorry: {error}"))
-    assert structural.root_error_fallback(RuntimeError("a"), lambda: None).props["text"] == "sorry: a"
+    assert _fallback().props["text"] == "sorry: a"
     pn.set_error_fallback(lambda error, reset: pn.Button("again", on_press=reset))
-    assert structural.root_error_fallback(RuntimeError("a"), lambda: None).props["title"] == "again"
+    assert _fallback().props["title"] == "again"
+    pn.set_error_fallback(lambda: pn.Text("no arguments"))
+    assert _fallback().props["text"] == "no arguments"
+    pn.set_error_fallback(pn.Text("static"))
+    assert _fallback().props["text"] == "static"
 
 
 class _Host(ScreenHost):
@@ -158,6 +168,10 @@ def test_mount_failure_remounts_once_then_gives_up(monkeypatch: pytest.MonkeyPat
     assert host._gave_up is failure
     calls.pop()()
     assert _Recording.remounts == 2
+
+    # The fallback failing too stops recovery rather than remounting it forever.
+    host._recover_surface(RuntimeError("fallback broke"))
+    assert not calls and host._gave_up is failure and _Recording.remounts == 2
 
     host._restart()
     assert host._gave_up is None and host._last_recovery is None and _Recording.remounts == 3

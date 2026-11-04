@@ -104,7 +104,7 @@ when the iteration ends for any reason.
 | `android.manifest` | XML fragments: `root` goes before `<application>`, `application` inside it. |
 | `android.cmake` | A `CMakeLists.txt` built into the app. Load its library with `System.loadLibrary`. |
 | `android.gradle_plugins` | Gradle plugins: `{"id", "version"}`. |
-| `android.files` | Files copied into the project: `{"from", "to"}`. |
+| `android.files` | Files copied into the project: `{"from", "to"}`. `from` is a file inside the plugin, or a `path` option the app set. |
 | `ios.when`, `android.when` | Keys applied only when an option has a value. |
 | `web.entry` | An ES module for the browser preview. |
 
