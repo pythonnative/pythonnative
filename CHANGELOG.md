@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.53.0 (2026-11-04)
+
+### Features
+
+- Add the production platform ([#117](https://github.com/pythonnative/pythonnative/pull/117),
+  [`9c8daf9`](https://github.com/pythonnative/pythonnative/commit/9c8daf9a3fdeec37cb0ef416670b8f343e1d9884))
+
+
 ## v0.52.2 (2026-11-02)
 
 ### Bug Fixes
