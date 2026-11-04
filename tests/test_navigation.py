@@ -1,6 +1,7 @@
 """Tests for the navigation package: state, screens, navigator values, the core, rendering, hooks, and deep links."""
 
 import enum
+from decimal import Decimal
 from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Tuple
 
 import pytest
@@ -2042,6 +2043,234 @@ def test_link_table_decode_fallback_only_swallows_decode_errors(
 
     with pytest.raises(type(error), match="not a decoding problem"):
         _links().state_from_url("myapp://tabs/u/ada")
+
+
+# Empty path params (issue #105). An empty placeholder value used to
+# collapse into an empty segment: at the end of a path the URL stopped
+# matching, and in the middle it silently landed on a shorter pattern
+# with its values shifted. A placeholder now stands for exactly one
+# non-empty segment, in both directions.
+
+
+@component
+def Thread(org: str = "", repo: str = "") -> pn.Node:
+    return Text(f"thread {org}/{repo}")
+
+
+@component
+def Shifted(a: str = "", b: str = "") -> pn.Node:
+    return Text(f"shifted {a}/{b}")
+
+
+class Band(enum.Enum):
+    BLANK = ""
+    FULL = "full"
+
+
+@component
+def Banded(band: Band = Band.FULL) -> pn.Node:
+    return Text(f"banded {band}")
+
+
+def _overlapping() -> LinkTable:
+    # Thread's path is one segment longer than Shifted's, so an empty capture
+    # that vanished from Thread's URL used to land on Shifted instead.
+    return LinkTable(
+        StackNavigator(
+            Screen(Home, path=""),
+            Screen(Thread, path="org/{org}/repo/{repo}"),
+            Screen(Shifted, path="org/{a}/{b}"),
+        ),
+        ["myapp://"],
+    )
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({"user": ""}, id="empty-value"),
+        pytest.param({}, id="missing-key"),
+    ],
+)
+def test_link_table_declines_a_url_for_an_empty_leaf_param(params: Dict[str, str]) -> None:
+    # Both halves of the write side: an empty value and an absent one are the
+    # same empty text at the generation site, and both decline. Profile sits
+    # under Tabs, so the chain has to be nested or no pattern matches at all
+    # and the None would mean nothing.
+    links = _links()
+
+    def nested(values: Dict[str, str]) -> NavigationState:
+        return NavigationState([Route("Tabs", state=NavigationState([Route("Profile", values)]))])
+
+    assert links.url_from_state(nested(params)) is None
+    # Positive control: the same chain with a value does produce a URL.
+    assert links.url_from_state(nested({"user": "ada"})) == "myapp://tabs/u/ada"
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({"org": "", "user": "ada"}, id="empty-outer"),
+        pytest.param({"user": "ada"}, id="missing-outer"),
+        pytest.param({"org": "acme", "user": ""}, id="empty-inner"),
+    ],
+)
+def test_link_table_declines_a_url_for_an_empty_param_on_an_outer_path(params: Dict[str, str]) -> None:
+    # The placeholder being empty sits on the outer navigator's path, not the
+    # leaf's, so the guard has to cover every segment of the pattern.
+    inner = StackNavigator(Screen(OrgProfile, path="u/{user}"), name="Inner")
+    table = LinkTable(StackNavigator(Screen(inner, path="org/{org}")), ["myapp://"])
+    nested = NavigationState([Route("Inner", state=NavigationState([Route("OrgProfile", params)]))])
+
+    assert table.url_from_state(nested) is None
+
+
+def test_link_table_declines_a_url_for_an_empty_mid_path_param() -> None:
+    # The end-of-path and mid-path halves of the issue, from the write side.
+    links = _overlapping()
+    mid = NavigationState([Route("Thread", {"org": "", "repo": "pn"})])
+    assert links.url_from_state(mid) is None
+
+    tail = NavigationState([Route("Thread", {"org": "acme", "repo": ""})])
+    assert links.url_from_state(tail) is None
+
+    full = NavigationState([Route("Thread", {"org": "acme", "repo": "pn"})])
+    assert links.url_from_state(full) == "myapp://org/acme/repo/pn"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        pytest.param("myapp://tabs/u/", id="end-of-path"),
+        pytest.param("myapp://items/", id="end-of-path-typed"),
+        pytest.param("myapp://tabs//", id="empty-inside-a-nested-path"),
+    ],
+)
+def test_link_table_rejects_an_externally_supplied_empty_capture(url: str) -> None:
+    # Regression controls, not proof of the new behavior: each of these
+    # already returned None on main, because discarding the trailing empty
+    # leaves the path one segment short of the pattern. They pin that the
+    # split change didn't start admitting them. The capture rejection itself
+    # is covered by the next test, where the length still fits.
+    assert _links().state_from_url(url) is None
+
+
+def test_link_table_rejects_an_empty_capture_where_the_length_still_fits() -> None:
+    # The capture rejection on its own. Every other empty-segment URL here is
+    # already refused by the length check, so this is the one case that
+    # isolates it: with the interior empty kept, the part count matches the
+    # pattern exactly and the empty value reaches the placeholder.
+    inner = StackNavigator(Screen(OrgProfile, path="u/{user}"), name="Inner")
+    table = LinkTable(StackNavigator(Screen(inner, path="org/{org}")), ["myapp://"])
+
+    assert table.state_from_url("myapp://org//u/ada") is None
+    assert _leaf(table.state_from_url("myapp://org/acme/u/ada")).params == {"org": "acme", "user": "ada"}
+
+
+def test_link_table_interior_empty_does_not_reach_a_shorter_pattern() -> None:
+    # The heart of the issue. org//repo/pn used to drop its empty segment,
+    # leaving three parts that matched Shifted with every value moved one
+    # place left: the literal "repo" became a captured value.
+    links = _overlapping()
+    assert links.state_from_url("myapp://org//repo/pn") is None
+
+    shifted = _leaf(links.state_from_url("myapp://org/acme/pn"))
+    assert (shifted.name, shifted.params) == ("Shifted", {"a": "acme", "b": "pn"})
+
+
+def test_link_table_round_trips_a_populated_overlapping_route() -> None:
+    # Both halves as round trips: whatever url_from_state does produce still
+    # reads back as the same route with the same values.
+    links = _overlapping()
+    for params in ({"org": "acme", "repo": "pn"}, {"org": "a b", "repo": "c/d"}):
+        state = NavigationState([Route("Thread", params)])
+        url = links.url_from_state(state)
+        assert url is not None
+        assert _leaf(links.state_from_url(url)).params == params
+
+
+def test_link_table_still_tolerates_a_trailing_slash() -> None:
+    # Nothing covered this before, which is the only reason a design that
+    # kept trailing empty segments stayed green. Tolerating the slash is the
+    # deliberate trade: a boundary empty is indistinguishable from it, so
+    # only an interior empty can be rejected on sight.
+    links = _links()
+    assert _leaf(links.state_from_url("myapp://tabs/u/ada/")).params == {"user": "ada"}
+    assert _leaf(links.state_from_url("myapp://items/3/")).params == {"id": 3}
+    assert _leaf(links.state_from_url("myapp://search/?q=x")).params == {"q": "x"}
+    assert _leaf(links.state_from_url("https://example.com/items/3/")).params == {"id": 3}
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        pytest.param("myapp://", id="bare-root"),
+        pytest.param("myapp:///", id="pathless-trailing-slash"),
+        pytest.param("myapp://///", id="only-slashes"),
+        pytest.param("https://example.com", id="web-bare"),
+        pytest.param("https://example.com/", id="web-trailing-slash"),
+    ],
+)
+def test_link_table_empty_paths_still_reach_the_root(url: str) -> None:
+    # The pathless root screen has a zero-segment pattern, so any split rule
+    # that leaves an empty segment behind stops it matching.
+    assert _leaf(_links().state_from_url(url)).name == "Home"
+
+
+@pytest.mark.parametrize(
+    ("value", "segment"),
+    [
+        pytest.param(42, "42", id="int"),
+        pytest.param(0, "0", id="zero"),
+        pytest.param(False, "false", id="false"),
+        pytest.param(0.0, "0.0", id="zero-float"),
+        pytest.param(Decimal("0"), "0", id="zero-decimal"),
+    ],
+)
+def test_link_table_falsy_value_with_a_non_empty_segment_still_builds(value: object, segment: str) -> None:
+    # Emptiness has to be judged on the serialized text, not on the value's
+    # own truthiness: 0, False, 0.0 and Decimal("0") are all falsy but
+    # serialize to something, so each must still produce a URL.
+    links = _links()
+    state = NavigationState([Route("Detail", {"id": value})])
+    assert links.url_from_state(state) == f"myapp://items/{segment}"
+
+
+def test_link_table_truthy_value_with_an_empty_segment_is_declined() -> None:
+    # The other direction. An enum member is always truthy, but this one
+    # serializes to "", which would collapse into an empty segment, so the
+    # URL has to be declined. A truthiness test on the raw value would let
+    # it through.
+    table = LinkTable(StackNavigator(Screen(Home, path=""), Screen(Banded, path="b/{band}")), ["myapp://"])
+
+    assert table.url_from_state(NavigationState([Route("Banded", {"band": Band.BLANK})])) is None
+    assert table.url_from_state(NavigationState([Route("Banded", {"band": Band.FULL})])) == "myapp://b/full"
+    assert _leaf(table.state_from_url("myapp://b/full")).params == {"band": Band.FULL}
+
+
+def test_link_table_non_str_param_is_unaffected() -> None:
+    # The guard is about emptiness, not about conversion: a typed param that
+    # converts still converts, and an empty one is rejected before the
+    # converter would have raised anyway.
+    links = _links()
+    assert _leaf(links.state_from_url("myapp://items/42")).params == {"id": 42}
+    assert links.state_from_url("myapp://items/") is None
+    assert links.state_from_url("myapp://items//") is None
+    assert links.url_from_state(NavigationState([Route("Detail", {"id": 42})])) == "myapp://items/42"
+
+
+def test_link_table_empty_query_value_still_round_trips() -> None:
+    # The asymmetry is deliberate. A query key carries its own name, so an
+    # empty value is unambiguous and survives as "key="; only a path segment
+    # loses its identity when empty. Pinned so the path rule above doesn't
+    # get "fixed" onto the query side.
+    links = _links()
+    state = NavigationState([Route("Detail", {"id": 3, "tab": ""})])
+    url = links.url_from_state(state)
+    assert url == "myapp://items/3?tab="
+
+    assert _leaf(links.state_from_url(url)).params == {"id": 3, "tab": ""}
+    assert _leaf(links.state_from_url("myapp://search?q=")).params == {"q": ""}
 
 
 @pytest.fixture
