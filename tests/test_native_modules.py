@@ -17,7 +17,6 @@ import pytest
 from pythonnative import (
     AppState,
     Battery,
-    Biometrics,
     Clipboard,
     Haptics,
     Linking,
@@ -25,10 +24,10 @@ from pythonnative import (
     Permissions,
     SecureStore,
     Share,
-    Vibration,
     use_app_state,
     use_net_info,
 )
+from pythonnative.biometrics import Biometrics
 from pythonnative.component import component
 from pythonnative.element import Element
 from pythonnative.native_modules import app_state, battery, linking, net_info
@@ -231,20 +230,11 @@ def test_permissions_request_undetermined_fallback() -> None:
     assert asyncio.run(Permissions.request("camera")) == "undetermined"
 
 
-def test_permissions_names_match_the_config_vocabulary() -> None:
-    """Runtime permission names are the [permissions] keys from pythonnative.toml."""
-    from pythonnative.native_modules.permissions import RUNTIME_PERMISSIONS
-    from pythonnative.project.permissions import CAPABILITIES
-
-    assert set(RUNTIME_PERMISSIONS) <= set(CAPABILITIES)
-    assert "photo_library" in RUNTIME_PERMISSIONS and "location_when_in_use" in RUNTIME_PERMISSIONS
-
-
-@pytest.mark.parametrize("name", ["photos", "location", "Camera", ""])
-def test_permissions_reject_names_outside_the_vocabulary(name: str) -> None:
-    with pytest.raises(ValueError, match="Unknown permission"):
+@pytest.mark.parametrize("name", ["not a key", "camera-roll", ""])
+def test_permissions_reject_names_that_cant_be_keys(name: str) -> None:
+    with pytest.raises(ValueError, match="Invalid permission"):
         asyncio.run(Permissions.check(name))  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match="Unknown permission"):
+    with pytest.raises(ValueError, match="Invalid permission"):
         asyncio.run(Permissions.request(name))  # type: ignore[arg-type]
 
 
@@ -316,54 +306,20 @@ def test_linking_listener_errors_do_not_break_dispatch() -> None:
     linking.set_initial_url(None)
 
 
-# ======================================================================
-# Notifications: remote push registration
-# ======================================================================
-
-
-def test_get_device_token_none_on_fallback() -> None:
-    from pythonnative.native_modules.notifications import Notifications
-
-    assert asyncio.run(Notifications.get_device_token()) is None
-
-
-def test_get_device_token_surfaces_native_error() -> None:
-    from pythonnative.native_modules.notifications import Notifications
-
-    class FailingNotifications:
-        def get_device_token(self) -> str:
-            raise module_registry.NativeModuleError("Notifications", "get_device_token", "no entitlement")
-
-    module_registry.register_python_module("Notifications", FailingNotifications())
-    try:
-        with pytest.raises(module_registry.NativeModuleError, match="no entitlement"):
-            asyncio.run(Notifications.get_device_token())
-    finally:
-        module_registry.unregister_python_module("Notifications")
-
-
 def test_async_facades_surface_native_errors() -> None:
-    """Camera / Share / Biometrics propagate a rejected promise instead of returning a default."""
-    from pythonnative import Camera
+    """A facade propagates a rejected promise instead of returning a default."""
 
     class Busy:
-        def take_photo(self, *, quality: float = 0.9, allow_editing: bool = False) -> str:
-            raise module_registry.NativeModuleError("Camera", "take_photo", "a picker is already open", code="busy")
+        def authenticate(self, reason: str = "Authenticate") -> bool:
+            raise module_registry.NativeModuleError("Biometrics", "authenticate", "a prompt is open", code="busy")
 
-    module_registry.register_python_module("Camera", Busy())
+    module_registry.register_python_module("Biometrics", Busy())
     try:
         with pytest.raises(module_registry.NativeModuleError) as info:
-            asyncio.run(Camera.take_photo())
+            asyncio.run(Biometrics.authenticate())
         assert info.value.code == "busy"
     finally:
-        module_registry.unregister_python_module("Camera")
-
-
-def test_camera_cancel_is_none_not_an_error() -> None:
-    from pythonnative import Camera
-
-    assert asyncio.run(Camera.take_photo()) is None
-    assert asyncio.run(Camera.pick_from_gallery()) is None
+        module_registry.unregister_python_module("Biometrics")
 
 
 # ======================================================================
@@ -423,8 +379,8 @@ def test_haptics_and_vibration_are_noops_fallback() -> None:
     Haptics.impact("light")
     Haptics.notification("success")
     Haptics.selection()
-    Vibration.vibrate(100)
-    Vibration.cancel()
+    Haptics.vibrate(100)
+    Haptics.cancel()
 
 
 # ======================================================================

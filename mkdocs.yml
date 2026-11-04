@@ -94,17 +94,34 @@ nav:
     - Native Modules: guides/native-modules.md
     - Generated Native Contracts: guides/native-contracts.md
     - PyPI Packages: guides/pypi-packages.md
+    - Native Plugins: guides/native-plugins.md
     - Custom Native Components: guides/custom-native-components.md
+    - Networking: guides/networking.md
     - Fast Refresh: guides/hot-reload.md
     - Error Boundaries: guides/error-boundaries.md
     - Testing: guides/testing.md
     - Linting: guides/linting.md
+  - Capabilities:
+    - Overview: guides/capabilities/index.md
+    - Audio: guides/capabilities/audio.md
+    - Background: guides/capabilities/background.md
+    - Biometrics: guides/capabilities/biometrics.md
+    - Camera: guides/capabilities/camera.md
+    - Location: guides/capabilities/location.md
+    - Maps: guides/capabilities/maps.md
+    - Notifications: guides/capabilities/notifications.md
+    - Pickers: guides/capabilities/pickers.md
+    - Purchases: guides/capabilities/purchases.md
+    - Push: guides/capabilities/push.md
+    - Sensors: guides/capabilities/sensors.md
+    - Video: guides/capabilities/video.md
   - Building:
     - Configuration: guides/configuration.md
     - Permissions: guides/permissions.md
     - Building for Release: guides/building-for-release.md
   - Examples:
     - Overview: examples.md
+    - Field Notes: examples/fieldnotes.md
     - Hello World: examples/hello-world.md
     - Counter: examples/counter.md
     - Forms: examples/forms.md
@@ -120,6 +137,18 @@ nav:
     - Animated: api/animated.md
     - Gestures: api/gestures.md
     - Alerts: api/alerts.md
+    - Audio: api/audio.md
+    - Background: api/background.md
+    - Biometrics: api/biometrics.md
+    - Camera: api/camera.md
+    - Location: api/location.md
+    - Maps: api/maps.md
+    - Notifications: api/notifications.md
+    - Pickers: api/pickers.md
+    - Purchases: api/purchases.md
+    - Push: api/push.md
+    - Sensors: api/sensors.md
+    - Video: api/video.md
     - Async runtime: api/runtime.md
     - Suspense: api/suspense.md
     - Appearance: api/appearance.md

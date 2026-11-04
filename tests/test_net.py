@@ -7,6 +7,7 @@ import json
 import socket
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from typing import Generator
 
 import pytest
@@ -232,3 +233,102 @@ def test_mapping_body_defaults_to_application_json() -> None:
     assert content_types == ["application/json"]
     assert isinstance(request.data, bytes)
     assert json.loads(request.data.decode("utf-8")) == {"name": "Ada"}
+
+
+# ======================================================================
+# Multipart uploads, progress, and streaming
+# ======================================================================
+
+
+class _EchoBodyHandler(BaseHTTPRequestHandler):
+    """Report what arrived, so tests can check the encoded request."""
+
+    def do_POST(self) -> None:
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        reply = json.dumps(
+            {
+                "content_type": self.headers.get("Content-Type"),
+                "length": length,
+                "chunked": self.headers.get("Transfer-Encoding"),
+                "body": body.decode("latin-1"),
+            }
+        ).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(reply)))
+        self.end_headers()
+        self.wfile.write(reply)
+
+    def do_GET(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Length", "200000")
+        self.end_headers()
+        self.wfile.write(b"z" * 200000)
+
+    def log_message(self, *args: object) -> None:
+        pass
+
+
+@pytest.fixture
+def upload_url() -> Generator[str, None, None]:
+    server = HTTPServer(("127.0.0.1", 0), _EchoBodyHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield f"http://127.0.0.1:{server.server_port}/"
+    server.shutdown()
+
+
+async def test_files_are_sent_as_multipart(upload_url: str, tmp_path: Path) -> None:
+    photo = tmp_path / "trail.png"
+    photo.write_bytes(b"\x89PNG")
+    response = await fetch(
+        upload_url,
+        method="POST",
+        body={"caption": "Trailhead"},
+        files={"photo": photo, "note": ("note.txt", b"hello", "text/plain"), "raw": b"\x00"},
+    )
+    reply = response.json()
+    assert reply["content_type"].startswith("multipart/form-data; boundary=")
+    body = reply["body"]
+    assert 'name="caption"\r\n\r\nTrailhead' in body
+    assert 'name="photo"; filename="trail.png"\r\nContent-Type: image/png\r\n\r\n\x89PNG' in body
+    assert 'name="note"; filename="note.txt"\r\nContent-Type: text/plain\r\n\r\nhello' in body
+    assert 'name="raw"; filename="raw"\r\nContent-Type: application/octet-stream' in body
+
+
+def test_files_refuse_a_non_mapping_body() -> None:
+    with pytest.raises(TypeError, match="form fields"):
+        _build_request(url="http://x", method="POST", headers=None, body="text", params=None, files={"a": b"1"})
+
+
+async def test_upload_progress_reports_on_the_loop_with_a_declared_length(upload_url: str) -> None:
+    seen: list[tuple[int, int]] = []
+    payload = b"a" * (200 * 1024)
+    response = await fetch(
+        upload_url, method="POST", body=payload, on_upload_progress=lambda sent, total: seen.append((sent, total))
+    )
+    await asyncio.sleep(0)
+    reply = response.json()
+    assert reply["length"] == len(payload) and reply["chunked"] is None
+    assert seen[-1] == (len(payload), len(payload))
+    assert [sent for sent, _ in seen] == sorted(sent for sent, _ in seen)
+    assert len(seen) >= 3
+
+
+async def test_streamed_responses_arrive_in_chunks(upload_url: str) -> None:
+    response = await fetch(upload_url, stream=True)
+    assert response.status == 200 and response.content == b""
+    chunks = [chunk async for chunk in response.chunks(50000)]
+    assert sum(len(chunk) for chunk in chunks) == 200000 and len(chunks) >= 4
+    with pytest.raises(RuntimeError, match="stream=True"):
+        async for _ in response.chunks():
+            pass
+
+
+async def test_streamed_read_and_close(upload_url: str) -> None:
+    response = await fetch(upload_url, stream=True)
+    assert len(await response.read()) == 200000
+    assert len(response.content) == 200000
+    abandoned = await fetch(upload_url, stream=True)
+    await abandoned.close()
+    await abandoned.close()

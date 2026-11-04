@@ -34,6 +34,7 @@ object PNBridge {
     }
     @Volatile private var host: PythonHost? = null
     private var activity: Activity? = null
+    private var applicationContext: Context? = null
     private val hostReadyListeners = ArrayList<Runnable>()
     private val modulePromises = java.util.concurrent.ConcurrentHashMap<Long, Promise>()
 
@@ -90,6 +91,7 @@ object PNBridge {
     @JvmStatic
     fun setContext(activity: Activity) {
         this.activity = activity
+        setApplicationContext(activity)
         PNRegistry.ensureBuiltins()
         PNCore.install(activity)
         Measurement.prepare(activity)
@@ -121,9 +123,14 @@ object PNBridge {
     /** The current activity, or `null` before [setContext]. */
     fun activity(): Activity? = activity
 
-    /** The context used to create views; throws before [setContext]. */
+    /** Record the application context, so plugins can run with no activity (a push or background job). */
+    fun setApplicationContext(context: Context) {
+        applicationContext = context.applicationContext
+    }
+
+    /** The activity when one is attached, or the application context; throws when neither is known. */
     fun context(): Context =
-        activity ?: throw IllegalStateException("PNBridge.setContext(activity) has not been called")
+        activity ?: applicationContext ?: throw IllegalStateException("PNBridge.setContext(activity) has not been called")
 
     /** Display density of the current context (1.0 when no context is attached). */
     fun density(): Float {

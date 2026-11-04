@@ -1,0 +1,11 @@
+        <!-- Camera.take_photo writes the full-resolution capture through this
+             provider, handing the system camera a URI as EXTRA_OUTPUT. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.pythonnative.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/pn_camera_file_paths" />
+        </provider>

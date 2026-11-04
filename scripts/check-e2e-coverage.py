@@ -53,33 +53,14 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "ViewProps",  # TypedDict of shared view keys; every demo container passes some of them
     "Section",  # typed section record exercised by the SectionList flow
     "ViewableItem",  # typed callback record exercised by the ListData flow
-    "UnsetType",  # sentinel type; UNSET is exercised by the custom_component flow
     "ImageLoadEvent",  # typed callback record; real Image flow exercises delivery
     "ImageSize",  # typed record returned by Images.get_size; asserted in the image_size demo
     "ImageSource",  # type alias (str | Asset) for Image sources
     "IconName",  # Literal of icon names; the Icon demo exercises the lookup
     "WebNavigationEvent",  # typed callback record; WebView flow exercises navigation
-    "UNSET",  # custom_component flow removes font_size from a live native Text
     "AccessibilityState",
-    "AlignContent",
-    "AlignItems",
-    "AlignSelf",
-    "AutoCapitalize",
     "Color",
-    "Dimension",
-    "Display",
     "EdgeInsets",
-    "FlexDirection",
-    "FlexWrap",
-    "FontWeight",
-    "JustifyContent",
-    "KeyboardType",
-    "LayoutDirection",
-    "Overflow",
-    "PointerEvents",
-    "Position",
-    "ReturnKeyType",
-    "ScaleType",
     "ScreenOptions",
     "Navigation",  # handle type returned by use_navigation; exercised by every screen
     "NavigationState",  # pure state value; unit-tested in tests/test_navigation.py
@@ -89,10 +70,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "ShadowOffset",
     "Style",
     "StyleProp",
-    "TextAlign",
-    "TextDecoration",
-    "TextTransform",
-    "TransformSpec",
     "AnimatedValue",  # observed via use_animated_value usage in animations
     "QueryResult",  # observed via use_query demo
     "MutationCall",  # observed via use_mutation demo
@@ -113,14 +90,12 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Screen",  # main.py wraps every demo in one; the navigation demos set per-screen options
     "Navigator",  # base type of the three navigator values; every navigation demo builds one
     "Group",  # layers options over screens; the stack_options demo groups two screens
-    "create_screen",  # platform bridge invoked by the native templates
     "use_navigation",  # used by every screen for go_back
     "use_is_focused",  # underlies use_focus_effect; covered by the focus_effect demo
     "use_subscription",  # underlies use_color_scheme / use_window_dimensions demos
     "use_animated_value",  # used in every animation demo
     "create_context",  # covered by use_context demo (Context.Provider)
     "style",  # the style helper itself is exercised by every styled demo
-    "resolve_style",  # internal helper exposed for SDK authors
     # --------------------------------------------------------------
     # Hooks whose values depend on physical device state that an
     # emulator/simulator can't reliably reproduce.
@@ -137,23 +112,22 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # tests/test_native_modules.py against their desktop fallbacks.
     # --------------------------------------------------------------
     "fetch",
+    "WebSocketClosed",  # raised by the WebSocket demo's client; asserted in tests/test_websocket.py
+    "WebSocketError",  # raised by a failed handshake; asserted in tests/test_websocket.py
+    "set_error_handler",  # no error reaches it in a healthy flow; covered by tests/test_failure_recovery.py
+    "set_error_fallback",  # release builds only; covered by tests/test_failure_recovery.py
     "HTTPError",
     "Response",
     "AppState",
     "Battery",
-    "Biometrics",
-    "Camera",
     "Clipboard",
     "FileSystem",
     "Haptics",
     "Linking",
-    "Location",
     "NetInfo",
-    "Notifications",
     "Permissions",
     "SecureStore",
     "Share",
-    "Vibration",
     # --------------------------------------------------------------
     # Theming data: app/app_theme.py derives the suite's themes from
     # the presets, main.py provides them, and the use_theme and
@@ -173,14 +147,12 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # --------------------------------------------------------------
     # SDK re-exports: module-level names mirroring submodule content.
     # --------------------------------------------------------------
-    "runtime",  # module re-export; run_async demo covers it
     "run_blocking",  # blocking script/test helper; can't run inside the app's live loop
     "start_resource",  # non-hook Resource constructor; driven by the lazy demo and unit tests
     "sdk",  # module re-export; custom_component demo covers it
     "icons",  # module re-export; the Icon demo drives icon_names / is_icon_name
     "svg",  # module re-export; the Svg demo drives svg.load and the shape classes
     "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
-    "element_factory",  # unit-tested; define_component returns one, so the define_component demo renders through it
     "Props",  # tested in custom_component demo and SDK unit tests
     # --------------------------------------------------------------
     # Dev-mode diagnostics: warnings, hook-order checks, and RedBox
@@ -188,13 +160,11 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # release-app UI to assert on. Covered by unit tests
     # (tests/test_core_semantics.py).
     # --------------------------------------------------------------
-    "diagnostics",
     "HookOrderError",
     # --------------------------------------------------------------
     # Thin functional aliases: one-line wrappers over a value that is
     # already covered elsewhere.
     # --------------------------------------------------------------
-    "get_platform",  # thin functional alias of Platform.OS
     # --------------------------------------------------------------
     # RFC 0002 type aliases and typed records. Each is a pure type
     # (Literal alias, TypedDict, frozen dataclass, or constant) with no
@@ -202,7 +172,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     # --------------------------------------------------------------
     "Deps",  # Sequence alias for use_effect deps; every use_effect demo passes one
     "ColorScheme",  # Literal alias returned by use_color_scheme; asserted in the use_color_scheme demo
-    "BorderStyle",  # Literal alias; the borders_shadows demo draws solid/dashed/dotted boxes
     "DynamicColor",  # TypedDict color pair; the dynamic_color demo paints from one and flips the scheme
     "EasingSpec",  # frozen descriptor built by Easing.*; the easing demo runs every curve
     "GestureSpec",  # wire dict alias produced by gesture descriptors; the gestures and pan_gesture demos
@@ -223,7 +192,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "WindowDimensions",  # NamedTuple from Dimensions.get / use_window_dimensions; both demos print it
     "DeviceInfo",  # frozen record from Device.info; every field printed by the device_info demo
     "Locale",  # frozen record from Localization.get_locales / use_locales; both demos print its fields
-    "ANIMATABLE_PROPS",  # frozenset constant; its size is printed by the easing demo
     "AnimationResult",  # frozen record returned by awaited animations; easing and decay demos read .finished
     "ViewHandle",  # base handle on ref.current for plain views; the on_layout demo reads .frame
 }
@@ -271,6 +239,9 @@ def _flow_files() -> Set[str]:
     """Return the set of demo ids that have a flow file."""
     ids: Set[str] = set()
     for path in FLOWS_DIR.rglob("*.yaml"):
+        # Field Notes has its own flows; it isn't a demo in the e2e app.
+        if path.parent.name == "fieldnotes":
+            continue
         # Flow filename is the demo id (e.g. ``use_state.yaml``).
         ids.add(path.stem)
     return ids

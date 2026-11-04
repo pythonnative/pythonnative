@@ -159,11 +159,10 @@ public enum PNSvgRenderer {
     /// The paint string behind a shape color: a plain string as written, a
     /// `{"light", "dark"}` dynamic color resolved for the current scheme,
     /// and `nil` for JSON `null` (inherit from the root paint).
-    public static func paintString(_ color: PNActivityIndicatorColor?) -> String? {
+    public static func paintString(_ color: PNViewBorderColor?) -> String? {
         switch color {
         case .option0(let text)?: return text
         case .option1(let dynamic)?: return PNColor.parse(PNValues.encode(dynamic)).map(PNColor.hexString)
-        case .option2(.string(let text))?: return text
         default: return nil
         }
     }

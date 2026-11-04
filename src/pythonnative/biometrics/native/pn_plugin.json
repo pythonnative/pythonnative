@@ -1,0 +1,10 @@
+{
+  "name": "biometrics",
+  "contracts": "schema.json",
+  "requires": {"permissions": ["face_id"]},
+  "ios": {"entry": "BiometricsPlugin"},
+  "android": {
+    "entry": "com.pythonnative.plugins.biometrics.BiometricsPlugin",
+    "dependencies": ["androidx.biometric:biometric:1.1.0"]
+  }
+}

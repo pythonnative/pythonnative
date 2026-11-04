@@ -18,6 +18,7 @@ python_version = "3.13"         # embedded CPython version (3.13 or 3.14)
 orientation = "portrait"        # portrait | landscape | all
 entry_point = "app/main.py"     # module whose `App` is mounted
 url_schemes = ["myapp"]         # deep-link schemes the app handles
+associated_domains = ["example.com"]  # https links that open the app
 
 [permissions]
 camera = "Scan receipts with your camera."
@@ -33,6 +34,7 @@ packages = ["humanize", "httpx", "numpy"]
 # extra_index_urls = ["https://wheels.example.com/simple"]
 
 [plugins]
+# use = ["camera", "notifications"]  # first-party capabilities to compile in
 # paths = ["native/my_plugin"]  # project-local Swift/Kotlin plugins
 
 [ios]
@@ -75,6 +77,7 @@ Core identity, shared by both platforms.
 | `python_version` | string | `"3.13"` | Embedded CPython version. One of `3.13`, `3.14`; every listed version has a pinned, checksum-verified iOS runtime and a matching Chaquopy build. Packages are resolved for this version, not your host's (see [PyPI packages](pypi-packages.md)). |
 | `orientation` | string | `"portrait"` | `portrait`, `landscape`, or `all`. |
 | `url_schemes` | list of strings | `[]` | Custom deep-link URL schemes (e.g. `["myapp"]` handles `myapp://…`). Wired into `CFBundleURLTypes` on iOS and a `VIEW` intent filter on Android; inbound URLs reach `pn.Linking`. |
+| `associated_domains` | list of strings | `[]` | Domains whose `https` links open the app. Wired into the `applinks` entitlement on iOS and a verified intent filter on Android. `pn links` prints the files the site hosts. See [Navigation](navigation.md). |
 | `entry_point` | string | `"app/main.py"` | The module whose top-level `App` component is mounted. `app/main.py` → imported as `app.main`. |
 
 !!! tip "Per-platform id overrides"
@@ -117,9 +120,10 @@ catalog and how each capability maps to native artifacts.
 
 Asset generation requires [Pillow](https://python-pillow.org/), the
 `pythonnative[build]` optional dependency (`pip install
-'pythonnative[build]'`). If Pillow isn't installed, the template's
-default assets are kept and the build still succeeds; `pn doctor`
-reports whether Pillow is available. See
+'pythonnative[build]'`). If Pillow isn't installed, a debug build keeps
+the template's default assets, and a release build that names an icon
+fails unless you pass `--allow-unsigned`. `pn doctor` reports whether
+Pillow is available. See
 [Building for release](building-for-release.md#app-icon-and-splash).
 
 ---
@@ -161,25 +165,26 @@ Simulator). Many popular extensions have no upstream mobile wheels yet.
 
 ## `[plugins]`
 
-| Key | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `paths` | list of strings | `[]` | Project-relative directories containing a native plugin (`pn_plugin.json` plus `ios/` and `android/` sources). |
-
 ```toml
 [plugins]
-paths = ["native/badge"]
+use = ["camera", "maps"]
+paths = ["native/my_plugin"]
+
+[plugins.maps]
+android_api_key = "..."
 ```
 
-Native plugins add Swift and Kotlin component managers and native
-modules to the app. Installed packages contribute theirs through the
-`pythonnative.plugins` entry point group automatically; `paths` is for
-native code that lives in the app repository itself. At build time each
-plugin's `ios/*.swift` is copied into `PythonNativeKit` and its
-`android/**/*.kt` into the `pythonnative` Gradle module, and the
-generated registration file calls every plugin's `register`. See
-[Custom native components](custom-native-components.md).
+`use` lists the [first-party capabilities](capabilities/index.md) to compile into this
+app. An app links only what it lists, so it never references a privacy-sensitive API it
+doesn't call. Each capability's guide says what `[permissions]` entry it needs; a missing
+one fails the build.
 
----
+`paths` lists project-local plugin directories. Packages listed in `[requirements]` that
+ship a plugin are found automatically. See [Native plugins](native-plugins.md).
+
+A `[plugins.<name>]` table sets options that plugin declares. An unknown option, or a table
+for a plugin that isn't in the build, is a build error. An option can also name an
+environment variable to read, which is the place for secrets.
 
 ## `[ios]`
 

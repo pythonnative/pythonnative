@@ -237,6 +237,13 @@ class AssetsAndSvgTest {
         assertNull(TabBarManager.icon(activity, JSONObject().put("uri", "asset://missing.png")))
     }
 
+    @Test fun unsetShapePaintInheritsFromTheRoot() {
+        // An unset paint must decode to null, or `shape.fill ?: root.fill` never inherits.
+        assertNull(shape("""{"kind":"path","d":"M0 0h24v24H0z"}""").fill)
+        assertNull(shape("""{"kind":"path","d":"M0 0h24v24H0z","stroke":null}""").stroke)
+        assertEquals(Color.RED, SvgRenderer.resolve(shape("""{"kind":"path","fill":"#FF0000"}""").fill, Color.BLUE))
+    }
+
     @Test fun boxBlurAveragesNeighborsAndReportsChanges() {
         val bitmap = Bitmap.createBitmap(4, 1, Bitmap.Config.ARGB_8888)
         bitmap.setPixel(0, 0, Color.WHITE)

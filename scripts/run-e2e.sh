@@ -15,7 +15,7 @@
 #     ./scripts/run-e2e.sh android hooks navigation    # two categories, one session
 #
 # Available suites: inbox, full, components, hooks, navigation, layout, styling,
-# animations, gestures, assets, misc. The components and hooks categories also
+# animations, gestures, assets, misc, capabilities. The components and hooks categories also
 # have lettered parts (components-a/b/c, hooks-a/b) that CI's Android shards
 # run separately.
 #
@@ -102,12 +102,12 @@ for suite in "${SUITES[@]}"; do
         MAESTRO_TARGETS+=("tests/e2e/ios.yaml")
       fi
       ;;
-    components|components-a|components-b|components-c|hooks|hooks-a|hooks-b|navigation|layout|styling|animations|gestures|assets|misc)
+    components|components-a|components-b|components-c|hooks|hooks-a|hooks-b|navigation|layout|styling|animations|gestures|assets|misc|capabilities)
       MAESTRO_TARGETS+=("tests/e2e/suites/${suite}.yaml")
       ;;
     *)
       echo "Error: unknown suite '$suite'" >&2
-      echo "Available suites: full, components, components-a, components-b, components-c, hooks, hooks-a, hooks-b, navigation, layout, styling, animations, gestures, assets, misc" >&2
+      echo "Available suites: full, components, components-a, components-b, components-c, hooks, hooks-a, hooks-b, navigation, layout, styling, animations, gestures, assets, misc, capabilities" >&2
       exit 2
       ;;
   esac
@@ -117,6 +117,14 @@ printf "\n==> Building e2e-suite app for %s\n" "$PLATFORM"
 pushd examples/e2e-suite > /dev/null
 pn run "$PLATFORM" --no-logs
 popd > /dev/null
+
+# CameraView asks for the camera when it mounts, and Android's prompt then
+# covers the demo before open_demo can see its title. A retry relaunches
+# through Maestro's launchApp, which grants permissions, so grant the camera
+# up front to make the first attempt start from the same state.
+if [[ "$PLATFORM" == "android" ]]; then
+  adb shell pm grant "$APP_ID" android.permission.CAMERA
+fi
 
 run_maestro() {
   if [[ "$PLATFORM" == "ios" ]]; then

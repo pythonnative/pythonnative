@@ -18,10 +18,18 @@ camera = "Demo: capture a photo."
 microphone = "Demo: record audio."
 photo_library = "Demo: pick an image."
 location_when_in_use = "Demo: show your location."
-contacts = "Demo: read a contact."
 face_id = "Demo: authenticate with biometrics."
+motion = "Demo: read the barometer."
 notifications = true
+remote_notifications = true
 vibration = true
+
+[plugins]
+use = ["audio", "background", "biometrics", "camera", "location", "maps", "notifications", "pickers", "purchases", "push", "sensors", "video"]
+paths = ["native/checksum"]
+
+[plugins.background]
+tasks = ["e2e_sync"]
 
 [requirements]
 packages = ["httpx", "numpy"]

@@ -38,7 +38,11 @@ packages = ["humanize", "httpx"]
 extra_index_urls = ["https://wheels.example.com/simple"]
 
 [plugins]
+use = ["camera", "maps"]      # first-party capabilities to compile into this app
 paths = ["native/my_plugin"]  # local native plugins (pn_plugin.json + ios/ + android/)
+
+[plugins.maps]                # options for one plugin, declared in its pn_plugin.json
+android_api_key = "..."
 
 [ios]
 deployment_target = "13.0"
@@ -133,6 +137,7 @@ _JAVA_KEYWORDS = frozenset("""
 _APP_ID_SEGMENT = re.compile(r"^[a-z][a-z0-9_]*$")
 _VERSION_RE = re.compile(r"^\d+(\.\d+){0,3}$")
 _URL_SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*$")
+_DOMAIN_RE = re.compile(r"(?:\*\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+")
 
 
 class ConfigError(Exception):
@@ -276,9 +281,16 @@ class AppConfig:
         extra_index_urls: Additional package indexes
             (``[requirements].extra_index_urls``) searched after PyPI and
             the platform wheel repositories.
+        plugin_use: First-party capabilities compiled into this app
+            (``[plugins].use``).
         plugin_paths: Project-local native plugin directories
-            (``[plugins].paths``); installed packages contribute plugins
-            through the ``pythonnative.plugins`` entry point group instead.
+            (``[plugins].paths``); packages in ``[requirements]`` that ship a
+            ``pn_plugin.json`` contribute plugins automatically.
+        plugin_options: Options per plugin, by plugin name
+            (``[plugins.<name>]`` tables).
+        associated_domains: Domains whose ``https`` links open this app
+            (``app.associated_domains``); wired into the ``applinks``
+            entitlement on iOS and a verified intent filter on Android.
         ios: Nested [`IOSConfig`][pythonnative.project.config.IOSConfig].
         android: Nested
             [`AndroidConfig`][pythonnative.project.config.AndroidConfig].
@@ -303,7 +315,10 @@ class AppConfig:
     splash: Optional[str] = None
     requirements: List[str] = field(default_factory=list)
     extra_index_urls: List[str] = field(default_factory=list)
+    plugin_use: List[str] = field(default_factory=list)
     plugin_paths: List[str] = field(default_factory=list)
+    plugin_options: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    associated_domains: List[str] = field(default_factory=list)
     ios: IOSConfig = field(default_factory=IOSConfig)
     android: AndroidConfig = field(default_factory=AndroidConfig)
     project_root: Path = field(default_factory=Path.cwd)
@@ -420,6 +435,7 @@ class AppConfig:
             orientation=(_opt_str(app, "orientation") or "portrait").lower(),
             entry_point=_opt_str(app, "entry_point") or "app/main.py",
             url_schemes=_opt_str_list(app, "url_schemes"),
+            associated_domains=_opt_str_list(app, "associated_domains"),
             permissions=dict(_expect_table(data, "permissions", optional=True)),
             ios=_parse_ios(_expect_table(data, "ios", optional=True)),
             android=_parse_android(_expect_table(data, "android", optional=True)),
@@ -435,7 +451,14 @@ class AppConfig:
         config.extra_index_urls = _opt_str_list(requirements, "extra_index_urls")
 
         plugins = _expect_table(data, "plugins", optional=True)
+        config.plugin_use = _opt_str_list(plugins, "use")
         config.plugin_paths = _opt_str_list(plugins, "paths")
+        for name, table in plugins.items():
+            if name in ("use", "paths"):
+                continue
+            if not isinstance(table, dict):
+                raise ConfigError(f"[plugins].{name} must be a table of options for plugin {name!r}.")
+            config.plugin_options[name] = dict(table)
 
         config.validate()
         return config
@@ -472,6 +495,18 @@ class AppConfig:
         if not self.entry_point.strip():
             raise ConfigError("app.entry_point must not be empty.")
 
+        for domain in self.associated_domains:
+            if not _DOMAIN_RE.fullmatch(domain):
+                raise ConfigError(
+                    f"app.associated_domains entry {domain!r} is invalid; use a bare host such as 'example.com'."
+                )
+        from .plugins import FIRST_PARTY_PLUGINS
+
+        for name in self.plugin_use:
+            if name not in FIRST_PARTY_PLUGINS:
+                raise ConfigError(
+                    f"[plugins].use entry {name!r} is unknown. Available: {', '.join(FIRST_PARTY_PLUGINS)}."
+                )
         for scheme in self.url_schemes:
             if not _URL_SCHEME_RE.match(scheme):
                 raise ConfigError(
@@ -737,6 +772,8 @@ orientation = "portrait"        # portrait | landscape | all
 entry_point = "app/main.py"
 # Custom URL schemes for deep links (e.g. "{name}" opens {name}://...).
 # url_schemes = ["{name}"]
+# Domains whose https links open this app. `pn links` prints the files they host.
+# associated_domains = ["example.com"]
 
 # Declare the device capabilities your app needs. A string becomes the
 # iOS permission prompt text; `true` uses a sensible default.
@@ -752,6 +789,12 @@ entry_point = "app/main.py"
 [assets]
 # icon = "assets/icon.png"
 # splash = "assets/splash.png"
+
+# First-party capabilities to compile into this app, for example
+# use = ["camera", "location", "notifications"]. An app only links what it lists.
+# Docs: https://pythonnative.com/guides/capabilities/
+[plugins]
+# use = []
 
 # Third-party pip packages bundled into the app. Pure-Python packages
 # always work; packages with C extensions need a wheel for each device

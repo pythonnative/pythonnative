@@ -71,11 +71,12 @@ from .lists import (  # noqa: F401
 )
 from .media import Image, ImageBackground, ImageSource, WebView
 from .overlays import Modal, Portal
-from .pressable import Pressable, PressState, Ripple, TouchableOpacity, _StatefulPressable  # noqa: F401
-from .structural import ErrorBoundary, Fragment, Suspense
+from .pressable import Pressable, PressState, Ripple, _StatefulPressable  # noqa: F401
+from .structural import ErrorBoundary, Fragment, Suspense, set_error_fallback
 from .text import Button, EllipsizeMode, KeyboardAppearance, Text, TextInput
 
 __all__ = [
+    "set_error_fallback",
     "ActivityIndicator",
     "BlurType",
     "BlurView",
@@ -122,7 +123,6 @@ __all__ = [
     "Switch",
     "Text",
     "TextInput",
-    "TouchableOpacity",
     "View",
     "WebNavigationEvent",
     "WebView",

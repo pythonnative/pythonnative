@@ -27,34 +27,10 @@ from pythonnative.components import (
     StatusBar,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
     WebView,
 )
 from pythonnative.components._base import _SpanPressDispatcher
-
-# ======================================================================
-# TouchableOpacity
-# ======================================================================
-
-
-def test_touchable_opacity_is_pressable_with_active_opacity() -> None:
-    cb = lambda: None  # noqa: E731
-    el = TouchableOpacity(Text("Tap"), on_press=cb, active_opacity=0.3)
-    assert el.type == "Pressable"
-    assert el.props["pressed_opacity"] == 0.3
-    assert el.props["on_press"] is cb
-    assert el.props["accessibility_role"] == "button"
-    assert len(el.children) == 1
-
-
-def test_touchable_opacity_disabled_forwards_disabled_and_dims() -> None:
-    cb = lambda: None  # noqa: E731
-    el = TouchableOpacity(Text("Tap"), on_press=cb, disabled=True)
-    assert el.props["disabled"] is True
-    assert el.props["accessibility_state"] == {"disabled": True}
-    assert el.props["opacity"] == 0.4
-
 
 # ======================================================================
 # Pressable: disabled, delay, ripple, callable child

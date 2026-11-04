@@ -1,10 +1,10 @@
 # Native modules
 
 Native modules are PythonNative's wrappers around device APIs that
-aren't part of the view tree: the camera, GPS, file I/O, clipboard,
-share sheet, deep links, permissions, connectivity, secure storage,
-battery, haptics, biometrics, and the device-environment set React
-Native core ships (`Keyboard`, `Dimensions`, `PixelRatio`, `Device`,
+aren't part of the view tree. Every app gets the core set: file I/O,
+clipboard, share sheet, deep links, permissions, connectivity, secure
+storage, battery, haptics, and the device-environment set React Native
+core ships (`Keyboard`, `Dimensions`, `PixelRatio`, `Device`,
 `Localization`, `AccessibilityInfo`). Each module is a Swift class in
 `PythonNativeKit` and a Kotlin class in the `pythonnative` Gradle
 module, registered by name; the Python class you call is a thin facade
@@ -13,27 +13,32 @@ device (`pn preview`, `pytest`), the same facade resolves to a Python
 implementation with safe defaults (in-memory buffers, `"unknown"`
 states, no-op feedback), so app code stays single-source.
 
+!!! note "Device features are capabilities"
+    The camera, location, notifications, biometrics, video, audio, maps,
+    push, sensors, background work, and in-app purchases aren't built in.
+    They're opt-in [capabilities](capabilities/index.md): you list one in
+    `[plugins].use`, import it from its own package (such as
+    `pythonnative.camera`), and only then does it compile into your app.
+    See [Device features](#device-features).
+
 Every facade follows the same two rules, so you never need to look
 one up:
 
 1. **Sync or async is decided by what the OS has to do.** A method is a
    plain function when the answer is already on the device and returns
-   on the calling thread: `Clipboard`, `Linking`, `Haptics` /
-   `Vibration`, `Battery`, `NetInfo.fetch`, `SecureStore`, `AppState`,
-   `FileSystem`, `Biometrics.is_available`, `Keyboard`, `Dimensions`,
-   `PixelRatio`, `Device.info`, `Localization`, and
+   on the calling thread: `Clipboard`, `Linking`, `Haptics`, `Battery`,
+   `NetInfo.fetch`, `SecureStore`, `AppState`, `FileSystem`, `Keyboard`,
+   `Dimensions`, `PixelRatio`, `Device.info`, `Localization`, and
    `AccessibilityInfo`. It is a coroutine when the OS has to prompt
    the user, drive hardware, or hand off to another process:
-   `Camera.take_photo` / `pick_from_gallery`, `Location.get_current`,
    `Share.share`, `Permissions.check` / `request`,
-   `Biometrics.authenticate`, `Notifications.*`,
    `Alert.confirm` / `choose`, and all of `AsyncStorage`. Inside a
    component, drive coroutines with an `async def`
    [`use_effect`][pythonnative.use_effect] callback,
    [`use_resource`][pythonnative.use_resource],
    [`use_query`][pythonnative.hooks.use_query], or
    [`pn.run_async(coro)`][pythonnative.runtime.run_async] from a sync
-   handler.
+   handler. Capabilities follow the same rule.
 2. **Failures raise; "nothing happened" returns a value.** A native
    error (a rejected call, a missing module, a bad argument) is a
    [`NativeModuleError`][pythonnative.native_modules.NativeModuleError]
@@ -56,13 +61,16 @@ values are frozen dataclasses (`DeviceInfo`, `Locale`, `KeyboardEvent`,
 
 ## Permissions: declare them once, request at runtime
 
-Declare the capabilities your app uses in the `[permissions]` table of
+Declare the permissions your app uses in the `[permissions]` table of
 `pythonnative.toml`. `pn` writes the matching `Info.plist` usage
 strings, `AndroidManifest.xml` `<uses-permission>` entries, background
 modes, and entitlements into the native projects for you (the full
-catalog is in the [configuration reference](configuration.md#permissions)):
+catalog is in the [Permissions guide](permissions.md#permission-catalog)):
 
 ```toml
+[plugins]
+use = ["camera", "location", "pickers", "notifications"]
+
 [permissions]
 camera = "So you can take photos in MyApp."
 location_when_in_use = "So MyApp can show nearby content."
@@ -75,71 +83,22 @@ them as you would want a user to read them. The same keys are the
 names you pass to [`Permissions`](#permissions-runtime) at runtime, so
 there is one vocabulary to learn.
 
-## Camera
+## Device features
 
-[`Camera`][pythonnative.native_modules.camera.Camera] wraps photo
-capture and gallery picking. Both coroutines resolve to a path to the
-saved file (or `None` if the user cancelled).
+These moved out of the core and into [capabilities](capabilities/index.md).
+Enable one in `[plugins].use`, then import it from its package. Calling
+one that isn't in the build raises
+[`NativeModuleError`][pythonnative.native_modules.NativeModuleError] with
+the code `plugin_not_enabled`.
 
-```python
-import pythonnative as pn
-
-
-@pn.component
-def CameraScreen() -> pn.Node:
-    photo, set_photo = pn.use_state("")
-
-    async def take():
-        path = await pn.Camera.take_photo()
-        if path:
-            set_photo(path)
-
-    return pn.Column(
-        pn.Button("Take photo", on_press=lambda: pn.run_async(take())),
-        pn.Image(source=photo) if photo else pn.Spacer(),
-    )
-```
-
-!!! note "Cold-start permissions"
-    The first call shows the system permission prompt. If the user
-    denies it, subsequent calls resolve to `None` immediately; surface
-    a helpful message in your UI rather than calling in a loop.
-
-On Android, `take_photo` writes the full-resolution capture to a
-`FileProvider` URI handed to the camera app as `EXTRA_OUTPUT`, so the
-returned path is the real photo, not the intent's thumbnail. The
-library manifest declares the provider; `allow_editing=True` raises
-`NativeModuleError("unsupported")` on Android.
-
-## Location
-
-[`Location.get_current`][pythonnative.native_modules.location.Location.get_current]
-reads a single GPS fix.
-
-```python
-import pythonnative as pn
-
-
-@pn.component
-def WhereAmI() -> pn.Node:
-    q = pn.use_query(pn.Location.get_current, [])
-    if q.loading:
-        return pn.Text("Acquiring location...")
-    if q.data is None:
-        return pn.Text("Location unavailable")
-    lat, lon = q.data
-    return pn.Text(f"{lat:.4f}, {lon:.4f}")
-```
-
-[`use_query`][pythonnative.hooks.use_query] manages the
-loading/data/error state for you and exposes a `refetch()` callable.
-`get_current` requests when-in-use permission inline on both platforms
-the first time it runs; a denial comes back as `None`.
-
-For continuous updates, write a small native module that subscribes
-to `CLLocationManagerDelegate` (iOS) or `LocationManager.requestUpdates`
-(Android). Send updates through the module event channel; the Python callback
-can call `set_state` on the application thread.
+| You want | Import | Guide |
+| --- | --- | --- |
+| Photos, video, and a live camera preview | `from pythonnative.camera import Camera, CameraView` | [Camera](capabilities/camera.md) |
+| Picking from the gallery or files | `from pythonnative.pickers import pick_images, pick_videos, pick_documents` | [Pickers](capabilities/pickers.md) |
+| A GPS fix, or a stream of them | `from pythonnative.location import Location` | [Location](capabilities/location.md) |
+| Local notifications | `from pythonnative.notifications import Notifications` | [Notifications](capabilities/notifications.md) |
+| Remote push | `from pythonnative.push import Push` | [Push](capabilities/push.md) |
+| Face ID, Touch ID, and fingerprint | `from pythonnative.biometrics import Biometrics` | [Biometrics](capabilities/biometrics.md) |
 
 ## File system
 
@@ -173,44 +132,6 @@ text = await asyncio.to_thread(pn.FileSystem.read_text, "big.txt")
     Prefer [`AsyncStorage`][pythonnative.storage.AsyncStorage] over
     serialising JSON into a file by hand; it's the native
     `NSUserDefaults` / `SharedPreferences` API and is async-first.
-
-## Notifications
-
-[`Notifications`][pythonnative.native_modules.notifications.Notifications]
-schedules local notifications and cancels previously scheduled ones.
-
-```python
-import pythonnative as pn
-
-
-async def setup_reminder():
-    granted = await pn.Notifications.request_permission()
-    if not granted:
-        return
-    await pn.Notifications.schedule(
-        title="Stretch break",
-        body="Stand up!",
-        delay_seconds=1800,
-        identifier="reminder",
-    )
-```
-
-`request_permission()` is required on iOS and on Android 13+. On
-older Android the call returns `True` without prompting.
-
-For server-sent (remote) pushes, declare the `remote_notifications`
-capability in `pythonnative.toml`, then register with APNs:
-
-```python
-token = await pn.Notifications.get_device_token()  # APNs hex token
-```
-
-Your server passes the token to APNs to address this install. The
-simulator has no APNs connection, so test on a real device. Android
-remote push requires a provider extension (Firebase Cloud Messaging),
-which the built-in module doesn't wire up; `get_device_token()` raises
-`NativeModuleError("unsupported")` there, and
-`Platform.supports("Notifications", "get_device_token")` reports it.
 
 ## Clipboard
 
@@ -270,11 +191,12 @@ unsubscribe = pn.Linking.add_listener(lambda url: navigate_to(url))
 [`Permissions`][pythonnative.Permissions] normalizes the iOS/Android
 permission models. Both `check` and `request` are coroutines (`check`
 reads asynchronous platform settings APIs; `request` prompts). Names
-are the `[permissions]` keys from `pythonnative.toml`
-that have a runtime prompt: `"camera"`, `"microphone"`,
-`"photo_library"`, `"location_when_in_use"`, `"contacts"`,
-`"notifications"` (any other name raises `ValueError`). Statuses:
-`"granted"`, `"denied"`, `"blocked"`, `"undetermined"`.
+are the `[permissions]` keys from `pythonnative.toml`. A name works only
+when a plugin in the build provides it, and otherwise the call raises
+`NativeModuleError` with the code `plugin_not_enabled`. See
+[Permission providers](permissions.md#permission-providers) for which
+capability provides which name. Statuses: `"granted"`, `"denied"`,
+`"blocked"`, `"undetermined"`.
 
 ```python
 if await pn.Permissions.check("camera") != "granted":
@@ -283,7 +205,7 @@ if await pn.Permissions.check("camera") != "granted":
         pn.Linking.open_settings()  # user must enable it in Settings
 ```
 
-Declaring the capability in `[permissions]` is what puts the usage
+Declaring the permission in `[permissions]` is what puts the usage
 string in the manifest; `request` is what shows the prompt.
 
 ## App state
@@ -349,25 +271,14 @@ state = pn.Battery.get_state()   # "charging" | "full" | "unplugged" | "unknown"
 
 ## Haptics & vibration
 
-[`Haptics`][pythonnative.Haptics] plays semantic feedback;
-[`Vibration`][pythonnative.Vibration] is a blunt duration-based buzz.
+[`Haptics`][pythonnative.Haptics] plays semantic feedback and, with
+`vibrate`, a blunt duration-based buzz.
 
 ```python
 pn.Haptics.impact("medium")          # light | medium | heavy | soft | rigid
 pn.Haptics.notification("success")   # success | warning | error
 pn.Haptics.selection()
-pn.Vibration.vibrate(400)            # milliseconds
-```
-
-## Biometrics
-
-[`Biometrics`][pythonnative.Biometrics] gates an action behind Face ID /
-Touch ID / fingerprint.
-
-```python
-async def unlock():
-    if pn.Biometrics.is_available() and await pn.Biometrics.authenticate("Unlock"):
-        show_secrets()
+pn.Haptics.vibrate(400)              # milliseconds
 ```
 
 ## Keyboard, dimensions, and pixel ratio
@@ -463,18 +374,20 @@ reactive form. See
 
 A native module has three parts: a Swift class, a Kotlin class, and a
 Python facade. The two native classes are registered under one name by
-a plugin entry (the same `pn_plugin.json` layout used for
-[custom components](custom-native-components.md)); the facade calls
-them by that name and never imports platform code.
+a plugin entry (the `pn_plugin.json` layout described in
+[Native plugins](native-plugins.md)); the facade calls them by that name
+and never imports platform code. Every first-party capability is built
+this way, so `src/pythonnative/location/` is a good example to read.
 
 ### Native side
 
-Each platform's base type is one method that settles a promise:
+Each platform's base type is one method that settles a promise. Your
+Swift sources compile inside `PythonNativeKit` itself, so they don't
+import it:
 
 ```swift
 // native/ios/CompassModule.swift
 import CoreLocation
-import PythonNativeKit
 
 public final class CompassModule: NSObject, PNNativeModule, CLLocationManagerDelegate {
     public static let name = "Compass"
@@ -623,6 +536,8 @@ listeners without a device.
 - Reference: [Native modules API](../api/native_modules.md).
 - Async hooks and data fetching: [Async + data](async.md).
 - See how device APIs interact with focus: [Lifecycle](../concepts/lifecycle.md).
+- Enable a device feature: [Capabilities](capabilities/index.md).
+- Package your own module: [Native plugins](native-plugins.md).
 - Wrap a custom widget instead of an API: [Custom native components](custom-native-components.md).
 - Wire protocol and plugin layout: [The native bridge](../concepts/bridge.md).
 

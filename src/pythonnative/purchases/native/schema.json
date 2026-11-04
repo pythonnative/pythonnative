@@ -1,0 +1,119 @@
+{
+  "components": {},
+  "modules": {
+    "Purchases": {
+      "events": {
+        "update": {
+          "additionalProperties": {
+            "type": "json"
+          },
+          "type": "object"
+        }
+      },
+      "methods": {
+        "finish": {
+          "arguments": {
+            "consume": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "string"
+            },
+            "token": {
+              "type": "string"
+            }
+          },
+          "async": true,
+          "defaults": {
+            "consume": false
+          },
+          "required": [
+            "id",
+            "token"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "is_available": {
+          "arguments": {},
+          "async": true,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "type": "boolean"
+          }
+        },
+        "listen": {
+          "arguments": {},
+          "async": false,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "type": "null"
+          }
+        },
+        "products": {
+          "arguments": {
+            "ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "async": true,
+          "defaults": {},
+          "required": [
+            "ids"
+          ],
+          "result": {
+            "items": {
+              "additionalProperties": {
+                "type": "json"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "purchase": {
+          "arguments": {
+            "product_id": {
+              "type": "string"
+            }
+          },
+          "async": true,
+          "defaults": {},
+          "required": [
+            "product_id"
+          ],
+          "result": {
+            "additionalProperties": {
+              "type": "json"
+            },
+            "type": "object"
+          }
+        },
+        "restore": {
+          "arguments": {},
+          "async": true,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "items": {
+              "additionalProperties": {
+                "type": "json"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      },
+      "name": "Purchases"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

@@ -1,11 +1,33 @@
 import XCTest
 @testable import PythonNativeKit
 
-private final class PNInvalidLocation: LocationImplementation {
-    var complete: ((Result<[String: Double]?, Error>) -> Void)?
+private final class PNInvalidImages: ImagesImplementation {
+    var complete: ((Result<PNImageSize, Error>) -> Void)?
     init() {}
-    func get_current(accuracy: PNLocationGetCurrentAccuracy, timeout: Double, completion: @escaping (Result<[String: Double]?, Error>) -> Void) -> (() -> Void)? {
+    func clear_cache() throws {}
+    func prefetch(uri: String, completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)? { nil }
+    func get_size(uri: String, completion: @escaping (Result<PNImageSize, Error>) -> Void) -> (() -> Void)? {
         complete = completion
+        return nil
+    }
+}
+
+private final class PNRecordingHook: PNAppLifecycleHook {
+    var urls: [URL] = []
+    func openURL(_ url: URL) -> Bool {
+        urls.append(url)
+        return url.scheme == "hook"
+    }
+    func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any], completion: @escaping (UIBackgroundFetchResult) -> Void) -> Bool {
+        completion(.newData)
+        return true
+    }
+}
+
+private final class PNFixedPermission: PNPermissionProvider {
+    func check(_ done: @escaping (String) -> Void) { done("granted") }
+    func request(_ done: @escaping (String) -> Void) -> (() -> Void)? {
+        done("blocked")
         return nil
     }
 }
@@ -29,14 +51,46 @@ final class PNTestEchoModule: PNNativeModule {
 
 final class PNModuleTests: XCTestCase {
     func testGeneratedAdapterRejectsInvalidLateNativeResult() {
-        let implementation = PNInvalidLocation()
-        let adapter = LocationModuleAdapter(implementation: implementation)
-        let promise = PNPromise(callId: 200, module: "Location", method: "get_current")
-        adapter.call("get_current", args: [:], promise: promise)
+        let implementation = PNInvalidImages()
+        let adapter = ImagesModuleAdapter(implementation: implementation)
+        let promise = PNPromise(callId: 200, module: "Images", method: "get_size")
+        adapter.call("get_size", args: ["uri": "x"], promise: promise)
         XCTAssertEqual(promise.takeInlineResult()["pending"] as? Bool, true)
-        implementation.complete?(.success(["latitude": .nan]))
+        implementation.complete?(.success(PNImageSize(width: .nan, height: 1)))
         XCTAssertEqual(promise.result?["ok"] as? Bool, false)
         XCTAssertNotNil(promise.result?["error"])
+    }
+
+    func testLifecycleHooksSeeEventsAndReportWhetherTheyConsumedThem() {
+        let hook = PNRecordingHook()
+        PNRegistry.shared.registerLifecycleHook(hook)
+        XCTAssertTrue(PNAppLifecycle.shared.openURL(URL(string: "hook://a")!))
+        XCTAssertFalse(PNAppLifecycle.shared.openURL(URL(string: "other://b")!))
+        XCTAssertEqual(hook.urls.count, 2)
+    }
+
+    func testARemoteNotificationCompletesOnceHoweverManyHooksHandleIt() {
+        let first = PNRecordingHook(), second = PNRecordingHook()
+        PNRegistry.shared.registerLifecycleHook(first)
+        PNRegistry.shared.registerLifecycleHook(second)
+        var completions = 0
+        PNAppLifecycle.shared.didReceiveRemoteNotification([:]) { _ in completions += 1 }
+        XCTAssertEqual(completions, 1)
+    }
+
+    func testPermissionsAskTheProviderAndRejectAnUnprovidedName() {
+        PNPermissions.register("pn_test_permission", PNFixedPermission())
+        let module = PermissionsModule()
+        var status: String?
+        _ = module.check(permission: "pn_test_permission") { status = try? $0.get() }
+        XCTAssertEqual(status, "granted")
+        _ = module.request(permission: "pn_test_permission") { status = try? $0.get() }
+        XCTAssertEqual(status, "blocked")
+        var failure: NSError?
+        _ = module.check(permission: "pn_no_such_permission") {
+            if case .failure(let error) = $0 { failure = error as NSError }
+        }
+        XCTAssertEqual(failure?.domain, "plugin_not_enabled")
     }
 
     private let dispatcher = PNModuleDispatcher { module, method, args in

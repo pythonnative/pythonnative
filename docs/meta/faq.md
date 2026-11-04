@@ -44,7 +44,8 @@ Yes. Two patterns:
 
 - **Per-platform native modules** for larger pieces (a custom widget,
   a device API). Implement once per platform behind a single Python
-  facade. See [Native modules guide](../guides/native-modules.md).
+  facade. See [Native modules guide](../guides/native-modules.md) and
+  [Native plugins](../guides/native-plugins.md).
 
 ## How do I add a new widget?
 
@@ -55,6 +56,16 @@ implement a Swift `PNComponentManager` and a Kotlin `ComponentManager`
 under the same name. Headless tests and the browser preview need no
 extra Python code. Step-by-step instructions live in
 [Custom native components](../guides/custom-native-components.md).
+
+## How do I use the camera, maps, push, and other device features?
+
+They're [capabilities](../guides/capabilities/index.md): opt-in packages
+that ship inside `pythonnative`. List one in `[plugins].use` in
+`pythonnative.toml`, declare any permission it needs under `[permissions]`,
+rebuild, and import it by name, such as `from pythonnative.camera import
+CameraView`. They're opt-in because an app that doesn't list `camera`
+contains no camera code, and App Review notices binaries that reference
+privacy-sensitive APIs without a matching usage string.
 
 ## Does PythonNative work on the desktop or the web?
 
@@ -78,15 +89,16 @@ that's how the unit-test suite works.
 
 ## How do I package and distribute my app?
 
-`pn run android` and `pn run ios` produce installable artifacts in
-`build/`:
+`pn build android` and `pn build ios` produce signed, store-ready
+artifacts, and `pn submit` uploads the latest one to Google Play or App
+Store Connect with credentials from the environment. To open the staged
+project in Android Studio or Xcode instead, use `pn run <platform>
+--prepare-only`. See
+[Building for release](../guides/building-for-release.md).
 
-- Android: `build/android/android_template/app/build/outputs/apk/`.
-- iOS: `build/ios/ios_template/build/Build/Products/Debug-iphonesimulator/ios_template.app`.
-
-For release distribution, treat the staged template directory as a
-normal Android Studio / Xcode project (sign, archive, upload via
-Play Console / App Store Connect).
+PythonNative's CI builds and runs release artifacts and tests `pn submit`
+against fakes, but no real store submission has been verified yet. Try
+TestFlight and an internal track well before a deadline.
 
 ## Can I use any Python package?
 
@@ -196,7 +208,9 @@ own widgets, scrolling, and animation frames. Components themselves can be `asyn
 them with [`Suspense`][pythonnative.Suspense] for loading states),
 `use_effect` accepts coroutine callbacks and cancels them on unmount,
 [`use_resource`][pythonnative.use_resource] fetches during render, and
-native modules like `Camera` and `Location` are awaitable. From a
+device APIs that wait on the OS, such as `pn.Share.share` and the
+[`location`](../guides/capabilities/location.md) capability's
+`Location.get_current`, are awaitable. From a
 synchronous event handler, kick off work with
 [`pn.run_async`][pythonnative.run_async]. See the
 [Async + data guide](../guides/async.md).

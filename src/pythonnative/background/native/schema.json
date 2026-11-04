@@ -1,0 +1,120 @@
+{
+  "components": {},
+  "modules": {
+    "Background": {
+      "events": {
+        "expired": {
+          "additionalProperties": {
+            "type": "json"
+          },
+          "type": "object"
+        },
+        "run": {
+          "additionalProperties": {
+            "type": "json"
+          },
+          "type": "object"
+        }
+      },
+      "methods": {
+        "cancel": {
+          "arguments": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "name"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "complete": {
+          "arguments": {
+            "id": {
+              "type": "string"
+            },
+            "result": {
+              "enum": [
+                "success",
+                "failure",
+                "retry"
+              ]
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id",
+            "result"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "ready": {
+          "arguments": {},
+          "async": false,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "type": "null"
+          }
+        },
+        "schedule": {
+          "arguments": {
+            "every": {
+              "type": "number"
+            },
+            "name": {
+              "type": "string"
+            },
+            "processing": {
+              "type": "boolean"
+            },
+            "requires_charging": {
+              "type": "boolean"
+            },
+            "requires_network": {
+              "type": "boolean"
+            }
+          },
+          "async": false,
+          "defaults": {
+            "processing": false,
+            "requires_charging": false,
+            "requires_network": false
+          },
+          "required": [
+            "name",
+            "every"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "status": {
+          "arguments": {},
+          "async": false,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "items": {
+              "additionalProperties": {
+                "type": "json"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      },
+      "name": "Background"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

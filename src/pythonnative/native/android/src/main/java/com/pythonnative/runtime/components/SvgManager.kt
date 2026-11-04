@@ -145,7 +145,7 @@ object SvgRenderer {
         val path = if (transform != null) Path(geometry).also { it.transform(transform) } else geometry
         val opacity = (shape.opacity ?: 1.0).coerceIn(0.0, 1.0).toFloat()
 
-        val fill = resolve(shape.fill ?: root.fill ?: "none", currentColor)
+        val fill = resolve(shape.fill ?: root.fill ?: "#000000", currentColor)
         if (fill != null) {
             paint.reset()
             paint.isAntiAlias = true

@@ -1,0 +1,30 @@
+{
+  "name": "maps",
+  "contracts": "schema.json",
+  "options": {
+    "android_api_key": {
+      "type": "string",
+      "default": null,
+      "env": "GOOGLE_MAPS_API_KEY"
+    }
+  },
+  "ios": {
+    "entry": "MapsPlugin"
+  },
+  "android": {
+    "entry": "com.pythonnative.plugins.maps.MapsPlugin",
+    "dependencies": [
+      "com.google.android.gms:play-services-maps:19.2.0"
+    ],
+    "when": {
+      "android_api_key": {
+        "manifest": {
+          "application": "android/application.xml"
+        }
+      }
+    }
+  },
+  "web": {
+    "entry": "web/index.js"
+  }
+}

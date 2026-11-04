@@ -211,7 +211,12 @@ class ScreenStackManager : ComponentManager() {
             for ((index, tag) in screens.withIndex()) {
                 var fragment = fragments[tag]
                 if (fragment == null) {
-                    val restored = manager.findFragmentByTag(FRAGMENT_TAG_PREFIX + tag) as? LogicalScreenFragment
+                    val found = manager.findFragmentByTag(FRAGMENT_TAG_PREFIX + tag) as? LogicalScreenFragment
+                    // After process death, a fragment restored before Python mounted
+                    // inflated a placeholder. Tags repeat across launches, so it can
+                    // match this screen by tag without ever showing its view.
+                    val restored = found?.takeIf { it.view == null || it.view === PNBridge.registry.get(tag)?.view }
+                    if (found != null && restored == null) transaction.remove(found)
                     fragment = restored ?: LogicalScreenFragment().apply { arguments = Bundle().apply { putLong("tag", tag) } }
                     fragments[tag] = fragment
                     if (restored == null) transaction.add(container.id, fragment, FRAGMENT_TAG_PREFIX + tag)

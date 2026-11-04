@@ -388,24 +388,24 @@ def test_bridge_module_sync_call_and_error(transport: FakeTransport) -> None:
 
 
 def test_bridge_module_pending_call_resolves_later(transport: FakeTransport) -> None:
-    transport.module_handlers["Camera"] = lambda method, args: FakeTransport.pending()
+    transport.module_handlers["Images"] = lambda method, args: FakeTransport.pending()
 
     async def scenario() -> Any:
-        task = asyncio.ensure_future(modules.native_module("Camera").call_async("take_photo", quality=0.8))
+        task = asyncio.ensure_future(modules.native_module("Images").call_async("prefetch", uri="https://x/y.png"))
         await asyncio.sleep(0)
         _module, call_id, method, args = transport.pending_calls[0]
-        assert method == "take_photo" and args == {"quality": 0.8, "allow_editing": False}
-        transport.resolve_pending(call_id, "/tmp/photo.jpg")
+        assert method == "prefetch" and args == {"uri": "https://x/y.png"}
+        transport.resolve_pending(call_id, True)
         return await task
 
-    assert asyncio.run(scenario()) == "/tmp/photo.jpg"
+    assert asyncio.run(scenario()) is True
 
 
 def test_bridge_module_pending_call_rejects(transport: FakeTransport) -> None:
-    transport.module_handlers["Biometrics"] = lambda method, args: FakeTransport.pending()
+    transport.module_handlers["Images"] = lambda method, args: FakeTransport.pending()
 
     async def scenario() -> None:
-        task = asyncio.ensure_future(modules.native_module("Biometrics").call_async("authenticate", reason="x"))
+        task = asyncio.ensure_future(modules.native_module("Images").call_async("prefetch", uri="https://x/y.png"))
         await asyncio.sleep(0)
         transport.resolve_pending(transport.pending_calls[0][1], error="cancelled")
         await task
@@ -504,10 +504,6 @@ def test_fallback_defaults_resolve_for_every_builtin() -> None:
         "Battery",
         "NetInfo",
         "Permissions",
-        "Notifications",
-        "Camera",
-        "Location",
-        "Biometrics",
     ):
         assert isinstance(modules.native_module(name), modules.PythonModule), name
     assert modules.native_module("Device").call("info")["platform"] == "test"

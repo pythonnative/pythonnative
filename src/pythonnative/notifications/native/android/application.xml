@@ -1,0 +1,1 @@
+        <receiver android:name="com.pythonnative.plugins.notifications.NotificationReceiver" android:exported="false" />

@@ -825,7 +825,7 @@ def test_event_handler_error_routed_to_reporter(dev_mode: Any) -> None:
         rec, backend = _make_reconciler()
         root = rec.mount(App())
         dispatch_event(root.tag, "on_press")
-        assert reported and "on_press" in reported[0]
+        assert reported == ["event"]
     finally:
         diagnostics.set_error_reporter(owner, None)
 

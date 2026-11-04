@@ -33,7 +33,7 @@ resources, and real SwiftPM and Maven dependencies.
 | `PNTypedComponentManager<Props>` subclass | Swift (`ios/`) | Creates the `UIView`, applies checked props, measures, handles commands. |
 | `TypedComponentManager<Props>` subclass | Kotlin (`android/`) | Same for `android.view.View`. |
 | `PNPlugin` entry | Swift and Kotlin | Registers the managers (and any native modules) by name. |
-| `pn_plugin.json` | Plugin root | Tells `pn build` which entry to call on each platform and which contract file to merge. |
+| `pn_plugin.json` | Plugin root | Names the plugin and tells `pn build` which entry to call on each platform and which contract file to merge. [Native plugins](native-plugins.md) covers the whole manifest. |
 
 The renderer core validates every commit against your contract and runs
 Yoga over the committed styles, off the UI thread. Managers receive frames
@@ -135,10 +135,10 @@ the managers below receive.
 
 ## 3. The Swift manager
 
-`native/ios/BadgeManager.swift`:
+`native/ios/BadgeManager.swift`. Your Swift sources compile inside
+`PythonNativeKit` itself, so they don't import it:
 
 ```swift
-import PythonNativeKit
 import UIKit
 
 final class BadgeView: UIView {
@@ -243,8 +243,6 @@ class converts to pixels in `setFrame` and back in `measure`.
 `native/ios/MyBadgePlugin.swift`:
 
 ```swift
-import PythonNativeKit
-
 public enum MyBadgePlugin: PNPlugin {
     public static func register(into registry: PNRegistry) {
         registry.registerComponent("Badge") { BadgeManager() }
@@ -278,19 +276,40 @@ object MyBadgePlugin : PNPlugin {
 }
 ```
 
+`name` is required. It has to be an identifier that's unique in the app, and
+it names the plugin's folder in the staged project. The manifest can also
+declare options, required permissions, and changes to `Info.plist`,
+entitlements, and the Android manifest; see [Native plugins](native-plugins.md).
+
 A plugin may declare only one platform; pass
 `define_component(..., platforms=("ios",))` so
 `Platform.supports("Badge")` answers truthfully, and gate its use with
 `Platform.OS` or provide an application-level fallback elsewhere. Native
 commits reject unregistered component types.
 
-## 6. Tell `pn build` about the plugin
+## 6. Ship the plugin
 
-Point the `pythonnative.plugins` entry point at the directory holding
-`pn_plugin.json`. If the app doesn't import your package itself, also
-point the `pythonnative.handlers` entry point at the module that calls
-`define_component`, so the schema is registered before the first commit
-is validated:
+A mobile build finds plugins in two ways, neither of which imports your
+package on the build machine:
+
+- **Packages.** For each device target, `pn build` (and `pn run`) resolves the
+  `[requirements].packages` wheels and scans them for `pn_plugin.json`. So the
+  manifest and sources have to be in the wheel, and an app enables your plugin
+  by requiring your package.
+- **Project directories.** For native code that lives inside an app rather than
+  a package, list the directory in `pythonnative.toml`:
+
+    ```toml
+    [plugins]
+    paths = ["native/badge"]
+    ```
+
+Package the files, and declare two entry points that aren't part of the build.
+`pythonnative.plugins` tells `pn start` that the project has native code, so it
+runs the project's own debug build rather than PythonNative Go. If the app
+doesn't import your package itself, `pythonnative.handlers` names the module
+that calls `define_component`, so the schema is registered before the first
+commit is validated:
 
 ```toml
 [project.entry-points."pythonnative.plugins"]
@@ -300,25 +319,17 @@ my_badge = "my_badge.native"
 my_badge = "my_badge"
 
 [tool.setuptools.package-data]
-"my_badge.native" = ["*.json", "ios/*.swift", "android/**/*.kt"]
+"my_badge.native" = ["*.json", "ios/**/*", "android/**/*"]
 ```
 
-`pn build` (and `pn run`) copies `ios/*.swift` into
-`PythonNativeKit/Sources/PythonNativeKit/Plugins/my_badge/` and
-`android/**/*.kt` into the `pythonnative` Gradle module, merges
-`schema.json` into the compiled contract, then regenerates the
-registration file that calls `MyBadgePlugin.register` on each platform.
-SwiftPM and Gradle compile whatever lands there; no Xcode or Gradle
-project edits are involved. Startup checks the contract fingerprint, so
-rebuild the app after changing `BadgeProps` or the native sources.
-
-For native code that lives inside an app rather than a package, list
-the directory in `pythonnative.toml` instead of an entry point:
-
-```toml
-[plugins]
-paths = ["native/badge"]
-```
+The build copies `ios/**/*.swift` into
+`PythonNativeKit/Sources/PythonNativeKit/Plugins/<name>/`, where `<name>` is the
+manifest's `name` (`MyBadge` here), and `android/**/*.kt` into the `pythonnative`
+Gradle module. It merges `schema.json` into the compiled contract, then
+regenerates the registration file that calls `MyBadgePlugin.register` on each
+platform. SwiftPM and Gradle compile whatever lands there; no Xcode or Gradle
+project edits are involved. Startup checks the contract fingerprint, so rebuild
+the app after changing `BadgeProps` or the native sources.
 
 ## 7. Use it
 
@@ -434,7 +445,9 @@ Neither the [browser preview](browser-preview.md) nor
 `pythonnative.testing` loads Swift or Kotlin. In the preview, a
 component with no browser implementation validates its props, takes
 part in layout, and renders as a labeled placeholder box, so the
-layout around it stays truthful while you work on everything else.
+layout around it stays truthful while you work on everything else. A
+plugin can draw the real thing with a
+[`web` entry](browser-preview.md#plugins-in-the-preview).
 
 Off device, a defined component renders into the
 [`FakeBackend`][pythonnative.testing.FakeBackend] like any built-in, so
@@ -477,6 +490,7 @@ Fast Refresh relies on when you edit `BadgeProps`.
 
 ## Next steps
 
+- Manifest keys, options, and lifecycle hooks: [Native plugins](native-plugins.md).
 - Protocol details: [The native bridge](../concepts/bridge.md).
 - Contract vocabulary and module adapters: [Generated native contracts](native-contracts.md).
 - SDK reference: [`pythonnative.sdk`](../api/sdk.md).

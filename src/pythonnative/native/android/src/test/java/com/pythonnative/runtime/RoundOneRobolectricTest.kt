@@ -16,7 +16,6 @@ import com.pythonnative.runtime.components.PNColor
 import com.pythonnative.runtime.components.PNTheme
 import com.pythonnative.runtime.components.TextManager
 import com.pythonnative.runtime.modules.BuiltinModules
-import com.pythonnative.runtime.modules.CameraModule
 import com.pythonnative.runtime.screens.PNKeyboard
 import com.pythonnative.runtime.screens.Viewport
 import com.pythonnative.runtime.views.PNAccessibilityDelegate
@@ -210,14 +209,6 @@ class RoundOneRobolectricTest {
         val content = record.state["content_view"] as FrameLayout
         assertEquals(PNTheme.background(activity), (content.background as ColorDrawable).color)
         (record.state["dialog"] as Dialog).dismiss()
-    }
-
-    @Test fun cameraCaptureFilesLiveInTheCacheDirectory() {
-        val file = CameraModule.newCaptureFile(activity)
-        assertTrue(file.absolutePath.startsWith(activity.cacheDir.absolutePath))
-        assertTrue(file.name.endsWith(".jpg"))
-        assertEquals(activity.packageName + ".pythonnative.fileprovider", CameraModule.authority(activity))
-        file.delete()
     }
 
     @Test fun screensPaintTheThemeBackgroundUnlessTransparent() {

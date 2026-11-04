@@ -494,7 +494,7 @@ export function measureElement(el, maxW, maxH, { block = false } = {}) {
 // Component managers
 // ---------------------------------------------------------------------------
 
-class ViewManager {
+export class ViewManager {
   create(view, props) {
     const el = document.createElement("div");
     el.className = "pn-view";
@@ -2867,6 +2867,11 @@ export class Renderer {
     this.prototypes = new Map();
     this.resizes = typeof ResizeObserver === "function" ? new ResizeObserver(() => this.reportContainers()) : null;
     for (const [name, Manager] of Object.entries(MANAGERS)) this.managers[name] = new Manager();
+  }
+
+  /** Add a plugin's component manager (a `ViewManager` subclass) by element type. */
+  registerManager(name, Manager) {
+    this.managers[name] = new Manager();
   }
 
   /** Connect the core's platform host (`core/mount.js`). */

@@ -16,6 +16,30 @@ pn build android --debug
 pn build ios --debug
 ```
 
+When the build looks right, [`pn submit`](#submitting-to-the-stores) uploads
+it. To try the release configuration first, `pn run --release` builds and
+launches it on a simulator or emulator, with no dev server.
+
+## What a release build refuses
+
+A release build stops, rather than producing something a store will reject,
+when:
+
+- `[assets].icon` isn't set, or Pillow isn't installed to render it;
+- an Android release has no `[android.signing]` key;
+- a capability in `[plugins].use` needs a `[permissions]` entry that's
+  missing, because iOS crashes an app that reaches a protected API without
+  its usage string.
+
+`--allow-unsigned` turns off the icon and signing checks for a smoke build
+that won't reach a store. On iOS it signs ad hoc and stops at the archive.
+PythonNative's own CI builds this way:
+
+```bash
+pn build android --allow-unsigned
+pn build ios --allow-unsigned
+```
+
 `pn build` reads identity, permissions, assets, and signing from
 [`pythonnative.toml`](configuration.md). Run [`pn doctor`](#check-first-pn-doctor)
 first to confirm the toolchain is ready.
@@ -115,9 +139,10 @@ upgrading your app's NDK can't repair a prebuilt wheel. See Android's
 
 ### Signing
 
-Without signing configured, Gradle emits an **unsigned** release APK
-(`app-release-unsigned.apk`), fine for inspection, not for the store.
-To produce signed artifacts, create a keystore once:
+A release build fails without signing configured. Only `--allow-unsigned`
+produces an **unsigned** release APK (`app-release-unsigned.apk`), which is
+fine for inspection but not for the store. To produce signed artifacts, create
+a keystore once:
 
 ```bash
 keytool -genkeypair -v -keystore release.keystore \
@@ -164,21 +189,13 @@ build/ios/export/*.ipa
 build/ios/ios_template.xcarchive
 ```
 
-To send the build straight to App Store Connect instead of exporting a
-local `.ipa`, set `export_method = "app-store"` and pass `--upload`:
-
-```bash
-pn build ios --upload
-```
-
-The upload uses the App Store Connect credentials Xcode has stored; in
-CI, provide an ASC API key through Xcode's standard mechanisms or
-upload the exported `.ipa` with `xcrun altool`/Transporter instead.
-
 ### Privacy manifests
 
-The template includes an app `PrivacyInfo.xcprivacy`. Supply your app's own
-manifest with a path relative to the project:
+The app's `PrivacyInfo.xcprivacy` starts with what the embedded runtime
+itself uses: `SystemBootTime` (35F9.1), `DiskSpace` (E174.1), `FileTimestamp`
+(C617.1), and `UserDefaults` (CA92.1). Each capability in `[plugins].use` adds
+its own. Add your app's declarations with a path relative to the project;
+they merge with the others:
 
 ```toml
 [ios]
@@ -187,11 +204,14 @@ privacy_manifest = "assets/PrivacyInfo.xcprivacy"
 
 PythonNativeKit ships its own resource-bundle manifest for preferences and
 cache-file timestamps. Archive validation checks that the app and runtime
-manifests are present and structurally valid before export or upload. It also
-parses manifests supplied by bundled dependencies. This check doesn't infer
-your application's data collection, tracking, or required-reason API usage.
-Declare those from your actual behavior using Apple's
+manifests are present and structurally valid before export. It also parses
+manifests supplied by bundled dependencies. This check doesn't infer your
+application's data collection or tracking. Declare those from your actual
+behavior using Apple's
 [privacy-manifest documentation](https://developer.apple.com/documentation/bundleresources/privacy-manifest-files).
+
+Release builds also remove `bin/` and test suites from the wheels they bundle
+on iOS. Those scripts carry a build machine's shebang, which stores flag.
 
 ### Bytecode everywhere
 
@@ -210,9 +230,11 @@ An app bundle is read-only, so the device can't cache what it compiles.
 Bytecode records bundle-relative file names (`app/main.py`), never paths
 on your build machine. Because bytecode is version-specific, compiling
 needs an interpreter matching `app.python_version`: the one running `pn`,
-or `python3.13` (for example) on your `PATH`. Release builds fail without
-one; debug builds warn and let the device compile at launch. Android uses
-Chaquopy's own compilation and has no such requirement.
+or `python3.13` (for example) on your `PATH`. iOS release builds fail
+without one; debug builds warn and let the device compile at launch.
+Android compiles with Chaquopy, which needs that same matching interpreter
+on the build machine whenever the app has `[requirements]` packages to
+install. `pn doctor` reports whether it found one.
 
 ### Signing
 
@@ -229,8 +251,13 @@ provisioning_profile = "My App Distribution"
 
 `development_team` drives signing during `archive`; `export_method` and
 the optional `provisioning_profile` are written into the
-`exportOptions.plist` that `xcodebuild -exportArchive` consumes. If
-export fails, the error points you back at `[ios.signing]`.
+`exportOptions.plist` that `xcodebuild -exportArchive` consumes. A
+`provisioning_profile` also switches the archive itself to manual signing, so a
+CI runner with no Xcode account can build. If export fails, the error points
+you back at `[ios.signing]`.
+
+With an App Store Connect API key in `PN_ASC_KEY_PATH`, `PN_ASC_KEY_ID`, and
+`PN_ASC_ISSUER_ID`, automatic signing uses that key instead of an Xcode account.
 
 ### Embedded Python runtime
 
@@ -278,9 +305,9 @@ dependency:
 pip install 'pythonnative[build]'
 ```
 
-If Pillow isn't installed the build still succeeds; it just keeps the
-template's default assets. `pn doctor` reports whether Pillow is
-available.
+If Pillow isn't installed, a debug build keeps the template's default
+assets. A release build with an icon fails instead, unless you pass
+`--allow-unsigned`. `pn doctor` reports whether Pillow is available.
 
 ---
 
@@ -332,3 +359,41 @@ This writes a fully configured project (identity, permissions, icons,
 relocated Android package) under `build/`, which you can open and build
 with the native IDE, useful for debugging signing or build issues with
 the platform's own tooling.
+
+---
+
+## Submitting to the stores
+
+`pn submit` uploads the latest release build, with credentials from the
+environment, so it runs the same on a laptop and in CI.
+
+```bash
+pn submit ios
+pn submit android --track internal
+```
+
+**App Store Connect** needs an API key, created under Users and Access >
+Integrations, and an `.ipa` from `export_method = "app-store"`:
+
+```bash
+export PN_ASC_KEY_PATH=AuthKey_ABC123.p8
+export PN_ASC_KEY_ID=ABC123
+export PN_ASC_ISSUER_ID=00000000-0000-0000-0000-000000000000
+```
+
+**Google Play** needs a service account's JSON key, granted access in the Play
+Console under Users and permissions:
+
+```bash
+export PN_PLAY_SERVICE_ACCOUNT=play-service-account.json
+```
+
+Tracks are `internal`, `alpha`, `beta`, and `production`. Google requires an app's
+first release to go through the Play Console, so use `--draft` until then.
+`--path` uploads a specific artifact rather than the latest.
+
+!!! warning "What hasn't been proven"
+    PythonNative's CI builds and runs release artifacts and tests `pn submit`
+    against a fake Play API and a stubbed `altool`. It can't hold store credentials, so
+    a real upload is the first true test of your signing and store setup. Try
+    TestFlight and an internal track well before a deadline.

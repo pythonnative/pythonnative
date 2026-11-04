@@ -226,7 +226,7 @@ public final class ActivityIndicatorProps: PNViewProps, PNNativeProps {
     public var has_background_color: Bool { values["background_color"] != nil }
     public private(set) lazy var `background_color`: PNViewBorderColor? = { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "background_color") }()
     public var has_color: Bool { values["color"] != nil }
-    public private(set) lazy var `color`: PNActivityIndicatorColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "color") }()
+    public private(set) lazy var `color`: PNViewBorderColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "color") }()
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
     public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
     public var has_tint_color: Bool { values["tint_color"] != nil }
@@ -297,7 +297,7 @@ public final class CheckboxProps: PNViewProps, PNNativeProps {
     public var has_background_color: Bool { values["background_color"] != nil }
     public private(set) lazy var `background_color`: PNViewBorderColor? = { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "background_color") }()
     public var has_color: Bool { values["color"] != nil }
-    public private(set) lazy var `color`: PNActivityIndicatorColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "color") }()
+    public private(set) lazy var `color`: PNViewBorderColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "color") }()
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
     public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
     public var has_tint_color: Bool { values["tint_color"] != nil }
@@ -376,9 +376,9 @@ public final class ImageProps: PNViewProps, PNNativeProps {
     public var has_color: Bool { values["color"] != nil }
     public private(set) lazy var `color`: PNViewBorderColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "color") }()
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public private(set) lazy var `placeholder_color`: PNActivityIndicatorColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "placeholder_color") }()
+    public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public private(set) lazy var `tint_color`: PNActivityIndicatorColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "tint_color") }()
+    public private(set) lazy var `tint_color`: PNViewBorderColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "tint_color") }()
     public var has_source: Bool { values["source"] != nil }
     public private(set) lazy var `source`: String? = { guard let value = values["source"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "source") }()
     public var has_default_source: Bool { values["default_source"] != nil }
@@ -608,7 +608,7 @@ public final class ProgressBarProps: PNViewProps, PNNativeProps {
     public var has_background_color: Bool { values["background_color"] != nil }
     public private(set) lazy var `background_color`: PNViewBorderColor? = { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "background_color") }()
     public var has_color: Bool { values["color"] != nil }
-    public private(set) lazy var `color`: PNActivityIndicatorColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "color") }()
+    public private(set) lazy var `color`: PNViewBorderColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "color") }()
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
     public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
     public var has_tint_color: Bool { values["tint_color"] != nil }
@@ -616,7 +616,7 @@ public final class ProgressBarProps: PNViewProps, PNNativeProps {
     public var has_value: Bool { values["value"] != nil }
     public private(set) lazy var `value`: Double? = { guard let value = values["value"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Double.self, value, field: "value") }()
     public var has_track_color: Bool { values["track_color"] != nil }
-    public private(set) lazy var `track_color`: PNActivityIndicatorColor? = { guard let value = values["track_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "track_color") }()
+    public private(set) lazy var `track_color`: PNViewBorderColor? = { guard let value = values["track_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "track_color") }()
     public var has_indeterminate: Bool { values["indeterminate"] != nil }
     public private(set) lazy var `indeterminate`: Bool? = { guard let value = values["indeterminate"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "indeterminate") }()
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
@@ -637,7 +637,7 @@ public final class RefreshControlProps: PNViewProps, PNNativeProps {
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
     public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public private(set) lazy var `tint_color`: PNActivityIndicatorColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "tint_color") }()
+    public private(set) lazy var `tint_color`: PNViewBorderColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "tint_color") }()
     public var has_refreshing: Bool { values["refreshing"] != nil }
     public private(set) lazy var `refreshing`: Bool? = { guard let value = values["refreshing"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "refreshing") }()
     public var has_on_refresh: Bool { values["on_refresh"] != nil }
@@ -831,7 +831,7 @@ public final class SegmentedControlProps: PNViewProps, PNNativeProps {
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
     public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
     public var has_tint_color: Bool { values["tint_color"] != nil }
-    public private(set) lazy var `tint_color`: PNActivityIndicatorColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "tint_color") }()
+    public private(set) lazy var `tint_color`: PNViewBorderColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "tint_color") }()
     public var has_segments: Bool { values["segments"] != nil }
     public private(set) lazy var `segments`: [String]? = { guard let value = values["segments"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord([String].self, value, field: "segments") }()
     public var has_selected_index: Bool { values["selected_index"] != nil }
@@ -872,11 +872,11 @@ public final class SliderProps: PNViewProps, PNNativeProps {
     public var has_step: Bool { values["step"] != nil }
     public private(set) lazy var `step`: Double? = { guard let value = values["step"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Double.self, value, field: "step") }()
     public var has_minimum_track_color: Bool { values["minimum_track_color"] != nil }
-    public private(set) lazy var `minimum_track_color`: PNActivityIndicatorColor? = { guard let value = values["minimum_track_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "minimum_track_color") }()
+    public private(set) lazy var `minimum_track_color`: PNViewBorderColor? = { guard let value = values["minimum_track_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "minimum_track_color") }()
     public var has_maximum_track_color: Bool { values["maximum_track_color"] != nil }
-    public private(set) lazy var `maximum_track_color`: PNActivityIndicatorColor? = { guard let value = values["maximum_track_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "maximum_track_color") }()
+    public private(set) lazy var `maximum_track_color`: PNViewBorderColor? = { guard let value = values["maximum_track_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "maximum_track_color") }()
     public var has_thumb_color: Bool { values["thumb_color"] != nil }
-    public private(set) lazy var `thumb_color`: PNActivityIndicatorColor? = { guard let value = values["thumb_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "thumb_color") }()
+    public private(set) lazy var `thumb_color`: PNViewBorderColor? = { guard let value = values["thumb_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "thumb_color") }()
     public var has_on_sliding_start: Bool { values["on_sliding_start"] != nil }
     public private(set) lazy var `on_sliding_start`: Bool? = { guard let value = values["on_sliding_start"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "on_sliding_start") }()
     public var has_on_sliding_complete: Bool { values["on_sliding_complete"] != nil }
@@ -914,7 +914,7 @@ public final class StatusBarProps: PNViewProps, PNNativeProps {
     public var has_flex: Bool { values["flex"] != nil }
     public private(set) lazy var `flex`: Double? = { guard let value = values["flex"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Double.self, value, field: "flex") }()
     public var has_background_color: Bool { values["background_color"] != nil }
-    public private(set) lazy var `background_color`: PNActivityIndicatorColor? = { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "background_color") }()
+    public private(set) lazy var `background_color`: PNViewBorderColor? = { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "background_color") }()
     public var has_color: Bool { values["color"] != nil }
     public private(set) lazy var `color`: PNViewBorderColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "color") }()
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
@@ -955,9 +955,9 @@ public final class SvgProps: PNViewProps, PNNativeProps {
     public var has_preserve_aspect_ratio: Bool { values["preserve_aspect_ratio"] != nil }
     public private(set) lazy var `preserve_aspect_ratio`: PNSvgPreserveAspectRatio? = { guard let value = values["preserve_aspect_ratio"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNSvgPreserveAspectRatio.self, value, field: "preserve_aspect_ratio") }()
     public var has_fill: Bool { values["fill"] != nil }
-    public private(set) lazy var `fill`: PNActivityIndicatorColor? = { guard let value = values["fill"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "fill") }()
+    public private(set) lazy var `fill`: PNViewBorderColor? = { guard let value = values["fill"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "fill") }()
     public var has_stroke: Bool { values["stroke"] != nil }
-    public private(set) lazy var `stroke`: PNActivityIndicatorColor? = { guard let value = values["stroke"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "stroke") }()
+    public private(set) lazy var `stroke`: PNViewBorderColor? = { guard let value = values["stroke"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "stroke") }()
     public var has_stroke_width: Bool { values["stroke_width"] != nil }
     public private(set) lazy var `stroke_width`: Double? = { guard let value = values["stroke_width"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Double.self, value, field: "stroke_width") }()
     public var has_stroke_linecap: Bool { values["stroke_linecap"] != nil }
@@ -992,9 +992,9 @@ public final class SwitchProps: PNViewProps, PNNativeProps {
     public var has_disabled: Bool { values["disabled"] != nil }
     public private(set) lazy var `disabled`: Bool? = { guard let value = values["disabled"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "disabled") }()
     public var has_on_tint_color: Bool { values["on_tint_color"] != nil }
-    public private(set) lazy var `on_tint_color`: PNActivityIndicatorColor? = { guard let value = values["on_tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "on_tint_color") }()
+    public private(set) lazy var `on_tint_color`: PNViewBorderColor? = { guard let value = values["on_tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "on_tint_color") }()
     public var has_thumb_color: Bool { values["thumb_color"] != nil }
-    public private(set) lazy var `thumb_color`: PNActivityIndicatorColor? = { guard let value = values["thumb_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "thumb_color") }()
+    public private(set) lazy var `thumb_color`: PNViewBorderColor? = { guard let value = values["thumb_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "thumb_color") }()
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public private(set) lazy var `accessibility_role`: String? = { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "accessibility_role") }()
 }
@@ -1075,7 +1075,7 @@ public final class TextInputProps: PNViewProps, PNNativeProps {
     public var has_color: Bool { values["color"] != nil }
     public private(set) lazy var `color`: PNViewBorderColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "color") }()
     public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public private(set) lazy var `placeholder_color`: PNActivityIndicatorColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "placeholder_color") }()
+    public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
     public var has_tint_color: Bool { values["tint_color"] != nil }
     public private(set) lazy var `tint_color`: PNViewBorderColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "tint_color") }()
     public var has_value: Bool { values["value"] != nil }
@@ -1125,36 +1125,9 @@ public final class TextInputProps: PNViewProps, PNNativeProps {
     public var has_on_blur: Bool { values["on_blur"] != nil }
     public private(set) lazy var `on_blur`: Bool? = { guard let value = values["on_blur"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "on_blur") }()
     public var has_selection_color: Bool { values["selection_color"] != nil }
-    public private(set) lazy var `selection_color`: PNActivityIndicatorColor? = { guard let value = values["selection_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNActivityIndicatorColor.self, value, field: "selection_color") }()
+    public private(set) lazy var `selection_color`: PNViewBorderColor? = { guard let value = values["selection_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "selection_color") }()
     public var has_text_content_type: Bool { values["text_content_type"] != nil }
     public private(set) lazy var `text_content_type`: String? = { guard let value = values["text_content_type"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "text_content_type") }()
-    public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
-    public private(set) lazy var `accessibility_role`: String? = { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "accessibility_role") }()
-}
-
-public final class TouchableOpacityProps: PNViewProps, PNNativeProps {
-    // The renderer core validated these values before they were mounted.
-    public init(_ values: [String: Any], partial: Bool = true) {
-        super.init(values)
-    }
-    public var has_flex: Bool { values["flex"] != nil }
-    public private(set) lazy var `flex`: Double? = { guard let value = values["flex"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Double.self, value, field: "flex") }()
-    public var has_background_color: Bool { values["background_color"] != nil }
-    public private(set) lazy var `background_color`: PNViewBorderColor? = { guard let value = values["background_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "background_color") }()
-    public var has_color: Bool { values["color"] != nil }
-    public private(set) lazy var `color`: PNViewBorderColor? = { guard let value = values["color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "color") }()
-    public var has_placeholder_color: Bool { values["placeholder_color"] != nil }
-    public private(set) lazy var `placeholder_color`: PNViewBorderColor? = { guard let value = values["placeholder_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "placeholder_color") }()
-    public var has_tint_color: Bool { values["tint_color"] != nil }
-    public private(set) lazy var `tint_color`: PNViewBorderColor? = { guard let value = values["tint_color"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewBorderColor.self, value, field: "tint_color") }()
-    public var has_on_press: Bool { values["on_press"] != nil }
-    public private(set) lazy var `on_press`: Bool? = { guard let value = values["on_press"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "on_press") }()
-    public var has_on_long_press: Bool { values["on_long_press"] != nil }
-    public private(set) lazy var `on_long_press`: Bool? = { guard let value = values["on_long_press"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "on_long_press") }()
-    public var has_active_opacity: Bool { values["active_opacity"] != nil }
-    public private(set) lazy var `active_opacity`: Double? = { guard let value = values["active_opacity"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Double.self, value, field: "active_opacity") }()
-    public var has_disabled: Bool { values["disabled"] != nil }
-    public private(set) lazy var `disabled`: Bool? = { guard let value = values["disabled"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "disabled") }()
     public var has_accessibility_role: Bool { values["accessibility_role"] != nil }
     public private(set) lazy var `accessibility_role`: String? = { guard let value = values["accessibility_role"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "accessibility_role") }()
 }
@@ -1393,12 +1366,6 @@ public enum PNComponentEvents {
         public static func `on_content_size_change`(_ view: UIView, _ argument0: PNContentSizeEvent) { PNEvents.emitIfWired(view, "on_content_size_change", [PNValues.encode(argument0)]) }
         public static func `on_focus`(_ view: UIView) { PNEvents.emitIfWired(view, "on_focus", []) }
         public static func `on_blur`(_ view: UIView) { PNEvents.emitIfWired(view, "on_blur", []) }
-        public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
-        public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
-    }
-    public enum TouchableOpacity {
-        public static func `on_press`(_ view: UIView) { PNEvents.emitIfWired(view, "on_press", []) }
-        public static func `on_long_press`(_ view: UIView) { PNEvents.emitIfWired(view, "on_long_press", []) }
         public static func `on_accessibility_action`(_ view: UIView, _ argument0: String) { PNEvents.emitIfWired(view, "on_accessibility_action", [PNValues.encode(argument0)]) }
         public static func `on_layout`(_ view: UIView, _ argument0: PNLayoutEvent) { PNEvents.emitIfWired(view, "on_layout", [PNValues.encode(argument0)]) }
     }

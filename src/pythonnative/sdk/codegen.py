@@ -8,7 +8,7 @@ from typing import Any
 
 from ..bridge.codec import to_jsonable
 from .native_types import NativeTypes, identifier
-from .schema import COMPONENTS, fingerprint, manifest
+from .schema import COMPONENTS, builtin_component_names, fingerprint, manifest
 
 
 def generate(destination: str | Path) -> list[Path]:
@@ -32,17 +32,21 @@ def generate(destination: str | Path) -> list[Path]:
     # View) when every component that declares it declares the same schema.
     # Compare JSON forms: extension manifests arrive through JSON, so a
     # built-in tuple and an extension's list must still count as equal, or a
-    # plugin build would rename the built-in types hand-written code uses.
+    # plugin build would rename the built-in types hand-written code uses. For the
+    # same reason, only built-ins decide: a plugin's own `accessibility_label`
+    # mustn't take the getter away from the managers that read it on View.
     def canonical(field: Any) -> str:
         return json.dumps(to_jsonable(field), sort_keys=True, default=str)
 
+    builtin_components = builtin_component_names()
     view_props = dict(COMPONENTS["View"].props) if "View" in COMPONENTS else {}
     common = {
         key: field
         for key, field in view_props.items()
         if all(
             key not in component.props or canonical(component.props[key]) == canonical(field)
-            for component in COMPONENTS.values()
+            for name, component in COMPONENTS.items()
+            if not builtin_components or name in builtin_components
         )
     }
 
@@ -89,6 +93,7 @@ def generate(destination: str | Path) -> list[Path]:
     for name, component in sorted(COMPONENTS.items()):
         if not name.isidentifier():
             raise ValueError(f"Invalid native component name {name!r}")
+        types.scope = "" if not builtin_components or name in builtin_components else name
         swift.extend(
             [
                 f"public final class {name}Props: PNViewProps, PNNativeProps {{",

@@ -1,0 +1,74 @@
+# Tests Sound against a tone embedded in the demo, and records a second from the
+# microphone, then plays it back. Only the file and the timing are asserted: a
+# simulator's input may be silent, and its audio output can't be heard from here.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/audio.py
+# Source under test: src/pythonnative/audio/__init__.py :: Sound, Recorder
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Audio
+- tapOn: "Play tone"
+# A fresh simulator takes tens of seconds to discover its Audio Units on first use.
+- extendedWaitUntil:
+    visible: "Duration: about 1s"
+    timeout: 60000
+# A simulator's output goes through the host Mac's audio server, which can stall when
+# macOS is waiting on a microphone prompt for Simulator. Android must really play.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "(Position: moving|Position: stuck)"
+          timeout: 15000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: "Position: moving"
+          timeout: 10000
+      - extendedWaitUntil:
+          visible: "Ends: 1"
+          timeout: 10000
+- scrollUntilVisible:
+    element: "Record a second"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Record a second"
+# The first recording prompts for the microphone.
+- runFlow:
+    when:
+      visible: "(Allow|OK|While using the app)"
+    commands:
+      - tapOn: "(While using the app|Allow|OK)"
+# The iOS simulator's input depends on the host Mac's audio server, which may
+# never answer, and the recorder then reports `recording_failed` after 20 seconds.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: "(Replayed: yes|Audio error: recording_failed)"
+          timeout: 40000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element: "Replayed: yes"
+          direction: DOWN
+          timeout: 20000
+          centerElement: false
+      - assertVisible: "Level: in range"
+      - assertVisible: "Recording: nonempty"
+      - assertVisible: "Audio error: none"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

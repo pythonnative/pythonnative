@@ -86,6 +86,7 @@ object Viewport {
             )
             .put("color_scheme", if (night == Configuration.UI_MODE_NIGHT_YES) "dark" else "light")
             .put("keyboard_height", keyboard.toDouble())
+            .put("keyboard_overlap", PNKeyboard.overlapDp)
             .put("scale", density.toDouble())
             .put("font_scale", view.resources.configuration.fontScale.toDouble())
             .put("screen_width", screen.x / density.toDouble())

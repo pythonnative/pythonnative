@@ -63,6 +63,23 @@ compiles the registered schemas into Swift and Kotlin; see
         - NativeField
         - register_schema
 
+## Plugin declarations
+
+A plugin's facade uses these instead of `define_component` and
+`register_schema` when its native code is opt-in, as every
+[first-party capability](../guides/capabilities/index.md) does. See
+[Native plugins](../guides/native-plugins.md).
+
+::: pythonnative.sdk.plugin
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      members:
+        - PluginNotEnabledError
+        - plugin_module
+        - plugin_component
+
 ## Entry-point discovery
 
 Third-party packages can define components automatically by exposing
@@ -87,6 +104,8 @@ imports are needed to run its
 
 - [Custom native components guide](../guides/custom-native-components.md)
   walks through a complete `Badge` widget across iOS and Android.
+- [Native plugins](../guides/native-plugins.md) covers the manifest,
+  options, lifecycle hooks, and permission providers.
 - [Native views (concept)](../concepts/native-views.md) describes the
   reconciler boundary the SDK plugs into.
 - [Native views API](native_views.md) documents the runtime backend

@@ -103,14 +103,40 @@ class Shell {
     new ResizeObserver(() => this.fitFrame()).observe(this.stage);
     // The renderer core runs in the page; connect once it's instantiated.
     startCore(this.renderer, { send: (kind, tag, name, payload) => this.bridge.callback(kind, tag, name, payload) })
-      .then((core) => {
+      .then(async (core) => {
         this.core = core;
+        await this.loadPlugins();
         this.bridge.connect();
       })
       .catch((error) => {
         this.logLine("error", `the renderer core failed to load: ${error?.stack || error}`);
         this.showConsole(true);
       });
+  }
+
+  /**
+   * Import each plugin's browser entry. An entry exports `components`
+   * (element type to `ViewManager` subclass) and `modules(host)`, which
+   * returns module implementations. A broken entry only loses its plugin.
+   */
+  async loadPlugins() {
+    let entries = [];
+    try {
+      entries = await (await fetch("/static/plugins.json")).json();
+    } catch (error) {
+      this.logLine("warn", `couldn't list plugins: ${error}`);
+    }
+    await Promise.all(entries.map(async (url) => {
+      try {
+        const plugin = await import(url);
+        for (const [name, Manager] of Object.entries(plugin.components || {})) {
+          this.renderer.registerManager(name, Manager);
+        }
+        if (plugin.modules) this.host.registerModules(plugin.modules(this.host));
+      } catch (error) {
+        this.logLine("error", `plugin ${url} failed to load: ${error?.stack || error}`);
+      }
+    }));
   }
 
   // -- preferences --------------------------------------------------------

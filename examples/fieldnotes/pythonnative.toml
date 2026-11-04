@@ -1,0 +1,46 @@
+[app]
+id = "dev.pythonnative.fieldnotes"
+name = "fieldnotes"
+display_name = "Field Notes"
+version = "0.1.0"
+build = 1
+python_version = "3.13"
+entry_point = "app/main.py"
+url_schemes = ["fieldnotes"]
+
+[assets]
+icon = "assets/icon.png"
+
+[plugins]
+use = [
+    "audio",
+    "background",
+    "biometrics",
+    "camera",
+    "location",
+    "maps",
+    "notifications",
+    "pickers",
+    "purchases",
+    "sensors",
+    "video",
+]
+
+[plugins.background]
+tasks = ["sync"]
+
+[permissions]
+camera = "Take photos and short clips to attach to your journal entries."
+microphone = "Record voice notes and the sound of your video clips."
+location_when_in_use = "Record where each journal entry was written and show it on your map."
+notifications = true
+face_id = "Lock your field journal behind Face ID."
+motion = "Show a level on the capture screen so your photos stay straight."
+
+[ios]
+deployment_target = "13.0"
+
+[android]
+min_sdk = 24
+target_sdk = 36
+abi_filters = ["arm64-v8a", "x86_64"]

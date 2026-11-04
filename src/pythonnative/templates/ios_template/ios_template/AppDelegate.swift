@@ -2,10 +2,8 @@
 //  AppDelegate.swift
 //  ios_template
 //
-//  Application-level callbacks. Battery monitoring and APNs
-//  registration results are forwarded to the Swift native modules in
-//  PythonNativeKit (BatteryModule, NotificationsModule), which relay
-//  them to Python over the bridge.
+//  Application-level callbacks, forwarded to the lifecycle hooks plugins
+//  register (see PNAppLifecycle in PythonNativeKit).
 //
 
 import PythonNativeKit
@@ -21,6 +19,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // waits for it without blocking the main thread.
         PythonRuntime.shared.startInBackground()
         BatteryModule.startMonitoring()
+        PNAppLifecycle.shared.didFinishLaunching(application, options: launchOptions)
         return true
     }
 
@@ -30,14 +29,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
-        NotificationsModule.deliverToken(deviceToken)
+        PNAppLifecycle.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
     }
 
     func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        NotificationsModule.deliverError(error)
+        PNAppLifecycle.shared.didFailToRegisterForRemoteNotifications(error: error)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        PNAppLifecycle.shared.didReceiveRemoteNotification(userInfo, completion: completionHandler)
+    }
+
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        PNAppLifecycle.shared.handleEventsForBackgroundSession(identifier: identifier, completion: completionHandler)
     }
 
     // MARK: - UISceneSession lifecycle

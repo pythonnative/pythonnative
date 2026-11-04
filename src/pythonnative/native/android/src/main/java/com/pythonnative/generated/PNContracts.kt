@@ -9,7 +9,7 @@ import org.json.JSONObject
  * nothing on the Kotlin side interprets them.
  */
 object PNContracts {
-    const val fingerprint = "b89b466f083ea2df7473d29e351ce99257f66792a17955c6ce3c2c0f238ae5c3"
+    const val fingerprint = "d0f4503111acbb6117870bb5bdd997964a29ec05d3190445e2c12ce446b18c4d"
     const val protocolVersion = 7
     const val yogaVersion = "3.2.1"
 

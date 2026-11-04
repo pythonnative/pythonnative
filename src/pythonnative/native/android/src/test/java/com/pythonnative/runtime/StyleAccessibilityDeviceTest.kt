@@ -2,7 +2,6 @@ package com.pythonnative.runtime
 
 import android.view.View
 import com.pythonnative.runtime.components.ViewStyler
-import com.pythonnative.runtime.modules.CameraModule
 import com.pythonnative.runtime.modules.DeviceModule
 import com.pythonnative.runtime.views.PNAccessibilityDelegate
 import com.pythonnative.runtime.views.PNBorderDrawable
@@ -82,6 +81,5 @@ class StyleAccessibilityDeviceTest {
         assertTrue(DeviceModule.isEmulator(fingerprint = "google/sdk_gphone64_arm64/emu64a:14/UE1A/1:user", model = "sdk_gphone64_arm64", product = "sdk_gphone64_arm64", hardware = "ranchu", brand = "google", device = "emu64a", manufacturer = "Google"))
         assertTrue(DeviceModule.isEmulator(fingerprint = "generic/x86", model = "x", product = "x", hardware = "x", brand = "x", device = "x", manufacturer = "x"))
         assertFalse(DeviceModule.isEmulator(fingerprint = "google/panther/panther:14/UQ1A/1:user/release-keys", model = "Pixel 7", product = "panther", hardware = "panther", brand = "google", device = "panther", manufacturer = "Google"))
-        assertEquals(".pythonnative.fileprovider", CameraModule.AUTHORITY_SUFFIX)
     }
 }

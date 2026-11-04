@@ -8,9 +8,10 @@ and re-render when the insets or keyboard height change.
 
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union, Unpack, cast
 
+from .. import platform_metrics
 from ..component import component
 from ..element import Element, Node
-from ..hooks import Ref, use_keyboard_height, use_safe_area_insets, use_state
+from ..hooks import Ref, use_safe_area_insets, use_state, use_subscription
 from ..style import (
     EdgeInsets,
     Style,
@@ -435,8 +436,8 @@ def _KeyboardAvoidingContainer(
 ) -> Element:
     """Hook-driven body of `KeyboardAvoidingView`.
 
-    Subscribes to the platform-reported keyboard height via
-    [`use_keyboard_height`][pythonnative.use_keyboard_height] and
+    Subscribes to how much of the keyboard still covers the content, which
+    is less than its height when the window resized itself for it, and
     applies the shift according to ``behavior``:
 
     - ``"padding"``: adds the shift as bottom padding, resizing the
@@ -448,7 +449,7 @@ def _KeyboardAvoidingContainer(
       The resting height is captured via ``on_layout`` while the
       keyboard is hidden, so flex-sized containers work too.
     """
-    keyboard = use_keyboard_height()
+    keyboard = use_subscription(platform_metrics.subscribe, platform_metrics.get_keyboard_overlap)
     base_height, set_base_height = use_state(0.0)
     mode = behavior or "padding"
     offset = float(keyboard_vertical_offset or 0.0)

@@ -1,0 +1,46 @@
+{
+  "name": "push",
+  "contracts": "schema.json",
+  "requires": {
+    "plugins": [
+      "notifications"
+    ],
+    "permissions": [
+      "remote_notifications"
+    ]
+  },
+  "options": {
+    "google_services_file": {
+      "type": "path",
+      "default": null
+    }
+  },
+  "ios": {
+    "entry": "PushPlugin"
+  },
+  "android": {
+    "entry": "com.pythonnative.plugins.push.PushPlugin",
+    "manifest": {
+      "application": "android/application.xml"
+    },
+    "dependencies": [
+      "com.google.firebase:firebase-messaging:24.1.0"
+    ],
+    "when": {
+      "google_services_file": {
+        "gradle_plugins": [
+          {
+            "id": "com.google.gms.google-services",
+            "version": "4.4.2"
+          }
+        ],
+        "files": [
+          {
+            "from": "${google_services_file}",
+            "to": "app/google-services.json"
+          }
+        ]
+      }
+    }
+  }
+}

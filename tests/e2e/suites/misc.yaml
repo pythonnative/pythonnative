@@ -15,3 +15,4 @@ appId: ${APP_ID}
 - runFlow: ../flows/packages/pypi_packages.yaml
 - runFlow: ../flows/sdk/custom_component.yaml
 - runFlow: ../flows/sdk/define_component.yaml
+- runFlow: ../flows/sdk/plugin_config.yaml

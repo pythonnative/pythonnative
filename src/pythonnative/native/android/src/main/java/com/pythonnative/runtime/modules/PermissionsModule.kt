@@ -1,83 +1,110 @@
 package com.pythonnative.runtime.modules
 
 import android.content.pm.PackageManager
-import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.pythonnative.runtime.PNBridge
 import com.pythonnative.generated.PermissionsImplementation
+import com.pythonnative.runtime.PNBridge
 
 /**
- * `Permissions.check(permission)` (sync) and `request(permission)`
- * (async, routed through `onRequestPermissionsResult`). Statuses are
- * `granted`, `denied`, `blocked`, and `undetermined`.
- *
- * Permission names are the `[permissions]` keys from pythonnative.toml
- * (`camera`, `microphone`, `photo_library`, `location_when_in_use`,
- * `contacts`, `notifications`); the Python facade validates them before
- * the call reaches this module, so an unknown name here is a bug rather
- * than user input, and is rejected rather than answered.
+ * The permission names plugins own. A name works only when a plugin that uses
+ * it is in the build, so the app's manifest never needs a permission it
+ * doesn't use.
+ */
+object PNPermissions {
+    /**
+     * @property manifest The permission whose grant decides the status.
+     * @property requests What to prompt for (Android 12+ ignores a fine-location request that omits coarse).
+     * @property satisfiedBy Another permission that also counts as granted (coarse for a downgraded fine request).
+     * @property minSdk Below this API level the permission doesn't exist and is implicitly granted.
+     * @property legacy What to check below [minSdk] instead of granting implicitly.
+     */
+    class Spec(
+        val manifest: String,
+        val requests: Array<String>,
+        val satisfiedBy: String? = null,
+        val minSdk: Int = 0,
+        val legacy: String? = null,
+    )
+
+    private val specs = HashMap<String, Spec>()
+
+    /** Register (or replace) the Android permissions behind `[permissions]` name [name]. */
+    fun register(
+        name: String,
+        manifest: String,
+        requests: Array<String> = arrayOf(manifest),
+        satisfiedBy: String? = null,
+        minSdk: Int = 0,
+        legacy: String? = null,
+    ) {
+        specs[name] = Spec(manifest, requests, satisfiedBy, minSdk, legacy)
+    }
+
+    internal fun spec(name: String): Spec? {
+        com.pythonnative.runtime.bridge.PNRegistry.ensureBuiltins()
+        return specs[name]
+    }
+}
+
+/**
+ * `Permissions.check(permission)` and `request(permission)` (async, routed
+ * through `onRequestPermissionsResult`). Statuses are `granted`, `denied`,
+ * `blocked`, and `undetermined`. A name no plugin in this build owns is
+ * rejected with the code `plugin_not_enabled`.
  */
 class PermissionsModule : PermissionsImplementation {
     private val pending = HashMap<Int, Pair<Array<String>, (IntArray) -> Unit>>()
 
     override fun check(permission: String, completion: (Result<String>) -> Unit): (() -> Unit)? {
-        require(MANIFEST.containsKey(permission)) { "Unknown permission: $permission" }
-        completion(Result.success(check(permission)))
+        val spec = PNPermissions.spec(permission)
+        completion(if (spec == null) Result.failure(notEnabled(permission)) else Result.success(status(spec)))
         return null
     }
 
     override fun request(permission: String, completion: (Result<String>) -> Unit): (() -> Unit)? {
-        require(MANIFEST.containsKey(permission)) { "Unknown permission: $permission" }
-        return requestStatus(permission) { completion(Result.success(it)) }
+        val spec = PNPermissions.spec(permission) ?: run { completion(Result.failure(notEnabled(permission))); return null }
+        return requestStatus(spec) { completion(Result.success(it)) }
     }
 
-    /** Current status of `permission` without prompting. */
-    fun check(permission: String): String {
-        val manifest = MANIFEST[permission] ?: return UNDETERMINED
-        if (permission == "notifications" && Build.VERSION.SDK_INT < 33) return GRANTED
-        if (permission == "photo_library" && Build.VERSION.SDK_INT < 33) {
-            return statusOf("android.permission.READ_EXTERNAL_STORAGE")
+    private fun notEnabled(permission: String) =
+        PNModuleError("No plugin in this build provides the $permission permission", "plugin_not_enabled")
+
+    private fun status(spec: PNPermissions.Spec): String {
+        if (android.os.Build.VERSION.SDK_INT < spec.minSdk) {
+            return if (spec.legacy == null) GRANTED else statusOf(spec.legacy, null)
         }
-        return statusOf(manifest)
+        return statusOf(spec.manifest, spec.satisfiedBy)
     }
 
-    private fun statusOf(manifest: String): String {
+    private fun statusOf(manifest: String, satisfiedBy: String?): String {
         val ctx = PNBridge.activity() ?: return UNDETERMINED
-        if (isGranted(manifest)) return GRANTED
-        // Coarse location satisfies a when-in-use request the user downgraded to "approximate".
-        if (manifest == FINE_LOCATION && isGranted(COARSE_LOCATION)) return GRANTED
+        if (isGranted(manifest) || (satisfiedBy != null && isGranted(satisfiedBy))) return GRANTED
         // "denied" with no rationale after a previous denial means "don't ask again".
         val asked = ctx.getSharedPreferences("pn_permissions", 0).getBoolean(manifest, false)
         return if (asked && !ActivityCompat.shouldShowRequestPermissionRationale(ctx, manifest)) BLOCKED else DENIED
     }
 
-    /** Whether the manifest permission `manifest` is currently granted. */
+    /** Whether the manifest permission [manifest] is currently granted. */
     fun isGranted(manifest: String): Boolean {
         val ctx = PNBridge.activity() ?: return false
         return ContextCompat.checkSelfPermission(ctx, manifest) == PackageManager.PERMISSION_GRANTED
     }
 
-    /** Prompt for `permission` if needed and report the resulting status to `onDone`. */
-    fun requestStatus(permission: String, onDone: (String) -> Unit): (() -> Unit)? {
-        val manifest = MANIFEST[permission] ?: run { onDone(UNDETERMINED); return null }
-        if (check(permission) == GRANTED) { onDone(GRANTED); return null }
-        val targets = when {
-            permission == "photo_library" && Build.VERSION.SDK_INT < 33 -> arrayOf("android.permission.READ_EXTERNAL_STORAGE")
-            // Android 12+ ignores a fine-location request that omits coarse.
-            manifest == FINE_LOCATION -> arrayOf(FINE_LOCATION, COARSE_LOCATION)
-            else -> arrayOf(manifest)
-        }
+    private fun requestStatus(spec: PNPermissions.Spec, onDone: (String) -> Unit): (() -> Unit)? {
+        if (status(spec) == GRANTED) { onDone(GRANTED); return null }
+        val legacy = android.os.Build.VERSION.SDK_INT < spec.minSdk
+        val targets = if (legacy) arrayOf(spec.legacy!!) else spec.requests
         return requestManifest(targets) { results ->
             val granted = results.isNotEmpty() && results.any { it == PackageManager.PERMISSION_GRANTED }
-            onDone(if (granted) GRANTED else statusOf(targets[0]))
+            onDone(if (granted) GRANTED else statusOf(targets[0], null))
         }
     }
 
     /**
      * Request raw manifest permissions and deliver the grant results
-     * (`onDone` gets an empty array when no activity can prompt). Other
-     * modules reuse this for inline prompts (`Location.get_current`).
+     * ([onDone] gets an empty array when no activity can prompt). Plugins
+     * reuse this for inline prompts (`Location.get_current`).
      */
     fun requestManifest(targets: Array<String>, onDone: (IntArray) -> Unit): (() -> Unit)? {
         if (targets.all { isGranted(it) }) { onDone(IntArray(targets.size) { PackageManager.PERMISSION_GRANTED }); return null }
@@ -110,16 +137,5 @@ class PermissionsModule : PermissionsImplementation {
         const val DENIED = "denied"
         const val BLOCKED = "blocked"
         const val UNDETERMINED = "undetermined"
-        const val FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION"
-        const val COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION"
-
-        val MANIFEST = mapOf(
-            "camera" to "android.permission.CAMERA",
-            "microphone" to "android.permission.RECORD_AUDIO",
-            "photo_library" to "android.permission.READ_MEDIA_IMAGES",
-            "location_when_in_use" to FINE_LOCATION,
-            "contacts" to "android.permission.READ_CONTACTS",
-            "notifications" to "android.permission.POST_NOTIFICATIONS",
-        )
     }
 }

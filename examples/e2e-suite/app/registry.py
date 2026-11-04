@@ -43,6 +43,19 @@ from app.screens.animations.timing_animation import TimingAnimationDemo
 from app.screens.assets.bundled_image import BundledImageDemo
 from app.screens.assets.custom_font import CustomFontDemo
 from app.screens.assets.image_size import ImageSizeDemo
+from app.screens.capabilities.audio import AudioDemo
+from app.screens.capabilities.background import BackgroundDemo
+from app.screens.capabilities.biometrics import BiometricsDemo
+from app.screens.capabilities.camera import CameraDemo
+from app.screens.capabilities.location import LocationDemo
+from app.screens.capabilities.maps import MapsDemo
+from app.screens.capabilities.notifications import NotificationsDemo
+from app.screens.capabilities.pickers import PickersDemo
+from app.screens.capabilities.purchases import PurchasesDemo
+from app.screens.capabilities.push import PushDemo
+from app.screens.capabilities.sensors import SensorsDemo
+from app.screens.capabilities.video import VideoDemo
+from app.screens.capabilities.websocket import WebSocketDemo
 from app.screens.components.accessibility_props import AccessibilityPropsDemo
 from app.screens.components.activity_indicator import ActivityIndicatorDemo
 from app.screens.components.blur_view import BlurViewDemo
@@ -79,7 +92,6 @@ from app.screens.components.switch import SwitchDemo
 from app.screens.components.text import TextDemo
 from app.screens.components.text_input import TextInputDemo
 from app.screens.components.text_input_handle import TextInputHandleDemo
-from app.screens.components.touchable_opacity import TouchableOpacityDemo
 from app.screens.components.view_column_row import ViewColumnRowDemo
 from app.screens.components.web_view import WebViewDemo
 from app.screens.components.web_view_handle import WebViewHandleDemo
@@ -139,6 +151,7 @@ from app.screens.platform.platform_info import PlatformInfoDemo
 from app.screens.runtime.run_async_demo import RunAsyncDemo
 from app.screens.sdk.custom_component import CustomComponentDemo
 from app.screens.sdk.define_component_demo import DefineComponentDemo
+from app.screens.sdk.plugin_config import PluginConfigDemo
 from app.screens.storage.async_storage_demo import AsyncStorageDemo
 from app.screens.styling.borders_shadows import BordersShadowsDemo
 from app.screens.styling.dynamic_color import DynamicColorDemo
@@ -243,7 +256,6 @@ DEMOS: List[DemoEntry] = [
     DemoEntry("section_list", "Components", "SectionList", "SectionList", SectionListDemo),
     DemoEntry("web_view", "Components", "WebView", "WebView", WebViewDemo),
     DemoEntry("web_view_handle", "Components", "WebViewHandle", "WebViewHandle", WebViewHandleDemo),
-    DemoEntry("touchable_opacity", "Components", "TouchableOpacity", "TouchableOpacity", TouchableOpacityDemo),
     DemoEntry("image_background", "Components", "ImageBackground", "ImageBackground", ImageBackgroundDemo),
     DemoEntry("checkbox", "Components", "Checkbox", "Checkbox", CheckboxDemo),
     DemoEntry("segmented_control", "Components", "SegmentedControl", "SegmentedControl", SegmentedControlDemo),
@@ -528,6 +540,20 @@ DEMOS: List[DemoEntry] = [
         CustomComponentDemo,
     ),
     DemoEntry("define_component", "SDK", "define_component", "define_component", DefineComponentDemo),
+    DemoEntry("plugin_config", "SDK", "Plugin config", "sdk::plugin_config", PluginConfigDemo),
+    DemoEntry("audio", "Capabilities", "Audio", "capabilities::audio", AudioDemo),
+    DemoEntry("background", "Capabilities", "Background", "capabilities::background", BackgroundDemo),
+    DemoEntry("biometrics", "Capabilities", "Biometrics", "capabilities::biometrics", BiometricsDemo),
+    DemoEntry("camera", "Capabilities", "Camera", "capabilities::camera", CameraDemo),
+    DemoEntry("location", "Capabilities", "Location", "capabilities::location", LocationDemo),
+    DemoEntry("maps", "Capabilities", "Maps", "capabilities::maps", MapsDemo),
+    DemoEntry("notifications", "Capabilities", "Notifications", "capabilities::notifications", NotificationsDemo),
+    DemoEntry("pickers", "Capabilities", "Pickers", "capabilities::pickers", PickersDemo),
+    DemoEntry("purchases", "Capabilities", "Purchases", "capabilities::purchases", PurchasesDemo),
+    DemoEntry("push", "Capabilities", "Push", "capabilities::push", PushDemo),
+    DemoEntry("sensors", "Capabilities", "Sensors", "capabilities::sensors", SensorsDemo),
+    DemoEntry("video", "Capabilities", "Video", "capabilities::video", VideoDemo),
+    DemoEntry("websocket", "Capabilities", "WebSocket", "WebSocket", WebSocketDemo),
 ]
 
 CATEGORIES: List[str] = []

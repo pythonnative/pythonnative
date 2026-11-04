@@ -146,15 +146,7 @@ class BoundaryMixin:
         fallback = node.element.props.get("fallback")
         if fallback is None:
             return []
-        result: Any = fallback
-        if callable(fallback) and not isinstance(fallback, Element):
-            arity = _positional_arity(fallback)
-            if arity >= 2:
-                result = fallback(exc, self._make_boundary_reset(node))
-            elif arity == 1:
-                result = fallback(exc)
-            else:
-                result = fallback()
+        result = call_fallback(fallback, exc, lambda: self._make_boundary_reset(node))
         return normalize_children(result, owner="ErrorBoundary.fallback")
 
     def _make_boundary_reset(self, node: VNode) -> Callable[[], None]:
@@ -458,6 +450,21 @@ class BoundaryMixin:
             "fallback. Wrap the async part of the tree in pn.Suspense(..., "
             "fallback=...) to declare its loading state."
         )
+
+
+def call_fallback(fallback: Any, error: BaseException, reset: Callable[[], Callable[[], None]]) -> Any:
+    """Render an ``ErrorBoundary`` fallback in any of its forms.
+
+    ``fallback`` is an element, ``fallback()``, ``fallback(error)``, or
+    ``fallback(error, reset)``. ``reset`` builds the reset callable, only when
+    the fallback takes one.
+    """
+    if not callable(fallback) or isinstance(fallback, Element):
+        return fallback
+    arity = _positional_arity(fallback)
+    if arity >= 2:
+        return fallback(error, reset())
+    return fallback(error) if arity == 1 else fallback()
 
 
 def _positional_arity(fn: Callable[..., Any]) -> int:

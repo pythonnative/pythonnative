@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from .native_types import NativeTypes, identifier, quoted
-from .schema import MODULES
+from .schema import MODULES, builtin_module_names
 
 
 def generate_modules(types: NativeTypes) -> dict[str, str]:
     """Generate recursive native interfaces and ordinary Python methods."""
+    builtin_modules = builtin_module_names()
     python = []
     swift = ["import Foundation", ""]
     kotlin = [
@@ -19,6 +20,7 @@ def generate_modules(types: NativeTypes) -> dict[str, str]:
         "",
     ]
     for name, module in sorted(MODULES.items()):
+        types.scope = "" if not builtin_modules or name in builtin_modules else name
         if not name.isidentifier():
             raise ValueError(f"Invalid module name: {name!r}")
         python.append(f"class {name}:")
@@ -168,7 +170,7 @@ def generate_modules(types: NativeTypes) -> dict[str, str]:
                 kotlin.append(
                     "                        result.fold({ value -> promise.resolve("
                     + ("null" if void else "PNValues.encode(value)")
-                    + ') }, { error -> promise.reject(error.message ?: "Native call failed") })'
+                    + ") }, { error -> promise.reject(error) })"
                 )
                 kotlin.extend(
                     [
@@ -198,7 +200,7 @@ def generate_modules(types: NativeTypes) -> dict[str, str]:
             [
                 "                else -> promise.rejectUnknownMethod(method)",
                 "            }",
-                '        } catch (error: Exception) { promise.reject(error.message ?: "Native call failed") }',
+                "        } catch (error: Exception) { promise.reject(error) }",
                 "    }",
                 "}",
                 "",

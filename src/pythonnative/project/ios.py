@@ -29,7 +29,6 @@ Python sources into the project before invoking ``xcodebuild``.
 from __future__ import annotations
 
 import plistlib
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
@@ -88,7 +87,12 @@ class IOSLayout:
 
 
 def configure(
-    project_dir: Path, config: AppConfig, *, release: bool = False, log: Optional[Logger] = None
+    project_dir: Path,
+    config: AppConfig,
+    *,
+    release: bool = False,
+    allow_unsigned: bool = False,
+    log: Optional[Logger] = None,
 ) -> IOSLayout:
     """Configure a staged iOS template for ``config``.
 
@@ -98,6 +102,8 @@ def configure(
         release: Configure a release build, which doesn't talk to the
             dev server (see
             [`configure_info_plist`][pythonnative.project.ios.configure_info_plist]).
+        allow_unsigned: A smoke build that never reaches a store, so
+            release checks such as the required icon don't apply.
         log: Optional progress logger.
 
     Returns:
@@ -113,14 +119,38 @@ def configure(
     if config.ios.privacy_manifest:
         source = config.resolve_path(config.ios.privacy_manifest)
         privacy_manifest(source)
-        shutil.copy2(source, manifest_path)
+        _merge_privacy_manifest(manifest_path, source)
     privacy_manifest(manifest_path)
     configure_info_plist(info_plist, config, release=release)
     write_entitlements(project_dir, config, release=release)
-    _apply_branding(project_dir, config, emit)
+    _apply_branding(project_dir, config, emit, release=release, allow_unsigned=allow_unsigned)
 
     emit(f"Configured iOS project ({config.bundle_id}).")
     return IOSLayout(project_dir=project_dir, info_plist=info_plist, bundle_id=config.bundle_id)
+
+
+def _merge_privacy_manifest(manifest_path: Path, source: Path) -> None:
+    """Add the app's own declarations to the template's, which cover the embedded runtime."""
+    with open(manifest_path, "rb") as handle:
+        merged = plistlib.load(handle)
+    with open(source, "rb") as handle:
+        own = plistlib.load(handle)
+    types = merged.setdefault("NSPrivacyAccessedAPITypes", [])
+    for entry in own.get("NSPrivacyAccessedAPITypes", ()):
+        name = entry.get("NSPrivacyAccessedAPIType")
+        existing = next((item for item in types if item.get("NSPrivacyAccessedAPIType") == name), None)
+        if existing is None:
+            types.append(entry)
+            continue
+        reasons = existing["NSPrivacyAccessedAPITypeReasons"]
+        reasons.extend(reason for reason in entry.get("NSPrivacyAccessedAPITypeReasons", ()) if reason not in reasons)
+    for key in ("NSPrivacyCollectedDataTypes", "NSPrivacyTrackingDomains"):
+        if key in own:
+            values = merged.setdefault(key, [])
+            values.extend(item for item in own[key] if item not in values)
+    merged["NSPrivacyTracking"] = bool(merged.get("NSPrivacyTracking") or own.get("NSPrivacyTracking"))
+    with open(manifest_path, "wb") as handle:
+        plistlib.dump(merged, handle)
 
 
 # ======================================================================
@@ -208,12 +238,17 @@ def write_entitlements(project_dir: Path, config: AppConfig, *, release: bool = 
         capability requires entitlements.
     """
     entitlements = dict(config.resolved_permissions().ios_entitlements)
+    if config.associated_domains:
+        entitlements["com.apple.developer.associated-domains"] = [
+            f"applinks:{domain}" for domain in config.associated_domains
+        ]
+    dest = project_dir / ENTITLEMENTS_FILE
+    dest.unlink(missing_ok=True)
     if not entitlements:
         return None
     if "aps-environment" in entitlements:
         production = release and config.ios.signing.export_method in _PRODUCTION_EXPORTS
         entitlements["aps-environment"] = "production" if production else "development"
-    dest = project_dir / ENTITLEMENTS_FILE
     dest.parent.mkdir(parents=True, exist_ok=True)
     with open(dest, "wb") as handle:
         plistlib.dump(entitlements, handle)
@@ -225,13 +260,23 @@ def write_entitlements(project_dir: Path, config: AppConfig, *, release: bool = 
 # ======================================================================
 
 
-def build_settings(config: AppConfig, *, for_archive: bool = False) -> List[str]:
+def build_settings(
+    config: AppConfig,
+    *,
+    for_archive: bool = False,
+    project_dir: Optional[Path] = None,
+    allow_unsigned: bool = False,
+) -> List[str]:
     """Return ``KEY=VALUE`` ``xcodebuild`` overrides for this config.
 
     Args:
         config: The validated app configuration.
         for_archive: When ``True``, include signing settings appropriate
             for a device archive.
+        project_dir: The staged project. Plugins can add entitlements, so
+            the generated file decides whether signing references it.
+        allow_unsigned: Sign an archive ad hoc, for a CI smoke build
+            that never leaves the runner.
 
     Returns:
         A list of ``"SETTING=value"`` strings to append to an
@@ -249,22 +294,41 @@ def build_settings(config: AppConfig, *, for_archive: bool = False) -> List[str]
     ]
     if config.ios.development_team:
         settings.append(f"DEVELOPMENT_TEAM={config.ios.development_team}")
-    if config.resolved_permissions().ios_entitlements:
-        settings.append(f"CODE_SIGN_ENTITLEMENTS={ENTITLEMENTS_FILE}")
-    if for_archive and not config.ios.signing.provisioning_profile:
-        settings.append("CODE_SIGN_STYLE=Automatic")
+    has_entitlements = (
+        (project_dir / ENTITLEMENTS_FILE).is_file()
+        if project_dir is not None
+        else bool(config.resolved_permissions().ios_entitlements or config.associated_domains)
+    )
+    if has_entitlements:
+        # A command-line setting reaches every target, packages included, so the
+        # template's app target alone refers to this variable. Staging rewrites the
+        # file before each build, which Xcode otherwise takes for tampering.
+        settings += [f"PN_ENTITLEMENTS={ENTITLEMENTS_FILE}", "CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES"]
+    if for_archive:
+        if allow_unsigned:
+            # Xcode can't sign a device build without a team, so it doesn't. BeeWare's
+            # framework step signs for itself and needs an identity, even an ad hoc one.
+            settings += [
+                "CODE_SIGNING_ALLOWED=NO",
+                "EXPANDED_CODE_SIGN_IDENTITY=-",
+                "EXPANDED_CODE_SIGN_IDENTITY_NAME=-",
+            ]
+        elif config.ios.signing.provisioning_profile:
+            settings += [
+                "CODE_SIGN_STYLE=Manual",
+                f"PROVISIONING_PROFILE_SPECIFIER={config.ios.signing.provisioning_profile}",
+            ]
+        else:
+            settings.append("CODE_SIGN_STYLE=Automatic")
     return settings
 
 
-def write_export_options(config: AppConfig, dest: Path, *, upload: bool = False) -> Path:
+def write_export_options(config: AppConfig, dest: Path) -> Path:
     """Write an ``exportOptions.plist`` for ``xcodebuild -exportArchive``.
 
     Args:
         config: The validated app configuration.
         dest: Destination plist path.
-        upload: When ``True``, ask ``xcodebuild`` to upload the build to
-            App Store Connect instead of exporting a local ``.ipa``
-            (requires ``export_method = "app-store"``).
 
     Returns:
         ``dest``.
@@ -275,8 +339,6 @@ def write_export_options(config: AppConfig, dest: Path, *, upload: bool = False)
         "compileBitcode": False,
         "stripSwiftSymbols": True,
     }
-    if upload:
-        options["destination"] = "upload"
     if config.ios.development_team:
         options["teamID"] = config.ios.development_team
     if signing.provisioning_profile:
@@ -296,7 +358,9 @@ def write_export_options(config: AppConfig, dest: Path, *, upload: bool = False)
 # ======================================================================
 
 
-def _apply_branding(project_dir: Path, config: AppConfig, emit: Logger) -> None:
+def _apply_branding(
+    project_dir: Path, config: AppConfig, emit: Logger, *, release: bool = False, allow_unsigned: bool = False
+) -> None:
     assets_dir = project_dir / "ios_template" / "Assets.xcassets"
     icon_path = config.resolve_path(config.icon) if config.icon else None
     splash_path = config.resolve_path(config.splash) if config.splash else None
@@ -304,8 +368,12 @@ def _apply_branding(project_dir: Path, config: AppConfig, emit: Logger) -> None:
     if icon_path and icons.has_source(icon_path):
         if icons.generate_ios_icons(icon_path, assets_dir / "AppIcon.appiconset"):
             emit("Generated iOS app icon.")
+        elif release and not allow_unsigned:
+            raise ValueError("Release builds need Pillow to generate the app icon: pip install 'pythonnative[build]'.")
         else:
             emit("Skipping iOS icon: Pillow not installed (pip install 'pythonnative[build]').")
+    elif release and not allow_unsigned:
+        raise ValueError("App Store validation requires an app icon. Set [assets].icon to a 1024x1024 PNG.")
 
     if splash_path and icons.has_source(splash_path):
         if icons.generate_ios_splash(splash_path, assets_dir / "Splash.imageset"):

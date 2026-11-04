@@ -1,0 +1,175 @@
+{
+  "components": {},
+  "modules": {
+    "Notifications": {
+      "events": {
+        "received": {
+          "additionalProperties": {
+            "type": "json"
+          },
+          "type": "object"
+        },
+        "response": {
+          "additionalProperties": {
+            "type": "json"
+          },
+          "type": "object"
+        }
+      },
+      "methods": {
+        "cancel": {
+          "arguments": {
+            "identifier": {
+              "type": "string"
+            }
+          },
+          "async": true,
+          "defaults": {
+            "identifier": "default"
+          },
+          "required": [],
+          "result": {
+            "type": "null"
+          }
+        },
+        "cancel_all": {
+          "arguments": {},
+          "async": true,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "type": "null"
+          }
+        },
+        "last_response": {
+          "arguments": {},
+          "async": false,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "json"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "request_permission": {
+          "arguments": {},
+          "async": true,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "type": "boolean"
+          }
+        },
+        "schedule": {
+          "arguments": {
+            "badge": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "body": {
+              "type": "string"
+            },
+            "data": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "json"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "delay_seconds": {
+              "type": "number"
+            },
+            "identifier": {
+              "type": "string"
+            },
+            "sound": {
+              "type": "boolean"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "async": true,
+          "defaults": {
+            "badge": null,
+            "body": "",
+            "data": null,
+            "delay_seconds": 0.0,
+            "identifier": "default",
+            "sound": true
+          },
+          "required": [
+            "title"
+          ],
+          "result": {
+            "type": "boolean"
+          }
+        },
+        "set_badge": {
+          "arguments": {
+            "count": {
+              "type": "integer"
+            }
+          },
+          "async": true,
+          "defaults": {},
+          "platforms": [
+            "ios"
+          ],
+          "required": [
+            "count"
+          ],
+          "result": {
+            "type": "null"
+          }
+        },
+        "set_listening": {
+          "arguments": {
+            "event": {
+              "enum": [
+                "received",
+                "response"
+              ]
+            },
+            "listening": {
+              "type": "boolean"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "event",
+            "listening"
+          ],
+          "result": {
+            "type": "null"
+          }
+        }
+      },
+      "name": "Notifications"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

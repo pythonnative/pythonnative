@@ -13,6 +13,8 @@ let package = Package(
         // pn:end-packages
     ],
     targets: [
+        // pn:targets
+        // pn:end-targets
         .target(
             name: "PythonNativeKit",
             dependencies: [

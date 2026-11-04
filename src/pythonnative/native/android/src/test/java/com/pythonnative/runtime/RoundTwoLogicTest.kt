@@ -70,7 +70,9 @@ class RoundTwoLogicTest {
     @Test
     fun modulePayloadsMatchTheContracts() {
         val keyboard = KeyboardModule.payload(216.5, true, 250L).mapValues { it.value.value }
-        assertEquals(mapOf("height" to 216.5, "visible" to true, "duration_ms" to 250.0), keyboard)
+        assertEquals(mapOf("height" to 216.5, "overlap" to 216.5, "visible" to true, "duration_ms" to 250.0), keyboard)
+        // A window that resized itself leaves nothing for KeyboardAvoidingView to avoid.
+        assertEquals(0.0, KeyboardModule.payload(216.5, true, 250L, overlapDp = 0.0).getValue("overlap").value)
         val a11y = AccessibilityInfoModule.payload(screenReader = true, reduceMotion = false).mapValues { it.value.value }
         assertEquals(mapOf("screen_reader" to true, "reduce_motion" to false), a11y)
         val en = LocalizationModule.describe(Locale.forLanguageTag("en-US")).mapValues { it.value.value }

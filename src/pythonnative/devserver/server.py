@@ -490,6 +490,37 @@ class DevServer:
 
         return _remove
 
+    def _web_plugins(self) -> List[Any]:
+        """Plugins with a browser entry: every first-party capability, plus the project's own."""
+        from ..project import plugins as native_plugins
+
+        found = []
+        for name in native_plugins.FIRST_PARTY_PLUGINS:
+            try:
+                found.append(native_plugins.first_party_plugins([name])[0])
+            except native_plugins.PluginError:
+                continue
+        for relative in getattr(self.config, "plugin_paths", ()) or ():
+            try:
+                found.append(native_plugins.load_plugin(self.config.resolve_path(relative)))
+            except native_plugins.PluginError:
+                continue
+        return [plugin for plugin in found if plugin.web_entry]
+
+    def _respond_plugin_file(self, writer: Any, relative: str) -> None:
+        """Serve a file from a plugin's ``web`` directory, and nothing else of the plugin."""
+        name, _, rest = relative.partition("/")
+        plugin = next((item for item in self._web_plugins() if item.name == name), None)
+        if plugin is None or not rest.startswith("web/"):
+            _respond(writer, 404, b"not found", "text/plain")
+            return
+        root = os.path.realpath(os.path.join(str(plugin.root), "web"))
+        candidate = os.path.realpath(os.path.join(str(plugin.root), rest))
+        if os.path.commonpath([root, candidate]) != root:
+            _respond(writer, 404, b"not found", "text/plain")
+            return
+        _respond_file(writer, candidate)
+
     @property
     def project_runtime(self) -> Any:
         """What the project needs from a dev client (computed once, on first use)."""
@@ -691,6 +722,13 @@ class DevServer:
             return
         if path.startswith("/devtools/"):
             path = "/static/devtools/" + path[len("/devtools/") :]
+        if path == "/static/plugins.json":
+            entries = [f"/static/plugins/{plugin.name}/{plugin.web_entry}" for plugin in self._web_plugins()]
+            _respond(writer, 200, json.dumps(entries).encode("utf-8"), "application/json")
+            return
+        if path.startswith("/static/plugins/"):
+            self._respond_plugin_file(writer, path[len("/static/plugins/") :])
+            return
         if path.startswith("/static/"):
             name = path[len("/static/") :]
             root = os.path.realpath(self.static_dir)

@@ -3,14 +3,15 @@
 A dev client syncs Python sources, never native code, so the code it was
 built with has to match the project's:
 
-- **PythonNative Go** carries the framework and every built-in native
-  module, nothing else. It runs a project when its framework version
-  equals the host's (the bundled ``pythonnative`` package can't be
-  replaced while it runs), the project adds no native plugins, and every
-  package the project needs is pure Python.
-- **A project's debug build** carries the framework and plugins it was
-  built with. The framework version and the plugin set must still match;
-  otherwise ``pn run`` must rebuild it.
+- **PythonNative Go** carries the framework, every built-in native
+  module, and every first-party capability, nothing else. It runs a
+  project when its framework version equals the host's (the bundled
+  ``pythonnative`` package can't be replaced while it runs), the project
+  adds no third-party native plugins, and every package the project needs
+  is pure Python.
+- **A project's debug build** carries the framework, capabilities, and
+  plugins it was built with. The framework version and those sets must
+  still match; otherwise ``pn run`` must rebuild it.
 
 [`check`][pythonnative.devserver.compat.check] returns an
 [`Incompatibility`][pythonnative.devserver.compat.Incompatibility] with a
@@ -50,7 +51,8 @@ class ProjectRuntime:
     Attributes:
         pythonnative: The host's framework version.
         protocol: The host's bridge protocol version.
-        plugins: Native plugin names the project uses.
+        plugins: Third-party and local native plugin names the project uses.
+        capabilities: First-party capabilities from ``[plugins].use``.
         requirements: ``[requirements].packages``.
         native_packages: Required distributions with compiled code.
         missing_packages: Requirements that aren't installed on the host.
@@ -59,6 +61,7 @@ class ProjectRuntime:
     pythonnative: str
     protocol: int
     plugins: List[str] = field(default_factory=list)
+    capabilities: List[str] = field(default_factory=list)
     requirements: List[str] = field(default_factory=list)
     native_packages: List[str] = field(default_factory=list)
     missing_packages: List[str] = field(default_factory=list)
@@ -66,7 +69,9 @@ class ProjectRuntime:
     @property
     def go_compatible(self) -> bool:
         """Whether PythonNative Go can run this project."""
-        return not self.plugins and not self.native_packages
+        from ..project.plugins import NOT_IN_GO
+
+        return not self.plugins and not self.native_packages and not set(self.capabilities) & set(NOT_IN_GO)
 
 
 def _framework_version() -> str:
@@ -111,6 +116,7 @@ def project_runtime(config: Any = None) -> ProjectRuntime:
         pythonnative=_framework_version(),
         protocol=PROTOCOL_VERSION,
         plugins=_plugin_names(requirements, plugin_paths),
+        capabilities=sorted(getattr(config, "plugin_use", ()) or ()),
         requirements=requirements,
         native_packages=sorted(dist.name for dist in distributions if not dist.pure),
         missing_packages=missing,
@@ -148,6 +154,14 @@ def check(hello: Dict[str, Any], project: ProjectRuntime) -> Optional[Incompatib
             rebuild,
         )
     if kind == "go":
+        from ..project.plugins import NOT_IN_GO
+
+        own_build = sorted(set(project.capabilities) & set(NOT_IN_GO))
+        if own_build:
+            return Incompatibility(
+                f"PythonNative Go doesn't include {', '.join(own_build)}, which only works in the app's own build.",
+                f"Build its development app with `pn run {platform}`.",
+            )
         if project.plugins:
             return Incompatibility(
                 f"This project adds native code ({', '.join(project.plugins)}), which PythonNative Go doesn't "
@@ -173,4 +187,8 @@ def check(hello: Dict[str, Any], project: ProjectRuntime) -> Optional[Incompatib
         return Incompatibility(
             f"The project's native plugins changed since this build ({'; '.join(changes)}).", rebuild
         )
+    built_capabilities = {str(name) for name in runtime.get("capabilities") or []}
+    missing = sorted(set(project.capabilities) - built_capabilities)
+    if missing:
+        return Incompatibility(f"This build doesn't include {', '.join(missing)} from [plugins].use.", rebuild)
     return None

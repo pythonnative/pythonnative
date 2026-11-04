@@ -71,6 +71,7 @@ _safe_area_insets: SafeAreaInsets = SafeAreaInsets(0.0, 0.0, 0.0, 0.0)
 _window_dimensions: WindowDimensions = WindowDimensions(0.0, 0.0)
 _screen_dimensions: WindowDimensions = WindowDimensions(0.0, 0.0)
 _keyboard_height: float = 0.0
+_keyboard_overlap: float = 0.0
 
 _subscribers: List[Callable[[], None]] = []
 _subscribers_lock = threading.Lock()
@@ -261,17 +262,24 @@ def reset_screen_dimensions() -> None:
     _screen_dimensions = WindowDimensions(0.0, 0.0)
 
 
-def set_keyboard_height(height: float) -> None:
+def set_keyboard_height(height: float, overlap: Optional[float] = None) -> None:
     """Publish the on-screen keyboard height in layout units.
 
     Negative inputs are clamped to ``0.0``. Notifies subscribers only
-    when the value actually changes.
+    when a value actually changes.
+
+    Args:
+        height: The keyboard's height.
+        overlap: How much of it still covers the content, for a window that
+            resized itself for part of it. Defaults to all of it.
     """
-    global _keyboard_height
+    global _keyboard_height, _keyboard_overlap
     new_h = max(0.0, float(height))
-    if new_h == _keyboard_height:
+    new_overlap = new_h if overlap is None else max(0.0, float(overlap))
+    if new_h == _keyboard_height and new_overlap == _keyboard_overlap:
         return
     _keyboard_height = new_h
+    _keyboard_overlap = new_overlap
     _notify_subscribers()
 
 
@@ -280,10 +288,16 @@ def get_keyboard_height() -> float:
     return _keyboard_height
 
 
+def get_keyboard_overlap() -> float:
+    """Return how much of the keyboard still covers the content."""
+    return _keyboard_overlap
+
+
 def reset_keyboard_height() -> None:
     """Reset the keyboard height back to ``0.0``. Intended for tests."""
-    global _keyboard_height
+    global _keyboard_height, _keyboard_overlap
     _keyboard_height = 0.0
+    _keyboard_overlap = 0.0
 
 
 # ======================================================================

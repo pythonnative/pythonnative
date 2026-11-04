@@ -1,15 +1,12 @@
 package com.pythonnative.runtime
 
 import android.app.Activity
-import android.app.AlarmManager
-import android.app.NotificationManager
 import android.content.Context
 import android.text.InputType
 import android.widget.EditText
 import android.widget.FrameLayout
 import com.pythonnative.runtime.mount.MountOp
 import com.pythonnative.runtime.mount.Mounter
-import com.pythonnative.runtime.modules.NotificationScheduler
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
@@ -66,19 +63,46 @@ class NativeLifecycleTest {
         assertEquals("typed clipboard", JSONObject(value.markReturned()).getString("value"))
     }
 
+    @Test fun lifecycleHooksSeeEventsAndReportWhetherTheyConsumedThem() {
+        val seen = ArrayList<Int>()
+        val hook = object : com.pythonnative.runtime.modules.PNLifecycleHook {
+            override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?): Boolean {
+                seen.add(requestCode)
+                return requestCode == 7
+            }
+        }
+        com.pythonnative.runtime.bridge.PNRegistry.registerLifecycleHook(hook)
+        assertTrue(com.pythonnative.runtime.modules.BuiltinModules.onActivityResult(7, 0, null))
+        assertFalse(com.pythonnative.runtime.modules.BuiltinModules.onActivityResult(8, 0, null))
+        assertEquals(listOf(7, 8), seen)
+    }
+
+    @Test fun permissionsAnswerForRegisteredNamesAndRejectOthers() {
+        com.pythonnative.runtime.modules.PNPermissions.register("pn_test_permission", "android.permission.CAMERA")
+        val module = com.pythonnative.runtime.modules.PermissionsModule()
+        var status: Result<String>? = null
+        module.check("pn_test_permission") { status = it }
+        assertEquals(com.pythonnative.runtime.modules.PermissionsModule.DENIED, status!!.getOrThrow())
+        module.check("pn_no_such_permission") { status = it }
+        val failure = status!!.exceptionOrNull() as com.pythonnative.runtime.modules.PNModuleError
+        assertEquals("plugin_not_enabled", failure.code)
+    }
+
     @Test fun generatedAdapterRejectsInvalidLateNativeResult() {
-        var complete: ((Result<Map<String, Double>?>) -> Unit)? = null
-        val implementation = object : com.pythonnative.generated.LocationImplementation {
-            override fun get_current(accuracy: com.pythonnative.generated.PNLocationGetCurrentAccuracy, timeout: Double, completion: (Result<Map<String, Double>?>) -> Unit): (() -> Unit)? {
+        var complete: ((Result<com.pythonnative.generated.PNImageSize>) -> Unit)? = null
+        val implementation = object : com.pythonnative.generated.ImagesImplementation {
+            override fun clear_cache() {}
+            override fun prefetch(uri: String, completion: (Result<Boolean>) -> Unit): (() -> Unit)? = null
+            override fun get_size(uri: String, completion: (Result<com.pythonnative.generated.PNImageSize>) -> Unit): (() -> Unit)? {
                 complete = completion
                 return null
             }
         }
-        val adapter = com.pythonnative.generated.LocationModuleAdapter(implementation)
-        val promise = com.pythonnative.runtime.modules.Promise(200, "Location")
-        adapter.call("get_current", JSONObject(), promise)
+        val adapter = com.pythonnative.generated.ImagesModuleAdapter(implementation)
+        val promise = com.pythonnative.runtime.modules.Promise(200, "Images")
+        adapter.call("get_size", JSONObject().put("uri", "x"), promise)
         assertTrue(JSONObject(promise.markReturned()).getBoolean("pending"))
-        complete!!(Result.success(mapOf("latitude" to Double.NaN)))
+        complete!!(Result.success(com.pythonnative.generated.PNImageSize(width = Double.NaN, height = 1.0)))
         assertTrue(promise.isSettled)
     }
 
@@ -118,22 +142,6 @@ class NativeLifecycleTest {
         assertNull(PNBridge.registry.get(1))
     }
 
-    @Test fun scheduledNotificationDeliversWithoutAnActivityOrPythonHost() {
-        val context = activity.applicationContext
-        val args = JSONObject().put("title", "Persisted reminder").put("delay_seconds", 60).put("identifier", "survives")
-        assertTrue(NotificationScheduler.schedule(context, args.optString("title"), args.optString("body"), args.optDouble("delay_seconds"), args.optString("identifier")))
-        val alarms = shadowOf(context.getSystemService(Context.ALARM_SERVICE) as AlarmManager)
-        val alarm = alarms.nextScheduledAlarm
-        assertNotNull(alarm)
-        PNBridge.clearContext(activity)
-        alarm!!.operation!!.send()
-        shadowOf(android.os.Looper.getMainLooper()).idle()
-        val notifications = shadowOf(context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-        assertEquals("Persisted reminder", notifications.getNotification("survives", 0).extras.getString("android.title"))
-        NotificationScheduler.cancel(context, "survives")
-        assertNull(notifications.getNotification("survives", 0))
-    }
-
     @Test fun containerResetRetainsPhysicalIdentityAndInsertedChildren() {
         applier.applyOp(MountOp.Create(10, "View", JSONObject().put("background_color", "#ff0000")))
         applier.applyOp(MountOp.Create(11, "Text", JSONObject().put("text", "child")))
@@ -146,14 +154,4 @@ class NativeLifecycleTest {
         assertEquals(1, replacement.childCount)
     }
 
-    @Test fun replacingAndCancelingIdentifiersDoesNotLeaveDuplicateAlarms() {
-        val context = activity.applicationContext
-        val args = JSONObject().put("title", "A").put("delay_seconds", 60).put("identifier", "same")
-        assertTrue(NotificationScheduler.schedule(context, args.optString("title"), args.optString("body"), args.optDouble("delay_seconds"), args.optString("identifier")))
-        assertTrue(NotificationScheduler.schedule(context, "B", args.optString("body"), args.optDouble("delay_seconds"), args.optString("identifier")))
-        val alarms = shadowOf(context.getSystemService(Context.ALARM_SERVICE) as AlarmManager)
-        assertEquals(1, alarms.scheduledAlarms.size)
-        NotificationScheduler.cancel(context, "same")
-        assertTrue(alarms.scheduledAlarms.isEmpty())
-    }
 }

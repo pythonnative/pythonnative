@@ -339,43 +339,6 @@ class FallbackPermissions:
         return "undetermined"
 
 
-class FallbackNotifications:
-    def request_permission(self) -> bool:
-        return False
-
-    def schedule(self, title: str, body: str = "", delay_seconds: float = 0, identifier: str = "default") -> bool:
-        del title, body, delay_seconds, identifier
-        return False
-
-    def cancel(self, identifier: str = "default") -> None:
-        del identifier
-
-    def get_device_token(self) -> Optional[str]:
-        return None
-
-
-class FallbackCamera:
-    def take_photo(self, *, quality: float = 0.9, allow_editing: bool = False) -> Optional[str]:
-        return None
-
-    def pick_from_gallery(self, *, quality: float = 0.9, allow_editing: bool = False) -> Optional[str]:
-        return None
-
-
-class FallbackLocation:
-    def get_current(self, *, accuracy: str = "balanced", timeout: float = 10.0) -> Optional[Dict[str, float]]:
-        return None
-
-
-class FallbackBiometrics:
-    def is_available(self) -> bool:
-        return False
-
-    def authenticate(self, reason: str = "Authenticate") -> bool:
-        del reason
-        return False
-
-
 # ======================================================================
 # Assets and images
 # ======================================================================
@@ -520,10 +483,6 @@ _DEFAULTS: Dict[str, Callable[[], Any]] = {
     "Battery": FallbackBattery,
     "NetInfo": FallbackNetInfo,
     "Permissions": FallbackPermissions,
-    "Notifications": FallbackNotifications,
-    "Camera": FallbackCamera,
-    "Location": FallbackLocation,
-    "Biometrics": FallbackBiometrics,
     "Assets": FallbackAssets,
     "Images": FallbackImages,
     "WebViews": FallbackWebViews,

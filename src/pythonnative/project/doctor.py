@@ -306,6 +306,19 @@ def check_config(project_root: Path) -> tuple[Optional[AppConfig], List[CheckRes
         results.append(CheckResult("pythonnative.toml", ERROR, str(exc).splitlines()[0]))
         return None, results
     results.append(CheckResult("pythonnative.toml", OK, f"{config.app_id} (v{config.version})"))
+    if config.plugin_use:
+        from . import plugin_config, plugins
+
+        try:
+            plugin_config.resolve_all(plugins.first_party_plugins(config.plugin_use), config)
+            results.append(CheckResult("Capabilities", OK, ", ".join(config.plugin_use)))
+        except plugins.PluginError as exc:
+            results.append(CheckResult("Capabilities", ERROR, str(exc)))
+    if not config.icon:
+        results.append(CheckResult("App icon", INFO, "not set; release builds need [assets].icon"))
+    if config.associated_domains:
+        domains = ", ".join(config.associated_domains)
+        results.append(CheckResult("Associated domains", INFO, f"{domains}; 'pn links' prints the files they host"))
     return config, results
 
 

@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import pythonnative as pn
 from app.screens.scaffold import DemoScreen, DemoSection, Hint
+from pythonnative.style import TransformSpec
 
 
-def _box(label: str, color: str, transform: pn.TransformSpec) -> pn.Element:
+def _box(label: str, color: str, transform: TransformSpec) -> pn.Element:
     return pn.View(
         pn.Text(label, style=pn.style(color="#FFFFFF")),
         style=pn.style(padding=8, background_color=color, transform=transform),

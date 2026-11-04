@@ -36,7 +36,6 @@ def test_public_api_names() -> None:
         "WebView",
         # Core
         "Node",
-        "create_screen",
         # Hooks
         "batch_updates",
         "component",

@@ -1,0 +1,80 @@
+{
+  "components": {},
+  "modules": {
+    "Sensors": {
+      "events": {
+        "reading": {
+          "additionalProperties": {
+            "type": "json"
+          },
+          "type": "object"
+        }
+      },
+      "methods": {
+        "is_available": {
+          "arguments": {
+            "sensor": {
+              "enum": [
+                "accelerometer",
+                "gyroscope",
+                "magnetometer",
+                "barometer"
+              ]
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "sensor"
+          ],
+          "result": {
+            "type": "boolean"
+          }
+        },
+        "start": {
+          "arguments": {
+            "hz": {
+              "type": "number"
+            },
+            "sensor": {
+              "enum": [
+                "accelerometer",
+                "gyroscope",
+                "magnetometer",
+                "barometer"
+              ]
+            }
+          },
+          "async": true,
+          "defaults": {
+            "hz": 30.0
+          },
+          "required": [
+            "sensor"
+          ],
+          "result": {
+            "type": "integer"
+          }
+        },
+        "stop": {
+          "arguments": {
+            "id": {
+              "type": "integer"
+            }
+          },
+          "async": false,
+          "defaults": {},
+          "required": [
+            "id"
+          ],
+          "result": {
+            "type": "null"
+          }
+        }
+      },
+      "name": "Sensors"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

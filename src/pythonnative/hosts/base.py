@@ -13,6 +13,7 @@ import asyncio
 import importlib
 import json
 import sys
+import time
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -20,6 +21,8 @@ from .. import diagnostics
 from ..element import Element
 
 __all__ = ["ScreenHost", "import_component"]
+
+_RECOVERY_WINDOW_SECONDS = 60.0
 
 
 # ======================================================================
@@ -107,6 +110,9 @@ class ScreenHost:
         self._render_queued = False
         self._redbox_visible = False
         self._refresh_task: asyncio.Task[Any] | None = None
+        self._recovering = False
+        self._last_recovery: Optional[float] = None
+        self._gave_up: Optional[BaseException] = None
 
     # ------------------------------------------------------------------
     # Platform primitives (override)
@@ -193,6 +199,7 @@ class ScreenHost:
                 self._is_rendering = False
         except Exception as exc:
             if not diagnostics.is_dev():
+                diagnostics.handle_error(exc, "mount")
                 raise
             self.show_redbox(exc, phase="mount")
 
@@ -279,7 +286,16 @@ class ScreenHost:
         from ..navigation.host import HostRoot
 
         self.component = import_component(self.component_path)
-        return HostRoot(self.component(), host=self)
+        if diagnostics.is_dev():
+            return HostRoot(self.component(), host=self)
+        # A release build has no error screen, so no error may leave a broken one.
+        from ..components.structural import ErrorBoundary, root_error_fallback
+
+        def caught(error: BaseException) -> None:
+            diagnostics.handle_error(error, "render")
+
+        content = root_error_fallback(self._gave_up, self._restart) if self._gave_up else self.component()
+        return HostRoot(ErrorBoundary(content, fallback=root_error_fallback, on_error=caught), host=self)
 
     def _new_reconciler(self) -> Any:
         from ..native_views import get_backend
@@ -311,10 +327,47 @@ class ScreenHost:
             else:
                 from ..runtime import get_loop
 
+                diagnostics.handle_error(error, "mount")
                 get_loop().call_exception_handler({"message": "Native commit failed", "exception": error})
+                self._recover_surface(error)
 
         reconciler.on_commit_error = failed
+        reconciler.backend.on_surface_failed = self._recover_surface
         return reconciler
+
+    def _recover_surface(self, error: BaseException) -> None:
+        """Remount after the UI thread couldn't mount a transaction, in a release build.
+
+        The first failure gets a fresh tree. A second within a minute means the
+        tree itself is what breaks mounting, so the retry mounts the fallback
+        screen instead of looping. If the fallback can't mount either, nothing
+        a remount would build can, so it stops there. Development builds show
+        the error screen.
+        """
+        if diagnostics.is_dev() or self._recovering or self.reconciler is None:
+            return
+        now = time.monotonic()
+        recent = self._last_recovery is not None and now - self._last_recovery < _RECOVERY_WINDOW_SECONDS
+        if recent and self._gave_up is not None:
+            return
+        if recent:
+            self._gave_up = error
+        self._last_recovery = now
+        self._recovering = True
+
+        def recover() -> None:
+            self._recovering = False
+            self._full_remount(())
+
+        from ..runtime import get_loop
+
+        get_loop().call_soon_threadsafe(recover)
+
+    def _restart(self) -> None:
+        """The fallback's retry: clear the failure and mount the app again."""
+        self._gave_up = None
+        self._last_recovery = None
+        self._full_remount(())
 
     def _seed_viewport(self) -> None:
         """Give the reconciler a plausible viewport before the first mount.
@@ -352,6 +405,7 @@ class ScreenHost:
                 self._is_rendering = False
         except Exception as exc:
             if not diagnostics.is_dev():
+                diagnostics.handle_error(exc, "render")
                 raise
             self.show_redbox(exc, phase="render")
         diagnostics.log("_re_render: done")
@@ -392,6 +446,7 @@ class ScreenHost:
             traceback.print_exception(type(exc), exc, exc.__traceback__)
         except Exception:
             pass
+        diagnostics.handle_error(exc, phase)
         diagnostics.notify_error(exc, phase)
 
         def show() -> None:

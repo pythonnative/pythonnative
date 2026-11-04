@@ -143,7 +143,10 @@ marks the surface failed and sends a `host` message named
 `surface_failed` with `{"surface", "error"}`. A failed surface rejects
 further incremental commits. A new application identity and a complete
 remount establish a clean surface; replaying a partial commit isn't a
-recovery strategy. The current app host uses one surface.
+recovery strategy. The current app host uses one surface. In a release build
+it schedules that remount itself. A second failure within a minute mounts the
+fallback screen instead, so a broken tree can't loop, and every failure reaches
+[`pn.set_error_handler`][pythonnative.set_error_handler] with the phase `mount`.
 
 The application loop keeps running while an acknowledgement is pending.
 A reconciler queues state writes instead of rendering against an
@@ -285,7 +288,18 @@ Module calls carry a call ID and arguments. A module can settle inline or return
 `pending` and settle later. Cancellation removes the Python waiter and notifies
 the native promise. Swift `PNPromise.onCancel` and Kotlin `Promise.onCancel`
 allow implementations to release underlying work. The core validates module
-arguments against the same contracts (`pn_core_validate_module`).
+arguments against the same contracts (`pn_core_validate_module`). A call to a
+module no plugin in the build registered comes back as `unknown_module`. When a
+capability's facade declared that module, Python raises it as
+`NativeModuleError` with the code `plugin_not_enabled`, naming the
+`[plugins].use` entry to add.
+
+Native code can reach Python when there's no screen. On Android, a plugin that
+runs in a process started by a push or a background job calls
+`PNHeadless.ensureStarted()`, which starts Python if it isn't running and imports
+the app's entry module so its registrations run. On iOS, Python starts on every
+launch. Either way, the plugin then delivers through the normal module event path,
+and no surface exists until an activity or scene asks for one.
 
 The SDK derives component and module contracts from Python dataclasses,
 annotations, and protocols. `pn codegen` produces typed Swift and Kotlin
@@ -293,7 +307,9 @@ props, values, and module adapters, Python facades, and reference
 documentation. The built-in contracts are derived once, at code
 generation, into `pythonnative/sdk/_builtin_contracts.json`, which `import
 pythonnative` reads instead of evaluating annotations. Plugin manifests can
-name a generated contract file; builders merge it with the built-ins.
+name a generated contract file, which each first-party capability does with its
+`native/schema.json`; builders merge the ones in the app's build with the
+built-ins, so the contract fingerprint differs from app to app.
 Before the first commit, Python passes the merged contract document to
 `pn_core_load_contracts`, which compiles it into indexed tables; the core
 rejects commits until contracts are loaded. Startup checks the protocol

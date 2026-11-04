@@ -43,7 +43,9 @@ __all__ = [
     "get_warnings",
     "clear_warnings",
     "set_error_reporter",
+    "handle_error",
     "report_error",
+    "set_error_handler",
     "add_listener",
 ]
 
@@ -316,8 +318,49 @@ def notify_error(exc: BaseException, phase: str) -> None:
         pass
 
 
+_error_handler: Optional[Callable[[BaseException, str], None]] = None
+
+
+def set_error_handler(handler: Optional[Callable[[BaseException, str], None]]) -> None:
+    """Receive every uncaught error, in development and release builds alike.
+
+    This is where a crash reporter attaches. ``handler`` gets the exception and
+    the phase it came from (``"render"``, ``"effect"``, ``"event"``, ``"async"``,
+    ``"mount"``, and similar). It runs on the application thread and should
+    return quickly. An error it raises itself is printed and dropped. Errors a
+    boundary of your own catches don't arrive here; use its ``on_error``.
+
+    Args:
+        handler: The callback, or ``None`` to remove the current one.
+
+    Example:
+        ```python
+        import pythonnative as pn
+
+        pn.set_error_handler(lambda error, phase: crash_reporter.capture(error, tags={"phase": phase}))
+        ```
+    """
+    global _error_handler
+    _error_handler = handler
+
+
+def handle_error(exc: BaseException, phase: str) -> None:
+    """Tell the app's error handler about ``exc``, at most once per exception."""
+    handler = _error_handler
+    if handler is None or getattr(exc, "_pn_handled", False):
+        return
+    try:
+        exc._pn_handled = True  # type: ignore[attr-defined]
+    except AttributeError:
+        pass
+    try:
+        handler(exc, phase)
+    except Exception:
+        traceback.print_exc()
+
+
 def report_error(exc: BaseException, phase: str = "runtime") -> bool:
-    """Route ``exc`` to the active RedBox reporter (dev mode only).
+    """Give ``exc`` to the app's error handler, and to the RedBox reporter in dev mode.
 
     Args:
         exc: The exception to display.
@@ -329,6 +372,7 @@ def report_error(exc: BaseException, phase: str = "runtime") -> bool:
         reporter is registered (or dev mode is off), in which case the
         caller should fall back to its default behavior.
     """
+    handle_error(exc, phase)
     if not is_dev():
         return False
     with _reporter_lock:

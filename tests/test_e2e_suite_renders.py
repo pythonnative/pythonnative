@@ -23,6 +23,7 @@ import pytest
 
 import pythonnative as pn
 from pythonnative import appearance
+from pythonnative.animated import ANIMATABLE_PROPS
 from pythonnative.testing import RenderResult, render
 
 _SUITE_DIR = Path(__file__).parents[1] / "examples" / "e2e-suite"
@@ -375,7 +376,7 @@ def test_device_demos_read_fallback_values(suite: RenderResult) -> None:
 def test_easing_and_decay_demos_complete(suite: RenderResult) -> None:
     _open(suite, "easing")
     assert suite.get_by_text("Rejects unknown easing: yes")
-    assert suite.get_by_text(f"Animatable props: {len(pn.ANIMATABLE_PROPS)}")
+    assert suite.get_by_text(f"Animatable props: {len(ANIMATABLE_PROPS)}")
     suite.press(suite.get_by_text("Run all curves"))
     assert suite.find_by_text("Curves run: 9", timeout=10.0)
     assert suite.get_by_text("Status: done")

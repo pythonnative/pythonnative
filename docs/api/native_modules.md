@@ -1,15 +1,20 @@
 # Native modules
 
 Cross-platform wrappers around device APIs that are not part of the
-view tree: camera, GPS, file I/O, notifications, clipboard, share
-sheet, deep links, permissions, connectivity, secure storage, battery,
-haptics, biometrics, and the React Native core set of `Keyboard`,
-`Dimensions`, `PixelRatio`, `Device`, `Localization`, and
-`AccessibilityInfo`. Each module is a Swift and a Kotlin class
-registered by name in the native runtime; the Python classes below are
-facades that call them through
+view tree and that every app gets: file I/O, clipboard, share sheet,
+deep links, permissions, connectivity, secure storage, battery, haptics,
+and the React Native core set of `Keyboard`, `Dimensions`, `PixelRatio`,
+`Device`, `Localization`, and `AccessibilityInfo`. Each module is a Swift
+and a Kotlin class registered by name in the native runtime; the Python
+classes below are facades that call them through
 [`native_module`][pythonnative.native_modules.registry.native_module],
 with a Python implementation registered for the desktop and tests.
+
+The camera, location, notifications, biometrics, and other hardware
+features aren't here. They're opt-in
+[capabilities](../guides/capabilities/index.md), with their own pages in
+this reference.
+
 Return values are frozen dataclasses
 ([`DeviceInfo`][pythonnative.DeviceInfo], [`Locale`][pythonnative.Locale],
 [`KeyboardEvent`][pythonnative.KeyboardEvent], ...).
@@ -88,36 +93,9 @@ the runtime coroutines are scheduled on, see the
       members_order: source
       filters: ["!^_"]
 
-## Camera
-
-::: pythonnative.native_modules.camera
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
-
-## Location
-
-::: pythonnative.native_modules.location
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
-
 ## File system
 
 ::: pythonnative.native_modules.file_system
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
-
-## Notifications
-
-::: pythonnative.native_modules.notifications
     options:
       show_root_heading: false
       show_root_toc_entry: false
@@ -205,17 +183,9 @@ the runtime coroutines are scheduled on, see the
       members_order: source
       filters: ["!^_"]
 
-## Biometrics
-
-::: pythonnative.native_modules.biometrics
-    options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      members_order: source
-      filters: ["!^_"]
-
 ## Next steps
 
 - See guidance and permission setup in [Native modules guide](../guides/native-modules.md).
+- Enable a device feature: [Capabilities](../guides/capabilities/index.md).
 - Accessibility settings and hooks: [Platform & Accessibility](../guides/platform-accessibility.md#accessibility-settings-accessibilityinfo).
 - Write your own: [Native modules guide](../guides/native-modules.md#writing-your-own-native-module).

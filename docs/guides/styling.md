@@ -73,8 +73,8 @@ pn.View(content, style=[Styles.card, {"opacity": 0.5}])
 A list is the only composition tool you need: there's no `compose` or
 `flatten` helper to learn. When you need the merged dict itself (for
 example, to read one key), call
-[`pn.resolve_style`][pythonnative.style.resolve_style], which flattens a
-style prop into a fresh dict.
+[`pythonnative.style.resolve_style`][pythonnative.style.resolve_style],
+which flattens a style prop into a fresh dict.
 
 ### Styles in your own components
 
@@ -549,7 +549,7 @@ pn.View(
 
 ## Transforms
 
-`transform` ([`TransformSpec`][pythonnative.TransformSpec]) is a single
+`transform` ([`TransformSpec`][pythonnative.style.TransformSpec]) is a single
 operation or an ordered list of operations, each a one-key mapping:
 
 ```python

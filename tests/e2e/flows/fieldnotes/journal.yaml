@@ -1,0 +1,212 @@
+# The longer pass through examples/fieldnotes, with no sync server configured and
+# nothing that needs a camera or a store: writing and editing entries, searching,
+# tags, the guard on unsaved edits, a reminder, the map, settings, the store's
+# unavailable state, the error log, and deleting.
+#
+#     maestro test -e APP_ID=dev.pythonnative.fieldnotes tests/e2e/flows/fieldnotes/journal.yaml
+#
+# Source under test: examples/fieldnotes/app/ui/
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+      location: inuse
+- extendedWaitUntil:
+    visible: "An empty notebook"
+    timeout: 60000
+
+# Write two entries.
+- tapOn: "New entry"
+# Maestro can't pre-grant "while in use" on Android, so the real prompt appears,
+# sometimes only after the editor does. Answer it whenever it shows up until the
+# lookup it started is over (at most about 15 seconds), so it can't cover the
+# fields the next steps tap.
+- extendedWaitUntil:
+    visible: "(Save|While using the app)"
+    timeout: 10000
+- repeat:
+    while:
+      visible: "(Finding where you are.*|While using the app)"
+    times: 20
+    commands:
+      - tapOn:
+          text: "While using the app"
+          optional: true
+- extendedWaitUntil:
+    visible: "Save"
+    timeout: 10000
+- tapOn:
+    id: "field-notes"
+- inputText: "Standing in the shallows"
+- tapOn:
+    id: "field-title"
+- inputText: "Heron at the mill"
+- tapOn:
+    id: "field-tags"
+- inputText: "birds river"
+- tapOn: "Save"
+- extendedWaitUntil:
+    visible: "Attachments"
+    timeout: 10000
+- assertVisible: "#birds"
+- runFlow: _back.yaml
+- extendedWaitUntil:
+    visible: "Heron at the mill"
+    timeout: 10000
+- tapOn: "New entry"
+# Maestro can't pre-grant "while in use" on Android, so the real prompt appears,
+# sometimes only after the editor does. Answer it whenever it shows up until the
+# lookup it started is over (at most about 15 seconds), so it can't cover the
+# fields the next steps tap.
+- extendedWaitUntil:
+    visible: "(Save|While using the app)"
+    timeout: 10000
+- repeat:
+    while:
+      visible: "(Finding where you are.*|While using the app)"
+    times: 20
+    commands:
+      - tapOn:
+          text: "While using the app"
+          optional: true
+- extendedWaitUntil:
+    visible: "Save"
+    timeout: 10000
+- tapOn:
+    id: "field-title"
+- inputText: "Ridge walk"
+- tapOn: "Save"
+- extendedWaitUntil:
+    visible: "Attachments"
+    timeout: 10000
+- runFlow: _back.yaml
+- extendedWaitUntil:
+    visible: "Ridge walk"
+    timeout: 10000
+
+# Search by word, and filter by tag.
+- tapOn:
+    id: "journal-search"
+- inputText: "shallows"
+- extendedWaitUntil:
+    notVisible: "Ridge walk"
+    timeout: 5000
+- assertVisible: "Heron at the mill"
+
+# Edit, and let the guard catch an unsaved change.
+- tapOn: "Heron at the mill"
+- extendedWaitUntil:
+    visible: "Standing in the shallows"
+    timeout: 10000
+- tapOn: "Edit"
+- extendedWaitUntil:
+    visible: "Save"
+    timeout: 10000
+- tapOn:
+    id: "field-title"
+- inputText: " today"
+# On Android, the first back only closes the keyboard.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow: _back.yaml
+- extendedWaitUntil:
+    visible: "Discard changes?"
+    timeout: 5000
+- tapOn: "Keep editing"
+- tapOn: "Save"
+- extendedWaitUntil:
+    visible: "Heron at the mill today"
+    timeout: 10000
+
+# A reminder, set and canceled.
+- scrollUntilVisible:
+    element: "Next week"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Next week"
+- extendedWaitUntil:
+    visible: "Cancel reminder"
+    timeout: 10000
+- tapOn: "Cancel reminder"
+- extendedWaitUntil:
+    visible: "Next week"
+    timeout: 10000
+- scrollUntilVisible:
+    element: "Delete"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+
+# Delete it, after confirming.
+- tapOn: "Delete"
+- extendedWaitUntil:
+    visible: "Delete this entry?"
+    timeout: 5000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: "Delete"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: "DELETE"
+# The search is still in the field, and its one match is gone.
+- extendedWaitUntil:
+    visible: "No matches"
+    timeout: 10000
+- tapOn:
+    id: "journal-search"
+- eraseText
+- extendedWaitUntil:
+    visible: "Ridge walk"
+    timeout: 10000
+- pressKey: Enter
+- assertNotVisible: "Heron at the mill today"
+
+# The map tab counts what it can show. Android has no Maps key here, and says so.
+- tapOn: "Map"
+- extendedWaitUntil:
+    visible: ".* of 1 entries have a location."
+    timeout: 10000
+
+# Settings: offline, the store's state, and the error log.
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "Offline. No sync server is set, so your journal stays on this device."
+    timeout: 10000
+- tapOn: "See Pro"
+- extendedWaitUntil:
+    visible: "One purchase, no subscription."
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "(The store isn't available.*|Pro isn't on sale.*|Couldn't reach the store.*|Unlock Pro for .*)"
+    timeout: 30000
+- runFlow: _back.yaml
+- scrollUntilVisible:
+    element: "Log a test error"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Log a test error"
+# A debug build shows the error screen over the app. A release build goes straight on.
+- runFlow:
+    when:
+      visible: "Dismiss"
+    commands:
+      - tapOn: "Dismiss"
+- tapOn: "Error log"
+- extendedWaitUntil:
+    visible: "TestError: This is a test of the error log."
+    timeout: 10000
+- tapOn: "Clear"
+- extendedWaitUntil:
+    visible: "No errors"
+    timeout: 5000

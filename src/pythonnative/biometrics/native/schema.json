@@ -1,0 +1,37 @@
+{
+  "components": {},
+  "modules": {
+    "Biometrics": {
+      "events": {},
+      "methods": {
+        "authenticate": {
+          "arguments": {
+            "reason": {
+              "type": "string"
+            }
+          },
+          "async": true,
+          "defaults": {
+            "reason": "Authenticate"
+          },
+          "required": [],
+          "result": {
+            "type": "boolean"
+          }
+        },
+        "is_available": {
+          "arguments": {},
+          "async": false,
+          "defaults": {},
+          "required": [],
+          "result": {
+            "type": "boolean"
+          }
+        }
+      },
+      "name": "Biometrics"
+    }
+  },
+  "protocol": 7,
+  "yoga": "3.2.1"
+}

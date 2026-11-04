@@ -163,79 +163,6 @@ public enum BatteryEvents {
     public static func `change`(_ payload: [String: PNJSONValue]) { PNModuleEvents.emit(module: "Battery", event: "change", payload: PNValues.encode(payload)) }
 }
 
-public protocol BiometricsImplementation {
-    init()
-    func `authenticate`(`reason`: String, completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)?
-    func `is_available`() throws -> Bool
-}
-
-public final class BiometricsModuleAdapter<Implementation: BiometricsImplementation>: PNNativeModule {
-    public static var name: String { "Biometrics" }
-    private let implementation: Implementation
-    public init() { implementation = Implementation() }
-    public init(implementation: Implementation) { self.implementation = implementation }
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        do {
-            guard PNContracts.validateModule("Biometrics", method, args) else { throw NativeDecodeError.invalid("Biometrics.\(method)") }
-            switch method {
-            case "authenticate":
-                let `reason` = try PNValues.decode(String.self, args["reason"] ?? PNValues.defaultValue("\"Authenticate\""))
-                let cancellation = implementation.`authenticate`(`reason`: `reason`) { result in
-                    switch result {
-                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
-                    case .failure(let error): promise.reject(error)
-                    }
-                }
-                if let cancellation = cancellation { promise.onCancel(cancellation) }
-            case "is_available":
-                promise.resolve(try PNValues.checkedEncode(implementation.`is_available`()))
-            default: promise.reject("Unknown method", code: "unknown_method")
-            }
-        } catch { promise.reject(error) }
-    }
-}
-
-public protocol CameraImplementation {
-    init()
-    func `pick_from_gallery`(`quality`: Double, `allow_editing`: Bool, completion: @escaping (Result<String?, Error>) -> Void) -> (() -> Void)?
-    func `take_photo`(`quality`: Double, `allow_editing`: Bool, completion: @escaping (Result<String?, Error>) -> Void) -> (() -> Void)?
-}
-
-public final class CameraModuleAdapter<Implementation: CameraImplementation>: PNNativeModule {
-    public static var name: String { "Camera" }
-    private let implementation: Implementation
-    public init() { implementation = Implementation() }
-    public init(implementation: Implementation) { self.implementation = implementation }
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        do {
-            guard PNContracts.validateModule("Camera", method, args) else { throw NativeDecodeError.invalid("Camera.\(method)") }
-            switch method {
-            case "pick_from_gallery":
-                let `quality` = try PNValues.decode(Double.self, args["quality"] ?? PNValues.defaultValue("0.9"))
-                let `allow_editing` = try PNValues.decode(Bool.self, args["allow_editing"] ?? PNValues.defaultValue("false"))
-                let cancellation = implementation.`pick_from_gallery`(`quality`: `quality`, `allow_editing`: `allow_editing`) { result in
-                    switch result {
-                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
-                    case .failure(let error): promise.reject(error)
-                    }
-                }
-                if let cancellation = cancellation { promise.onCancel(cancellation) }
-            case "take_photo":
-                let `quality` = try PNValues.decode(Double.self, args["quality"] ?? PNValues.defaultValue("0.9"))
-                let `allow_editing` = try PNValues.decode(Bool.self, args["allow_editing"] ?? PNValues.defaultValue("false"))
-                let cancellation = implementation.`take_photo`(`quality`: `quality`, `allow_editing`: `allow_editing`) { result in
-                    switch result {
-                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
-                    case .failure(let error): promise.reject(error)
-                    }
-                }
-                if let cancellation = cancellation { promise.onCancel(cancellation) }
-            default: promise.reject("Unknown method", code: "unknown_method")
-            }
-        } catch { promise.reject(error) }
-    }
-}
-
 public protocol ClipboardImplementation {
     init()
     func `get_string`() throws -> String
@@ -455,36 +382,6 @@ public enum LocalizationEvents {
     public static func `change`(_ payload: [String: PNJSONValue]) { PNModuleEvents.emit(module: "Localization", event: "change", payload: PNValues.encode(payload)) }
 }
 
-public protocol LocationImplementation {
-    init()
-    func `get_current`(`accuracy`: PNLocationGetCurrentAccuracy, `timeout`: Double, completion: @escaping (Result<[String: Double]?, Error>) -> Void) -> (() -> Void)?
-}
-
-public final class LocationModuleAdapter<Implementation: LocationImplementation>: PNNativeModule {
-    public static var name: String { "Location" }
-    private let implementation: Implementation
-    public init() { implementation = Implementation() }
-    public init(implementation: Implementation) { self.implementation = implementation }
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        do {
-            guard PNContracts.validateModule("Location", method, args) else { throw NativeDecodeError.invalid("Location.\(method)") }
-            switch method {
-            case "get_current":
-                let `accuracy` = try PNValues.decode(PNLocationGetCurrentAccuracy.self, args["accuracy"] ?? PNValues.defaultValue("\"balanced\""))
-                let `timeout` = try PNValues.decode(Double.self, args["timeout"] ?? PNValues.defaultValue("10.0"))
-                let cancellation = implementation.`get_current`(`accuracy`: `accuracy`, `timeout`: `timeout`) { result in
-                    switch result {
-                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
-                    case .failure(let error): promise.reject(error)
-                    }
-                }
-                if let cancellation = cancellation { promise.onCancel(cancellation) }
-            default: promise.reject("Unknown method", code: "unknown_method")
-            }
-        } catch { promise.reject(error) }
-    }
-}
-
 public protocol NetInfoImplementation {
     init()
     func `fetch`() throws -> [String: PNJSONValue]?
@@ -509,66 +406,6 @@ public final class NetInfoModuleAdapter<Implementation: NetInfoImplementation>: 
 
 public enum NetInfoEvents {
     public static func `change`(_ payload: [String: PNJSONValue]) { PNModuleEvents.emit(module: "NetInfo", event: "change", payload: PNValues.encode(payload)) }
-}
-
-public protocol NotificationsImplementation {
-    init()
-    func `cancel`(`identifier`: String, completion: @escaping (Result<Void, Error>) -> Void) -> (() -> Void)?
-    func `get_device_token`(completion: @escaping (Result<String?, Error>) -> Void) -> (() -> Void)?
-    func `request_permission`(completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)?
-    func `schedule`(`title`: String, `body`: String, `delay_seconds`: Double, `identifier`: String, completion: @escaping (Result<Bool, Error>) -> Void) -> (() -> Void)?
-}
-
-public final class NotificationsModuleAdapter<Implementation: NotificationsImplementation>: PNNativeModule {
-    public static var name: String { "Notifications" }
-    private let implementation: Implementation
-    public init() { implementation = Implementation() }
-    public init(implementation: Implementation) { self.implementation = implementation }
-    public func call(_ method: String, args: [String: Any], promise: PNPromise) {
-        do {
-            guard PNContracts.validateModule("Notifications", method, args) else { throw NativeDecodeError.invalid("Notifications.\(method)") }
-            switch method {
-            case "cancel":
-                let `identifier` = try PNValues.decode(String.self, args["identifier"] ?? PNValues.defaultValue("\"default\""))
-                let cancellation = implementation.`cancel`(`identifier`: `identifier`) { result in
-                    switch result {
-                    case .success(let value): promise.resolve(nil)
-                    case .failure(let error): promise.reject(error)
-                    }
-                }
-                if let cancellation = cancellation { promise.onCancel(cancellation) }
-            case "get_device_token":
-                let cancellation = implementation.`get_device_token`() { result in
-                    switch result {
-                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
-                    case .failure(let error): promise.reject(error)
-                    }
-                }
-                if let cancellation = cancellation { promise.onCancel(cancellation) }
-            case "request_permission":
-                let cancellation = implementation.`request_permission`() { result in
-                    switch result {
-                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
-                    case .failure(let error): promise.reject(error)
-                    }
-                }
-                if let cancellation = cancellation { promise.onCancel(cancellation) }
-            case "schedule":
-                let `title` = try PNValues.decode(String.self, args["title"])
-                let `body` = try PNValues.decode(String.self, args["body"] ?? PNValues.defaultValue("\"\""))
-                let `delay_seconds` = try PNValues.decode(Double.self, args["delay_seconds"] ?? PNValues.defaultValue("0"))
-                let `identifier` = try PNValues.decode(String.self, args["identifier"] ?? PNValues.defaultValue("\"default\""))
-                let cancellation = implementation.`schedule`(`title`: `title`, `body`: `body`, `delay_seconds`: `delay_seconds`, `identifier`: `identifier`) { result in
-                    switch result {
-                    case .success(let value): do { promise.resolve(try PNValues.checkedEncode(value)) } catch { promise.reject(error) }
-                    case .failure(let error): promise.reject(error)
-                    }
-                }
-                if let cancellation = cancellation { promise.onCancel(cancellation) }
-            default: promise.reject("Unknown method", code: "unknown_method")
-            }
-        } catch { promise.reject(error) }
-    }
 }
 
 public protocol PermissionsImplementation {

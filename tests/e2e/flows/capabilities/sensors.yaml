@@ -1,0 +1,70 @@
+# Tests sensor availability and the stream's lifecycle. The iOS simulator has
+# no sensors, so starting must fail with `unavailable`. The Android emulator's
+# virtual sensors stream readings; the values themselves aren't asserted here
+# because Maestro can't set them. Set them by hand with `adb emu sensor set`.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/sensors.py
+# Source under test: src/pythonnative/sensors/__init__.py :: Accelerometer
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Sensors
+# Availability sits at the top; the stream's results are scrolled to, since a
+# small screen (CI's 320x640) cuts them off.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible: "Accelerometer: no"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: "Accelerometer: yes"
+- scrollUntilVisible:
+    element: "Readings: none"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- scrollUntilVisible:
+    element: "Start readings"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Start readings"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - scrollUntilVisible:
+          element: "Stream error: unavailable"
+          direction: DOWN
+          timeout: 5000
+          centerElement: false
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element: "Readings: some"
+          direction: DOWN
+          timeout: 10000
+          centerElement: false
+      - scrollUntilVisible:
+          element: "Stop readings"
+          direction: UP
+          timeout: 15000
+          centerElement: false
+      - tapOn: "Stop readings"
+      - scrollUntilVisible:
+          element: "Running: no"
+          direction: DOWN
+          timeout: 5000
+          centerElement: false
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

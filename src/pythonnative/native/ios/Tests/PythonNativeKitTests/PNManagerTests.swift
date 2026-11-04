@@ -173,8 +173,7 @@ final class PNManagerTests: XCTestCase {
             XCTAssertTrue(names.contains(type), "missing manager for \(type)")
         }
         for module in ["Host", "Device", "Alert", "Storage", "SecureStore", "Clipboard", "Share", "Linking",
-                       "Haptics", "Battery", "NetInfo", "AppState", "Permissions", "Notifications", "Camera",
-                       "Location", "Biometrics"] {
+                       "Haptics", "Battery", "NetInfo", "AppState", "Permissions"] {
             XCTAssertTrue(PNRegistry.shared.moduleNames.contains(module), "missing module \(module)")
         }
     }

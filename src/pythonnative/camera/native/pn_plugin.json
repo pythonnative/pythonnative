@@ -1,0 +1,19 @@
+{
+  "name": "camera",
+  "contracts": "schema.json",
+  "requires": {"permissions": ["camera"]},
+  "ios": {"entry": "CameraPlugin"},
+  "android": {
+    "entry": "com.pythonnative.plugins.camera.CameraPlugin",
+    "resources": ["android/res/xml/*.xml"],
+    "manifest": {"root": "android/manifest.xml", "application": "android/application.xml"},
+    "dependencies": [
+      "androidx.camera:camera-camera2:1.4.2",
+      "androidx.camera:camera-lifecycle:1.4.2",
+      "androidx.camera:camera-video:1.4.2",
+      "androidx.camera:camera-view:1.4.2",
+      "com.google.mlkit:barcode-scanning:17.3.0"
+    ]
+  },
+  "web": {"entry": "web/index.js"}
+}

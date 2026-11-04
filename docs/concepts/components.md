@@ -198,11 +198,11 @@ def App() -> pn.Node:
     return pn.Text(f"Hello, {name}!", style={"font_size": 24})
 ```
 
-The entry point [`create_screen`][pythonnative.create_screen] is called
-internally by native templates to bootstrap your root component. You
-don't call it directly: name your top-level component `App` (so the
-templates can find it by convention) and `app.entry_point` in
-`pythonnative.toml` points at the module that defines it.
+The native templates bootstrap your root component through a
+[`ScreenHost`][pythonnative.hosts.base.ScreenHost]. You don't create one
+yourself: name your top-level component `App` (so the templates can find
+it by convention) and `app.entry_point` in `pythonnative.toml` points at
+the module that defines it.
 
 ## State and re-rendering
 

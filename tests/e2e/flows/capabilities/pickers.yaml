@@ -1,0 +1,35 @@
+# Tests that a system picker opens and that canceling returns an empty list.
+# Choosing an item isn't asserted: a picker's contents and layout belong to the
+# system and differ between OS versions and simulator images.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/pickers.py
+# Source under test: src/pythonnative/pickers/__init__.py
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Pickers
+- assertVisible: "Last pick: none"
+- tapOn: "Pick a document"
+- extendedWaitUntil:
+    notVisible: "Last pick: none"
+    timeout: 10000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: "Cancel"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: "Last pick: canceled"
+    timeout: 10000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

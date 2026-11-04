@@ -1,0 +1,16 @@
+{
+  "name": "audio",
+  "contracts": "schema.json",
+  "ios": {
+    "entry": "AudioPlugin"
+  },
+  "android": {
+    "entry": "com.pythonnative.plugins.audio.AudioPlugin",
+    "dependencies": [
+      "androidx.media3:media3-exoplayer:1.5.1"
+    ]
+  },
+  "web": {
+    "entry": "web/index.js"
+  }
+}

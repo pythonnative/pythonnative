@@ -25,10 +25,6 @@ object BuiltinModules {
     val netInfo = NetInfoModule()
     val appState = AppStateModule()
     val permissions = PermissionsModule()
-    val notifications = NotificationsModule()
-    val camera = CameraModule()
-    val location = LocationModule()
-    val biometrics = BiometricsModule()
     val assets = AssetsModule()
     val images = ImagesModule()
     val keyboard = KeyboardModule()
@@ -50,10 +46,6 @@ object BuiltinModules {
         com.pythonnative.generated.NetInfoModuleAdapter(netInfo),
         com.pythonnative.generated.AppStateModuleAdapter(appState),
         com.pythonnative.generated.PermissionsModuleAdapter(permissions),
-        com.pythonnative.generated.NotificationsModuleAdapter(notifications),
-        com.pythonnative.generated.CameraModuleAdapter(camera),
-        com.pythonnative.generated.LocationModuleAdapter(location),
-        com.pythonnative.generated.BiometricsModuleAdapter(biometrics),
         com.pythonnative.generated.AssetsModuleAdapter(assets),
         com.pythonnative.generated.ImagesModuleAdapter(images),
         com.pythonnative.generated.WebViewsModuleAdapter(com.pythonnative.runtime.components.WebViewsModule()),
@@ -77,34 +69,44 @@ object BuiltinModules {
         localization.attach(activity)
         devSupport.attach(activity)
         activity.intent?.dataString?.let { linking.onDeepLink(it) }
+        PNLifecycle.forEach { it.onActivityCreated(activity) }
     }
 
     /** Forward `Activity.onActivityResult`. Returns `true` when a module consumed it. */
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean =
-        camera.onActivityResult(requestCode, resultCode, data) || share.onActivityResult(requestCode)
+        share.onActivityResult(requestCode) || PNLifecycle.any { it.onActivityResult(requestCode, resultCode, data) }
 
     /** Forward `Activity.onRequestPermissionsResult`. Returns `true` when a module consumed it. */
     fun onRequestPermissionsResult(
         requestCode: Int,
-        @Suppress("UNUSED_PARAMETER") permissionNames: Array<out String>,
+        permissionNames: Array<out String>,
         grantResults: IntArray,
-    ): Boolean = permissions.onRequestPermissionsResult(requestCode, grantResults)
+    ): Boolean = permissions.onRequestPermissionsResult(requestCode, grantResults) ||
+        PNLifecycle.any { it.onRequestPermissionsResult(requestCode, permissionNames, grantResults) }
 
     /** Forward `Activity.onNewIntent` (deep links). */
     fun onNewIntent(intent: Intent?) {
-        intent?.dataString?.let { linking.onDeepLink(it) }
+        if (intent == null || PNLifecycle.any { it.onNewIntent(intent) }) return
+        intent.dataString?.let { linking.onDeepLink(it) }
     }
 
     /** Forward activity lifecycle transitions to the `AppState` module. */
     fun onActivityResumed() {
         appState.transition("active")
-        PNBridge.activity()?.let { devSupport.resume(it) }
+        PNBridge.activity()?.let { activity ->
+            devSupport.resume(activity)
+            PNLifecycle.forEach { it.onActivityResumed(activity) }
+        }
     }
     fun onActivityPaused() {
         appState.transition("inactive")
         devSupport.pause()
+        PNBridge.activity()?.let { activity -> PNLifecycle.forEach { it.onActivityPaused(activity) } }
     }
-    fun onActivityStopped() = appState.transition("background")
+    fun onActivityStopped() {
+        appState.transition("background")
+        PNBridge.activity()?.let { activity -> PNLifecycle.forEach { it.onActivityStopped(activity) } }
+    }
 
     /** Release observers when the activity is destroyed. */
     fun onActivityDestroyed(activity: Activity) {
@@ -115,5 +117,6 @@ object BuiltinModules {
         accessibilityInfo.detach(activity)
         localization.detach(activity)
         devSupport.detach(activity)
+        PNLifecycle.forEach { it.onActivityDestroyed(activity) }
     }
 }

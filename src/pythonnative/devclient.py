@@ -339,6 +339,7 @@ def _runtime(overlay: str) -> Dict[str, Any]:
         "protocol": PROTOCOL_VERSION,
         "contracts": contracts,
         "plugins": list(info.get("plugins") or []),
+        "capabilities": list(info.get("capabilities") or []),
         "distributions": _bundled_distributions(overlay),
     }
 

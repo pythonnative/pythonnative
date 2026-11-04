@@ -77,9 +77,9 @@ WebAssembly. Python reaches it through a C ABI with `ctypes`.
 
 | Owner | Responsibilities |
 | --- | --- |
-| Python (application thread) | Components, hooks, reconciliation, commit operations, event handlers, effects, device module facades |
+| Python (application thread) | Components, hooks, reconciliation, commit operations, event handlers, effects, device module and capability facades |
 | Renderer core (C++) | Contract tables and validation, surfaces and revisions, the shadow tree, Yoga style mapping and layout, view flattening, mount diffing, list datasets, animation graphs and drivers, gesture recognition (Android, browser, and tests), event identity stamping |
-| Platform (UI thread) | Widget creation and prop application, text drawing, text input, scroll physics, navigation containers, modal windows, accessibility, image decoding, the frame clock, iOS gesture recognizers, device modules, app lifecycle |
+| Platform (UI thread) | Widget creation and prop application, text drawing, text input, scroll physics, navigation containers, modal windows, accessibility, image decoding, the frame clock, iOS gesture recognizers, device modules, plugins, app lifecycle |
 
 A commit worker hands each commit to the core while the application loop
 remains available for input and asyncio tasks. The core validates the commit,
@@ -112,6 +112,28 @@ window. Native collection and recycler views request rows asynchronously by
 key, index, and data revision. Measured heights replace estimates. Headers,
 footers, empty states, grouped grids, and sections use the same ownership model.
 
+## Capabilities and plugins
+
+The core runtime contains no reference to a privacy-sensitive framework. Video,
+audio, the camera, maps, location, notifications, push, pickers, sensors,
+biometrics, background tasks, and purchases are
+[capabilities](../guides/capabilities/index.md): subpackages of `pythonnative`,
+each holding a Python facade and a `native/` plugin directory. `pn build` stages
+only the ones in `[plugins].use`, so an app that doesn't list `camera` doesn't
+compile a line that references `AVCaptureDevice`. Capabilities use nothing private:
+they're built with the same [plugin format](../guides/native-plugins.md) a
+third-party package uses.
+
+A plugin's manifest is declarative. It can merge keys into `Info.plist`,
+entitlements, the privacy manifest, and the Android manifest, add Gradle plugins
+and native dependencies, and compile C, C++, or an xcframework, and it runs no code
+at build time. That's what keeps target wheels safe to inspect as data. At runtime,
+lifecycle hooks (`PNAppLifecycleHook`, `PNLifecycleHook`) let a plugin observe
+app events, and each permission's provider registers with the plugin that needs it.
+Off device, each capability registers a Python fallback, so tests and the
+browser preview run the same code. On a device whose build leaves a capability out,
+calling it raises `plugin_not_enabled`.
+
 ## Contracts and tooling
 
 The bridge protocol (version 7) validates commits in the core before mutation
@@ -127,7 +149,9 @@ and Kotlin prop wrappers cache decoded fields for the managers. The core
 applies touched styles to Yoga directly and returns geometry only for observed
 refs and layout callbacks. `ListData` feeds revisioned keyed patches; ordinary
 sequences use a scanning adapter to that same protocol.
-Generated artifacts are checked in and tested for drift. Target-wheel plugin
+Generated artifacts are checked in and tested for drift. The contract document
+an app compiles merges the built-ins, its capabilities, and its plugins, so the
+fingerprint differs per app. Target-wheel plugin
 metadata is read as data, without importing a mobile binary on the development
 machine. Resources and registration code are staged into the native libraries.
 
@@ -153,7 +177,11 @@ export instructions.
 ## Runtime limits
 
 The application host uses one surface. A failed bridge commit requires a
-complete surface reset and remount; see [Commits](bridge.md#commits).
+complete surface reset and remount; see [Commits](bridge.md#commits). In a
+release build the host does that once on its own, and a second failure inside a
+minute shows a fallback screen, so a broken tree can't loop forever.
+[`pn.set_error_handler`][pythonnative.set_error_handler] receives every uncaught
+error with its phase, in development and release builds alike.
 Reconciliation reduces work at dirty component roots but doesn't time-slice
 arbitrary Python render functions. Long computations delay Python callbacks
 and commits even while native scrolling and the core's animation drivers
@@ -181,12 +209,15 @@ validate device signing, store submission, or performance on physical devices.
 | Platform mounting layers | `native/ios/`, `native/android/` |
 | Navigation and lists | `navigation/`, `components/lists.py` |
 | Animation graphs | `animated.py`, `animation_graph.py` |
-| Contracts and plugins | `sdk/`, `project/plugins.py` |
+| Contracts and plugins | `sdk/`, `project/plugins.py`, `project/plugin_config.py` |
 | Device modules | `native_modules/` |
+| Capabilities | `audio/`, `background/`, `biometrics/`, `camera/`, `location/`, `maps/`, `notifications/`, `pickers/`, `purchases/`, `push/`, `sensors/`, `video/` |
 | Testing library and pytest plugin | `testing/` |
-| Build and dependency locks | `project/`, `cli/` |
+| Build, store release, and dependency locks | `project/`, `cli/` |
 | Browser preview | `preview.py`, `bridge/web.py`, `devserver/static/` (the WebAssembly core in `devserver/static/core/`) |
 
-The [Inbox example](../examples.md#complete-apps) combines shared providers,
+The [Field Notes example](../examples/fieldnotes.md) puts capabilities,
+networking, deep links, and the release path together in one app. The
+[Inbox example](../examples.md#complete-apps) combines shared providers,
 variable-height rows, cancellable search, forms, persistence, native navigation,
 and a generated native extension.

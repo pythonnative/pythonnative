@@ -74,7 +74,9 @@ def _publish_metrics(payload: Any) -> Tuple[float, float]:
             float(insets.get("right") or 0.0),
         )
     if "keyboard_height" in payload:
-        platform_metrics.set_keyboard_height(float(payload.get("keyboard_height") or 0.0))
+        platform_metrics.set_keyboard_height(
+            float(payload.get("keyboard_height") or 0.0), overlap=payload.get("keyboard_overlap")
+        )
     scheme = payload.get("color_scheme")
     if scheme in ("light", "dark"):
         appearance.set_system_color_scheme(str(scheme))

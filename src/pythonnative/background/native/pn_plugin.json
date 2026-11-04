@@ -1,0 +1,25 @@
+{
+  "name": "background",
+  "contracts": "schema.json",
+  "options": {
+    "tasks": {"type": "list", "default": null}
+  },
+  "ios": {
+    "entry": "BackgroundPlugin",
+    "privacy": {
+      "accessed_api_types": [{"type": "NSPrivacyAccessedAPICategoryUserDefaults", "reasons": ["CA92.1"]}]
+    },
+    "when": {
+      "tasks": {
+        "info_plist": {
+          "BGTaskSchedulerPermittedIdentifiers": "${tasks}",
+          "UIBackgroundModes": ["fetch", "processing"]
+        }
+      }
+    }
+  },
+  "android": {
+    "entry": "com.pythonnative.plugins.background.BackgroundPlugin",
+    "dependencies": ["androidx.work:work-runtime-ktx:2.10.5"]
+  }
+}

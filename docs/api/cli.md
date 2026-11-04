@@ -14,8 +14,9 @@ the documented behavior never drifts from the code.
   Flag: `--force` to overwrite existing files or scaffold into a
   non-empty directory. See [Configuration](../guides/configuration.md).
 - `pn doctor [android|ios]`: diagnose the local toolchain and validate
-  `pythonnative.toml`, including that a `python3.X` matching
-  `[app].python_version` is available for package resolution. Exits
+  `pythonnative.toml`, including its `[plugins].use` capabilities and that a
+  `python3.X` matching `[app].python_version` is available for Android
+  package installation and release bytecode. Exits
   non-zero when something will block a build. Flag: `--json` to print a
   JSON array of check results to stdout for scripting; the verdict line
   goes to stderr instead, and the exit status is unchanged.
@@ -52,7 +53,9 @@ the documented behavior never drifts from the code.
   reinstalled. Flags: `--device` (target a specific device by
   identifier or name), `--prepare-only`, `--no-logs`, `--rebuild`
   (force the toolchain), `--dev-server URL` (override the server URL
-  passed to the app; include the `?token=` from `pn start`), `--port` (where `pn start` listens).
+  passed to the app; include the `?token=` from `pn start`), `--port` (where `pn start` listens),
+  `--release` (build and launch the release configuration on a simulator or
+  emulator, with no dev server; physical devices need `pn build`).
   When no Android device is running it boots an emulator, and it opens
   the app with a connect link (`pn-<app id>://connect?url=...`).
 - `pn go android|ios`: install [PythonNative Go](../guides/devtools.md#pythonnative-go),
@@ -65,9 +68,23 @@ the documented behavior never drifts from the code.
   or name, same as `pn run`). Physical iOS devices aren't supported for
   log streaming; use Console.app or Xcode > Devices and Simulators.
 - `pn build android|ios`: build distributable artifacts (release by
-  default). Flags: `--debug` for the debug variant, `--upload` to send
-  an iOS release build to App Store Connect. See
+  default). A release build fails when it has no icon or no Android
+  signing, when Pillow is missing, or when a capability's required
+  `[permissions]` entry is missing. Flags: `--debug` for the debug variant,
+  `--allow-unsigned` for a smoke build that isn't signed, may have no icon,
+  and can't reach a store (on iOS it signs ad hoc and stops at the archive). See
   [Building for release](../guides/building-for-release.md).
+- `pn submit android|ios`: upload the latest release build, the `.ipa` to App
+  Store Connect or the `.aab` to Google Play. Credentials come from the
+  environment: `PN_ASC_KEY_PATH`, `PN_ASC_KEY_ID`, and `PN_ASC_ISSUER_ID` for
+  iOS, and `PN_PLAY_SERVICE_ACCOUNT` for Android. Flags: `--path` for another
+  artifact, and for Google Play, `--track` (`internal`, the default, or `alpha`,
+  `beta`, or `production`) and `--draft` (leave the release as a draft, which a
+  new app requires). See
+  [Submitting to the stores](../guides/building-for-release.md#submitting-to-the-stores).
+- `pn links`: print the files a site hosts so its `https` links open this app,
+  for each domain in `[app].associated_domains`. See
+  [Navigation](../guides/navigation.md).
 - `pn app-id android|ios`: print the resolved application id (Android)
   or bundle id (iOS), handy for scripts and CI. Flag: `--json` to print
   a `{"platform": "...", "app_id": "..."}` object to stdout for

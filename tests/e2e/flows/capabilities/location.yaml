@@ -1,0 +1,20 @@
+# Location: the capability is compiled in and answers. A simulator's position is
+# whatever the host configured, so the flow doesn't assert a place.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/location.py
+# Source under test: src/pythonnative/location/
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Location
+- extendedWaitUntil:
+    visible: "Permission known: yes"
+    timeout: 5000
+- assertVisible: "Facade imported: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

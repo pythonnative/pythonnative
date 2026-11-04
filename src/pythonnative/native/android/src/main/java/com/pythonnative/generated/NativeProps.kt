@@ -186,7 +186,7 @@ open class PNViewProps(val values: JSONObject) {
     val has_accessibility_state: Boolean get() = values.has("accessibility_state")
     val `accessibility_state`: PNAccessibilityState? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_state"))) null else PNValues.decodeOrRecord("accessibility_state") { if (PNValues.isNull(values.get("accessibility_state"))) null else PNAccessibilityState.decode(values.get("accessibility_state")) } }
     val has_accessibility_value: Boolean get() = values.has("accessibility_value")
-    val `accessibility_value`: PNViewAccessibilityValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_value"))) null else PNValues.decodeOrRecord("accessibility_value") { PNViewAccessibilityValue.decode(values.get("accessibility_value")) } }
+    val `accessibility_value`: PNViewAccessibilityValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_value"))) null else PNValues.decodeOrRecord("accessibility_value") { if (PNValues.isNull(values.get("accessibility_value"))) null else PNViewAccessibilityValue.decode(values.get("accessibility_value")) } }
     val has_accessibility_actions: Boolean get() = values.has("accessibility_actions")
     val `accessibility_actions`: List<PNAccessibilityAction>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_actions"))) null else PNValues.decodeOrRecord("accessibility_actions") { if (PNValues.isNull(values.get("accessibility_actions"))) null else PNValues.array(values.get("accessibility_actions")).map { item -> PNAccessibilityAction.decode(item) } } }
     val has_on_accessibility_action: Boolean get() = values.has("on_accessibility_action")
@@ -200,7 +200,7 @@ open class PNViewProps(val values: JSONObject) {
     val has_gestures: Boolean get() = values.has("gestures")
     val `gestures`: List<PNJSONValue>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("gestures"))) null else PNValues.decodeOrRecord("gestures") { PNValues.array(values.get("gestures")).map { item -> PNJSONValue(item ?: JSONObject.NULL) } } }
     val has_hit_slop: Boolean get() = values.has("hit_slop")
-    val `hit_slop`: PNViewHitSlop? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("hit_slop"))) null else PNValues.decodeOrRecord("hit_slop") { PNViewHitSlop.decode(values.get("hit_slop")) } }
+    val `hit_slop`: PNViewHitSlop? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("hit_slop"))) null else PNValues.decodeOrRecord("hit_slop") { if (PNValues.isNull(values.get("hit_slop"))) null else PNViewHitSlop.decode(values.get("hit_slop")) } }
     val has_on_layout: Boolean get() = values.has("on_layout")
     val `on_layout`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_layout"))) null else PNValues.decodeOrRecord("on_layout") { PNValues.boolean(values.get("on_layout")) } }
     val has__pn_layout: Boolean get() = values.has("_pn_layout")
@@ -224,7 +224,7 @@ class ActivityIndicatorProps(values: JSONObject, partial: Boolean = true): PNVie
     val has_background_color: Boolean get() = values.has("background_color")
     val `background_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("background_color"))) null else PNValues.decodeOrRecord("background_color") { PNViewBorderColor.decode(values.get("background_color")) } }
     val has_color: Boolean get() = values.has("color")
-    val `color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { PNActivityIndicatorColor.decode(values.get("color")) } }
+    val `color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { if (PNValues.isNull(values.get("color"))) null else PNViewBorderColor.decode(values.get("color")) } }
     val has_placeholder_color: Boolean get() = values.has("placeholder_color")
     val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNViewBorderColor.decode(values.get("placeholder_color")) } }
     val has_tint_color: Boolean get() = values.has("tint_color")
@@ -286,7 +286,7 @@ class CheckboxProps(values: JSONObject, partial: Boolean = true): PNViewProps(va
     val has_background_color: Boolean get() = values.has("background_color")
     val `background_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("background_color"))) null else PNValues.decodeOrRecord("background_color") { PNViewBorderColor.decode(values.get("background_color")) } }
     val has_color: Boolean get() = values.has("color")
-    val `color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { PNActivityIndicatorColor.decode(values.get("color")) } }
+    val `color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { if (PNValues.isNull(values.get("color"))) null else PNViewBorderColor.decode(values.get("color")) } }
     val has_placeholder_color: Boolean get() = values.has("placeholder_color")
     val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNViewBorderColor.decode(values.get("placeholder_color")) } }
     val has_tint_color: Boolean get() = values.has("tint_color")
@@ -356,9 +356,9 @@ class ImageProps(values: JSONObject, partial: Boolean = true): PNViewProps(value
     val has_color: Boolean get() = values.has("color")
     val `color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { PNViewBorderColor.decode(values.get("color")) } }
     val has_placeholder_color: Boolean get() = values.has("placeholder_color")
-    val `placeholder_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNActivityIndicatorColor.decode(values.get("placeholder_color")) } }
+    val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { if (PNValues.isNull(values.get("placeholder_color"))) null else PNViewBorderColor.decode(values.get("placeholder_color")) } }
     val has_tint_color: Boolean get() = values.has("tint_color")
-    val `tint_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { PNActivityIndicatorColor.decode(values.get("tint_color")) } }
+    val `tint_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { if (PNValues.isNull(values.get("tint_color"))) null else PNViewBorderColor.decode(values.get("tint_color")) } }
     val has_source: Boolean get() = values.has("source")
     val `source`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("source"))) null else PNValues.decodeOrRecord("source") { PNValues.string(values.get("source")) } }
     val has_default_source: Boolean get() = values.has("default_source")
@@ -564,7 +564,7 @@ class ProgressBarProps(values: JSONObject, partial: Boolean = true): PNViewProps
     val has_background_color: Boolean get() = values.has("background_color")
     val `background_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("background_color"))) null else PNValues.decodeOrRecord("background_color") { PNViewBorderColor.decode(values.get("background_color")) } }
     val has_color: Boolean get() = values.has("color")
-    val `color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { PNActivityIndicatorColor.decode(values.get("color")) } }
+    val `color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { if (PNValues.isNull(values.get("color"))) null else PNViewBorderColor.decode(values.get("color")) } }
     val has_placeholder_color: Boolean get() = values.has("placeholder_color")
     val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNViewBorderColor.decode(values.get("placeholder_color")) } }
     val has_tint_color: Boolean get() = values.has("tint_color")
@@ -572,7 +572,7 @@ class ProgressBarProps(values: JSONObject, partial: Boolean = true): PNViewProps
     val has_value: Boolean get() = values.has("value")
     val `value`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("value"))) null else PNValues.decodeOrRecord("value") { PNValues.number(values.get("value")) } }
     val has_track_color: Boolean get() = values.has("track_color")
-    val `track_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("track_color"))) null else PNValues.decodeOrRecord("track_color") { PNActivityIndicatorColor.decode(values.get("track_color")) } }
+    val `track_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("track_color"))) null else PNValues.decodeOrRecord("track_color") { if (PNValues.isNull(values.get("track_color"))) null else PNViewBorderColor.decode(values.get("track_color")) } }
     val has_indeterminate: Boolean get() = values.has("indeterminate")
     val `indeterminate`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("indeterminate"))) null else PNValues.decodeOrRecord("indeterminate") { PNValues.boolean(values.get("indeterminate")) } }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
@@ -590,7 +590,7 @@ class RefreshControlProps(values: JSONObject, partial: Boolean = true): PNViewPr
     val has_placeholder_color: Boolean get() = values.has("placeholder_color")
     val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNViewBorderColor.decode(values.get("placeholder_color")) } }
     val has_tint_color: Boolean get() = values.has("tint_color")
-    val `tint_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { PNActivityIndicatorColor.decode(values.get("tint_color")) } }
+    val `tint_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { if (PNValues.isNull(values.get("tint_color"))) null else PNViewBorderColor.decode(values.get("tint_color")) } }
     val has_refreshing: Boolean get() = values.has("refreshing")
     val `refreshing`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("refreshing"))) null else PNValues.decodeOrRecord("refreshing") { PNValues.boolean(values.get("refreshing")) } }
     val has_on_refresh: Boolean get() = values.has("on_refresh")
@@ -766,7 +766,7 @@ class SegmentedControlProps(values: JSONObject, partial: Boolean = true): PNView
     val has_placeholder_color: Boolean get() = values.has("placeholder_color")
     val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNViewBorderColor.decode(values.get("placeholder_color")) } }
     val has_tint_color: Boolean get() = values.has("tint_color")
-    val `tint_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { PNActivityIndicatorColor.decode(values.get("tint_color")) } }
+    val `tint_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { if (PNValues.isNull(values.get("tint_color"))) null else PNViewBorderColor.decode(values.get("tint_color")) } }
     val has_segments: Boolean get() = values.has("segments")
     val `segments`: List<String>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("segments"))) null else PNValues.decodeOrRecord("segments") { if (PNValues.isNull(values.get("segments"))) null else PNValues.array(values.get("segments")).map { item -> PNValues.string(item) } } }
     val has_selected_index: Boolean get() = values.has("selected_index")
@@ -804,11 +804,11 @@ class SliderProps(values: JSONObject, partial: Boolean = true): PNViewProps(valu
     val has_step: Boolean get() = values.has("step")
     val `step`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("step"))) null else PNValues.decodeOrRecord("step") { PNValues.number(values.get("step")) } }
     val has_minimum_track_color: Boolean get() = values.has("minimum_track_color")
-    val `minimum_track_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("minimum_track_color"))) null else PNValues.decodeOrRecord("minimum_track_color") { PNActivityIndicatorColor.decode(values.get("minimum_track_color")) } }
+    val `minimum_track_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("minimum_track_color"))) null else PNValues.decodeOrRecord("minimum_track_color") { if (PNValues.isNull(values.get("minimum_track_color"))) null else PNViewBorderColor.decode(values.get("minimum_track_color")) } }
     val has_maximum_track_color: Boolean get() = values.has("maximum_track_color")
-    val `maximum_track_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("maximum_track_color"))) null else PNValues.decodeOrRecord("maximum_track_color") { PNActivityIndicatorColor.decode(values.get("maximum_track_color")) } }
+    val `maximum_track_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("maximum_track_color"))) null else PNValues.decodeOrRecord("maximum_track_color") { if (PNValues.isNull(values.get("maximum_track_color"))) null else PNViewBorderColor.decode(values.get("maximum_track_color")) } }
     val has_thumb_color: Boolean get() = values.has("thumb_color")
-    val `thumb_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("thumb_color"))) null else PNValues.decodeOrRecord("thumb_color") { PNActivityIndicatorColor.decode(values.get("thumb_color")) } }
+    val `thumb_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("thumb_color"))) null else PNValues.decodeOrRecord("thumb_color") { if (PNValues.isNull(values.get("thumb_color"))) null else PNViewBorderColor.decode(values.get("thumb_color")) } }
     val has_on_sliding_start: Boolean get() = values.has("on_sliding_start")
     val `on_sliding_start`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_sliding_start"))) null else PNValues.decodeOrRecord("on_sliding_start") { if (PNValues.isNull(values.get("on_sliding_start"))) null else PNValues.boolean(values.get("on_sliding_start")) } }
     val has_on_sliding_complete: Boolean get() = values.has("on_sliding_complete")
@@ -840,7 +840,7 @@ class StatusBarProps(values: JSONObject, partial: Boolean = true): PNViewProps(v
     val has_flex: Boolean get() = values.has("flex")
     val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
     val has_background_color: Boolean get() = values.has("background_color")
-    val `background_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("background_color"))) null else PNValues.decodeOrRecord("background_color") { PNActivityIndicatorColor.decode(values.get("background_color")) } }
+    val `background_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("background_color"))) null else PNValues.decodeOrRecord("background_color") { if (PNValues.isNull(values.get("background_color"))) null else PNViewBorderColor.decode(values.get("background_color")) } }
     val has_color: Boolean get() = values.has("color")
     val `color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { PNViewBorderColor.decode(values.get("color")) } }
     val has_placeholder_color: Boolean get() = values.has("placeholder_color")
@@ -878,9 +878,9 @@ class SvgProps(values: JSONObject, partial: Boolean = true): PNViewProps(values)
     val has_preserve_aspect_ratio: Boolean get() = values.has("preserve_aspect_ratio")
     val `preserve_aspect_ratio`: PNSvgPreserveAspectRatio? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("preserve_aspect_ratio"))) null else PNValues.decodeOrRecord("preserve_aspect_ratio") { PNSvgPreserveAspectRatio.decode(values.get("preserve_aspect_ratio")) } }
     val has_fill: Boolean get() = values.has("fill")
-    val `fill`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("fill"))) null else PNValues.decodeOrRecord("fill") { PNActivityIndicatorColor.decode(values.get("fill")) } }
+    val `fill`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("fill"))) null else PNValues.decodeOrRecord("fill") { if (PNValues.isNull(values.get("fill"))) null else PNViewBorderColor.decode(values.get("fill")) } }
     val has_stroke: Boolean get() = values.has("stroke")
-    val `stroke`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("stroke"))) null else PNValues.decodeOrRecord("stroke") { PNActivityIndicatorColor.decode(values.get("stroke")) } }
+    val `stroke`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("stroke"))) null else PNValues.decodeOrRecord("stroke") { if (PNValues.isNull(values.get("stroke"))) null else PNViewBorderColor.decode(values.get("stroke")) } }
     val has_stroke_width: Boolean get() = values.has("stroke_width")
     val `stroke_width`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("stroke_width"))) null else PNValues.decodeOrRecord("stroke_width") { if (PNValues.isNull(values.get("stroke_width"))) null else PNValues.number(values.get("stroke_width")) } }
     val has_stroke_linecap: Boolean get() = values.has("stroke_linecap")
@@ -912,9 +912,9 @@ class SwitchProps(values: JSONObject, partial: Boolean = true): PNViewProps(valu
     val has_disabled: Boolean get() = values.has("disabled")
     val `disabled`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("disabled"))) null else PNValues.decodeOrRecord("disabled") { PNValues.boolean(values.get("disabled")) } }
     val has_on_tint_color: Boolean get() = values.has("on_tint_color")
-    val `on_tint_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_tint_color"))) null else PNValues.decodeOrRecord("on_tint_color") { PNActivityIndicatorColor.decode(values.get("on_tint_color")) } }
+    val `on_tint_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_tint_color"))) null else PNValues.decodeOrRecord("on_tint_color") { if (PNValues.isNull(values.get("on_tint_color"))) null else PNViewBorderColor.decode(values.get("on_tint_color")) } }
     val has_thumb_color: Boolean get() = values.has("thumb_color")
-    val `thumb_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("thumb_color"))) null else PNValues.decodeOrRecord("thumb_color") { PNActivityIndicatorColor.decode(values.get("thumb_color")) } }
+    val `thumb_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("thumb_color"))) null else PNValues.decodeOrRecord("thumb_color") { if (PNValues.isNull(values.get("thumb_color"))) null else PNViewBorderColor.decode(values.get("thumb_color")) } }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
@@ -986,7 +986,7 @@ class TextInputProps(values: JSONObject, partial: Boolean = true): PNViewProps(v
     val has_color: Boolean get() = values.has("color")
     val `color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { PNViewBorderColor.decode(values.get("color")) } }
     val has_placeholder_color: Boolean get() = values.has("placeholder_color")
-    val `placeholder_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNActivityIndicatorColor.decode(values.get("placeholder_color")) } }
+    val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { if (PNValues.isNull(values.get("placeholder_color"))) null else PNViewBorderColor.decode(values.get("placeholder_color")) } }
     val has_tint_color: Boolean get() = values.has("tint_color")
     val `tint_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { PNViewBorderColor.decode(values.get("tint_color")) } }
     val has_value: Boolean get() = values.has("value")
@@ -1036,33 +1036,9 @@ class TextInputProps(values: JSONObject, partial: Boolean = true): PNViewProps(v
     val has_on_blur: Boolean get() = values.has("on_blur")
     val `on_blur`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_blur"))) null else PNValues.decodeOrRecord("on_blur") { if (PNValues.isNull(values.get("on_blur"))) null else PNValues.boolean(values.get("on_blur")) } }
     val has_selection_color: Boolean get() = values.has("selection_color")
-    val `selection_color`: PNActivityIndicatorColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("selection_color"))) null else PNValues.decodeOrRecord("selection_color") { PNActivityIndicatorColor.decode(values.get("selection_color")) } }
+    val `selection_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("selection_color"))) null else PNValues.decodeOrRecord("selection_color") { if (PNValues.isNull(values.get("selection_color"))) null else PNViewBorderColor.decode(values.get("selection_color")) } }
     val has_text_content_type: Boolean get() = values.has("text_content_type")
     val `text_content_type`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("text_content_type"))) null else PNValues.decodeOrRecord("text_content_type") { if (PNValues.isNull(values.get("text_content_type"))) null else PNValues.string(values.get("text_content_type")) } }
-    val has_accessibility_role: Boolean get() = values.has("accessibility_role")
-    val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
-}
-
-// The renderer core validated these values before they were mounted.
-class TouchableOpacityProps(values: JSONObject, partial: Boolean = true): PNViewProps(values) {
-    val has_flex: Boolean get() = values.has("flex")
-    val `flex`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("flex"))) null else PNValues.decodeOrRecord("flex") { PNValues.number(values.get("flex")) } }
-    val has_background_color: Boolean get() = values.has("background_color")
-    val `background_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("background_color"))) null else PNValues.decodeOrRecord("background_color") { PNViewBorderColor.decode(values.get("background_color")) } }
-    val has_color: Boolean get() = values.has("color")
-    val `color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("color"))) null else PNValues.decodeOrRecord("color") { PNViewBorderColor.decode(values.get("color")) } }
-    val has_placeholder_color: Boolean get() = values.has("placeholder_color")
-    val `placeholder_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("placeholder_color"))) null else PNValues.decodeOrRecord("placeholder_color") { PNViewBorderColor.decode(values.get("placeholder_color")) } }
-    val has_tint_color: Boolean get() = values.has("tint_color")
-    val `tint_color`: PNViewBorderColor? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("tint_color"))) null else PNValues.decodeOrRecord("tint_color") { PNViewBorderColor.decode(values.get("tint_color")) } }
-    val has_on_press: Boolean get() = values.has("on_press")
-    val `on_press`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_press"))) null else PNValues.decodeOrRecord("on_press") { if (PNValues.isNull(values.get("on_press"))) null else PNValues.boolean(values.get("on_press")) } }
-    val has_on_long_press: Boolean get() = values.has("on_long_press")
-    val `on_long_press`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("on_long_press"))) null else PNValues.decodeOrRecord("on_long_press") { if (PNValues.isNull(values.get("on_long_press"))) null else PNValues.boolean(values.get("on_long_press")) } }
-    val has_active_opacity: Boolean get() = values.has("active_opacity")
-    val `active_opacity`: Double? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("active_opacity"))) null else PNValues.decodeOrRecord("active_opacity") { PNValues.number(values.get("active_opacity")) } }
-    val has_disabled: Boolean get() = values.has("disabled")
-    val `disabled`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("disabled"))) null else PNValues.decodeOrRecord("disabled") { PNValues.boolean(values.get("disabled")) } }
     val has_accessibility_role: Boolean get() = values.has("accessibility_role")
     val `accessibility_role`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("accessibility_role"))) null else PNValues.decodeOrRecord("accessibility_role") { if (PNValues.isNull(values.get("accessibility_role"))) null else PNValues.string(values.get("accessibility_role")) } }
 }
@@ -1292,12 +1268,6 @@ object PNComponentEvents {
         fun `on_content_size_change`(view: android.view.View, argument0: PNContentSizeEvent): Boolean = PNEvents.fire(view, "on_content_size_change", PNValues.encode(argument0))
         fun `on_focus`(view: android.view.View): Boolean = PNEvents.fire(view, "on_focus")
         fun `on_blur`(view: android.view.View): Boolean = PNEvents.fire(view, "on_blur")
-        fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
-        fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
-    }
-    object TouchableOpacity {
-        fun `on_press`(view: android.view.View): Boolean = PNEvents.fire(view, "on_press")
-        fun `on_long_press`(view: android.view.View): Boolean = PNEvents.fire(view, "on_long_press")
         fun `on_accessibility_action`(view: android.view.View, argument0: String): Boolean = PNEvents.fire(view, "on_accessibility_action", PNValues.encode(argument0))
         fun `on_layout`(view: android.view.View, argument0: PNLayoutEvent): Boolean = PNEvents.fire(view, "on_layout", PNValues.encode(argument0))
     }

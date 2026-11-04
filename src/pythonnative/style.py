@@ -375,7 +375,6 @@ AlignItems = Literal[
     "bottom",
     "fill",
 ]
-AlignSelf = AlignItems
 Position = Literal["relative", "absolute"]
 Display = Literal["flex", "none"]
 """``display`` style value. ``"none"`` removes the node and its subtree
@@ -484,7 +483,7 @@ class Style(TypedDict, total=False):
     flex_wrap: FlexWrap
     justify_content: JustifyContent
     align_items: AlignItems
-    align_self: AlignSelf
+    align_self: AlignItems
     align_content: AlignContent
     direction: LayoutDirection
     display: Display
@@ -825,7 +824,6 @@ __all__ = [
     "AccessibilityState",
     "AccessibilityValue",
     "AlignItems",
-    "AlignSelf",
     "AutoCapitalize",
     "BorderStyle",
     "Color",

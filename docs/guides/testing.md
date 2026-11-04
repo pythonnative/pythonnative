@@ -339,8 +339,28 @@ Facades don't swallow errors: a fake that raises
 [`NativeModuleError`][pythonnative.native_modules.NativeModuleError]
 surfaces through the facade to the component, which is the right way
 to test your error handling. User cancellations and denials are
-ordinary return values (`None` from `Camera.launch_camera`, `False`
-from `Permissions.request`), so fake those by returning them.
+ordinary return values (`None` from `Camera.take_photo`, `False` from
+`Biometrics.authenticate`, `"denied"` from `Permissions.request`), so fake
+those by returning them.
+
+### Capabilities
+
+Importing a [capability](capabilities/index.md) registers a Python fallback,
+so a component that uses one renders and runs in `pytest` without changing
+`[plugins].use`, and `plugin_not_enabled` never appears off device. Fallbacks
+answer with the "nothing happened" value:
+
+| Call | Fallback's answer |
+| --- | --- |
+| `Camera.take_photo`, `Location.get_current`, `Push.get_device_token` | `None` |
+| `Biometrics.is_available`, `Biometrics.authenticate`, `Notifications.request_permission`, `Notifications.schedule` | `False` |
+| `pick_images`, `pick_videos`, `pick_documents` | `[]` |
+| `pn.Permissions.check`, `pn.Permissions.request` | `"undetermined"` |
+
+Some keep state so a test can read it back. For example, `background` records
+what you schedule. To answer differently, register a fake under the module's
+name, as above: `"Location"`, `"Camera"`, `"Pickers"`, and so on. Components
+such as `CameraView` and `MapView` render into the fake backend like any built-in.
 
 ## Testing what the platform mounts
 
@@ -417,7 +437,7 @@ before returning, so `use_effect` coroutines, `use_resource`,
 trigger async work outside the helpers (a module-level task, a
 mutation started from a fixture), call `result.settle()` or
 [`settle()`][pythonnative.testing.settle], or use
-[`pn.runtime.drain()`][pythonnative.runtime.drain] /
+[`pythonnative.runtime.drain()`][pythonnative.runtime.drain] /
 [`pn.run_blocking(coro)`][pythonnative.runtime.run_blocking] directly.
 See [Testing async code](async.md#testing-async-code).
 

@@ -146,7 +146,9 @@ class WebTransport:
 
     def call(self, module: str, method: str, args_json: str) -> Optional[str]:
         """Call a native module: page modules over the wire, the others in Python."""
-        if module in BROWSER_MODULES:
+        from ..native_modules.registry import is_page_module
+
+        if module in BROWSER_MODULES or is_page_module(module):
             result = self._request(["call", None, module, method, args_json])
             return _as_json_text(result)
         return self._call_python_module(module, method, args_json)

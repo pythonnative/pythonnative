@@ -199,7 +199,7 @@ def test_agent_records_fetch_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     agent = Agent(recorder)
     agent.start()
 
-    def fake_dispatch(request: Any, timeout: float) -> net.Response:
+    def fake_dispatch(request: Any, timeout: float, stream: bool = False) -> net.Response:
         return net.Response(status=201, url=request.full_url, headers={"X": "1"}, content=b'{"ok": true}')
 
     monkeypatch.setattr(net, "_dispatch_request", fake_dispatch)

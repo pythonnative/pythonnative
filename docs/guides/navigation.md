@@ -533,6 +533,28 @@ def App() -> pn.Node:
 - The URL that launched the app seeds the initial state, and URLs that
   arrive while the app is running navigate.
 
+### Universal links and app links
+
+A custom scheme works once declared in `app.url_schemes`. An `https` link opening your app needs both
+sides to agree that the app owns the domain. Declare it:
+
+```toml
+[app]
+associated_domains = ["example.com"]
+```
+
+That writes the `applinks:` entitlement on iOS and a verified intent filter on Android. Then host the
+two files `pn links` prints, with your Apple team ID and signing certificate filled in:
+
+```bash
+pn links
+```
+
+Include the same `https://example.com` in `link_prefixes`. The entitlement needs a paid Apple
+developer team, and verification needs a real domain, so test on a signed build. On an
+Android emulator, `adb shell am start -a android.intent.action.VIEW -d https://example.com/items/42`
+reaches the same code path without verification when you pick the app.
+
 There's no separate route tree to keep in sync: the container derives
 its pattern table from the navigators once. To build a URL for sharing,
 or to test your paths, use

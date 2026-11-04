@@ -1,20 +1,18 @@
-"""Touch wrappers: ``Pressable`` and its ``TouchableOpacity`` alias."""
+"""The touch wrapper: ``Pressable``."""
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Union, Unpack, cast
+from typing import Any, Callable, Dict, List, Optional, Union, Unpack
 
 from ..component import component
 from ..element import Element, Node
 from ..hooks import Ref, use_state
 from ..style import (
     Color,
-    Style,
     StyleProp,
-    resolve_style,
 )
 from ._base import _make_element
-from .props import AccessibilityProps, ViewProps
+from .props import ViewProps
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,55 +216,4 @@ def Pressable(
         on_press_out=on_press_out,
         _defaults={"accessibility_role": "button"},
         **common,
-    )
-
-
-def TouchableOpacity(
-    *children: Node,
-    on_press: Optional[Callable[[], Any]] = None,
-    on_long_press: Optional[Callable[[], Any]] = None,
-    active_opacity: float = 0.2,
-    disabled: bool = False,
-    style: StyleProp = None,
-    key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
-) -> Element:
-    """Wrap children so they fade to ``active_opacity`` while pressed.
-
-    A thin ergonomic alias over [`Pressable`][pythonnative.Pressable]
-    that mirrors React Native's ``TouchableOpacity``: the only visual
-    feedback is an opacity dip on touch-down. When ``disabled`` is set,
-    the wrapper is inert and renders at reduced opacity.
-
-    Args:
-        *children: Nodes to make tappable.
-        on_press: Callback invoked on a normal tap.
-        on_long_press: Callback invoked on a sustained press.
-        active_opacity: Opacity (0 to 1) applied while the finger is down.
-        disabled: When ``True``, ignores presses and renders at reduced
-            opacity.
-        style: Style dict applied to the wrapper.
-        key: Stable identity for keyed reconciliation.
-        **props: Shared accessibility and test keywords; see
-            [`AccessibilityProps`][pythonnative.AccessibilityProps].
-
-    Returns:
-        An [`Element`][pythonnative.Element] of type ``"Pressable"``.
-    """
-    merged_style: StyleProp
-    if disabled:
-        base = resolve_style(style)
-        base.setdefault("opacity", 0.4)
-        merged_style = cast(Style, base)
-    else:
-        merged_style = style
-    return Pressable(
-        *children,
-        on_press=on_press,
-        on_long_press=on_long_press,
-        disabled=disabled,
-        pressed_opacity=active_opacity,
-        style=merged_style,
-        key=key,
-        **props,
     )

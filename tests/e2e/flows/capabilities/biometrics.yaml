@@ -1,0 +1,16 @@
+# Biometrics: the capability is compiled in and answers. A simulator has no enrolled face.
+#
+# Demo screen: examples/e2e-suite/app/screens/capabilities/biometrics.py
+# Source under test: src/pythonnative/biometrics/
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Capabilities
+      DEMO_TITLE: Biometrics
+- assertVisible: "Biometrics answered: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Capabilities

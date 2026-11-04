@@ -1,0 +1,60 @@
+# The release smoke test for examples/fieldnotes: launch from nothing, write an
+# entry, find it in the journal, and open it. It has to pass on a release build,
+# so it depends on nothing a debug build adds:
+#
+#     cd examples/fieldnotes && pn run <platform> --release --no-logs
+#     maestro test -e APP_ID=dev.pythonnative.fieldnotes tests/e2e/flows/fieldnotes/smoke.yaml
+#
+# Source under test: examples/fieldnotes/app/ui/journal_screen.py, editor_screen.py, entry_screen.py
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+      location: inuse
+- extendedWaitUntil:
+    visible: "An empty notebook"
+    timeout: 60000
+- assertVisible: "Offline. Your journal stays on this device."
+- tapOn: "New entry"
+# Maestro can't pre-grant "while in use" on Android, so the real prompt appears,
+# sometimes only after the editor does. Answer it whenever it shows up until the
+# lookup it started is over (at most about 15 seconds), so it can't cover the
+# fields the next steps tap.
+- extendedWaitUntil:
+    visible: "(Save|While using the app)"
+    timeout: 10000
+- repeat:
+    while:
+      visible: "(Finding where you are.*|While using the app)"
+    times: 20
+    commands:
+      - tapOn:
+          text: "While using the app"
+          optional: true
+- extendedWaitUntil:
+    visible: "Save"
+    timeout: 10000
+- tapOn:
+    id: "field-notes"
+- inputText: "Standing in the shallows"
+- tapOn:
+    id: "field-title"
+- inputText: "Heron at the mill"
+- tapOn: "Save"
+# Saving replaces the editor with the entry.
+- extendedWaitUntil:
+    visible: "Attachments"
+    timeout: 10000
+- assertVisible: "Standing in the shallows"
+# Back to the list, where the new entry is first.
+- runFlow: _back.yaml
+- extendedWaitUntil:
+    visible: "Heron at the mill"
+    timeout: 10000
+- tapOn: "Heron at the mill"
+- extendedWaitUntil:
+    visible: "Standing in the shallows"
+    timeout: 10000
+- assertVisible: "Attachments"

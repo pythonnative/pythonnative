@@ -1,0 +1,9 @@
+{
+  "name": "purchases",
+  "contracts": "schema.json",
+  "ios": {"entry": "PurchasesPlugin"},
+  "android": {
+    "entry": "com.pythonnative.plugins.purchases.PurchasesPlugin",
+    "dependencies": ["com.android.billingclient:billing-ktx:8.0.0"]
+  }
+}

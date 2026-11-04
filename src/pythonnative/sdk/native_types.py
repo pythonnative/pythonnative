@@ -38,14 +38,23 @@ class NativeTypes:
         self.python: dict[str, str] = {}
         self._names: dict[str, str] = {}
         self._schemas: dict[str, dict[str, Any]] = {}
+        self.scope = ""
+        """The plugin contract being generated; empty for built-ins.
+
+        Identical literals share one native type, named after the first use. Across plugins,
+        "first" would depend on which plugins are in the build, and the Swift and Kotlin a
+        plugin ships names these types. So each plugin's shared within itself only.
+        """
 
     def types(self, schema: dict[str, Any], hint: str) -> tuple[str, str, str]:
         """Return Python, Swift, and Kotlin representations, adding definitions."""
         alternatives = schema.get("anyOf")
         if alternatives is not None:
             nonnull = [item for item in alternatives if item.get("type") != "null"]
-            if len(nonnull) == 1 and len(nonnull) < len(alternatives):
-                py, sw, kt = self.types(nonnull[0], hint)
+            if len(nonnull) < len(alternatives):
+                # `None` means "unset", never a union case: a case for it would make
+                # the field non-optional natively, and `fill ?? root.fill` never inherits.
+                py, sw, kt = self.types(self._without_null(schema, nonnull), hint)
                 return py + " | None", sw.rstrip("?") + "?", kt.rstrip("?") + "?"
         if "enum" in schema or alternatives is not None or "properties" in schema or "prefixItems" in schema:
             name = self._named(schema, hint)
@@ -90,8 +99,8 @@ class NativeTypes:
         alternatives = schema.get("anyOf")
         if alternatives is not None:
             nonnull = [item for item in alternatives if item.get("type") != "null"]
-            if len(nonnull) == 1 and len(nonnull) < len(alternatives):
-                inner = self.kotlin_decode(nonnull[0], value, hint)
+            if len(nonnull) < len(alternatives):
+                inner = self.kotlin_decode(self._without_null(schema, nonnull), value, hint)
                 return f"if (PNValues.isNull({value})) null else {inner}"
         if "enum" in schema or alternatives is not None or "properties" in schema or "prefixItems" in schema:
             return f"{kt}.decode({value})"
@@ -113,9 +122,15 @@ class NativeTypes:
             return f"PNValues.objectValue({value}).let {{ objectValue -> objectValue.keys().asSequence().associateWith {{ key -> {inner} }} }}"  # noqa: E501
         return f"PNJSONValue({value} ?: JSONObject.NULL)"
 
+    @staticmethod
+    def _without_null(schema: dict[str, Any], nonnull: list[dict[str, Any]]) -> dict[str, Any]:
+        return nonnull[0] if len(nonnull) == 1 else {**schema, "anyOf": nonnull}
+
     def _named(self, schema: dict[str, Any], hint: str) -> str:
         portable = {key: value for key, value in schema.items() if key != "native"}
         signature = json.dumps(portable, sort_keys=True)
+        if "python_type" not in schema:
+            signature = f"{self.scope}|{signature}"
         if signature in self._names:
             return self._names[signature]
         declared = schema.get("python_type", "").partition(":")[2]

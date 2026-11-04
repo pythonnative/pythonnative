@@ -35,6 +35,7 @@ examples/e2e-suite/
 │       ├── runtime/           # run_async demo
 │       ├── platform/          # Platform info demo
 │       ├── device/            # Keyboard, Dimensions, PixelRatio, Device, Localization, AccessibilityInfo demos
+│       ├── capabilities/      # One file per first-party capability, plus WebSocket
 │       ├── packages/          # PyPI packages demo ([requirements].packages on device)
 │       └── sdk/               # SDK surface demo
 └── pythonnative.toml
@@ -74,7 +75,7 @@ scripts/
 ./scripts/run-e2e.sh ios components
 ```
 
-Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `assets`, `misc`. The `Device` category's flows (`flows/device/`) run as part of `misc` alongside alerts, storage, runtime, platform, packages, and SDK. The components category also has `components-a` / `components-b` / `components-c` parts, and the hooks category has `hooks-a` / `hooks-b` parts: CI's Android shards use them because a GitHub-hosted emulator session degrades and drops offline after roughly ten minutes of driving, before either category finishes in one run (`components.yaml` and `hooks.yaml` just chain their parts).
+Available category suites: `components`, `hooks`, `navigation`, `layout`, `styling`, `animations`, `gestures`, `assets`, `misc`, `capabilities`. The `Device` category's flows (`flows/device/`) run as part of `misc` alongside alerts, storage, runtime, platform, packages, and SDK. The components category also has `components-a` / `components-b` / `components-c` parts, and the hooks category has `hooks-a` / `hooks-b` parts: CI's Android shards use them because a GitHub-hosted emulator session degrades and drops offline after roughly ten minutes of driving, before either category finishes in one run (`components.yaml` and `hooks.yaml` just chain their parts).
 
 You can also run a single flow directly. Useful when iterating on one demo:
 
@@ -176,6 +177,27 @@ Diagnostic procedure:
 5. **Reproduce in isolation**: many failures are state-related. Re-run `./scripts/run-e2e.sh android components` (or the relevant category). If the flow passes there but fails in the full suite, the bug is most likely in cleanup between flows.
 6. **CI-only failures**: the E2E workflow uploads `~/.maestro/tests` (command log, view-hierarchy dumps, failure screenshots) as a `maestro-debug-<platform>-<shard>` artifact when a shard fails. Download it from the run page (or `gh run download <run-id>`) before trying to reproduce locally; the failure screenshot usually answers "what was actually on screen" immediately.
 
+## Capabilities
+
+First-party capabilities aren't in `pythonnative.__all__`, so the coverage checker doesn't require them by symbol. Each still gets a demo in `examples/e2e-suite/app/screens/capabilities/`, registered in `registry.py` under the `Capabilities` category with the feature `capabilities::<name>`, and a flow in `tests/e2e/flows/capabilities/`, collected by `tests/e2e/suites/capabilities.yaml` and the two full suites. The checker does confirm that every registered demo has its flow. Run them with:
+
+```bash
+./scripts/run-e2e.sh android capabilities
+./scripts/run-e2e.sh ios capabilities
+```
+
+The e2e app lists every capability in `[plugins].use`, along with the `[permissions]` they need, in `examples/e2e-suite/pythonnative.toml`. Adding a capability means adding it there as well, or its demo fails with `plugin_not_enabled`.
+
+A simulator can't prove all of a capability, so these flows go as far as each one allows and say where they stop in their header comments. Read the header before assuming a gap is a bug. For example:
+
+- `CameraView` capture needs hardware on iOS, so that flow asserts the `unavailable` state there. The Android emulator has virtual cameras.
+- Remote push needs APNs and Firebase credentials, and a device for APNs.
+- Purchases need App Store Connect and Play Console setup.
+- A background task can be forced with `adb` on Android, but iOS's scheduler has only a debugger-driven trigger.
+- Android maps need an API key and a Google APIs emulator image.
+
+The release path has its own workflow, `.github/workflows/release-builds.yml`, which runs a smoke flow against `pn run --release` rather than this suite.
+
 ## Adding a new demo (and its flow)
 
 When you add a new public symbol to `pythonnative`, follow this exact recipe:
@@ -273,6 +295,6 @@ When you do change a demo or flow, update its header comment so it still accurat
 
 ## CI integration
 
-The full suite runs on every push to `main` and every PR via `.github/workflows/e2e.yml`. Both the Android job (Linux runner + emulator) and the iOS job (macOS runner + simulator) call into `scripts/run-e2e.sh`, so the local and CI execution paths are identical.
+The full suite runs on every push to `main` and every PR via `.github/workflows/e2e.yml`, and `.github/workflows/release-builds.yml` builds and smoke-tests the release configuration. Both the Android job (Linux runner + emulator) and the iOS job (macOS runner + simulator) call into `scripts/run-e2e.sh`, so the local and CI execution paths are identical.
 
 The coverage check is wired into `scripts/check.sh`, which `ci.yml` runs on every push and PR. New `__all__` entries without a demo (or exemption) fail CI before the E2E job even starts, which keeps the inner loop fast.

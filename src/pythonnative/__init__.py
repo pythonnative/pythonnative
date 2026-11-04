@@ -4,10 +4,13 @@ PythonNative is a cross-platform toolkit that turns Python ``@component``
 functions into real, native Android and iOS views. The component model
 is React-like (function components plus hooks). Python owns the logical
 component tree and reconciliation on a dedicated asyncio application thread.
-Versioned commits cross into Swift ``PythonNativeKit`` on iOS and the Kotlin
-``pythonnative`` module on Android. Those renderers own widgets, Yoga layout,
-measurement, gestures, and animation frames on the platform UI thread.
-The browser preview uses DOM widgets and Yoga WebAssembly.
+Versioned commits go to a shared C++ renderer core, which every target links.
+The core validates each commit against the native contracts, lays it out with
+Yoga off the UI thread, flattens layout-only views, and runs animation graphs.
+Swift ``PythonNativeKit`` on iOS and the Kotlin ``pythonnative`` module on
+Android mount the result: they own widgets, text drawing, input, and the frame
+clock on the platform UI thread. The browser preview runs the same core as
+WebAssembly and mounts DOM widgets.
 
 Key building blocks:
 
@@ -50,6 +53,18 @@ Key building blocks:
   with [`define_component`][pythonnative.sdk.define_component], which
   returns its element factory (or expose it from a PyPI package via the
   ``pythonnative.handlers`` entry-point group).
+- **Capabilities** are opt-in device features, one subpackage each:
+  ``pythonnative.audio``, ``background``, ``biometrics``, ``camera``,
+  ``location``, ``maps``, ``notifications``, ``pickers``, ``purchases``,
+  ``push``, ``sensors``, and ``video``. They aren't re-exported here. List
+  one in ``[plugins].use`` in ``pythonnative.toml`` to compile it into the
+  app, then import it by name: ``from pythonnative.camera import CameraView``.
+  Calling one that isn't in the build raises ``NativeModuleError`` with the
+  code ``plugin_not_enabled``.
+- **Failures** in a release build reach
+  [`set_error_handler`][pythonnative.set_error_handler], and a render error
+  no boundary catches shows the screen set with
+  [`set_error_fallback`][pythonnative.set_error_fallback].
 
 Example:
     ```python
@@ -71,7 +86,7 @@ __version__ = "0.52.2"
 import importlib
 from typing import TYPE_CHECKING, Any
 
-from . import appearance, diagnostics, runtime, sdk, svg
+from . import appearance, sdk, svg
 from .alerts import Alert
 from .assets import Asset, asset
 from .component import Component, component, memo
@@ -118,13 +133,13 @@ from .components import (
     Switch,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
     WebNavigationEvent,
     WebView,
+    set_error_fallback,
 )
 from .components.props import AccessibilityProps, ViewProps
-from .diagnostics import HookOrderError
+from .diagnostics import HookOrderError, set_error_handler
 from .element import Element, Node
 from .handles import ScrollOffset, ScrollViewHandle, TextInputHandle, ViewHandle, WebViewHandle
 from .hooks import (
@@ -157,15 +172,11 @@ from .hooks import (
     use_transition,
     use_window_dimensions,
 )
-from .hosts import create_screen
-from .mutations import UNSET, UnsetType
 from .native_modules import (
     AccessibilityEvent,
     AccessibilityInfo,
     AppState,
     Battery,
-    Biometrics,
-    Camera,
     Clipboard,
     Device,
     DeviceInfo,
@@ -180,25 +191,22 @@ from .native_modules import (
     Linking,
     Locale,
     Localization,
-    Location,
     NetInfo,
-    Notifications,
     Permissions,
     PixelRatio,
     SecureStore,
     Share,
-    Vibration,
     use_app_state,
     use_locales,
     use_net_info,
     use_reduce_motion,
     use_screen_reader_enabled,
 )
-from .platform import Platform, get_platform
+from .platform import Platform
 from .platform_metrics import WindowDimensions
 from .runtime import run_async, run_blocking
 from .scheduler import batch_updates
-from .sdk import Props, define_component, element_factory
+from .sdk import Props, define_component
 from .storage import AsyncStorage, use_persisted_state
 from .store import Store, use_store
 from .style import (
@@ -206,36 +214,13 @@ from .style import (
     AccessibilityAction,
     AccessibilityState,
     AccessibilityValue,
-    AlignContent,
-    AlignItems,
-    AlignSelf,
-    AutoCapitalize,
-    BorderStyle,
     Color,
-    Dimension,
-    Display,
     DynamicColor,
     EdgeInsets,
-    FlexDirection,
-    FlexWrap,
-    FontWeight,
-    JustifyContent,
-    KeyboardType,
-    LayoutDirection,
-    Overflow,
-    PointerEvents,
-    Position,
-    ReturnKeyType,
-    ScaleType,
     ShadowOffset,
     Style,
     StyleProp,
     StyleSheet,
-    TextAlign,
-    TextDecoration,
-    TextTransform,
-    TransformSpec,
-    resolve_style,
     style,
 )
 from .suspense import Resource, lazy, start_resource
@@ -253,8 +238,13 @@ from .theme import (
 )
 
 __all__ = [
-    "UNSET",
-    "UnsetType",
+    # Errors
+    "set_error_fallback",
+    "set_error_handler",
+    # Networking
+    "WebSocket",
+    "WebSocketClosed",
+    "WebSocketError",
     # Components
     "ActivityIndicator",
     "BlurView",
@@ -299,7 +289,6 @@ __all__ = [
     "Switch",
     "Text",
     "TextInput",
-    "TouchableOpacity",
     "View",
     "WebView",
     # Shared props
@@ -327,7 +316,6 @@ __all__ = [
     "Element",
     "Node",
     "component",
-    "create_screen",
     "memo",
     # Hooks
     "ColorScheme",
@@ -387,34 +375,13 @@ __all__ = [
     "AccessibilityAction",
     "AccessibilityState",
     "AccessibilityValue",
-    "AlignContent",
-    "AlignItems",
-    "AlignSelf",
-    "AutoCapitalize",
-    "BorderStyle",
     "Color",
-    "Dimension",
-    "Display",
     "DynamicColor",
     "EdgeInsets",
-    "FlexDirection",
-    "FlexWrap",
-    "FontWeight",
-    "JustifyContent",
-    "KeyboardType",
-    "LayoutDirection",
-    "Overflow",
-    "PointerEvents",
-    "Position",
-    "ReturnKeyType",
-    "ScaleType",
     "ShadowOffset",
     "Style",
     "StyleProp",
     "StyleSheet",
-    "TextAlign",
-    "TextDecoration",
-    "TextTransform",
     "Theme",
     "ThemeProvider",
     "Colors",
@@ -425,14 +392,11 @@ __all__ = [
     "DARK_THEME",
     "ABSOLUTE_FILL",
     "use_styles",
-    "TransformSpec",
-    "resolve_style",
     "style",
     "use_theme",
     # Appearance
     "appearance",
     # Animation
-    "ANIMATABLE_PROPS",
     "Animated",
     "AnimatedValue",
     "AnimationResult",
@@ -463,21 +427,16 @@ __all__ = [
     "use_screen_reader_enabled",
     "AppState",
     "Battery",
-    "Biometrics",
-    "Camera",
     "Clipboard",
     "FileSystem",
     "Haptics",
     "ImageSize",
     "Images",
     "Linking",
-    "Location",
     "NetInfo",
-    "Notifications",
     "Permissions",
     "SecureStore",
     "Share",
-    "Vibration",
     "use_app_state",
     "use_net_info",
     # Stores
@@ -491,17 +450,13 @@ __all__ = [
     # Runtime
     "run_async",
     "run_blocking",
-    "runtime",
     # Diagnostics
     "HookOrderError",
-    "diagnostics",
     # Platform
     "Platform",
-    "get_platform",
     # Custom-component SDK
     "Props",
     "define_component",
-    "element_factory",
     "sdk",
 ]
 
@@ -512,7 +467,6 @@ from .list_data import ListData, Section, ViewableItem
 # documentation are unchanged, and type checkers see ordinary imports.
 _LAZY_GROUPS: dict[str, tuple[str, ...]] = {
     "animated": (
-        "ANIMATABLE_PROPS",
         "Animated",
         "AnimatedValue",
         "AnimationResult",
@@ -543,6 +497,7 @@ _LAZY_GROUPS: dict[str, tuple[str, ...]] = {
         "use_screen_options",
     ),
     "net": ("HTTPError", "Response", "fetch"),
+    "websocket": ("WebSocket", "WebSocketClosed", "WebSocketError"),
 }
 _LAZY = {name: module for module, names in _LAZY_GROUPS.items() for name in names}
 _LAZY_MODULES = frozenset({"gestures", "icons"})
@@ -550,7 +505,6 @@ _LAZY_MODULES = frozenset({"gestures", "icons"})
 if TYPE_CHECKING:
     from . import gestures, icons
     from .animated import (
-        ANIMATABLE_PROPS,
         Animated,
         AnimatedValue,
         AnimationResult,
@@ -581,6 +535,7 @@ if TYPE_CHECKING:
         use_screen_options,
     )
     from .net import HTTPError, Response, fetch
+    from .websocket import WebSocket, WebSocketClosed, WebSocketError
 
 
 def __getattr__(name: str) -> Any:

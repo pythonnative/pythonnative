@@ -277,7 +277,7 @@ pn.TextInput(value="", placeholder="Enter text", on_change=handler, secure=False
 - `select_text_on_focus`: select the whole text when the field gains focus
 - `blur_on_submit`: whether submitting blurs the field; `None` (default)
   blurs single-line fields and keeps multiline fields focused
-- `keyboard_type`: a [`KeyboardType`][pythonnative.KeyboardType]:
+- `keyboard_type`: a [`KeyboardType`][pythonnative.style.KeyboardType]:
   `"default"`, `"email_address"`, `"number_pad"`, `"decimal_pad"`,
   `"phone_pad"`, `"url"`, `"ascii"`, `"numbers_and_punctuation"`,
   `"web_search"`, or `"visible_password"`
@@ -471,17 +471,6 @@ nothing visible.
 - `translucent`: draw content under the status bar instead of below it
   (Android only; iOS always draws underneath)
 - `animated`: animate `bar_style` and `hidden` changes (iOS only)
-
-## TouchableOpacity
-
-```python
-pn.TouchableOpacity(child, on_press=handler, on_long_press=handler,
-                    active_opacity=0.2, disabled=False)
-```
-
-Tappable wrapper that dips to `active_opacity` while pressed (a thin alias
-over [`Pressable`](#pressable)). `disabled=True` ignores presses and dims the
-content.
 
 ## ImageBackground
 

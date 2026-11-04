@@ -124,7 +124,7 @@ channel separately and composes them with the static `transform` prop,
 so binding `translate_x` and `translate_y` together works.
 
 The full set of style keys an animated node may drive is
-[`ANIMATABLE_PROPS`][pythonnative.ANIMATABLE_PROPS]: `opacity`,
+[`pythonnative.animated.ANIMATABLE_PROPS`][pythonnative.animated.ANIMATABLE_PROPS]: `opacity`,
 `background_color`, `color`, and the eight transform channels above.
 These are the properties every renderer can animate on its UI thread
 without a layout pass. Binding a node to any other key (`width`,

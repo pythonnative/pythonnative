@@ -1,0 +1,1 @@
+        <meta-data android:name="pn.e2e.plugin_key" android:value="${greeting}" />

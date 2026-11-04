@@ -131,6 +131,31 @@ work fine inside the embedded CPython runtime, although you'll
 need to declare them in `[requirements].packages` so the bundler picks
 them up.
 
+## Errors no boundary caught
+
+Every uncaught error, in any build, reaches
+[`pn.set_error_handler`][pythonnative.diagnostics.set_error_handler], with the phase it came from.
+That includes the handler and task errors a boundary can't see, so it's the one place a crash reporter
+needs to attach:
+
+```python
+pn.set_error_handler(lambda error, phase: crash_reporter.capture(error, tags={"phase": phase}))
+```
+
+Development builds show the error screen. A release build has no error screen, so it wraps each screen in
+a boundary of its own. A render error no boundary of yours caught replaces the screen with a message and
+a "Try again" button that remounts it with fresh state. Replace that screen with
+[`pn.set_error_fallback`][pythonnative.set_error_fallback], which takes the same forms as `fallback`:
+
+```python
+pn.set_error_fallback(lambda error, reset: SorryScreen(on_retry=reset))
+```
+
+Errors in event handlers and tasks don't replace the screen. They reach the handler, and the app carries on.
+
+If the UI thread can't mount an update, the screen remounts with a fresh tree once. A second failure
+within a minute means the tree itself is the problem, so it shows the fallback instead of looping.
+
 ## Boundaries vs `use_effect` cleanup
 
 Effect cleanups always run on unmount, even when an exception triggered

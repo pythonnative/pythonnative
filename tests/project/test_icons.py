@@ -49,6 +49,17 @@ def test_generate_android_icons(source_icon: Path, tmp_path: Path) -> None:
     assert not (res / "mipmap-anydpi-v26").exists()
 
 
+def test_generate_android_icons_replaces_template_webp(source_icon: Path, tmp_path: Path) -> None:
+    res = tmp_path / "res"
+    density = next(iter(icons.ANDROID_LAUNCHER_DENSITIES))
+    (res / f"mipmap-{density}").mkdir(parents=True)
+    (res / f"mipmap-{density}" / "ic_launcher.webp").write_bytes(b"template")
+
+    assert icons.generate_android_icons(source_icon, res) is True
+    # aapt rejects two files for one resource name.
+    assert not (res / f"mipmap-{density}" / "ic_launcher.webp").exists()
+
+
 def test_generate_ios_splash(source_icon: Path, tmp_path: Path) -> None:
     imageset = tmp_path / "Splash.imageset"
     assert icons.generate_ios_splash(source_icon, imageset) is True

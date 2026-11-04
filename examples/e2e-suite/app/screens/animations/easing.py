@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pythonnative as pn
 from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
+from pythonnative.animated import ANIMATABLE_PROPS
 
 _CURVES: list[tuple[str, pn.EasingSpec]] = [
     ("linear", pn.Easing.linear),
@@ -62,7 +63,7 @@ def EasingDemo() -> pn.Node:
             ResultText("Curves run", curves_run),
             ResultText("Last curve", last_curve),
             ResultText("Rejects unknown easing", "yes" if _rejects_unknown_easing() else "no"),
-            ResultText("Animatable props", len(pn.ANIMATABLE_PROPS)),
+            ResultText("Animatable props", len(ANIMATABLE_PROPS)),
             pn.Animated.View(
                 pn.Text("easing-box", style=pn.style(color="#FFFFFF", font_weight="700")),
                 style={
