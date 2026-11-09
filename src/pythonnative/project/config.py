@@ -127,12 +127,14 @@ VALID_IOS_EXPORT_METHODS = ("development", "ad-hoc", "app-store", "enterprise")
 """Accepted values for ``[ios.signing].export_method``."""
 
 # Reserved Java keywords can't appear as Android package segments.
-_JAVA_KEYWORDS = frozenset("""
+_JAVA_KEYWORDS = frozenset(
+    """
     abstract assert boolean break byte case catch char class const continue default do double else enum
     extends final finally float for goto if implements import instanceof int interface long native new
     package private protected public return short static strictfp super switch synchronized this throw
     throws transient try void volatile while true false null
-    """.split())
+    """.split()
+)
 
 _APP_ID_SEGMENT = re.compile(r"^[a-z][a-z0-9_]*$")
 _VERSION_RE = re.compile(r"^\d+(\.\d+){0,3}$")

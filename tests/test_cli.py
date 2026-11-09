@@ -532,7 +532,7 @@ def test_cli_app_id_json_is_indented(tmp_path: Path) -> None:
 
     result = run_pn(["app-id", "android", "--json"], project_dir)
 
-    assert result.stdout == ("{\n" '  "platform": "android",\n' '  "app_id": "com.example.android_override"\n' "}\n")
+    assert result.stdout == ('{\n  "platform": "android",\n  "app_id": "com.example.android_override"\n}\n')
 
 
 def test_cli_app_id_json_differs_per_platform(tmp_path: Path) -> None:
@@ -629,8 +629,7 @@ def _deps_project(tmp_path: Path, packages: str = '["httpx", "numpy"]') -> Path:
     (tmp_path / "app").mkdir()
     (tmp_path / "app" / "main.py").write_text("import pythonnative as pn\n", encoding="utf-8")
     (tmp_path / "pythonnative.toml").write_text(
-        '[app]\nid = "com.acme.deps"\nname = "deps"\npython_version = "3.13"\n'
-        f"[requirements]\npackages = {packages}\n",
+        f'[app]\nid = "com.acme.deps"\nname = "deps"\npython_version = "3.13"\n[requirements]\npackages = {packages}\n',
         encoding="utf-8",
     )
     return tmp_path

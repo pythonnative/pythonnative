@@ -1371,7 +1371,8 @@ def test_drawer_open_select_close_and_back() -> None:
     result = render(DrawerNavigator(Screen(Feed, title="My Feed"), Settings, drawer_width=200)())
     nav = _drawer("feed")
     assert not nav.is_drawer_open()
-    assert result.query_by_text("My Feed") is None
+    # The menu stays mounted off screen, so it can follow a swipe from the edge.
+    assert result.get_by_text("My Feed")
 
     nav.open_drawer()
     result.settle()
@@ -1386,15 +1387,14 @@ def test_drawer_open_select_close_and_back() -> None:
     assert row is not None
     result.press(row)
     assert result.get_by_text("settings count=0")
-    assert not nav.is_drawer_open()
-    assert result.query_by_text("My Feed") is None  # closed on select
+    assert not nav.is_drawer_open()  # closed on select
     assert result.get_by_text("feed count=0", hidden=True)  # kept alive
 
     _drawer("settings").toggle_drawer()
     result.settle()
-    assert result.get_by_text("My Feed")
+    assert _drawer("settings").is_drawer_open()
     assert result.back() is True  # back closes the drawer first
-    assert result.query_by_text("My Feed") is None
+    assert not _drawer("settings").is_drawer_open()
     assert result.back() is False
 
     _drawer("settings").jump_to(Feed)

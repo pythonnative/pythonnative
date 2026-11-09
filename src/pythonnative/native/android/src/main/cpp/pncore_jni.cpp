@@ -276,6 +276,18 @@ PN_JNI(void, nativeSetReduceMotion)(JNIEnv*, jclass, jboolean enabled) {
     pn_core_set_reduce_motion(core(), enabled ? 1 : 0);
 }
 
+PN_JNI(void, nativeExitFinished)(JNIEnv*, jclass, jlong surface, jlong tag) {
+    pn_core_exit_finished(core(), surface, tag);
+}
+
+PN_JNI(jbyteArray, nativeSharedElements)(JNIEnv* env, jclass, jlong surface, jlong from_screen, jlong to_screen) {
+    char* json = pn_core_shared_elements(core(), surface, from_screen, to_screen);
+    if (json == nullptr) return nullptr;
+    jbyteArray out = bytes(env, json);
+    pn_core_free(json);
+    return out;
+}
+
 PN_JNI(jint, nativePointer)(JNIEnv* env, jclass, jlong surface, jlong tag, jdoubleArray values, jint count) {
     if (values == nullptr || count <= 0 || env->GetArrayLength(values) < count * 7) return 0;
     std::vector<jdouble> raw(static_cast<size_t>(count) * 7);

@@ -573,7 +573,7 @@ with a `deg` or `rad` suffix), `rotate_x`, `rotate_y`, `rotate_z`,
 follow it in the list). iOS composes the list into a `CATransform3D`;
 Android applies skew through the animation matrix on API 29 and later
 and ignores it below that with a one-time log. For animated transforms,
-see [Animations](animations.md).
+see [Motion](motion.md#animatable-properties).
 
 ## Flex layout
 

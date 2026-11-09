@@ -224,6 +224,31 @@ it mounts.
 - `list_header=` / `list_footer=` render once before/after all rows.
 - `list_empty=` renders when `data` is empty.
 
+## Animating rows
+
+Rows belong to the native list, which recycles them, so a row's own
+`entering` and `exiting` props don't apply. List-level props animate
+rows when the data changes, never when you scroll:
+
+```python
+from pythonnative.motion import FadeIn, FadeOut, LinearTransition
+
+pn.FlatList(
+    data=entries,
+    render_item=lambda entry, _: EntryRow(entry),
+    key_extractor=lambda entry, _: entry.id,
+    item_entering=FadeIn(duration=200),   # rows added to the data
+    item_exiting=FadeOut(duration=150),   # rows removed from it
+    item_layout=LinearTransition(),       # rows that move
+)
+```
+
+`SectionList` takes the same three props. Each takes a preset from
+`pythonnative.motion`, run with the list's own machinery on each
+platform; see [List items](motion.md#list-items) in the Motion guide.
+To slide a row aside to reveal actions, wrap it in a
+[`Swipeable`](motion.md#swipeable).
+
 ## Inverted lists
 
 `inverted=True` renders the list bottom-up (or right-to-left when

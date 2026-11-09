@@ -4,8 +4,10 @@ Each commit is built as wire operations once, serialized once, and handed
 to the core, which validates it, applies it to its shadow tree, lays it
 out, and queues the mount for the platform's UI thread. The acknowledgement
 arrives when the core has accepted and laid out the commit, before widgets
-exist; commands and animation requests issued afterward queue behind that
-mount, so they always reach the widgets it creates. Rejected commits leave
+exist; commands and motion requests issued afterward queue behind that
+mount, so they always reach the widgets it creates. Motion requests made
+while rendering a commit go out just before it, so the programs and
+bindings it references are installed first. Rejected commits leave
 the surface as it was; a failed mount poisons it until it is remounted.
 
 Native events carry application, revision, sequence, and text edit
@@ -257,6 +259,7 @@ class BridgeBackend:
         if self._failed:
             raise CommitError("Native surface failed; remount the application with a new backend")
         self._ensure_contracts()
+        self._track_motion(ops)
         wire_ops, sidecar = codec.build_transaction(ops, self._types)
         for op in wire_ops:
             if op[0] == "u" and self._types.get(op[1]) == "TextInput" and "value" in op[2]:
@@ -324,6 +327,41 @@ class BridgeBackend:
             raise
         complete(raw)
         return None
+
+    def _track_motion(self, ops: Sequence[Mutation]) -> None:
+        """Send queued motion requests, and count which views use each worklet handler (RFC 0009)."""
+        from ..motion.runtime import runtime as motion
+        from ..mutations import UNSET, CreateOp, DestroyOp, UpdateOp
+
+        motion.flush_transport(self.transport)
+
+        def handlers(key: str, value: Any) -> tuple[int, ...]:
+            if value is UNSET or not value:
+                return ()
+            if key == "_pn_motion":
+                return tuple(int(binding) for binding in (value.get("events") or {}).values())
+            return tuple(
+                int(binding)
+                for spec in value
+                if isinstance(spec, dict)
+                for binding in (spec.get("worklets") or {}).values()
+            )
+
+        for op in ops:
+            if isinstance(op, DestroyOp):
+                motion.release_view(self, op.tag)
+                continue
+            if isinstance(op, CreateOp):
+                props = op.props
+            elif isinstance(op, UpdateOp):
+                props = op.changed_props
+            else:
+                continue
+            if not props:
+                continue
+            for key in ("_pn_motion", "gestures"):
+                if key in props:
+                    motion.retain_view(self, op.tag, key, handlers(key, props[key]))
 
     def _accept_commit(
         self,
@@ -457,9 +495,6 @@ class BridgeBackend:
         return True
 
     def _forget(self, tag: int) -> None:
-        from ..animated import release_view_backend
-
-        release_view_backend(self, (tag,))
         self._types.pop(tag, None)
         self._births.pop(tag, None)
         self._edit_revisions.pop(tag, None)
@@ -529,43 +564,12 @@ class BridgeBackend:
             return
         future.set_result(value)
 
-    def _animate(self, tag: int, request: Dict[str, Any]) -> Dict[str, Any]:
-        reply = codec.loads(self.transport.animate(self.surface, tag, codec.dumps(codec.to_jsonable(request))))
-        return reply if isinstance(reply, dict) else {"ok": False}
-
-    def _targets_animation(self, tag: int, prop_name: str) -> bool:
-        """Whether a request can reach the UI thread: graph nodes and unbound values need no view."""
-        return tag in self._types or prop_name.startswith(("_pn_graph:", "_pn_value:"))
-
-    def set_animated_property(self, tag: int, prop_name: str, value: Any) -> None:
-        """Write one animated property value without animating."""
-        if self._targets_animation(tag, prop_name):
-            self._animate(tag, {"op": "set", "prop": prop_name, "value": value})
-
-    def install_animation_graph(self, tag: int, graph: dict[str, Any]) -> None:
-        """Install expression nodes and view bindings on the UI thread."""
-        if tag in self._types:
-            self._animate(tag, {"op": "graph", "graph": graph})
-
-    def start_animation(self, tag: int, anim_id: int, prop_name: str, spec: Dict[str, Any]) -> bool:
-        """Start a driver on the UI thread; returns whether the core accepted the request."""
-        if not self._targets_animation(tag, prop_name):
-            return False
-        return bool(self._animate(tag, {"op": "start", "id": int(anim_id), "prop": prop_name, "spec": spec}).get("ok"))
-
-    def cancel_animation(self, tag: int, anim_id: int) -> None:
-        """Stop a driver; its value arrives with the ``animation`` message that reports the cancellation."""
-        self._animate(tag, {"op": "cancel", "id": int(anim_id)})
-
     def reset(self) -> None:
         """Forget a disconnected surface before the host remounts its tree."""
         if self._pending is not None:
             raise CommitError("Wait for the in-flight commit before resetting its surface")
         if any(not task.done() for task in self._queued_commits):
             raise CommitError("Wait for queued commits before resetting the surface")
-        from ..animated import release_view_backend
-
-        release_view_backend(self, list(self._types))
         self._publishing = False
         self._queued_events.clear()
         self._types.clear()

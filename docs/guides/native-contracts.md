@@ -191,7 +191,7 @@ A reset doesn't recreate the logical tag. Only fields marked `recreate`, such
 as `TextInput.multiline` and `ProgressBar.indeterminate`, replace the physical
 widget, retaining logical ownership and supported focus/selection state.
 
-`NativeField` also declares layout invalidation, animation, and platform support.
+`NativeField` also declares layout invalidation, widget recreation, flattening, and platform support.
 `Platform.supports("Image", "source")` or
 `Platform.supports("Notifications", "set_badge")` inspects the compiled
 contract, which answers `False` for `set_badge` on Android, because the

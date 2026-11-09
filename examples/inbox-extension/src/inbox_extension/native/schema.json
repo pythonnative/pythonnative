@@ -1,5 +1,5 @@
 {
-  "protocol": 7,
+  "protocol": 8,
   "yoga": "3.2.1",
   "components": {
     "InboxBadge": {
@@ -20,7 +20,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -46,7 +45,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -72,7 +70,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -98,7 +95,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -124,7 +120,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -150,7 +145,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -166,7 +160,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -182,7 +175,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -198,7 +190,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -214,7 +205,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -240,7 +230,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -261,7 +250,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -281,7 +269,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -310,7 +297,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -340,7 +326,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -370,7 +355,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -394,7 +378,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -413,7 +396,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -432,7 +414,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -451,7 +432,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -477,7 +457,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -503,7 +482,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -529,7 +507,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -555,7 +532,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -581,7 +557,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -607,7 +582,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -734,7 +708,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -760,7 +733,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -786,7 +758,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -812,7 +783,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -838,7 +808,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -864,7 +833,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -890,7 +858,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -916,7 +883,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -942,7 +908,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1074,7 +1039,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1105,7 +1069,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1136,7 +1099,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1167,7 +1129,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1198,7 +1159,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1229,7 +1189,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1260,7 +1219,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1291,7 +1249,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1322,7 +1279,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1338,7 +1294,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1354,7 +1309,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1370,7 +1324,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1390,7 +1343,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1429,7 +1381,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": true,
             "platforms": [
               "ios",
               "android",
@@ -1468,7 +1419,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": true,
             "platforms": [
               "ios",
               "android",
@@ -1507,7 +1457,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1546,7 +1495,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1585,7 +1533,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1601,7 +1548,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1621,7 +1567,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1637,7 +1582,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1653,7 +1597,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1669,7 +1612,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1685,7 +1627,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1701,7 +1642,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1717,7 +1657,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1733,7 +1672,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1749,7 +1687,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1765,7 +1702,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1804,7 +1740,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1843,7 +1778,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1882,7 +1816,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1921,7 +1854,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1937,7 +1869,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1953,7 +1884,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1981,7 +1911,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -1997,7 +1926,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2013,7 +1941,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2036,7 +1963,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2056,7 +1982,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2077,7 +2002,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2093,7 +2017,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2109,7 +2032,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2125,7 +2047,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2164,7 +2085,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2218,7 +2138,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2234,7 +2153,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2273,7 +2191,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2327,7 +2244,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2343,7 +2259,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2359,7 +2274,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2375,7 +2289,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2391,7 +2304,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": true,
             "platforms": [
               "ios",
               "android",
@@ -2843,7 +2755,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2859,7 +2770,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2880,7 +2790,6 @@
           "native": {
             "invalidates_layout": false,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2896,7 +2805,6 @@
           "native": {
             "invalidates_layout": true,
             "recreate": false,
-            "animated": false,
             "platforms": [
               "ios",
               "android",
@@ -2935,8 +2843,49 @@
             "type": "string"
           }
         },
-        "_pn_animated_events": {
-          "type": "object"
+        "_pn_motion": {
+          "type": "object",
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "entering": {
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "exiting": {
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "layout": {
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "shared_tag": {
+          "type": "string",
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "shared_transition": {
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "skip_entering": {
+          "type": "boolean",
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "skip_exiting": {
+          "type": "boolean",
+          "native": {
+            "invalidates_layout": false
+          }
         },
         "_pn_list_key": {
           "type": "string"

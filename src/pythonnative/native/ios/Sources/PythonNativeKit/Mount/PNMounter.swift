@@ -8,12 +8,21 @@ import PNCore
 /// mounter only creates widgets, applies props, moves children, and sets
 /// frames. It keeps the mounted parent and child lists itself, which
 /// `recreate` needs to rebuild a widget in place.
+///
+/// Exiting views (RFC 0009) stay in their parent's child list, where they
+/// still sit on screen, and `insert` indices from the core, which count
+/// only views that aren't exiting, are mapped past them.
 public enum PNMounter {
     private static let scheduleLock = NSLock()
     private static var scheduled = false
     private static var draining = false
     private static var parents: [Int64: Int64] = [:]
     private static var children: [Int64: [Int64]] = [:]
+    /// Views held on screen by an `exit` op until a `remove` write.
+    private static var exiting: Set<Int64> = []
+    /// Platform-owned exits whose transitions ended, for `pn_core_exit_finished`.
+    private static var finishedExits: [Int64] = []
+    private static var exitFlushScheduled = false
 
     /// Ask for a drain on the main queue; safe from any thread, coalesced.
     public static func schedule() {
@@ -49,21 +58,65 @@ public enum PNMounter {
             } else {
                 pn_core_mount_finished(PNCore.handle, id, nil)
             }
+            reportFinishedExits()
             applyWrites()
         }
     }
 
-    /// Apply animated prop writes the core's animator produced.
+    /// Apply the writes the core's motion runtime produced: paint props,
+    /// animated frames, and the removal of views whose exits finished.
     public static func applyWrites() {
         var bytes = pn_bytes()
-        guard pn_core_take_writes(PNCore.handle, &bytes) != 0, let base = bytes.data,
-              let writes = try? PNMountDecoder.writes(UnsafeRawPointer(base), count: bytes.size) else { return }
-        let registry = PNViewRegistry.shared
-        for (tag, prop, value) in writes {
-            guard let record = registry.resolve(tag) else { continue }
-            record.manager.setAnimatedProperty(view: record.view, prop: prop, value: value)
+        guard pn_core_take_writes(PNCore.handle, &bytes) != 0, let base = bytes.data else { return }
+        do {
+            apply(writes: try PNMountDecoder.writes(UnsafeRawPointer(base), count: bytes.size))
+        } catch {
+            PNLog.rateLimited(PNLog.animation, key: "writes", "[motion] \(error)")
         }
     }
+
+    /// Apply decoded motion writes in order.
+    static func apply(writes: [PNMotionWrite]) {
+        let registry = PNViewRegistry.shared
+        for write in writes {
+            switch write {
+            case let .prop(tag, name, value):
+                guard let record = registry.resolve(tag) else { continue }
+                record.manager.setAnimatedProperty(view: record.view, prop: name, value: value)
+            case let .frame(tag, x, y, width, height):
+                guard let record = registry.resolve(tag) else { continue }
+                if PNSharedElementTransition.deferFrame(of: record.view, x: x, y: y, width: width, height: height) { continue }
+                record.manager.setFrame(view: record.view, x: x, y: y, w: width, h: height)
+            case let .remove(tags):
+                for tag in tags { remove(tag) }
+            }
+        }
+    }
+
+    /// A platform-owned exit's transition ended: tell the core, which
+    /// answers with a `remove` write. Safe to call at any time on the main
+    /// thread; the core hears it once the exit's transaction has finished.
+    static func exitFinished(_ tag: Int64) {
+        finishedExits.append(tag)
+        guard !draining, !exitFlushScheduled else { return }
+        exitFlushScheduled = true
+        DispatchQueue.main.async {
+            exitFlushScheduled = false
+            guard !draining else { return }
+            reportFinishedExits()
+            applyWrites()
+        }
+    }
+
+    private static func reportFinishedExits() {
+        guard !finishedExits.isEmpty else { return }
+        let tags = finishedExits
+        finishedExits.removeAll()
+        for tag in tags { pn_core_exit_finished(PNCore.handle, PNCore.surface, tag) }
+    }
+
+    /// Whether `tag` is held on screen by an exit.
+    static func isExiting(_ tag: Int64) -> Bool { exiting.contains(tag) }
 
     /// The mounted parent of `tag`, as the core arranged it.
     public static func parent(of tag: Int64) -> Int64? { parents[tag] }
@@ -85,6 +138,7 @@ public enum PNMounter {
                 registry.removeAll()
                 parents.removeAll()
                 children.removeAll()
+                exiting.removeAll()
             case let .create(tag, component, props):
                 subject = (tag, component)
                 guard registry.resolve(tag) == nil else { return "duplicate create: \(tag)" }
@@ -115,22 +169,20 @@ public enum PNMounter {
                 }
                 var siblings = children[parentTag] ?? []
                 siblings.removeAll { $0 == childTag }
-                siblings.insert(childTag, at: max(0, min(index, siblings.count)))
+                let position = platformIndex(index, among: siblings)
+                siblings.insert(childTag, at: position)
                 children[parentTag] = siblings
                 parents[childTag] = parentTag
-                parent.manager.insertChild(parent: parent.view, child: child.view, index: index)
+                parent.manager.insertChild(parent: parent.view, child: child.view, index: position)
             case let .delete(tag):
-                guard let record = registry.unregister(tag) else { continue }
-                if let parentTag = parents.removeValue(forKey: tag) {
-                    children[parentTag]?.removeAll { $0 == tag }
-                    if let parent = registry.resolve(parentTag) {
-                        parent.manager.removeChild(parent: parent.view, child: record.view)
-                    }
-                }
-                for child in children.removeValue(forKey: tag) ?? [] { parents.removeValue(forKey: child) }
-                destroy(record)
+                remove(tag)
+            case let .exit(tag, owner):
+                guard let record = registry.resolve(tag) else { continue }
+                subject = (tag, record.typeName)
+                beginExit(record, owner: owner)
             case let .frame(tag, x, y, width, height):
                 guard let record = registry.resolve(tag) else { continue }
+                if PNSharedElementTransition.deferFrame(of: record.view, x: x, y: y, width: width, height: height) { continue }
                 record.manager.setFrame(view: record.view, x: x, y: y, w: width, h: height)
                 PNVirtualListManager.measured(tag, CGSize(width: width, height: height))
             case let .command(tag, name, arguments, callId):
@@ -147,6 +199,56 @@ public enum PNMounter {
             }
         }
         return nil
+    }
+
+    /// The child index under a parent for the core's `index`, which counts
+    /// only siblings that aren't exiting.
+    static func platformIndex(_ index: Int, among siblings: [Int64]) -> Int {
+        guard !exiting.isEmpty else { return max(0, min(index, siblings.count)) }
+        var live = 0
+        for (position, sibling) in siblings.enumerated() where !exiting.contains(sibling) {
+            if live == index { return position }
+            live += 1
+        }
+        return siblings.count
+    }
+
+    /// Hold `record` on screen without touches. The core animates owner 0
+    /// exits with writes; owner 1 exits are the platform's transitions (a
+    /// screen popping off a stack, a modal dismissing).
+    private static func beginExit(_ record: PNViewRecord, owner: UInt8) {
+        let tag = record.tag
+        record.view.isUserInteractionEnabled = false
+        let finished = { exitFinished(tag) }
+        if owner == 1 {
+            if let parentTag = parents[tag], let parent = PNViewRegistry.shared.resolve(parentTag),
+               parent.manager.exitChild(parent: parent.view, child: record.view, finished: finished) {
+                // The container dropped the child from its own model, so it
+                // no longer takes part in insert indices.
+                children[parentTag]?.removeAll { $0 == tag }
+                parents.removeValue(forKey: tag)
+                return
+            }
+            exiting.insert(tag)
+            if !record.manager.exitView(record.view, finished: finished) { finished() }
+            return
+        }
+        exiting.insert(tag)
+    }
+
+    /// Destroy one view as a `delete` op does; unknown tags are ignored.
+    private static func remove(_ tag: Int64) {
+        let registry = PNViewRegistry.shared
+        exiting.remove(tag)
+        guard let record = registry.unregister(tag) else { return }
+        if let parentTag = parents.removeValue(forKey: tag) {
+            children[parentTag]?.removeAll { $0 == tag }
+            if let parent = registry.resolve(parentTag) {
+                parent.manager.removeChild(parent: parent.view, child: record.view)
+            }
+        }
+        for child in children.removeValue(forKey: tag) ?? [] { parents.removeValue(forKey: child) }
+        destroy(record)
     }
 
     private static func destroy(_ record: PNViewRecord) {

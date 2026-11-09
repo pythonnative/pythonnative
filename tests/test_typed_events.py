@@ -103,14 +103,6 @@ def test_layout_callback_converts_dict_payloads_and_passes_records_through() -> 
     assert _layout_callback(wrapped) is wrapped
 
 
-def test_layout_callback_leaves_animated_events_alone() -> None:
-    value = pn.AnimatedValue(0.0)
-    handler = pn.Animated.event(width=value)
-    assert _layout_callback(handler) is handler
-    el = pn.View(on_layout=handler)
-    assert el.props["on_layout"] is handler
-
-
 def test_factories_wrap_on_layout() -> None:
     frames: list = []
     el = pn.View(on_layout=frames.append)
@@ -118,8 +110,8 @@ def test_factories_wrap_on_layout() -> None:
     assert frames == [pn.LayoutEvent(x=0.0, y=0.0, width=10.0, height=20.0)]
 
 
-def test_scroll_event_fields_match_the_animated_event_binding_names() -> None:
-    """``Animated.event(on_scroll, y=value)`` reads payload attributes by name, so the wire keys are the field names."""
+def test_scroll_event_fields_match_the_payload_keys_worklets_read() -> None:
+    """A worklet handler reads ``event.y`` from the payload by name, so the wire keys are the field names."""
     import dataclasses
 
     names = {field.name for field in dataclasses.fields(pn.ScrollEvent)}

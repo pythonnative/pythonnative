@@ -37,7 +37,7 @@ from ..style import Color, Style, StyleProp
 from ._names import ICON_NAMES, LUCIDE_VERSION, IconName
 
 if TYPE_CHECKING:
-    from ..components.props import AccessibilityProps
+    from ..components.props import CommonProps
     from ..svg import SvgShape
 
 __all__ = [
@@ -119,7 +119,7 @@ def Icon(
     fill: Optional[Color] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Render a bundled vector icon.
 

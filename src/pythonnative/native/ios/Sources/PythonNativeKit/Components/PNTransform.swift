@@ -1,7 +1,6 @@
 import UIKit
 
-/// Builds `CATransform3D`s from the `transform` style prop and composes
-/// them with the per-view animated channels.
+/// Builds `CATransform3D`s from the `transform` style prop.
 ///
 /// The prop is a list of single-key dicts applied in order (later entries
 /// act in the local space of earlier ones, as in React Native):
@@ -10,16 +9,9 @@ import UIKit
 /// `translate_y`, `skew_x`, `skew_y` (degrees), and `perspective`
 /// (distance in points; sets `m34 = -1 / d`).
 ///
-/// Animated channels (`PNViewState.animatedTransform`) are appended to
-/// the static list, so the static `transform` prop is the base and the
-/// animator overlays its channels without wiping each other out.
+/// A motion write of `transform` carries the whole list and replaces the
+/// static one while it's set (RFC 0009).
 public enum PNTransform {
-    /// The channel names `PNAnimator` may drive.
-    public static let animatedChannels: [String] = [
-        "perspective", "translate_x", "translate_y", "rotate", "rotate_x", "rotate_y",
-        "scale", "scale_x", "scale_y", "skew_x", "skew_y",
-    ]
-
     /// Build a 3D transform from a spec list (or single dict). `nil` is identity.
     public static func make(_ spec: Any?) -> CATransform3D {
         var transform = CATransform3DIdentity
@@ -80,31 +72,9 @@ public enum PNTransform {
          t.m31, t.m32, t.m33, t.m34, t.m41, t.m42, t.m43, t.m44].allSatisfy { $0.isFinite }
     }
 
-    /// Apply the static `transform` prop to `view`, composed with any
-    /// animated channels the view currently holds (identity when `null`).
+    /// Apply a `transform` list to `view` (identity when `nil`).
     public static func apply(_ view: UIView, spec: Any?) {
-        let animated = PNViewState.existing(for: view)?.animatedTransform ?? [:]
-        assign(view, compose(base: spec, animated: animated), spec: spec)
-    }
-
-    /// Recompute the view's transform from its merged `transform` prop
-    /// and its animated channels, then assign it to `layer.transform`.
-    public static func refresh(_ view: UIView) {
-        let state = PNViewState.existing(for: view)
-        let spec = state.map { PNProps.value($0.props, "transform") } ?? nil
-        assign(view, compose(base: spec, animated: state?.animatedTransform ?? [:]), spec: spec)
-    }
-
-    /// Base spec first, then one entry per animated channel in canonical order.
-    public static func compose(base: Any?, animated: [String: Double]) -> CATransform3D {
-        var entries: [Any] = []
-        if let base = base, !(base is NSNull) {
-            entries = (base as? [Any]) ?? [base]
-        }
-        for channel in animatedChannels {
-            if let value = animated[channel], value.isFinite { entries.append([channel: value]) }
-        }
-        return make(entries)
+        assign(view, make(spec), spec: spec)
     }
 
     private static func assign(_ view: UIView, _ transform: CATransform3D, spec: Any?) {
@@ -136,16 +106,5 @@ public enum PNTransform {
         let scaleY = sqrt(t.c * t.c + t.d * t.d)
         let rotation = atan2(t.b, t.a)
         return (t.tx, t.ty, scaleX, scaleY, rotation * 180 / .pi)
-    }
-
-    /// The animated overlay on `view` as seen on screen: the presentation
-    /// transform with the static base factored out (`nil` when the result
-    /// isn't affine, which only happens with 3D static transforms).
-    public static func presentedOverlay(_ view: UIView) -> CGAffineTransform? {
-        let layer = view.layer.presentation() ?? view.layer
-        let base = make(PNViewState.existing(for: view).map { PNProps.value($0.props, "transform") } ?? nil)
-        let overlay = CATransform3DConcat(layer.transform, CATransform3DInvert(base))
-        guard CATransform3DIsAffine(overlay) else { return nil }
-        return CATransform3DGetAffineTransform(overlay)
     }
 }

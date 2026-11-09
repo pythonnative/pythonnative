@@ -169,27 +169,6 @@ object ViewStyler {
         return true
     }
 
-    /**
-     * Apply one animated `background_color` frame without losing borders:
-     * mutate the existing drawable's fill in place when possible.
-     */
-    fun setAnimatedBackground(view: View, value: Any?) {
-        val color = PNColor.parse(value) ?: return
-        val record = record(view)
-        val visual = record?.state?.get("visual") as? JSONObject
-        val hasBorder = visual != null && drawableKeys.any { it != "background_color" && visual.value(it) != null }
-        if (hasBorder && visual != null) {
-            visual.put("background_color", String.format("#%08X", color))
-            when (val bg = view.background) {
-                is GradientDrawable -> bg.setColor(color)
-                is PNBorderDrawable -> bg.setFillColor(color)
-                else -> applyBorder(view, visual)
-            }
-            return
-        }
-        view.setBackgroundColor(color)
-    }
-
     // ------------------------------------------------------------------
     // Shadow / elevation
     // ------------------------------------------------------------------
@@ -213,17 +192,25 @@ object ViewStyler {
     // ------------------------------------------------------------------
 
     private fun applyTransform(view: View, props: JSONObject) {
-        if (!props.has("transform")) return
-        val spec = props.value("transform")
+        if (props.has("transform")) applyTransformValue(view, props.value("transform"))
+    }
+
+    /**
+     * Replace the view's whole transform with `spec` (a list of single-key
+     * entries, as the `transform` prop), or reset it when `spec` is null.
+     * Channels the list doesn't name return to identity. Static updates and
+     * motion writes both land here, so the last write is the transform.
+     */
+    fun applyTransformValue(view: View, spec: Any?) {
         val state = record(view)?.state
-        if (spec == null) {
-            view.rotation = 0f
-            view.rotationX = 0f
-            view.rotationY = 0f
-            view.scaleX = 1f
-            view.scaleY = 1f
-            view.translationX = 0f
-            view.translationY = 0f
+        view.rotation = 0f
+        view.rotationX = 0f
+        view.rotationY = 0f
+        view.scaleX = 1f
+        view.scaleY = 1f
+        view.translationX = 0f
+        view.translationY = 0f
+        if (spec == null || spec === JSONObject.NULL) {
             if (state?.remove("perspective") != null) view.cameraDistance = 1280f * density()
             if (state?.remove("skew") != null) setSkew(view, null)
             return

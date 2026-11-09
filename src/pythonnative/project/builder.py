@@ -420,7 +420,10 @@ class Builder:
             except (ValueError, native_plugins.PluginError) as exc:
                 raise BuildError(str(exc)) from exc
             self._stage_contracts(project_dir, platform, plugins, [layout.python_root / "pythonnative"])
-            if not release:
+            if release:
+                # Chaquopy drops the sources from release builds; worklets compile now.
+                self._precompile_worklets([(layout.python_root, "")])
+            else:
                 self._stage_dev_client([layout.python_root / "pythonnative"], plugins, dev_client)
             return PreparedProject(
                 platform=platform,
@@ -589,6 +592,19 @@ class Builder:
             [(app_dir, "app"), *((slice_dir, "app_packages") for slice_dir in slices)], release=release
         )
 
+    def _precompile_worklets(self, roots: Sequence[Tuple[Path, str]]) -> None:
+        """Compile every worklet before a release build drops the sources (RFC 0009).
+
+        Raises:
+            BuildError: When a worklet uses Python the UI thread can't run.
+        """
+        from ..motion.precompile import precompile_tree
+
+        errors = [error for root, label in roots if root.is_dir() for error in precompile_tree(root, label)]
+        if errors:
+            listing = "\n".join(f"  {error}" for error in errors)
+            raise BuildError(f"Some worklets can't run on the UI thread:\n{listing}")
+
     def _compile_ios_bytecode(self, roots: Sequence[Tuple[Path, str]], *, release: bool) -> None:
         """Compile the staged app and packages so the device never compiles them at launch.
 
@@ -598,6 +614,8 @@ class Builder:
         ``app.python_version``: release builds fail without one, and debug
         builds warn and compile on the device instead.
         """
+        if release:
+            self._precompile_worklets(roots)
         version = self.config.python_version
         compiler = bytecode.compiler_for(version)
         if compiler is None:

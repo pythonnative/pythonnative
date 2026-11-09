@@ -21,12 +21,16 @@ pn.View(
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Literal, Sequence, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Sequence, TypedDict, Union
 
 from ..style import AccessibilityAction, AccessibilityState, AccessibilityValue, ImportantForAccessibility
 from .events import LayoutEvent
 
-__all__ = ["AccessibilityProps", "ViewProps"]
+if TYPE_CHECKING:
+    from ..motion.layout import LayoutAnimation
+    from ..motion.transitions import SharedTransition
+
+__all__ = ["AccessibilityProps", "CommonProps", "MotionProps", "ViewProps"]
 
 
 class AccessibilityProps(TypedDict, total=False):
@@ -76,10 +80,45 @@ class AccessibilityProps(TypedDict, total=False):
     test_id: str | None
 
 
-class ViewProps(AccessibilityProps, total=False):
+class MotionProps(TypedDict, total=False):
+    """Layout animation and shared-element keywords accepted by every built-in view (RFC 0009).
+
+    Attributes:
+        entering: Animation that runs when the view mounts: a preset from
+            [`pythonnative.motion`][pythonnative.motion] (``FadeIn``,
+            ``SlideIn``, ``ZoomIn``), ``Keyframes``, or a custom worklet.
+        exiting: Animation that runs when the view unmounts (``FadeOut``,
+            ``SlideOut``, ``ZoomOut``, ``Keyframes``, or a custom worklet).
+            The component unmounts at once; the renderer holds the native
+            view until the animation finishes.
+        layout: Animation from the view's old frame to its new one when a
+            commit moves or resizes it (``LinearTransition``,
+            ``FadingTransition``, or a custom worklet).
+        shared_tag: Pairs this view with the view of the same tag on the
+            screen a stack push or pop moves to, so it flies between them.
+        shared_transition: How a shared element flies, a
+            [`SharedTransition`][pythonnative.motion.SharedTransition].
+    """
+
+    entering: "LayoutAnimation | None"
+    exiting: "LayoutAnimation | None"
+    layout: "LayoutAnimation | None"
+    shared_tag: str | None
+    shared_transition: "SharedTransition | None"
+
+
+class CommonProps(AccessibilityProps, MotionProps, total=False):
+    """Keywords every built-in view accepts.
+
+    That's every [`AccessibilityProps`][pythonnative.AccessibilityProps] and
+    [`MotionProps`][pythonnative.MotionProps] key.
+    """
+
+
+class ViewProps(CommonProps, total=False):
     """Layout and gesture keywords accepted by ``View``, ``Column``, ``Row``, and ``Pressable``.
 
-    Includes every [`AccessibilityProps`][pythonnative.AccessibilityProps] key.
+    Includes every [`CommonProps`][pythonnative.CommonProps] key.
 
     Attributes:
         gestures: Gesture descriptors from

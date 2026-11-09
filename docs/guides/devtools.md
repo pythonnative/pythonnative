@@ -166,8 +166,8 @@ banner to leave the inspector.
 The monitor shows these numbers, updated each second:
 
 - **UI fps:** measured by the native UI thread. It stays smooth while
-  Python works, because native scrolling and animation graphs don't wait
-  for Python.
+  Python works, because native scrolling and [Motion](motion.md)'s
+  worklets and animations don't wait for Python.
 - **PY lag:** how late a timer on the Python application loop fired. A
   high value means something blocked the loop: a slow render, a
   synchronous network call, or CPU work that belongs in a thread.

@@ -101,7 +101,7 @@ scheme, and console state are remembered per browser.
    the page and for dev clients.
 2. Installs a [`WebTransport`][pythonnative.bridge.web.WebTransport] as
    the bridge transport. It forwards the calls a device transport makes
-   into the renderer core (commits, layout reads, commands, and animation
+   into the renderer core (commits, layout reads, commands, and motion
    requests) over the WebSocket to the core in the page, and the core's
    messages come back as callbacks. Commits acknowledge exact revisions
    with the frames of observed views.
@@ -137,7 +137,12 @@ screen remains a logical child of the application's shared tree;
 `navigate(...)` selects or adds a route, `go_back()` pops, and covered
 screens keep their state.
 Pushes and pops animate with the screen's `animation` and
-`presentation` options.
+`presentation` options. A popped screen or a closing modal keeps its
+real content while it animates out: the core hands the page an `exit`
+for it, and the page releases the view when its transition ends.
+Views that share a `shared_tag` fly between the two screens of a push
+or pop in the page's overlay layer, timed with the screen transition
+(see [Shared-element transitions](motion.md#shared-element-transitions)).
 
 Each stack draws a navigation bar from the top screen's options, the way
 the native stacks do: `title`, `header_shown`, `header_large_title`,
@@ -204,15 +209,20 @@ Faithful:
 - Text wrapping and intrinsic sizing.
 - Colors (hex, rgb(a), named, `{"light", "dark"}`), border radius,
   borders, opacity, shadows, and overflow clipping.
-- `Animated` timing, spring, and decay, run by the core's animator in
-  the page, the same code the mobile apps use; transforms, opacity, and
-  colors update on the page's animation frames.
+- [Motion](motion.md): worklets, shared values, animations, animated
+  styles, and layout animations run in the WebAssembly core in the page,
+  the same code the mobile apps use, and the page applies the core's
+  writes on its animation frames. `BottomSheet`, `Swipeable`, and the
+  drawer follow the mouse or trackpad.
 - Gestures: the page forwards pointer events to the core's
   [gesture engine](gestures.md), the one Android uses. iOS uses UIKit's
   recognizers.
 - Scrolling, `FlatList` / `SectionList` windowing, pull to refresh
   (drag the content down at the top, or scroll up past it with a
-  trackpad or mouse wheel), and scroll-driven `Animated.event` bindings.
+  trackpad or mouse wheel), and scroll worklets (`on_scroll` marked
+  `@pn.worklet`). `FlatList` and `SectionList` item animations
+  (`item_entering`, `item_exiting`, and `item_layout`) run as FLIP
+  animations on the row elements.
 - Navigation transitions: card pushes slide over a parallaxing screen,
   modals slide up, and `Modal` honors `animation_type`.
 

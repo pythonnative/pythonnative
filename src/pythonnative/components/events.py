@@ -4,9 +4,10 @@ Every record here is a frozen, slotted dataclass, so callbacks read
 ``event.y`` instead of ``payload["y"]`` and a misspelled field is an
 ``AttributeError`` rather than a silent ``None``. The wire payload for
 each event is a JSON object whose keys match the field names, which is
-what lets ``Animated.event(on_scroll, y=scroll_y)`` keep binding by
-name: the contract generator derives the native record from these
-classes and the bridge reconstructs them before the callback runs.
+what lets a worklet handler read ``event.y`` in the renderer core: the
+contract generator derives the native record from these classes, the
+bridge reconstructs them before a Python callback runs, and a worklet
+reads the same fields from the payload by name.
 """
 
 from dataclasses import dataclass

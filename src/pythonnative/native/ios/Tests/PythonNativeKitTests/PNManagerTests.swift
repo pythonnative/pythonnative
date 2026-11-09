@@ -73,6 +73,39 @@ final class PNManagerTests: XCTestCase {
         XCTAssertEqual(PNProps.double(PNViewState.existing(for: view)?.props["opacity"]), 1)
     }
 
+    func testRootAttachesBelowAPortalMountedInTheSameCommit() throws {
+        let controller = PNViewController(nibName: nil, bundle: nil)
+        controller.loadViewIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        // The portal manager attaches its overlay while the commit mounts,
+        // before Host.attach_root adds the root, with a frame from stale insets.
+        let portal = PNPortalView(frame: CGRect(x: 0, y: 97, width: 390, height: 747))
+        controller.view.addSubview(portal)
+        let root = UIView()
+        controller.attachRoot(root)
+        let subviews = controller.view.subviews
+        XCTAssertLessThan(try XCTUnwrap(subviews.firstIndex(of: root)), try XCTUnwrap(subviews.firstIndex(of: portal)),
+                          "the portal must float over the screen's root")
+        XCTAssertEqual(portal.frame, controller.rootFrame)
+        XCTAssertEqual(root.frame, controller.rootFrame)
+        // Re-attaching the same root (Fast Refresh) keeps the order.
+        controller.attachRoot(root)
+        XCTAssertLessThan(controller.view.subviews.firstIndex(of: root)!, controller.view.subviews.firstIndex(of: portal)!)
+
+        // A full-screen box_none wrapper with a pointer_events none backdrop
+        // (a closed BottomSheet) lets touches through to the screen.
+        let wrapper = PNContainerView(frame: portal.bounds)
+        wrapper.pointerEvents = "box_none"
+        let backdrop = PNContainerView(frame: wrapper.bounds)
+        backdrop.pointerEvents = "none"
+        wrapper.addSubview(backdrop)
+        portal.addSubview(wrapper)
+        let center = CGPoint(x: portal.bounds.midX, y: portal.bounds.midY)
+        XCTAssertNil(portal.hitTest(center, with: nil))
+        backdrop.pointerEvents = nil
+        XCTAssertTrue(portal.hitTest(center, with: nil) === backdrop)
+    }
+
     func testTransformPropBuildsAffineTransform() {
         let manager = PNViewManager()
         let view = manager.createView(tag: 2, props: [

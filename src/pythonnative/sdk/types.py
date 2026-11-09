@@ -24,7 +24,6 @@ class NativeField:
 
     invalidates_layout: bool = False
     recreate: bool = False
-    animated: bool = False
     platforms: tuple[str, ...] = ("ios", "android", "web")
     description: str = ""
     python_only: bool = False
@@ -64,6 +63,12 @@ def type_schema(annotation: Any, *, _parents: tuple[type, ...] = ()) -> dict[str
     """Compile supported annotations; reject unsupported or recursive types."""
     origin, args = typing.get_origin(annotation), typing.get_args(annotation)
     if annotation is Any:
+        return {"type": "json"}
+    if (
+        getattr(annotation, "__module__", "") == "pythonnative.style"
+        and getattr(annotation, "__name__", "") == "AnimatedStyle"
+    ):
+        # Animated styles stay in Python; the reconciler sends their bindings as ``_pn_motion``.
         return {"type": "json"}
     if origin is typing.Annotated:
         metadata = next((item for item in args[1:] if isinstance(item, NativeField)), None)
@@ -270,10 +275,13 @@ def validate(value: Any, schema: Mapping[str, Any], path: str = "value") -> None
         "string": lambda: isinstance(value, str),
         "boolean": lambda: type(value) is bool,
         "integer": lambda: type(value) in (int, float) and abs(value) <= 2**53 - 1 and value == int(value),
-        "number": lambda: (type(value) is int and abs(value) <= 2**53 - 1)
-        or (type(value) is float and math.isfinite(value)),
-        "array": lambda: isinstance(value, (collections.abc.Sequence, set, frozenset))
-        and not isinstance(value, (str, bytes, bytearray)),
+        "number": lambda: (
+            (type(value) is int and abs(value) <= 2**53 - 1) or (type(value) is float and math.isfinite(value))
+        ),
+        "array": lambda: (
+            isinstance(value, (collections.abc.Sequence, set, frozenset))
+            and not isinstance(value, (str, bytes, bytearray))
+        ),
         "object": lambda: isinstance(value, Mapping) or dataclasses.is_dataclass(value) and not isinstance(value, type),
         "event": lambda: callable(value) or type(value) is bool,
     }

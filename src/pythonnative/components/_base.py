@@ -26,9 +26,7 @@ class _LayoutCallback:
     The layout pass reports frames as ``{"x", "y", "width", "height"}``
     dicts; this wrapper turns them into the typed record before the
     user's callback runs. A payload that already is a ``LayoutEvent``
-    passes through untouched. ``Animated.event`` handlers aren't
-    wrapped (the reconciler recognizes them by type to install native
-    bindings) and read the same field names either way.
+    passes through untouched.
     """
 
     __slots__ = ("callback",)
@@ -56,10 +54,6 @@ class _LayoutCallback:
 def _layout_callback(callback: Any) -> Any:
     """Wrap a plain ``on_layout`` callable so it receives a ``LayoutEvent``."""
     if callback is None or isinstance(callback, _LayoutCallback):
-        return callback
-    from ..animated import AnimatedEvent
-
-    if isinstance(callback, AnimatedEvent):
         return callback
     return _LayoutCallback(callback)
 

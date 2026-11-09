@@ -68,6 +68,7 @@ __all__ = ["MAX_RENDER_PASSES", "Reconciler"]
 # native handler. ``ref`` receives an imperative handle after commit,
 # mirroring React's ``ref`` semantics.
 _RECONCILER_OWNED_PROPS = frozenset({"ref"})
+_MOTION_PROPS = ("entering", "exiting", "layout", "shared_transition", "item_entering", "item_exiting", "item_layout")
 
 MAX_RENDER_PASSES = 50
 """How many times one flush may re-schedule itself before it is a render storm.
@@ -1440,29 +1441,31 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     # Props and refs
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _split_props(props: Mapping[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Callable[..., Any]]]:
+    def _split_props(self, props: Mapping[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Callable[..., Any]]]:
         """Strip reconciler-owned keys, then split event callables from native props.
 
-        ``Animated.event`` callbacks additionally publish their node
-        bindings under ``_pn_animated_events`` so the native animator can
-        drive the bound values without a Python round trip.
+        Worklet event and gesture handlers become handler bindings the
+        renderer core runs (RFC 0009), and layout animation props become
+        the descriptors the core reads.
         """
         if not props:
             return {}, {}
         stripped = {
             key: value for key, value in props.items() if key not in _RECONCILER_OWNED_PROPS and value is not UNSET
         }
-        clean, events = extract_events(stripped)
-        from ..animated import AnimatedEvent
+        from ..motion.runtime import runtime as motion
 
-        bindings = {
-            name: {field: id(value) for field, value in callback._bindings.items()}
-            for name, callback in events.items()
-            if isinstance(callback, AnimatedEvent)
-        }
-        if bindings:
-            clean["_pn_animated_events"] = bindings
+        for key in _MOTION_PROPS:
+            if key in stripped:
+                stripped[key] = motion.prop_wire(self.backend, stripped[key])
+        binder = None
+        if motion.target(self.backend) is not None:
+            backend = self.backend
+
+            def binder(fn: Callable[..., Any]) -> Optional[int]:
+                return motion.handler(backend, fn)
+
+        clean, events = extract_events(stripped, binder)
         if props.get("ref") is not None or "on_layout" in events:
             clean["_pn_layout"] = True
         if "on_layout" in events:

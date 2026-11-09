@@ -20,7 +20,7 @@ the
 
 The C ABI of the renderer core (`native/core/include/pn_core.h`), bound
 with `ctypes`, plus Python decoders for its binary mount transactions and
-animated writes. On iOS the symbols come from the app binary, on Android
+motion writes. On iOS the symbols come from the app binary, on Android
 from `libpncore.so` (named by `PN_CORE_LIBRARY`), and on the development
 machine from the `pythonnative._core` extension.
 

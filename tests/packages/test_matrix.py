@@ -142,9 +142,9 @@ def test_matrix_entries_are_well_formed() -> None:
         assert entry["kind"] in ("pure", "binary"), entry
         assert isinstance(entry["ios"], bool) and isinstance(entry["android"], bool), entry
         assert set(entry.get("downgrade", [])) <= {"ios", "android"}, entry
-        assert (
-            entry["kind"] == "binary" or entry["ios"] and entry["android"]
-        ), f"{entry['name']}: a pure-Python package resolves everywhere; if it does not, it is not pure"
+        assert entry["kind"] == "binary" or entry["ios"] and entry["android"], (
+            f"{entry['name']}: a pure-Python package resolves everywhere; if it does not, it is not pure"
+        )
         seen[entry["name"]] = seen.get(entry["name"], 0) + 1
     duplicates = [name for name, count in seen.items() if count > 1]
     assert not duplicates, duplicates

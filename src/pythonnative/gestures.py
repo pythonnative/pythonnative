@@ -8,25 +8,31 @@ from pythonnative import gestures
 
 
 @pn.component
-def Draggable():
-    tx = pn.use_animated_value(0.0)
-    ty = pn.use_animated_value(0.0)
+def Draggable() -> pn.Node:
+    x = pn.use_shared_value(0.0)
+    y = pn.use_shared_value(0.0)
 
-    def on_end(event):
-        pn.Animated.spring(tx, to=0.0).start()
-        pn.Animated.spring(ty, to=0.0).start()
+    @pn.worklet
+    def drag(event: gestures.GestureEvent) -> None:
+        x.value = event.translation_x
+        y.value = event.translation_y
 
-    return pn.Animated.View(
+    @pn.worklet
+    def release(event: gestures.GestureEvent) -> None:
+        x.value = pn.with_spring(0, velocity=event.velocity_x)
+        y.value = pn.with_spring(0, velocity=event.velocity_y)
+
+    moved = pn.use_animated_style(lambda: {"transform": [{"translate_x": x.value}, {"translate_y": y.value}]})
+    return pn.View(
         pn.Text("Drag me"),
-        style={"transform": [{"translate_x": tx}, {"translate_y": ty}], "padding": 24},
-        gestures=[
-            gestures.Pan(
-                on_change=pn.Animated.event(translation_x=tx, translation_y=ty),
-                on_end=on_end,
-            )
-        ],
+        style=[{"padding": 24}, moved],
+        gestures=[gestures.Pan(on_change=drag, on_end=release)],
     )
 ```
+
+Callbacks marked ``@pn.worklet`` run on the UI thread, inside the
+renderer core, so the card follows the finger even while Python is busy
+(RFC 0009). Other callbacks run on the Python thread.
 
 Each gesture descriptor is a frozen dataclass holding numeric
 configuration plus user callbacks. The reconciler serializes the
@@ -640,8 +646,16 @@ def Exclusive(*gestures: Any) -> GestureGroup:
     return GestureGroup("exclusive", tuple(gestures))
 
 
+def _state_callbacks(leaf: "_BaseGesture") -> Dict[str, Optional[GestureCallback]]:
+    """The callback each gesture state runs, as ``_dispatch`` resolves them."""
+    began = getattr(leaf, "on_long_press", None) or leaf.on_begin
+    ended = getattr(leaf, "on_tap", None) or getattr(leaf, "on_swipe", None) or getattr(leaf, "on_fling", None)
+    return {"began": began, "changed": leaf.on_change, "ended": ended or leaf.on_end, "cancelled": leaf.on_end}
+
+
 def serialize_gestures(
     specs: Sequence[Any],
+    bind_worklet: Optional[Callable[[Callable[..., Any]], Optional[int]]] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Callable[..., Any]]]:
     """Flatten gesture descriptors into native config dicts and event routers.
 
@@ -665,10 +679,18 @@ def serialize_gestures(
     is left out of every relationship: nothing waits for it and it
     races nobody.
 
+    Callbacks marked ``@worklet`` run on the UI thread (RFC 0009): with
+    ``bind_worklet``, each one becomes a handler binding under the spec's
+    ``"worklets"`` (keyed by gesture state), the Python router skips that
+    state, and ``"python": false`` tells the core not to send the event to
+    Python when no Python callback is left.
+
     Args:
         specs: The value of an element's ``gestures`` prop. Plain dicts
             are passed through with relationship metadata attached (no
             callbacks to route).
+        bind_worklet: Installs a worklet as a handler binding, or returns
+            ``None`` when no core can run it.
 
     Returns:
         ``(clean_specs, events)`` where ``clean_specs`` is a list of
@@ -721,23 +743,31 @@ def serialize_gestures(
     for i, leaf in enumerate(leaves):
         if isinstance(leaf, _BaseGesture):
             spec = leaf._to_spec()
-            from .animated import AnimatedEvent
+            from .motion.worklets import is_worklet
 
-            animated = {}
-            for state, callback in (
-                ("began", leaf.on_begin),
-                ("changed", leaf.on_change),
-                ("ended", leaf.on_end),
-            ):
-                if isinstance(callback, AnimatedEvent):
-                    animated[state] = {field: id(node) for field, node in callback._bindings.items()}
-            if animated:
-                spec["animated_events"] = animated
+            native: Dict[str, int] = {}
+            python = False
+            for state, callback in _state_callbacks(leaf).items():
+                if callback is None:
+                    continue
+                binding = bind_worklet(callback) if bind_worklet is not None and is_worklet(callback) else None
+                if binding is not None:
+                    native[state] = binding
+                else:
+                    python = True
+            if native:
+                spec["worklets"] = native
+                spec["python"] = python
+            if python or not native:
 
-            def _router(payload: Dict[str, Any], _spec: _BaseGesture = leaf) -> None:
-                _spec._dispatch(event_from_payload(payload))
+                def _router(
+                    payload: Dict[str, Any], _spec: _BaseGesture = leaf, _native: frozenset = frozenset(native)
+                ) -> None:
+                    event = event_from_payload(payload)
+                    if str(event.state.value) not in _native:
+                        _spec._dispatch(event)
 
-            events[f"gesture:{i}"] = _router
+                events[f"gesture:{i}"] = _router
         elif isinstance(leaf, dict):
             spec = dict(leaf)
         else:

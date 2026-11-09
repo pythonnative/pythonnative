@@ -3,6 +3,9 @@ package com.pythonnative.runtime.components
 import com.pythonnative.generated.*
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -10,6 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.pythonnative.runtime.PNBridge
+import com.pythonnative.runtime.animation.PNItemAnimator
 import com.pythonnative.runtime.core.PNCore
 import org.json.JSONObject
 import kotlin.math.roundToInt
@@ -19,6 +23,12 @@ import kotlin.math.roundToInt
  * logical children asynchronously. Row keys, extents, and sticky flags are
  * read from the core (`PNCore.list*`), which validated and published the
  * dataset patch this list applies when its `dataset` prop changes.
+ *
+ * `item_entering`, `item_exiting`, and `item_layout` (RFC 0009) install a
+ * [PNItemAnimator], so inserted, removed, and moved rows of a dataset
+ * patch animate; without them rows change at once. A removed row's view
+ * tree is destroyed in the same mount as the patch, so the row container
+ * keeps a snapshot of it while it animates out.
  */
 class VirtualListManager : ComponentManager() {
     private class Holder(val container: FrameLayout) : RecyclerView.ViewHolder(container) { var key = "" }
@@ -34,6 +44,7 @@ class VirtualListManager : ComponentManager() {
         val holders = HashMap<String, Holder>()
         var horizontal = false
         val manager = LinearLayoutManager(context)
+        val animator = PNItemAnimator()
         val rows = object : RecyclerView.Adapter<Holder>() {
             override fun getItemCount() = PNCore.listCount(tag)
             override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder = Holder(FrameLayout(context))
@@ -49,6 +60,7 @@ class VirtualListManager : ComponentManager() {
             override fun onViewRecycled(holder: Holder) {
                 holders.remove(holder.key)
                 holder.container.removeAllViews()
+                holder.container.foreground = null
             }
         }
         init {
@@ -146,6 +158,7 @@ class VirtualListManager : ComponentManager() {
             params.height = if (horizontal) ViewGroup.LayoutParams.MATCH_PARENT else size
             holder.container.layoutParams = params
             holder.container.removeAllViews()
+            holder.container.foreground = null
             if (key == pinnedKey) return
             roots[key]?.let { root ->
                 (root.parent as? ViewGroup)?.removeView(root)
@@ -166,6 +179,16 @@ class VirtualListManager : ComponentManager() {
         list.isEnabled = refresh != null && !list.horizontal
         list.isRefreshing = refresh?.optBoolean("refreshing", false) == true
         refresh?.optString("tint_color")?.takeIf { it.isNotEmpty() }?.let { color -> PNColor.parse(color)?.let { list.setColorSchemeColors(it) } }
+        if (props.has("item_entering") || props.has("item_exiting") || props.has("item_layout")) {
+            list.animator.entering = all.optJSONObject("item_entering")
+            list.animator.exiting = all.optJSONObject("item_exiting")
+            list.animator.layout = all.optJSONObject("item_layout")
+            val wanted = if (list.animator.active) list.animator else null
+            if (list.recycler.itemAnimator !== wanted) {
+                list.recycler.itemAnimator?.endAnimations()
+                list.recycler.itemAnimator = wanted
+            }
+        }
         if (props.has("dataset")) publish(list)
     }
 
@@ -226,12 +249,26 @@ class VirtualListManager : ComponentManager() {
     }
     override fun removeChild(parent: View, child: View) {
         val list = parent as ListView
+        if (list.recycler.itemAnimator != null && list.animator.exiting != null) keepSnapshot(list, child)
         PNBridge.registry.recordFor(child)?.let { record ->
             list.roots.remove(record.props.optString("_pn_list_key"))
             rowOwners.remove(record.tag)
         }
         (child.parent as? ViewGroup)?.removeView(child)
     }
+    /** Draw a bound row's view into its container's foreground, so an exiting row still shows it. */
+    private fun keepSnapshot(list: ListView, row: View) {
+        val container = row.parent as? FrameLayout ?: return
+        if (container.parent !== list.recycler || row.width <= 0 || row.height <= 0) return
+        try {
+            val bitmap = Bitmap.createBitmap(row.width, row.height, Bitmap.Config.ARGB_8888)
+            row.draw(Canvas(bitmap))
+            container.foreground = BitmapDrawable(container.resources, bitmap).apply { setBounds(0, 0, row.width, row.height) }
+        } catch (error: Exception) {
+            com.pythonnative.runtime.bridge.PNLog.swallowed("VirtualList.keepSnapshot", error)
+        }
+    }
+
     override fun teardown(view: View) {
         val list = view as ListView
         for (root in list.roots.values) PNBridge.registry.recordFor(root)?.let { rowOwners.remove(it.tag) }

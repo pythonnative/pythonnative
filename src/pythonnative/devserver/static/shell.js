@@ -351,7 +351,8 @@ class Shell {
     b.handlers.commit = (message) => this.core.commit(message[2]);
     b.handlers.layout = (message) => this.core.layout(message[2]);
     b.handlers.command = (message) => this.core.command(message[2], message[3], message[4], message[5], message[6]);
-    b.handlers.animate = (message) => this.core.animate(message[2], message[3], message[4]);
+    b.handlers.motion = (message) => this.core.motion(message[2], message[3]);
+    b.handlers.shared_read = (message) => this.core.sharedRead(message[2]);
     b.handlers.measure = (message) => this.core.measure(message[2], message[3]);
     b.handlers.call = (message) => this.host.call(message[2], message[3], message[4]);
 

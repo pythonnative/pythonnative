@@ -1,0 +1,33 @@
+# Tests entering, exiting, and layout props: an added chip zooms in, a
+# removed chip fades out (its native view outlives its component until
+# the exit animation ends), and the remaining chips slide into place.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/layout_animations.py
+# Source under test: src/pythonnative/motion/layout.py :: ZoomIn, FadeOut, LinearTransition, LayoutAnimationConfig
+#                    src/pythonnative/components/props.py :: MotionProps
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: Layout animations
+- assertVisible: "Chips: 3"
+- assertVisible: "Chip 1"
+- tapOn: "Add chip"
+- extendedWaitUntil:
+    visible: "Chip 4"
+    timeout: 5000
+- assertVisible: "Chips: 4"
+- tapOn: "Remove first chip"
+- assertVisible: "Last removed: Chip 1"
+- assertVisible: "Chips: 3"
+- extendedWaitUntil:
+    notVisible: "Chip 1"
+    timeout: 5000
+- assertVisible: "Chip 2"
+- assertVisible: "Chip 4"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

@@ -34,7 +34,8 @@ import org.json.JSONObject
  * when it is wired and Python decides by flipping `visible`; the modal
  * never closes itself. `on_dismiss` fires once the dialog is gone.
  * `status_bar_translucent` lets the dialog window draw under the status
- * bar.
+ * bar. Unmounting dismisses the dialog before its children are destroyed
+ * ([beginExit]).
  */
 class ModalManager : ComponentManager() {
     override fun createView(context: Context, tag: Long, props: JSONObject): View {
@@ -92,6 +93,18 @@ class ModalManager : ComponentManager() {
 
     override fun teardown(view: View) {
         if (stateOf(view)["dialog"] != null) dismiss(view, emit = false)
+    }
+
+    /**
+     * An unmounted modal leaves as a platform-owned exit (RFC 0009): the
+     * dialog dismisses with its window animation while its children stay
+     * mounted. The window manager animates the departed window's last
+     * frame, so the exit finishes as soon as the dialog is dismissed.
+     */
+    override fun beginExit(view: View, finished: () -> Unit): Boolean {
+        if (stateOf(view)["dialog"] != null) dismiss(view, emit = false)
+        finished()
+        return true
     }
 
     private fun present(placeholder: View) {

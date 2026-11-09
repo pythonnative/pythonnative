@@ -47,7 +47,6 @@ struct GestureConfig {
     int pointers = 1;
     std::optional<std::set<int>> simultaneous;  // nullopt: alongside everything
     std::set<int> wait_for;
-    Value animated_events;                       // state -> {field: node id}
 };
 
 GestureConfig decode_gesture(const Value& spec);

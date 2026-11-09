@@ -20,7 +20,7 @@ def test_checked_native_contracts_match_python_definitions(tmp_path: Path) -> No
         [
             sys.executable,
             "-c",
-            "import pythonnative; from pythonnative.sdk.codegen import generate; " "import sys; generate(sys.argv[1])",
+            "import pythonnative; from pythonnative.sdk.codegen import generate; import sys; generate(sys.argv[1])",
             str(tmp_path),
         ],
         check=True,

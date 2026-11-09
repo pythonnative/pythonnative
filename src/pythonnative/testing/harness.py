@@ -168,9 +168,70 @@ class RenderResult(Queries):
         """
         tag = target.tag if isinstance(target, FakeView) else int(target)
         if not get_event_registry().has(tag, event):
+            native = self.backend.native.views.get(tag)
+            motion = (native.props.get("_pn_motion") or {}) if native is not None else {}
+            if event in (motion.get("events") or {}):
+                # A worklet handler: the platform reports the event to the core, which runs it.
+                self.backend.native.fire(tag, event, *args)
+                self.settle()
+                return
             raise LookupError(f"fire({target!r}, {event!r}): no handler registered\n\n{self.dump()}")
         dispatch_event(tag, event, *self._decoded(target, event, args))
         self.settle()
+
+    def drag(
+        self,
+        target: Target,
+        dx: float = 0.0,
+        dy: float = 0.0,
+        *,
+        duration: float = 0.25,
+        steps: int = 10,
+        release: bool = True,
+    ) -> None:
+        """Drag a finger across ``target``'s gestures through the renderer core's gesture engine.
+
+        The pointer goes down at the view's center, moves ``(dx, dy)`` points
+        in ``steps`` even steps over ``duration`` seconds (which sets the
+        release velocity), and lifts unless ``release`` is ``False``. Worklet
+        callbacks run in the core; Python callbacks run here, and the tree
+        settles afterward. UIKit's recognizers aren't simulated, as on the
+        other headless paths.
+
+        Raises:
+            LookupError: If ``target`` has no gestures.
+        """
+        from ..bridge.core import POINTER_DOWN, POINTER_MOVE, POINTER_UP
+        from ..runtime import get_loop
+
+        tag = target.tag if isinstance(target, FakeView) else int(target)
+        native = self.backend.native
+        if not native.core.has_gestures(native.surface, tag):
+            raise LookupError(f"drag({target!r}): the view has no gestures\n\n{self.dump()}")
+        view = native.views.get(tag)
+        x, y, width, height = view.frame if view is not None else (0.0, 0.0, 0.0, 0.0)
+        cx, cy = width / 2, height / 2
+        start = get_loop().time()
+        events = [(POINTER_DOWN, 0, cx, cy, x + cx, y + cy, start)]
+        for step in range(1, steps + 1):
+            t = step / steps
+            px, py = cx + dx * t, cy + dy * t
+            events.append((POINTER_MOVE, 0, px, py, x + px, y + py, start + duration * t))
+        if release:
+            events.append((POINTER_UP, 0, cx + dx, cy + dy, x + cx + dx, y + cy + dy, start + duration))
+        for event in events:
+            native.pointer(tag, [event])
+        self.settle()
+
+    def presented_style(self, target: Target) -> Dict[str, Any]:
+        """``target``'s style as the platform shows it: committed props with motion's writes on top (RFC 0009)."""
+        tag = target.tag if isinstance(target, FakeView) else int(target)
+        return self.backend.presented_style(tag)
+
+    def presented_frame(self, target: Target) -> Tuple[float, float, float, float]:
+        """``target``'s frame as the platform shows it, including layout animations."""
+        tag = target.tag if isinstance(target, FakeView) else int(target)
+        return self.backend.presented_frame(tag)
 
     def _decoded(self, target: Target, event: str, args: Tuple[Any, ...]) -> Tuple[Any, ...]:
         """Decode ``args`` through the target's contract when it declares ``event``."""

@@ -62,7 +62,9 @@ def hook_signature(function: Callable[..., Any], _seen: frozenset[int] = frozens
         name = (
             node.func.id
             if isinstance(node.func, ast.Name)
-            else node.func.attr if isinstance(node.func, ast.Attribute) else ""
+            else node.func.attr
+            if isinstance(node.func, ast.Attribute)
+            else ""
         )
         if not name.startswith("use_"):
             continue
@@ -70,7 +72,9 @@ def hook_signature(function: Callable[..., Any], _seen: frozenset[int] = frozens
         binding = (
             ast.dump(owner.targets[0])
             if isinstance(owner, ast.Assign)
-            else ast.dump(owner.target) if isinstance(owner, ast.AnnAssign) else ""
+            else ast.dump(owner.target)
+            if isinstance(owner, ast.AnnAssign)
+            else ""
         )
         signature = name + ":" + binding
         target = None

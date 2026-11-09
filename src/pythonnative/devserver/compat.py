@@ -164,8 +164,7 @@ def check(hello: Dict[str, Any], project: ProjectRuntime) -> Optional[Incompatib
             )
         if project.plugins:
             return Incompatibility(
-                f"This project adds native code ({', '.join(project.plugins)}), which PythonNative Go doesn't "
-                "include.",
+                f"This project adds native code ({', '.join(project.plugins)}), which PythonNative Go doesn't include.",
                 f"Build its development app with `pn run {platform}`.",
             )
         if project.native_packages:

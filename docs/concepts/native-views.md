@@ -61,15 +61,21 @@ view. The hooks mirror the mount transaction:
 | `apply(props, initial)` | On create (full props) and on every update (changed keys only; removed props arrive as `null`). |
 | `insertChild(parent, child, index)` | On insert, at the mounted index. Move-aware. |
 | `removeChild(parent, child)` | When a child is detached. |
-| `destroy(view)` | On delete. Unwires gestures and animations, then removes the view. |
+| `destroy(view)` | On delete, or when an exit finishes. Unwires gestures and animations, then removes the view. |
 | `setFrame(view, x, y, w, h)` | For each frame op, with the frame relative to the nearest mounted ancestor. Frames are points (iOS) or dp (Android). |
 | `measure(view, maxW, maxH)` | On the UI thread, when the core needs the size of an `intrinsic` leaf; the view is a prototype configured with the leaf's props, and the result is cached. |
 | `command(view, name, args)` | For imperative actions (`focus`, `scroll_to_offset`, ...), queued behind pending mounts. |
 
 The core interprets flex, margin, and padding props with Yoga. Managers
 apply visual props, apply the frames the core computed, and measure the
-controls that only the platform can size. Animated values arrive as prop
-writes from the core's animator on each display frame.
+controls that only the platform can size. [Motion](../guides/motion.md)
+reaches managers as writes from the core on each display frame and after
+each event: a paint property applied through the same path as a prop
+update (a `null` value restores the static one), a frame for a layout
+animation applied through `setFrame`, or the removal of a view whose
+exit animation finished. A view that's exiting stays mounted but gets
+no touches, and the mounting layer leaves it out when it resolves the
+indices of later insertions.
 
 Managers fire events by tag through `PNEvents.emit(view, "on_change",
 [value])` (Swift) or `PNEvents.fire(view, "on_change", value)`
@@ -93,14 +99,15 @@ picks it up on the next dispatch.
 ## The backend
 
 The backend protocol is what the reconciler talks to: `apply_mutations`,
-`resolve_view`, `command`, `measure_in_window`, and the animation hooks
-(`install_animation_graph`, `set_animated_property`, `start_animation`,
-`cancel_animation`). The implementation is chosen lazily by
+`resolve_view`, `command`, and `measure_in_window`. Motion doesn't add
+methods to it: the motion runtime sends its requests (programs, shared
+values, and bindings) through the backend's transport, behind the
+commits that reference them. The implementation is chosen lazily by
 [`get_backend`][pythonnative.native_views.get_backend]:
 
 - On iOS and Android, a
   [`BridgeBackend`][pythonnative.native_views.bridge_backend.BridgeBackend]
-  forwards every commit, layout read, command, and animation request to
+  forwards every commit, layout read, command, and motion request to
   the renderer core. Before its first commit it imports the
   `pythonnative.handlers` entry points so plugin component schemas are
   registered.

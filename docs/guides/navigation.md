@@ -23,7 +23,8 @@ On a device every stack is **native-backed**. Pushing a screen pushes a
 real `UIViewController` on iOS or a `Fragment` on Android, at every
 nesting level, so you get the platform's transitions, swipe-back, and
 state preservation for free. Tab bars are native too. The drawer is
-drawn in Python on every platform. Without a native host (headless
+drawn in Python on every platform and follows the finger with
+[Motion](motion.md) worklets. Without a native host (headless
 tests) the stack draws a themed header itself.
 
 ## A complete example
@@ -206,7 +207,10 @@ switches tabs too.
 
 A drawer is like tabs with a slide-in menu instead of a tab bar. Like
 tabs, drawer screens other than `initial` must be callable without
-arguments.
+arguments. The menu stays mounted and follows the finger: swipe from
+the left edge to pull it open, and drag it, or tap the dimmed screen,
+to close it. The drag and the spring run on the UI thread as
+[worklets](motion.md#the-drawer).
 
 ```python
 from pythonnative.navigation import DrawerNavigation
@@ -226,6 +230,9 @@ Drawer = pn.DrawerNavigator(
     pn.Screen(FeedScreen, title="My feed"),
     pn.Screen(ProfileScreen, title="Profile"),
     drawer_width=280,
+    drawer_type="front",   # or "slide", which pushes the screen aside with the menu
+    swipe_edge_width=24,   # how far from the left edge an opening swipe can start
+    swipe_enabled=True,
 )
 ```
 
@@ -609,6 +616,13 @@ pop the screen; Android's system back is always available). Predictive
 back on Android is enabled at the activity level: the system back
 preview appears once Python reports that the stack can't pop; screens
 themselves don't animate with the gesture.
+
+A popped screen keeps its content until its transition finishes, so it
+slides away intact. To carry an element across a push, give a view on
+each screen the same `shared_tag`; it flies from one place to the other
+while the screens move, and on iOS the back swipe drives it
+interactively. See
+[Shared-element transitions](motion.md#shared-element-transitions).
 
 ## Theming
 

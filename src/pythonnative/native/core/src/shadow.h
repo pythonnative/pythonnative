@@ -37,16 +37,19 @@ enum MountOp : uint8_t {
     kMountDelete = 5,
     kMountFrame = 6,
     kMountCommand = 7,
+    kMountExit = 8,
 };
 
 /// A change the UI thread applies to its mirror when it takes a transaction.
 struct MirrorChange {
-    enum class Kind : uint8_t { Create, Update, Delete, Reset } kind = Kind::Create;
+    enum class Kind : uint8_t { Create, Update, Delete, Reset, Exit } kind = Kind::Create;
     int64_t tag = 0;
     uint16_t component = 0;
     Object props;            // create: all props; update: changed (normalized)
     std::vector<std::string> removed;
     std::shared_ptr<ListPatch> list;  // a published dataset patch for this list
+    std::vector<int64_t> subtree;     // exit: every view leaving with `tag`, children first
+    int64_t screen = 0;               // create/update: the Screen a `shared_tag` view belongs to
 };
 
 /// One queued unit of UI-thread work.
@@ -58,7 +61,8 @@ struct Transaction {
     std::vector<uint8_t> bytes;  // header plus view ops
     uint32_t op_count = 0;
     std::vector<MirrorChange> mirror;
-    std::vector<Value> animations;  // `{"tag", "request"}` objects, run after the view ops
+    std::vector<Value> motion;   // `pn_core_motion` requests, applied after the view ops
+    std::vector<Value> records;  // entering, layout, and exit animations to start (RFC 0009)
 };
 
 struct ShadowNode {
@@ -126,6 +130,8 @@ public:
     void report_intrinsic(int64_t tag, float width, float height);
     void invalidate(int64_t tag);
     void invalidate_measurements();
+    /// An animated style's layout prop (null restores the committed value).
+    void animate_layout(int64_t tag, const std::string& key, const Value& value);
 
     /// `{"frame": [...], "window": [...]}` for a shadow node, or null.
     std::string measure(int64_t tag) const;
@@ -189,6 +195,33 @@ private:
     std::unordered_map<int64_t, std::vector<std::string>> touched_;
     std::unordered_map<int64_t, std::shared_ptr<ListPatch>> list_patches_;
     std::unordered_set<int64_t> layout_dirty_tags_;
+    std::unordered_map<int64_t, Object> animated_layout_;  // tag -> layout props motion overrides
+    std::unordered_set<int64_t> fresh_;                    // views that appeared in the current transaction
+
+    /// A view the current commit destroyed, as it was before.
+    struct Departed {
+        int64_t tag = 0;
+        int64_t mounted_parent = 0;
+        bool host_owned = false;  // a stack screen or a modal: the platform animates it out
+        Value exiting;
+        Frame frame{};
+        bool skip = false;  // inside `LayoutAnimationConfig(skip_exiting=True)`
+    };
+    std::vector<Departed> departed_;
+    /// A removed subtree whose top view animates out before the platform destroys it.
+    struct Exit {
+        int64_t tag = 0;
+        bool host_owned = false;
+        Value spec;
+        Frame frame{};
+        std::vector<int64_t> subtree;  // children first, `tag` last
+    };
+    std::vector<Exit> exits_;
+    void plan_exits(std::vector<int64_t>& destroyed);
+    Value window_json() const;
+    void write_records(Transaction& transaction, const std::vector<int64_t>& appeared,
+                       const std::vector<int64_t>& created);
+    int64_t screen_of(const ShadowNode& node) const;
 };
 
 }  // namespace pn

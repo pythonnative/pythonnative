@@ -148,6 +148,13 @@ class ModuleReloader:
         try:
             importlib.invalidate_caches()
             overlay_path = _overlay_module_path(module_name)
+            # Worklets compile from the module's syntax tree; read the new source (RFC 0009).
+            from .motion.compiler import forget_sources
+
+            old_file = getattr(previous, "__file__", None)
+            forget_sources(old_file)
+            if overlay_path is not None:
+                forget_sources(overlay_path)
             if overlay_path is not None:
                 spec = importlib.util.spec_from_file_location(module_name, overlay_path)
                 if spec is None or spec.loader is None:
@@ -193,6 +200,13 @@ class ModuleReloader:
         try:
             importlib.invalidate_caches()
             overlay_path = _overlay_module_path(module_name)
+            # Worklets compile from the module's syntax tree; read the new source (RFC 0009).
+            from .motion.compiler import forget_sources
+
+            old_file = getattr(previous, "__file__", None)
+            forget_sources(old_file)
+            if overlay_path is not None:
+                forget_sources(overlay_path)
             if overlay_path is not None:
                 spec = importlib.util.spec_from_file_location(module_name, overlay_path)
                 if spec is None or spec.loader is None:

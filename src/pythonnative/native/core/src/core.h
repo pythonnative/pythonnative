@@ -34,7 +34,8 @@ public:
     std::string commit(const char* envelope);
     std::string layout(const char* request);
     std::string command(int64_t surface, int64_t tag, const char* name, const char* arguments, int64_t call_id);
-    std::string animate(int64_t surface, int64_t tag, const char* request);
+    std::string motion(int64_t surface, const char* request);
+    std::string shared_read(int64_t id) { return motion_.published(id); }
     std::string measure(int64_t surface, int64_t tag);
     std::string inspect(int64_t surface, double x, double y);
     bool validate_module(const char* module, const char* method, const char* arguments);
@@ -52,6 +53,8 @@ public:
     bool animation_frame(double timestamp_ms);
     bool take_writes(pn_bytes& writes);
     void set_reduce_motion(bool enabled);
+    void exit_finished(int64_t surface, int64_t tag);
+    std::string shared_elements(int64_t surface, int64_t from_screen, int64_t to_screen);
 
     // Used by surfaces and mount state.
     const Contracts& contracts() const { return contracts_; }
@@ -95,7 +98,7 @@ private:
 
     // UI-thread state; touched only from the UI thread.
     std::map<int64_t, std::unique_ptr<MountState>> mounts_;
-    Animator animator_;
+    motion::Runtime motion_;
 };
 
 Core& shared_core();

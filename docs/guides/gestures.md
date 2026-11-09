@@ -51,9 +51,15 @@ Recognition itself runs on the platform's UI thread, never in Python:
   recognizers, velocity tracking, activation and failure offsets, and
   composition rules on every one of them.
 
-A recognized gesture reaches Python as an ordinary event and updates any
-animated bindings (`Animated.event`) in the core first, so a drag keeps
-moving while Python is busy.
+A recognized gesture runs its callbacks in one of two places:
+
+- A callback marked [`@pn.worklet`][pythonnative.worklet] runs on the
+  UI thread, inside the renderer core, as soon as the platform reports
+  the gesture. It never waits for Python, so a drag keeps moving, and a
+  release decides where to settle, while Python is busy. See
+  [Gesture worklets](#gesture-worklets).
+- Any other callback, including a `lambda`, reaches Python as an
+  ordinary event and runs on the application thread.
 
 Gestures listed side by side in the `gestures=` list recognize
 *simultaneously*. Use the composition combinators below when you need
@@ -115,6 +121,31 @@ Native Gesture Handler's fling semantics (including the multi-pointer
 requirement) and is what you want for "two-finger swipe down to
 close."
 
+## Gesture worklets
+
+Every callback slot takes a worklet: a function marked
+[`@pn.worklet`][pythonnative.worklet], written in the subset of Python
+the core can run (see [Worklets](motion.md#worklets)). The worklet
+receives the same [`GestureEvent`][pythonnative.gestures.GestureEvent]
+fields a Python callback does, reads and writes
+[shared values](motion.md#shared-values), and can start animations.
+Gesture worklets run on every platform: on Android, in the browser
+preview, and in tests the core's gesture engine calls them, and on iOS
+UIKit's recognizers report through the core, which runs them before
+anything reaches Python.
+
+A recognizer can mix the two kinds. Keep the per-frame work in
+worklets and hand anything that needs Python, like saving a position
+or navigating, to a Python callback or to
+[`run_on_python`](motion.md#calling-python-from-a-worklet):
+
+```python
+gestures.Pan(
+    on_change=drag,                                       # a worklet: every frame, on the UI thread
+    on_end=lambda event: save_offset(event.translation_x),  # Python, once
+)
+```
+
 ## Drag with spring-back
 
 The classic pattern: pan moves the view, release springs it home.
@@ -126,34 +157,57 @@ from pythonnative import gestures
 
 @pn.component
 def Draggable() -> pn.Node:
-    tx = pn.use_animated_value(0.0)
-    ty = pn.use_animated_value(0.0)
+    x = pn.use_shared_value(0.0)
+    y = pn.use_shared_value(0.0)
 
-    def on_pan(event):
-        tx.set_value(event.translation_x)
-        ty.set_value(event.translation_y)
+    @pn.worklet
+    def drag(event: gestures.GestureEvent) -> None:
+        x.value = event.translation_x
+        y.value = event.translation_y
 
-    def on_end(event):
-        pn.Animated.spring(tx, to=0.0).start()
-        pn.Animated.spring(ty, to=0.0).start()
+    @pn.worklet
+    def release(event: gestures.GestureEvent) -> None:
+        x.value = pn.with_spring(0, velocity=event.velocity_x)
+        y.value = pn.with_spring(0, velocity=event.velocity_y)
 
-    return pn.Animated.View(
+    moved = pn.use_animated_style(
+        lambda: {"transform": [{"translate_x": x.value}, {"translate_y": y.value}]}
+    )
+    return pn.View(
         pn.Text("Drag me"),
-        style={
-            "transform": [{"translate_x": tx}, {"translate_y": ty}],
-            "padding": 24,
-            "background_color": "#D1FAE5",
-            "border_radius": 12,
-        },
-        gestures=[gestures.Pan(on_change=on_pan, on_end=on_end)],
+        style=[{"padding": 24, "background_color": "#D1FAE5", "border_radius": 12}, moved],
+        gestures=[gestures.Pan(on_change=drag, on_end=release)],
     )
 ```
 
 `Pan` activates once the pointer travels `min_distance` points (10 by
 default, unless another activation criterion is set), reports
 `on_change` with translation measured from the activation point, and
-`on_end` with release velocity, ready to feed into
-[`Animated.decay`][pythonnative.Animated] for a fling.
+`on_end` with release velocity in points per second, which carries
+straight into [`with_spring`][pythonnative.with_spring] or
+[`with_decay`][pythonnative.with_decay] for a fling.
+
+To continue a drag from where the last one left off, record the
+starting offset in `on_begin`:
+
+```python
+start = pn.use_shared_value(0.0)
+
+
+@pn.worklet
+def begin(event: gestures.GestureEvent) -> None:
+    start.value = x.value
+
+
+@pn.worklet
+def drag(event: gestures.GestureEvent) -> None:
+    x.value = start.value + event.translation_x
+```
+
+For release decisions, such as snapping to the nearest of several
+points, [`snap_point`][pythonnative.snap_point] projects the release
+with its velocity. [`BottomSheet`][pythonnative.BottomSheet] and
+[`Swipeable`][pythonnative.Swipeable] are built this way.
 
 ### Activation offsets
 
@@ -285,12 +339,22 @@ def test_tap_counts() -> None:
 
 Time-based recognizers (long press, multi-tap windows) advance with
 `FakeTransport.poll_gestures(tag, time)`; `gesture_deadline(tag)` says
-when they next need it. `tests/gesture_harness.py` and
+when they next need it.
+
+For drags, [`RenderResult.drag`][pythonnative.testing.RenderResult.drag]
+builds the pointer stream for you, and `presented_style` shows where
+gesture worklets moved the view:
+
+```python
+tree.drag(card, dx=60, duration=0.2)  # down at the center, ten moves, up
+assert tree.presented_style(card)["transform"][0]["translate_x"] > 40
+```
+
+See [Testing](motion.md#testing) in the Motion guide. `tests/gesture_harness.py` and
 `tests/test_gestures.py` in the repository have more patterns. iOS
 recognizers have their own tests in the native test suite.
 
 ## Next steps
 
-- Pair gestures with the [Animated API](animations.md) for
-  physics-driven UI.
+- Drive motion from gestures with worklets: [Motion](motion.md).
 - API reference: [Gestures](../api/gestures.md).

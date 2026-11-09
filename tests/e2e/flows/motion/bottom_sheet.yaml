@@ -1,0 +1,42 @@
+# Tests BottomSheet: its handle's snap_to opens it (on_change), dragging
+# the handle up settles on the top detent (on_change again), the handle's
+# collapse moves it back down, and dragging it down closes it (on_close).
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/bottom_sheet.py
+# Source under test: src/pythonnative/components/bottom_sheet.py :: BottomSheet, BottomSheetHandle
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: BottomSheet
+- assertVisible: "Sheet index: closed"
+- tapOn: "Open sheet"
+- assertVisible: "Last request: open"
+- extendedWaitUntil:
+    visible: "Sheet content"
+    timeout: 5000
+- swipe:
+    from:
+      text: "Sheet handle"
+    direction: UP
+    duration: 400
+- extendedWaitUntil:
+    visible: "Sheet index: 1"
+    timeout: 5000
+- assertVisible: "Sheet changes: 2"
+- tapOn: "Sheet collapse"
+- assertVisible: "Last request: collapse"
+- swipe:
+    from:
+      text: "Sheet handle"
+    direction: DOWN
+    duration: 300
+- extendedWaitUntil:
+    visible: "Sheet index: closed"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

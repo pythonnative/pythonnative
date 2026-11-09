@@ -585,13 +585,40 @@ class Style(TypedDict, total=False):
     pointer_events: PointerEvents
 
 
-StyleProp = Union[Style, Sequence[Optional[Style]], None]
+class AnimatedStyle:
+    """A style the UI thread recomputes, from [`use_animated_style`][pythonnative.use_animated_style].
+
+    Put it in a ``style`` list after the static styles it overrides. Keys it
+    writes replace the same keys from the static style, including the whole
+    ``transform`` list, and the static value comes back when it stops
+    writing a key.
+    """
+
+    __slots__ = ("binding",)
+
+    def __init__(self, binding: int) -> None:
+        self.binding = binding
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, AnimatedStyle) and other.binding == self.binding
+
+    def __hash__(self) -> int:
+        return hash(("AnimatedStyle", self.binding))
+
+    def __repr__(self) -> str:
+        return f"AnimatedStyle({self.binding})"
+
+
+StyleProp = Union[Style, AnimatedStyle, Sequence[Union[Style, AnimatedStyle, None]], None]
 """Public type for the ``style`` parameter on every component factory.
 
-Accepts a [`Style`][pythonnative.Style] TypedDict, a sequence of them
-with ``None`` entries skipped, or ``None``. ``Style`` is a ``TypedDict``,
-so a plain dict literal type-checks against it and still works at
-runtime."""
+Accepts a [`Style`][pythonnative.Style] TypedDict, an
+[`AnimatedStyle`][pythonnative.AnimatedStyle], a sequence of them with
+``None`` entries skipped, or ``None``. ``Style`` is a ``TypedDict``, so a
+plain dict literal type-checks against it and still works at runtime."""
+
+MOTION_STYLE_KEY = "_pn_motion_style"
+"""Where [`resolve_style`][pythonnative.style.resolve_style] collects animated style bindings."""
 
 
 # ======================================================================
@@ -672,11 +699,18 @@ def resolve_style(value: StyleProp) -> Dict[str, Any]:
         return {}
     if isinstance(value, dict):
         result: Dict[str, Any] = dict(value)
+    elif isinstance(value, AnimatedStyle):
+        return {MOTION_STYLE_KEY: (value.binding,)}
     else:
         result = {}
+        animated: Tuple[int, ...] = ()
         for entry in value:
-            if entry:
+            if isinstance(entry, AnimatedStyle):
+                animated += (entry.binding,)
+            elif entry:
                 result.update(entry)
+        if animated:
+            result[MOTION_STYLE_KEY] = animated
     if result.keys() & _INSET_SHORTHANDS.keys():
         _expand_insets(result)
     return result
@@ -755,6 +789,8 @@ def validate_style_keys(style_dict: Dict[str, Any], owner: str = "") -> None:
     if not diagnostics.is_dev() or not style_dict:
         return
     for key, value in style_dict.items():
+        if key == MOTION_STYLE_KEY:
+            continue
         if key in _KNOWN_STYLE_KEYS:
             if value is None:
                 continue

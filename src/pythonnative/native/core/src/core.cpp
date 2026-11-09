@@ -29,10 +29,17 @@ Core& shared_core() {
     return *core;
 }
 
-Core::Core() : animator_(*this) {
-    animator_.set_lookup([this](int64_t surface, int64_t tag, const std::string& prop) -> const Value* {
+Core::Core() : motion_(*this) {
+    motion_.set_lookup([this](int64_t surface, int64_t tag, const std::string& prop) -> const Value* {
         auto found = mounts_.find(surface);
         return found == mounts_.end() ? nullptr : found->second->prop(tag, prop);
+    });
+    motion_.set_layout_post([this](int64_t surface, int64_t tag, const std::string& key, const Value& value) {
+        post([=](Core& core) { core.surface(surface).animate_layout(tag, key, value); });
+    });
+    motion_.set_removed([this](int64_t surface, const std::vector<int64_t>& tags) {
+        auto found = mounts_.find(surface);
+        if (found != mounts_.end()) found->second->forget(tags);
     });
 }
 
@@ -84,7 +91,7 @@ void Core::reset() {
         requests_.clear();
     }
     mounts_.clear();
-    animator_.reset();
+    motion_.reset();
     flattening_ = true;
 }
 
@@ -204,11 +211,11 @@ std::string Core::command(int64_t surface_id, int64_t tag, const char* name, con
     return "{\"ok\":true,\"queued\":true}";
 }
 
-std::string Core::animate(int64_t surface_id, int64_t tag, const char* text) {
+std::string Core::motion(int64_t surface_id, const char* text) {
     Value request;
     std::string error;
-    if (text == nullptr || !parse_json(text, request, error)) return error_json("invalid animation JSON: " + error);
-    if (!Animator::valid_request(request, error)) return error_json(error);
+    if (text == nullptr || !parse_json(text, request, error)) return error_json("invalid motion JSON: " + error);
+    if (!motion::Runtime::valid_request(request, error)) return error_json(error);
     std::lock_guard<std::mutex> lock(commit_mutex_);
     Surface& target = surface(surface_id);
     Transaction transaction;
@@ -225,7 +232,7 @@ std::string Core::animate(int64_t surface_id, int64_t tag, const char* text) {
     out.i64(static_cast<int64_t>(transaction.id));
     out.u32(0);
     transaction.bytes = out.take();
-    transaction.animations.push_back(Value::object({{"tag", Value::integer(tag)}, {"request", request}}));
+    transaction.motion.push_back(std::move(request));
     enqueue(std::move(transaction));
     return "{\"ok\":true}";
 }
@@ -281,7 +288,7 @@ void Core::work() {
 MountState* Core::mount_state(int64_t surface_id) {
     auto found = mounts_.find(surface_id);
     if (found == mounts_.end()) {
-        found = mounts_.emplace(surface_id, std::make_unique<MountState>(*this, animator_, surface_id)).first;
+        found = mounts_.emplace(surface_id, std::make_unique<MountState>(*this, motion_, surface_id)).first;
     }
     return found->second.get();
 }
@@ -310,9 +317,8 @@ void Core::mount_finished(uint64_t id, const char* error) {
     }
     MountState* state = mount_state(done->surface);
     state->finish(*done);
-    for (const Value& entry : done->animations) {
-        animator_.handle(done->surface, entry.find("tag")->as_int(), *entry.find("request"));
-    }
+    for (const Value& request : done->motion) motion_.handle(request, done->surface);
+    if (!done->records.empty()) motion_.records(done->surface, done->records);
     if (error != nullptr) {
         int64_t surface_id = done->surface;
         post([surface_id](Core& core) { core.surface(surface_id).mark_failed(); });
@@ -346,12 +352,12 @@ void Core::invalidate_measurements() {
 }
 
 bool Core::animation_frame(double timestamp_ms) {
-    return animator_.frame(timestamp_ms);
+    return motion_.frame(timestamp_ms);
 }
 
 bool Core::take_writes(pn_bytes& writes) {
     static thread_local std::vector<uint8_t> buffer;
-    if (!animator_.take_writes(buffer)) {
+    if (!motion_.take_writes(buffer)) {
         writes = {nullptr, 0};
         return false;
     }
@@ -360,7 +366,15 @@ bool Core::take_writes(pn_bytes& writes) {
 }
 
 void Core::set_reduce_motion(bool enabled) {
-    animator_.set_reduce_motion(enabled);
+    motion_.set_reduce_motion(enabled);
+}
+
+void Core::exit_finished(int64_t surface_id, int64_t tag) {
+    motion_.exit_finished(surface_id, tag);
+}
+
+std::string Core::shared_elements(int64_t surface_id, int64_t from_screen, int64_t to_screen) {
+    return mount_state(surface_id)->shared_elements(from_screen, to_screen);
 }
 
 // ----------------------------------------------------------------------
@@ -496,8 +510,16 @@ char* pn_core_command(pn_core* core, int64_t surface, int64_t tag, const char* n
     return guarded([&] { return unwrap(core).command(surface, tag, name, arguments, call_id); });
 }
 
-char* pn_core_animate(pn_core* core, int64_t surface, int64_t tag, const char* request) {
-    return guarded([&] { return unwrap(core).animate(surface, tag, request); });
+char* pn_core_motion(pn_core* core, int64_t surface, const char* request) {
+    return guarded([&] { return unwrap(core).motion(surface, request); });
+}
+
+char* pn_core_shared_read(pn_core* core, int64_t id) {
+    return guarded([&] { return unwrap(core).shared_read(id); });
+}
+
+char* pn_core_worklet_eval(const char* request) {
+    return guarded([&] { return pn::motion::evaluate(request); });
 }
 
 char* pn_core_measure(pn_core* core, int64_t surface, int64_t tag) {
@@ -600,6 +622,14 @@ int32_t pn_core_take_writes(pn_core* core, pn_bytes* writes) {
 
 void pn_core_set_reduce_motion(pn_core* core, int32_t enabled) {
     unwrap(core).set_reduce_motion(enabled != 0);
+}
+
+void pn_core_exit_finished(pn_core* core, int64_t surface, int64_t tag) {
+    guarded_void([&] { unwrap(core).exit_finished(surface, tag); });
+}
+
+char* pn_core_shared_elements(pn_core* core, int64_t surface, int64_t from_screen, int64_t to_screen) {
+    return guarded([&] { return unwrap(core).shared_elements(surface, from_screen, to_screen); });
 }
 
 int32_t pn_core_pointer(pn_core* core, int64_t surface, int64_t tag, const pn_pointer_event* events, size_t count) {

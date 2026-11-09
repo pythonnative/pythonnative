@@ -2,10 +2,10 @@ package com.pythonnative.runtime
 
 import com.pythonnative.runtime.mount.MountDecoder
 import com.pythonnative.runtime.mount.MountOp
+import com.pythonnative.runtime.mount.MotionWrite
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
@@ -99,24 +99,42 @@ class MountDecoderTest {
         assertEquals(listOf<MountOp>(MountOp.Delete(2)), MountDecoder.decode(third).ops)
     }
 
-    @Test fun writesAndValues() {
+    @Test fun writesCarryKindsPropsFramesAndRemovals() {
         val buffer = ByteBuffer.allocate(256).order(ByteOrder.LITTLE_ENDIAN)
         fun string(value: String) {
             val data = value.toByteArray(Charsets.UTF_8)
             buffer.putInt(data.size)
             buffer.put(data)
         }
-        buffer.putInt(3)
-        buffer.putLong(5); string("opacity"); buffer.put(4); buffer.putDouble(0.25)
-        buffer.putLong(5); string("background_color"); buffer.put(5); string("#80FF0000")
-        buffer.putLong(6); string("translate_x"); buffer.put(0)
+        buffer.putInt(5)
+        buffer.put(0); buffer.putLong(5); string("opacity"); buffer.put(4); buffer.putDouble(0.25)
+        buffer.put(0); buffer.putLong(5); string("background_color"); buffer.put(5); string("#80FF0000")
+        buffer.put(0); buffer.putLong(6); string("transform"); buffer.put(0)
+        buffer.put(1); buffer.putLong(6); buffer.putDouble(1.0); buffer.putDouble(2.0); buffer.putDouble(30.0); buffer.putDouble(40.0)
+        buffer.put(2); buffer.putInt(2); buffer.putLong(9); buffer.putLong(8)
         buffer.flip()
         val writes = MountDecoder.decodeWrites(buffer)
-        assertEquals(3, writes.size)
-        assertEquals(0.25, writes[0].value as Double, 0.0)
-        assertEquals("#80FF0000", writes[1].value)
-        assertNull(writes[2].value)
+        assertEquals(5, writes.size)
+        assertEquals(0.25, (writes[0] as MotionWrite.Prop).value as Double, 0.0)
+        assertEquals(MotionWrite.Prop(5, "background_color", "#80FF0000"), writes[1])
+        assertEquals(MotionWrite.Prop(6, "transform", null), writes[2])
+        assertEquals(MotionWrite.Frame(6, 1.0, 2.0, 30.0, 40.0), writes[3])
+        assertEquals(MotionWrite.Remove(listOf(9L, 8L)), writes[4])
+    }
 
+    @Test fun exitOpsCarryTheirOwner() {
+        val buffer = ByteBuffer.allocate(128).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.putInt(0x544D4E50); buffer.putShort(1); buffer.putShort(0)
+        buffer.putLong(1); buffer.putLong(4); buffer.putLong(12); buffer.putInt(3)
+        buffer.put(5); buffer.putLong(3)
+        buffer.put(8); buffer.putLong(4); buffer.put(0)
+        buffer.put(8); buffer.putLong(5); buffer.put(1)
+        buffer.flip()
+        val ops = MountDecoder.decode(buffer).ops
+        assertEquals(listOf(MountOp.Delete(3), MountOp.Exit(4, 0), MountOp.Exit(5, 1)), ops)
+    }
+
+    @Test fun values() {
         val value = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN)
         value.put(7); value.putInt(2)
         value.putInt(1); value.put('a'.code.toByte()); value.put(6); value.putInt(2); value.put(2); value.put(0)

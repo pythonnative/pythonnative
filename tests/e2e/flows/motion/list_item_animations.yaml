@@ -1,0 +1,31 @@
+# Tests item_entering, item_exiting, and item_layout on a FlatList: rows
+# inserted and removed at the top animate in and out through the native
+# list's own machinery.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/list_item_animations.py
+# Source under test: src/pythonnative/components/lists.py :: FlatList (item_entering, item_exiting, item_layout)
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: List item animations
+- assertVisible: "Rows: 5"
+- assertVisible: "ItemRow 5"
+- tapOn: "Add row"
+- extendedWaitUntil:
+    visible: "ItemRow 6"
+    timeout: 5000
+- assertVisible: "Rows: 6"
+- assertVisible: "Top row: ItemRow 6"
+- tapOn: "Remove top row"
+- assertVisible: "Rows: 5"
+- extendedWaitUntil:
+    notVisible: "ItemRow 6"
+    timeout: 5000
+- assertVisible: "ItemRow 5"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

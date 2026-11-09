@@ -66,48 +66,7 @@ final class PNParityTests: XCTestCase {
         window.makeKeyAndVisible()
     }
 
-    // MARK: - Transform composition
-
-    func testAnimatedTransformChannelsComposeOverStaticTransform() {
-        let manager = PNViewManager()
-        let view = manager.createView(tag: 5001, props: ["transform": [["rotate": "90deg"]]])
-        manager.setAnimatedProperty(view: view, prop: "translate_x", value: 10)
-        manager.setAnimatedProperty(view: view, prop: "translate_y", value: 5)
-        let state = PNViewState.existing(for: view)!
-        XCTAssertEqual(state.animatedTransform["translate_x"], 10)
-        XCTAssertEqual(state.animatedTransform["translate_y"], 5, "binding translate_y must not wipe translate_x")
-        // The static rotate stays applied...
-        XCTAssertEqual(view.transform.b, 1, accuracy: 0.001)
-        XCTAssertEqual(view.transform.a, 0, accuracy: 0.001)
-        // ...and both animated channels are present in the overlay.
-        let overlay = PNTransform.presentedOverlay(view)!
-        let parts = PNTransform.decompose(overlay)
-        XCTAssertEqual(parts.translateX, 10, accuracy: 0.001)
-        XCTAssertEqual(parts.translateY, 5, accuracy: 0.001)
-        XCTAssertEqual(PNProps.double(PNAnimator.shared.presentationValue(view: view, prop: "translate_x")), 10)
-        XCTAssertEqual(PNProps.double(PNAnimator.shared.presentationValue(view: view, prop: "translate_y")), 5)
-        // Restyling the static transform keeps the animated channels.
-        manager.update(view: view, changed: ["transform": [["scale": 2]]])
-        let scaled = PNTransform.decompose(CATransform3DGetAffineTransform(view.layer.transform))
-        XCTAssertEqual(scaled.scaleX, 2, accuracy: 0.001)
-        XCTAssertEqual(scaled.translateX, 20, accuracy: 0.001, "animated translate is appended after the static list")
-        XCTAssertEqual(scaled.translateY, 10, accuracy: 0.001)
-    }
-
-    func testGraphBindingsComposeTransformChannels() {
-        core.roots = [5002]
-        apply([["c", 5002, "View", ["background_color": "#000000"]]])
-        core.animate(tag: 5002, ["op": "graph", "graph": ["id": 501, "nodes": [
-            ["id": 501, "kind": "value", "value": 0.0],
-            ["id": 502, "kind": "value", "value": 0.0],
-        ], "bindings": [[5002, "translate_x", 501], [5002, "translate_y", 502]]]])
-        core.animate(tag: 0, ["op": "set", "prop": "_pn_graph:501", "value": 30])
-        core.animate(tag: 0, ["op": "set", "prop": "_pn_graph:502", "value": 40])
-        let view = PNViewRegistry.shared.view(for: 5002)!
-        let parts = PNTransform.decompose(view.transform)
-        XCTAssertEqual(parts.translateX, 30, accuracy: 0.001)
-        XCTAssertEqual(parts.translateY, 40, accuracy: 0.001)
-    }
+    // MARK: - Transforms
 
     func testThreeDimensionalStaticTransform() {
         let manager = PNViewManager()
@@ -120,29 +79,6 @@ final class PNParityTests: XCTestCase {
         XCTAssertEqual(PNTransform.makeAffine([["skew_x": "45deg"]]).c, 1, accuracy: 1e-6)
         manager.update(view: view, changed: ["transform": NSNull()])
         XCTAssertTrue(CATransform3DIsIdentity(view.layer.transform))
-    }
-
-    // MARK: - Core animation
-
-    func testCoreTimingDriverWritesFramesToTheView() {
-        core.roots = [5004]
-        apply([["c", 5004, "View", ["opacity": 1, "background_color": "#000000"]]])
-        core.animate(tag: 5004, ["op": "start", "id": 7, "prop": "opacity",
-                                 "spec": ["kind": "timing", "to": 0, "duration_ms": 100, "easing": "linear"]])
-        let view = PNViewRegistry.shared.view(for: 5004)!
-        var seen: [CGFloat] = []
-        for frame in 0..<12 {
-            _ = pn_core_animation_frame(PNCore.handle, Double(frame) * 1000 / 60)
-            PNMounter.applyWrites()
-            seen.append(view.alpha)
-        }
-        XCTAssertLessThan(seen[3], 1)
-        XCTAssertGreaterThan(seen[3], 0)
-        XCTAssertEqual(seen.last ?? 1, 0, accuracy: 0.001)
-        XCTAssertEqual(pn_core_animation_frame(PNCore.handle, 1000), 0, "nothing left to drive")
-        settle(0.2)
-        let done = PNEventCapture.all.filter { $0.kind == "animation" && $0.payload["id"] as? Int == 7 }
-        XCTAssertEqual(done.last?.payload["finished"] as? Bool, true)
     }
 
     // MARK: - Screen presentation and animation

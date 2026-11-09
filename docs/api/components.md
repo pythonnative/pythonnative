@@ -28,12 +28,37 @@ For the visual and layout properties accepted by each component's
         - "!^_"
         - "!^(ContentSizeEvent|ImageLoadEvent|KeyPressEvent|LayoutEvent|ScrollEvent|SelectionEvent|WebNavigationEvent)$"
 
+## Components built on Motion
+
+`BottomSheet` and `Swipeable` are written in Python with
+[Motion](motion.md) worklets: the drag, the snap decision, and the
+spring run on the UI thread, and your Python callbacks hear about the
+result once it settles. Both are exported from `pythonnative`. See the
+[Motion guide](../guides/motion.md#components-built-on-motion) for
+usage.
+
+::: pythonnative.components.bottom_sheet
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
+::: pythonnative.components.swipeable
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      members_order: source
+      filters: ["!^_"]
+
 ## Shared props
 
 Every built-in view accepts the
-[`AccessibilityProps`][pythonnative.AccessibilityProps] keywords, and
-`View`, `Column`, `Row`, and `Pressable` also accept the
-[`ViewProps`][pythonnative.ViewProps] layout and gesture keywords.
+[`AccessibilityProps`][pythonnative.AccessibilityProps] and
+[`MotionProps`][pythonnative.MotionProps] keywords (together,
+[`CommonProps`][pythonnative.CommonProps]), and `View`, `Column`, `Row`,
+and `Pressable` also accept the [`ViewProps`][pythonnative.ViewProps]
+layout and gesture keywords.
 Factories declare them as `**props: Unpack[...]`, so a type checker
 validates each keyword as if it were spelled out in the signature.
 Built-in props are validated at run time only in development builds.
@@ -64,9 +89,9 @@ section a stable identity, and `ViewableItem` describes a visible item. See the
 Frozen dataclasses delivered to `on_layout`, `on_scroll` (and the drag
 and momentum callbacks), `on_selection_change`, `on_key_press`,
 `on_content_size_change`, `on_load`, and the `WebView` navigation
-callbacks. Field names match the wire payload, which is what lets
-[`Animated.event`][pythonnative.animated.Animated] bind by name
-(`Animated.event(y=scroll_y)`).
+callbacks. Field names match the wire payload, and an event
+[worklet](../guides/motion.md#event-worklets) reads the same fields by
+name (`event.y` in an `on_scroll` worklet).
 
 ::: pythonnative.components.events
     options:

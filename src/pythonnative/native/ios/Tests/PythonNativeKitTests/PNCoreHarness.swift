@@ -1,5 +1,6 @@
 import XCTest
 import PNCore
+import QuartzCore
 @testable import PythonNativeKit
 
 /// Commits wire ops to the iOS build of the renderer core and mounts the
@@ -59,13 +60,16 @@ final class PNCoreHarness {
         return ack
     }
 
-    /// Queue an animation request and mount it.
-    func animate(tag: Int64, _ request: [String: Any]) {
-        let json = PNJSON.encode(request)
-        if let reply = json.withCString({ pn_core_animate(PNCore.handle, PNCoreHarness.surface, tag, $0) }) {
-            pn_core_free(reply)
+    /// The motion clock: a monotonic millisecond timestamp the frame helper advances.
+    private(set) var clock = CACurrentMediaTime() * 1000
+
+    /// Advance the core's motion runtime by `frames` display frames and apply its writes.
+    func frames(_ frames: Int, every ms: Double = 1000.0 / 60) {
+        for _ in 0..<frames {
+            clock += ms
+            _ = pn_core_animation_frame(PNCore.handle, clock)
+            PNMounter.applyWrites()
         }
-        PNMounter.drain()
     }
 
     /// Run `body` on a background queue, servicing the main queue meanwhile.

@@ -1,0 +1,50 @@
+# Tests an on_scroll worklet driving a collapsing header on the UI thread,
+# with use_animated_reaction reporting the collapse through run_on_python.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/collapsing_header.py
+# Source under test: src/pythonnative/motion/hooks.py :: use_animated_style, use_animated_reaction
+#                    src/pythonnative/motion/worklets.py :: worklet
+#
+# The scroll events never reach Python; the only signal Python gets is
+# the reaction's run_on_python call when the offset crosses 80 points.
+# Scrolling deep into the list must flip the readout to "collapsed".
+#
+# The inner scroll is 400 dp (matching scroll_view.yaml) so Maestro's
+# scrollUntilVisible, which swipes from screen center, lands inside it
+# on both CI emulators. See scroll_view.yaml for why the target row
+# must start beyond the physical screen (60 rows).
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: Collapsing header
+- assertVisible: "Header state: expanded"
+# Reaching row 60 takes several slow swipes, and each visibility check
+# snapshots the whole hierarchy; allow a slow device the time.
+- scrollUntilVisible:
+    element: "HeaderRow 60"
+    direction: DOWN
+    timeout: 60000
+    visibilityPercentage: 100
+    centerElement: false
+- extendedWaitUntil:
+    visible: "Header state: collapsed"
+    timeout: 5000
+# Surface the back button on Android's shorter viewport (the inner
+# scroll bottoms out and bubbles the over-scroll to the outer page;
+# see scroll_view.yaml for the full rationale).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "Back to list"
+          direction: DOWN
+          timeout: 20000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

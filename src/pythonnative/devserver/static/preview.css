@@ -333,7 +333,9 @@ body.pn-dark-shell #pn-scheme .pn-icon-sun { display: block; }
 .pn-screen.pn-screen-right, .pn-stack-screen.pn-screen-right { transform: translateX(100%); }
 .pn-screen.pn-screen-bottom, .pn-stack-screen.pn-screen-bottom { transform: translateY(100%); }
 .pn-screen.pn-screen-fade, .pn-stack-screen.pn-screen-fade { opacity: 0; }
-.pn-screen-ghost { z-index: 2; }
+/* Shared elements fly above both screens of a push or pop (RFC 0009). */
+.pn-flight-layer { position: absolute; inset: 0; z-index: 1000; pointer-events: none; overflow: visible; }
+.pn-overlays > .pn-flight-layer { pointer-events: none; }
 
 /* Native-stack navigation bar (`ScreenStack`), drawn from the top screen's
    options like UINavigationController's bar and the Android toolbar. */

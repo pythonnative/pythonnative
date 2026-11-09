@@ -4,7 +4,10 @@ Hooks are matched to their state by call order, so a hook that runs on
 one render and not the next corrupts every hook after it. A stale
 dependency list is quieter: the effect keeps using the values from the
 render that created it. `pn lint` catches both before you run the app.
-It's the PythonNative counterpart of `eslint-plugin-react-hooks`.
+It's the PythonNative counterpart of `eslint-plugin-react-hooks`. It
+also checks [worklets](motion.md#worklets), the functions that run on
+the UI thread, so a construct the core can't run shows up in your
+editor instead of on a device.
 
 The linter reads your source with Python's `ast` module. It never
 imports or runs your code, and it has no dependencies beyond
@@ -147,7 +150,7 @@ nested function. These are exempt:
 - names defined at module level, and builtins
 - the setter from `value, set_value = pn.use_state(...)` and the
   dispatcher from `state, dispatch = pn.use_reducer(...)`
-- names assigned from `pn.use_ref(...)` or `pn.use_animated_value(...)`
+- names assigned from `pn.use_ref(...)` or `pn.use_shared_value(...)`
 - names assigned from `pn.use_memo(...)` or `pn.use_callback(...)` with a
   literal empty dependency list, which are computed once
 - names bound by an import inside the component
@@ -192,6 +195,74 @@ can't declare a parameter named `key` at all: `@pn.component` raises
 `TypeError` for one, and calling a component with `key=` raises
 `TypeError` at run time too.
 
+### PN201: worklets must compile
+
+Every function marked `@pn.worklet`, and every inline lambda passed to
+a worklet-only API or to `on_finish=`, `entering=`, `exiting=`, or
+`layout=`, is compiled the way the renderer core will compile it.
+`PN201` reports a construct outside the
+[worklet subset](motion.md#the-language), with the compiler's message,
+at the construct's position:
+
+```python
+@pn.worklet
+def settle(event: gestures.GestureEvent) -> None:
+    while offset.value > 0:  # PN201: `while` loops can't run on the UI thread; use `for i in range(n)`
+        offset.value -= 1
+```
+
+These are the same errors a release build reports when it precompiles
+worklets, so a clean `pn lint` means `pn build` won't stop on one.
+Errors that depend on what a worklet captures at run time, such as
+calling a plain Python function, are reported when the worklet is
+installed instead; see [Errors](motion.md#errors).
+
+### PN202: worklet-only APIs need a marked worklet
+
+`use_animated_style`, `use_derived_value`, `use_animated_reaction`, and
+`use_frame_callback` only accept a `@pn.worklet` function or an inline
+lambda. `PN202` flags a name passed to one of them that isn't decorated
+in the same file:
+
+```python
+@pn.component
+def Card() -> pn.Node:
+    offset = pn.use_shared_value(0.0)
+
+    def fade() -> pn.Style:
+        return {"opacity": offset.value}
+
+    style = pn.use_animated_style(fade)  # PN202: mark 'fade' with @pn.worklet
+    ...
+```
+
+The hook raises `TypeError` for it at run time too. Requiring the
+marker keeps code that would compile in development, where every
+function has its source, from failing in a release build, which only
+precompiles marked worklets and inline lambdas. Add `@pn.worklet`, or
+pass a lambda.
+
+### PN203: shared values aren't read during render
+
+`PN203` flags a read of `.value` on a shared value (a name assigned
+from `pn.use_shared_value(...)` or `pn.use_derived_value(...)`) in a
+component's body:
+
+```python
+@pn.component
+def Progress() -> pn.Node:
+    progress = pn.use_shared_value(0.0)
+    label = f"{progress.value:.0%}"  # PN203: won't rerun when it changes
+    ...
+```
+
+The read works, but it returns the value at the moment of the render,
+and the component doesn't render again when the value changes. Read it
+in a worklet, such as a `use_animated_style` or `use_derived_value`
+lambda, or keep the number in state if text has to show it. Reads
+inside nested functions and lambdas aren't flagged, since those run
+later.
+
 ### PN000: the file couldn't be read
 
 A file with a syntax error, or one that isn't valid UTF-8, produces a
@@ -220,6 +291,9 @@ The linter works on one file at a time and doesn't infer types, so:
   alias that doesn't start with `use_`, isn't recognized.
 - `PN104` only knows about components defined at module level in the
   same file.
+- `PN202` only knows about worklets decorated in the same file. A
+  worklet imported from another module is flagged; suppress the finding
+  on that line.
 - `PN103` treats every local value as changing between renders. A
   value that you know is stable, such as a `use_memo(..., [])` result,
   still has to be listed or suppressed.

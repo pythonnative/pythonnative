@@ -1,0 +1,52 @@
+# Tests a shared-element push and pop on the root stack: a tile with
+# shared_tag flies into the hero of the pushed screen and back.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/shared_element.py
+# Source under test: src/pythonnative/motion/transitions.py :: SharedTransition
+#                    src/pythonnative/components/props.py :: MotionProps (shared_tag)
+#
+# Maestro can't see the flight itself; it asserts that the push and the
+# pop both land with their content, which a broken flight (a hidden
+# source, a hero left in the overlay) would not. On iOS the flow also
+# pops with the interactive back swipe, which drives the flight from
+# the percent-driven transition.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: Shared element
+- assertVisible: "Showing: list"
+- assertVisible: "Thumb"
+- tapOn: "Open detail"
+- extendedWaitUntil:
+    visible: "Showing: detail"
+    timeout: 5000
+- assertVisible: "Hero tile"
+- tapOn: "Back to list"
+- extendedWaitUntil:
+    visible: "Showing: list"
+    timeout: 5000
+- assertVisible: "Thumb"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: "Open detail"
+      - extendedWaitUntil:
+          visible: "Showing: detail"
+          timeout: 5000
+      # Start at the left edge for the navigation controller's back swipe.
+      - swipe:
+          start: "1%, 50%"
+          end: "90%, 50%"
+          duration: 600
+      - extendedWaitUntil:
+          visible: "Showing: list"
+          timeout: 5000
+      - assertVisible: "Thumb"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

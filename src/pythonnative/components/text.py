@@ -17,7 +17,7 @@ from ._base import (
     _SpanPressDispatcher,
 )
 from .events import ContentSizeEvent, KeyPressEvent, SelectionEvent
-from .props import AccessibilityProps
+from .props import CommonProps
 
 EllipsizeMode = Literal["head", "middle", "tail", "clip"]
 """Where ``Text`` truncates when it exceeds ``max_lines``."""
@@ -42,7 +42,7 @@ def Text(
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Display a string of text, optionally with styled nested spans.
 
@@ -137,7 +137,7 @@ def Button(
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Display a tappable button.
 
@@ -214,7 +214,7 @@ def TextInput(
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Display a text-entry field (single-line by default, or ``multiline``).
 

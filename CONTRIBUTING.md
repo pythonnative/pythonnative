@@ -71,7 +71,8 @@ Unsolicited pull requests for issues that are already assigned or already have a
   - `audio/`, `background/`, `biometrics/`, `camera/`, `location/`, `maps/`, `notifications/`, `pickers/`, `purchases/`, `push/`, `sensors/`, `video/`: first-party capabilities (see [Capabilities](#capabilities))
   - `navigation/`: navigator values, screens, container, hooks, deep-link table, and the navigation ref
   - `theme.py`, `style.py`, `store.py`: the app `Theme`, `StyleSheet` namespaces and style resolution, and `Store`
-  - `lint.py`: the `pn lint` rules-of-hooks checker
+  - `motion/`: worklets and their compiler, shared values, animations, layout animations, shared-element transitions, and release precompilation (RFC 0009); `BottomSheet` and `Swipeable` in `components/` are built on it
+  - `lint.py`: the `pn lint` rules-of-hooks and worklet checker
   - `testing/`: the headless testing library and the shipped pytest plugin (`testing/pytest_plugin.py`)
   - `bridge/`: the `ctypes` binding to the renderer core, the fake platform headless tests run it through, and per-platform transports
   - `cli/`: `pn` command
@@ -220,7 +221,6 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
 
 - Module/directory scopes:
   - `alerts`: imperative Alert/Picker helpers (`alerts.py`)
-  - `animated`: Animated namespace and animation primitives (`animated.py`)
   - `bootstrap`: on-device runtime start-up called by the templates (`bootstrap.py`)
   - `bridge`: wire codec, transports, handshake, and native-to-Python callback (`bridge/`)
   - `cli`: CLI tool and `pn` command (`src/pythonnative/cli/`)
@@ -236,7 +236,8 @@ Recommended scopes (choose the smallest, most accurate unit; prefer module/direc
   - `devclient`: on-device dev client that syncs sources and Fast Refreshes (`devclient.py`)
   - `hot_reload`: module reloader and Fast Refresh (`hot_reload.py`)
   - `journal`: render undo journal (`journal.py`)
-  - `lint`: the `pn lint` rules-of-hooks checker (`lint.py`)
+  - `lint`: the `pn lint` rules-of-hooks and worklet checker (`lint.py`)
+  - `motion`: worklets, shared values, animations, layout animations, and shared elements (`motion/`, `components/bottom_sheet.py`, `components/swipeable.py`)
   - `mutations`: batched mutation ops between reconciler and native backends (`mutations.py`)
   - `native_modules`: native module registry, Python facades, and Python fallbacks (`native_modules/`)
   - `native_views`: view backend accessor and bridge backend (`native_views/`)

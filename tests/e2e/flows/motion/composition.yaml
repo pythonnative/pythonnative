@@ -1,0 +1,43 @@
+# Tests with_sequence with a with_delay step (awaited from Python),
+# with_repeat with reverse and an on_finish worklet that calls back
+# through run_on_python, and an endless with_repeat stopped by cancel().
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/composition.py
+# Source under test: src/pythonnative/motion/animations.py :: with_sequence, with_delay, with_repeat
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: Sequence, repeat, delay
+- assertVisible: "Sequence: idle"
+- tapOn: "Run sequence"
+- extendedWaitUntil:
+    visible: "Sequence: done"
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Run repeat"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Run repeat"
+- extendedWaitUntil:
+    visible: "Repeat: finished"
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Stop loop"
+    direction: DOWN
+    timeout: 15000
+    centerElement: false
+- tapOn: "Start loop"
+- assertVisible: "Loop: running"
+- tapOn: "Stop loop"
+- extendedWaitUntil:
+    visible: "Loop: stopped"
+    timeout: 5000
+- assertVisible: "Loop moved: yes"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

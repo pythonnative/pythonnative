@@ -80,18 +80,4 @@ final class PNGestureTests: XCTestCase {
         XCTAssertTrue(swipes.allSatisfy { coordinator.index(of: $0) == 1 }, "every recognizer reports the spec index")
         XCTAssertNil(coordinator.direction(of: recognizers[0]))
     }
-
-    func testAnimatorSetAppliesImmediately() {
-        let core = PNCoreHarness()
-        core.roots = [50]
-        core.commit([["c", 50, "View", ["opacity": 1, "background_color": "#000000"]]])
-        core.animate(tag: 50, ["op": "set", "prop": "opacity", "value": 0.25])
-        XCTAssertEqual(PNViewRegistry.shared.view(for: 50)?.alpha ?? 0, 0.25, accuracy: 0.001)
-        core.animate(tag: 50, ["op": "set", "prop": "translate_x", "value": 12])
-        XCTAssertEqual(PNViewRegistry.shared.view(for: 50)?.transform.tx ?? 0, 12, accuracy: 0.001)
-        let request = PNJSON.encode(["op": "start", "id": 1, "prop": "opacity", "spec": ["kind": "mystery"]])
-        let reply = request.withCString { pn_core_animate(PNCore.handle, PNCore.surface, 50, $0) }
-        defer { pn_core_free(reply) }
-        XCTAssertEqual(PNJSON.decodeObject(reply.map { String(cString: $0) })["ok"] as? Bool, false)
-    }
 }

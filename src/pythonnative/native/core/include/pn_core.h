@@ -24,13 +24,23 @@
  *   5 delete   i64 tag (also detaches the view from its parent)
  *   6 frame    i64 tag, f64 x, f64 y, f64 width, f64 height
  *   7 command  i64 tag, str name, value arguments, i64 call id
+ *   8 exit     i64 tag, u8 owner (0: the core animates it out and sends a
+ *              `remove` write; 1: the platform animates it, a leaving
+ *              screen or modal, and calls `pn_core_exit_finished`). The
+ *              view and its subtree stay mounted but get no touches, and
+ *              later `insert` indices skip exiting siblings.
  *
  *   str:   u32 length, UTF-8 bytes
  *   value: u8 kind, then 0 null, 1 false, 2 true, 3 i64, 4 f64, 5 str,
  *          6 array (u32 count, values), 7 object (u32 count, str key, value)
  *
- * Animated writes (`pn_core_take_writes`): u32 count, then per write
- * i64 tag, str prop, value.
+ * Motion writes (`pn_core_take_writes`): u32 count, then per record a u8
+ * kind (RFC 0009):
+ *
+ *   0 prop     i64 tag, str prop, value (null restores the default)
+ *   1 frame    i64 tag, f64 x, f64 y, f64 width, f64 height
+ *   2 remove   u32 count, i64 tags... (an exit finished: destroy each,
+ *              children first)
  */
 #ifndef PN_CORE_H
 #define PN_CORE_H
@@ -48,7 +58,7 @@
 extern "C" {
 #endif
 
-#define PN_CORE_PROTOCOL_VERSION 7
+#define PN_CORE_PROTOCOL_VERSION 8
 
 typedef struct pn_core pn_core;
 
@@ -147,8 +157,13 @@ PN_CORE_API char *pn_core_layout(pn_core *core, const char *request);
  * asynchronously with a "command" message carrying `call_id`. */
 PN_CORE_API char *pn_core_command(pn_core *core, int64_t surface, int64_t tag, const char *name,
                                   const char *arguments, int64_t call_id);
-/* Queue an animation request (`graph`, `start`, `cancel`, `set`). */
-PN_CORE_API char *pn_core_animate(pn_core *core, int64_t surface, int64_t tag, const char *request);
+/* Queue a motion request behind pending mounts (RFC 0009): `program`,
+ * `shared`, `set`, `animate`, `cancel`, `bind`, `release`, or `batch`. */
+PN_CORE_API char *pn_core_motion(pn_core *core, int64_t surface, const char *request);
+/* The latest published value of a shared value, as JSON. Never blocks the UI thread. */
+PN_CORE_API char *pn_core_shared_read(pn_core *core, int64_t id);
+/* Run one worklet outside the runtime (tests and tooling). */
+PN_CORE_API char *pn_core_worklet_eval(const char *request);
 /* `{"frame": [x, y, w, h], "window": [x, y, w, h]}`, or "null". */
 PN_CORE_API char *pn_core_measure(pn_core *core, int64_t surface, int64_t tag);
 /* The deepest view at a point in surface coordinates (DevTools). */
@@ -180,14 +195,19 @@ PN_CORE_API void pn_core_report_intrinsic(pn_core *core, int64_t surface, int64_
 PN_CORE_API void pn_core_invalidate(pn_core *core, int64_t surface, int64_t tag);
 /* Re-measure every leaf (font scale or content size category changed). */
 PN_CORE_API void pn_core_invalidate_measurements(pn_core *core);
-/* Stamp and deliver a view event to Python; feeds animated event bindings. */
+/* Stamp and deliver a view event to Python, or run its worklet handler. */
 PN_CORE_API void pn_core_event(pn_core *core, int64_t surface, int64_t tag, const char *name,
                                const char *arguments, int64_t edit_revision);
 /* Advance animations to `timestamp_ms`; returns whether frames should continue. */
 PN_CORE_API int32_t pn_core_animation_frame(pn_core *core, double timestamp_ms);
-/* Take animated prop writes produced since the last call. */
+/* Take motion writes produced since the last call (format above). */
 PN_CORE_API int32_t pn_core_take_writes(pn_core *core, pn_bytes *writes);
 PN_CORE_API void pn_core_set_reduce_motion(pn_core *core, int32_t enabled);
+/* A platform-owned exit (`exit` op owner 1) finished; the core sends its `remove` write. */
+PN_CORE_API void pn_core_exit_finished(pn_core *core, int64_t surface, int64_t tag);
+/* Views sharing a `shared_tag` between two screens, as a JSON array of
+ * `{"name", "source", "target", "transition", "source_style", "target_style"}`. */
+PN_CORE_API char *pn_core_shared_elements(pn_core *core, int64_t surface, int64_t from_screen, int64_t to_screen);
 /* Feed pointer events to a view's gestures. Returns 1 while a pan is active. */
 PN_CORE_API int32_t pn_core_pointer(pn_core *core, int64_t surface, int64_t tag,
                                     const pn_pointer_event *events, size_t count);

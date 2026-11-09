@@ -31,15 +31,6 @@ from typing import Dict, List
 import pythonnative as pn
 from app.screens.alerts.confirm_alert import ConfirmAlertDemo
 from app.screens.alerts.simple_alert import SimpleAlertDemo
-from app.screens.animations.collapsing_header import CollapsingHeaderDemo
-from app.screens.animations.decay_animation import DecayAnimationDemo
-from app.screens.animations.easing import EasingDemo
-from app.screens.animations.interpolate_animation import InterpolateAnimationDemo
-from app.screens.animations.loop_stagger import LoopStaggerDemo
-from app.screens.animations.parallel_animation import ParallelAnimationDemo
-from app.screens.animations.sequence_animation import SequenceAnimationDemo
-from app.screens.animations.spring_animation import SpringAnimationDemo
-from app.screens.animations.timing_animation import TimingAnimationDemo
 from app.screens.assets.bundled_image import BundledImageDemo
 from app.screens.assets.custom_font import CustomFontDemo
 from app.screens.assets.image_size import ImageSizeDemo
@@ -137,6 +128,20 @@ from app.screens.layout.aspect_ratio import AspectRatioDemo
 from app.screens.layout.flex_layout import FlexLayoutDemo
 from app.screens.layout.on_layout import OnLayoutDemo
 from app.screens.layout.padding_margin import PaddingMarginDemo
+from app.screens.motion.bottom_sheet import BottomSheetDemo
+from app.screens.motion.collapsing_header import CollapsingHeaderDemo
+from app.screens.motion.composition import CompositionDemo
+from app.screens.motion.drag_under_load import DragUnderLoadDemo
+from app.screens.motion.easing import EasingDemo
+from app.screens.motion.frame_callback import FrameCallbackDemo
+from app.screens.motion.interpolate import InterpolateDemo
+from app.screens.motion.layout_animations import LayoutAnimationsDemo
+from app.screens.motion.list_item_animations import ListItemAnimationsDemo
+from app.screens.motion.shared_element import SharedElementDemo
+from app.screens.motion.swipeable import SwipeableDemo
+from app.screens.motion.with_decay import WithDecayDemo
+from app.screens.motion.with_spring import WithSpringDemo
+from app.screens.motion.with_timing import WithTimingDemo
 from app.screens.navigation.drawer_navigator import DrawerNavigatorDemo
 from app.screens.navigation.focus_effect import FocusEffectDemo
 from app.screens.navigation.navigation_ref import NavigationRefDemo
@@ -437,53 +442,34 @@ DEMOS: List[DemoEntry] = [
         InteractionPropsDemo,
     ),
     # ------------------------------------------------------------------
-    # Animations
+    # Motion
     # ------------------------------------------------------------------
-    DemoEntry("timing_animation", "Animations", "Animated.timing", "Animated", TimingAnimationDemo),
-    DemoEntry(
-        "spring_animation",
-        "Animations",
-        "Animated.spring",
-        "animated::spring",
-        SpringAnimationDemo,
-    ),
-    DemoEntry(
-        "parallel_animation",
-        "Animations",
-        "Animated.parallel",
-        "animated::parallel",
-        ParallelAnimationDemo,
-    ),
-    DemoEntry(
-        "sequence_animation",
-        "Animations",
-        "Animated.sequence",
-        "animated::sequence",
-        SequenceAnimationDemo,
-    ),
-    DemoEntry(
-        "interpolate_animation",
-        "Animations",
-        "Animated.interpolate",
-        "animated::interpolate",
-        InterpolateAnimationDemo,
-    ),
-    DemoEntry(
-        "loop_stagger",
-        "Animations",
-        "Animated.loop & stagger",
-        "animated::loop",
-        LoopStaggerDemo,
-    ),
+    DemoEntry("with_timing", "Motion", "with_timing", "with_timing", WithTimingDemo),
+    DemoEntry("easing", "Motion", "Easing", "Easing", EasingDemo),
+    DemoEntry("with_spring", "Motion", "with_spring", "with_spring", WithSpringDemo),
+    DemoEntry("with_decay", "Motion", "with_decay", "with_decay", WithDecayDemo),
+    DemoEntry("composition", "Motion", "Sequence, repeat, delay", "with_sequence", CompositionDemo),
+    DemoEntry("interpolate", "Motion", "Interpolate", "interpolate", InterpolateDemo),
     DemoEntry(
         "collapsing_header",
-        "Animations",
+        "Motion",
         "Collapsing header",
-        "animated::event",
+        "motion::scroll_worklet",
         CollapsingHeaderDemo,
     ),
-    DemoEntry("easing", "Animations", "Easing", "Easing", EasingDemo),
-    DemoEntry("decay_animation", "Animations", "Animated.decay", "animated::decay", DecayAnimationDemo),
+    DemoEntry("drag_under_load", "Motion", "Drag under load", "worklet", DragUnderLoadDemo),
+    DemoEntry("layout_animations", "Motion", "Layout animations", "MotionProps", LayoutAnimationsDemo),
+    DemoEntry(
+        "list_item_animations",
+        "Motion",
+        "List item animations",
+        "motion::item_animations",
+        ListItemAnimationsDemo,
+    ),
+    DemoEntry("shared_element", "Motion", "Shared element", "motion::shared_tag", SharedElementDemo),
+    DemoEntry("bottom_sheet", "Motion", "BottomSheet", "BottomSheet", BottomSheetDemo),
+    DemoEntry("swipeable", "Motion", "Swipeable", "Swipeable", SwipeableDemo),
+    DemoEntry("frame_callback", "Motion", "use_frame_callback", "use_frame_callback", FrameCallbackDemo),
     # ------------------------------------------------------------------
     # Gestures
     # ------------------------------------------------------------------

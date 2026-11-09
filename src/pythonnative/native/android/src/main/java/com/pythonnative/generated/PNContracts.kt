@@ -9,8 +9,8 @@ import org.json.JSONObject
  * nothing on the Kotlin side interprets them.
  */
 object PNContracts {
-    const val fingerprint = "d0f4503111acbb6117870bb5bdd997964a29ec05d3190445e2c12ce446b18c4d"
-    const val protocolVersion = 7
+    const val fingerprint = "b0e877e93fc406ca1947e2d6e08b438f7b93722f0de9e4ddaf14a21ebf5acbe5"
+    const val protocolVersion = 8
     const val yogaVersion = "3.2.1"
 
     /** Whether a native module call's arguments satisfy its contract. */

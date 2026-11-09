@@ -24,7 +24,16 @@ import weakref
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from . import codec
-from .core import PROTOCOL_VERSION, MountOp, MountTransaction, Platform, RendererCore, decode_transaction, load_core
+from .core import (
+    PROTOCOL_VERSION,
+    MotionWrite,
+    MountOp,
+    MountTransaction,
+    Platform,
+    RendererCore,
+    decode_transaction,
+    load_core,
+)
 
 __all__ = ["DEFAULT_MEASURE", "FakeNativeView", "FakeTransport", "reset_fakes"]
 
@@ -40,6 +49,15 @@ class FakeNativeView:
         self.parent: Optional["FakeNativeView"] = None
         self.frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
         self.animated: Dict[str, Any] = {}
+        """Paint props motion wrote, overriding ``props`` (RFC 0009)."""
+        self.exiting: Optional[int] = None
+        """The ``exit`` op's owner while the view animates out, else ``None``."""
+
+    def presented(self, key: str) -> Any:
+        """The value the platform shows for ``key``: motion's write, else the committed prop."""
+        if key in self.animated:
+            return self.animated[key]
+        return self.props.get(key)
 
     def __repr__(self) -> str:
         return f"<native {self.type_name} tag={self.tag}>"
@@ -145,13 +163,11 @@ def _frame() -> None:
 def _take_writes() -> None:
     if _installed is None:
         return
-    for tag, prop, value in _installed.take_writes():
+    for write in _installed.take_writes():
+        tag = write.tags[0] if write.kind == "remove" and write.tags else write.tag
         for transport in list(_transports.values()):
-            view = transport.views.get(tag)
-            if view is not None or transport.owns(tag):
-                transport.writes.append((tag, prop, value))
-                if view is not None:
-                    view.animated[prop] = value
+            if tag in transport.views or transport.owns(tag):
+                transport._write(write)
                 break
 
 
@@ -179,6 +195,12 @@ def _mount_all() -> None:
                     error = str(exc)
             _installed.mount_finished(ident, error)
             _take_writes()
+            if transport is not None and transport.finish_exits:
+                # The fake native stack finishes its transitions at once.
+                for op in transaction.ops:
+                    if op.kind == "exit" and op.owner == 1:
+                        _installed.exit_finished(transaction.surface, op.tag)
+                _take_writes()
     finally:
         _mounting = False
 
@@ -210,6 +232,9 @@ def reset_fakes() -> None:
     _transports.clear()
     if _installed is not None:
         _installed.reset()
+    from ..motion.runtime import runtime as motion
+
+    motion.reset()  # the core forgot every program, shared value, and binding
     from . import _loaded_contracts
 
     _loaded_contracts.clear()  # the reset dropped every compiled contract
@@ -233,7 +258,7 @@ class FakeTransport:
         views: Mounted views by tag (flattened views never appear).
         transactions: Every decoded mount transaction.
         commands: ``(tag, name, args)`` tuples in the order the UI thread ran them.
-        writes: ``(tag, prop, value)`` animated writes, in order.
+        writes: Every [`MotionWrite`][pythonnative.bridge.core.MotionWrite], in order.
         calls: ``(module, method, args)`` tuples in call order.
         measured: ``(tag, component)`` pairs the core asked the platform to measure.
     """
@@ -260,7 +285,9 @@ class FakeTransport:
         self.views: Dict[int, FakeNativeView] = {}
         self.transactions: List[MountTransaction] = []
         self.commands: List[Tuple[int, str, Dict[str, Any]]] = []
-        self.writes: List[Tuple[int, str, Any]] = []
+        self.writes: List[MotionWrite] = []
+        self.finish_exits = True
+        """Finish platform-owned exits (leaving screens and modals) as soon as they mount."""
         self.calls: List[Tuple[str, str, Dict[str, Any]]] = []
         self.measured: List[Tuple[int, str]] = []
         self.command_results: Dict[str, Any] = {}
@@ -316,11 +343,24 @@ class FakeTransport:
         _mount_all()
         return result
 
-    def animate(self, surface: int, tag: int, request_json: str) -> str:
-        """Queue an animation request and run it on the fake UI thread."""
-        result = self.core.animate(surface, tag, request_json)
+    def motion(self, surface: int, request_json: str) -> str:
+        """Queue a motion request and apply it on the fake UI thread."""
+        result = self.core.motion(surface, request_json)
         _mount_all()
         return result
+
+    def shared_read(self, ident: int) -> str:
+        """The latest value the fake UI thread published for a shared value, as JSON."""
+        return self.core.shared_read(ident)
+
+    def exit_finished(self, tag: int) -> None:
+        """Finish a platform-owned exit (a leaving screen or modal), as the native stack would."""
+        self.core.exit_finished(self.surface, tag)
+        _take_writes()
+
+    def shared_elements(self, from_screen: int, to_screen: int) -> List[Dict[str, Any]]:
+        """The views the core pairs by ``shared_tag`` between two screens."""
+        return list(json.loads(self.core.shared_elements(self.surface, from_screen, to_screen)))
 
     def measure(self, surface: int, tag: int) -> str:
         """The shadow and window frames of a view."""
@@ -387,9 +427,20 @@ class FakeTransport:
             child = self._require(op.tag, "insert")
             if child.parent is not None:
                 child.parent.children.remove(child)
-            index = max(0, min(int(op.index), len(parent.children)))
+            # Indices count only the children that aren't animating out.
+            index = len(parent.children)
+            live = 0
+            for position, sibling in enumerate(parent.children):
+                if sibling.exiting is not None:
+                    continue
+                if live == int(op.index):
+                    index = position
+                    break
+                live += 1
             parent.children.insert(index, child)
             child.parent = parent
+        elif op.kind == "exit":
+            self._require(op.tag, "exit").exiting = op.owner
         elif op.kind == "delete":
             deleted = self.views.pop(op.tag, None)
             if deleted is None:
@@ -413,6 +464,26 @@ class FakeTransport:
                 "",
                 codec.dumps({"call_id": op.call_id, "ok": True, "value": codec.to_jsonable(result)}),
             )
+
+    def _write(self, write: MotionWrite) -> None:
+        self.writes.append(write)
+        if write.kind == "prop":
+            view = self.views.get(write.tag)
+            if view is not None:
+                if write.value is None:
+                    view.animated.pop(write.prop, None)
+                else:
+                    view.animated[write.prop] = write.value
+        elif write.kind == "frame":
+            view = self.views.get(write.tag)
+            if view is not None:
+                view.frame = write.frame
+        elif write.kind == "remove":
+            for tag in write.tags:
+                removed = self.views.pop(tag, None)
+                if removed is not None and removed.parent is not None:
+                    removed.parent.children.remove(removed)
+                    removed.parent = None
 
     def _publish_list(self, tag: int) -> None:
         edits = self.core.list_apply(self.surface, tag)

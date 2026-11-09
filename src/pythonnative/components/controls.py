@@ -14,7 +14,7 @@ from ..style import (
     StyleProp,
 )
 from ._base import REFRESH_CONTROL_TYPE, _make_element
-from .props import AccessibilityProps
+from .props import CommonProps
 
 
 def Switch(
@@ -26,7 +26,7 @@ def Switch(
     thumb_color: Optional[Color] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Display a toggle switch.
 
@@ -72,7 +72,7 @@ def Slider(
     on_sliding_complete: Optional[Callable[[float], Any]] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Continuous-value slider between ``min_value`` and ``max_value``.
 
@@ -195,7 +195,7 @@ def Checkbox(
     color: Optional[Color] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """A boolean checkbox with an optional inline label.
 
@@ -240,7 +240,7 @@ def SegmentedControl(
     tint_color: Optional[Color] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """A horizontal multi-choice control (one selected segment at a time).
 
@@ -285,7 +285,7 @@ def DatePicker(
     disabled: bool = False,
     style: StyleProp = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """A native date / time picker.
 
@@ -337,7 +337,7 @@ def Picker(
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """A real native dropdown / select widget.
 

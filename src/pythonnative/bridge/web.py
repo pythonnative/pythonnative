@@ -136,9 +136,13 @@ class WebTransport:
         message = ["command", None, int(surface), int(tag), name, args_json, int(call_id)]
         return self._text(self._request(message), _failure(f"command {name!r}"))
 
-    def animate(self, surface: int, tag: int, request_json: str) -> str:
-        """Queue an animation request behind pending mounts."""
-        return self._text(self._request(["animate", None, int(surface), int(tag), request_json]), _failure("animate"))
+    def motion(self, surface: int, request_json: str) -> str:
+        """Queue a motion request behind pending mounts (RFC 0009)."""
+        return self._text(self._request(["motion", None, int(surface), request_json]), _failure("motion"))
+
+    def shared_read(self, ident: int) -> str:
+        """The latest value the page's UI thread published for a shared value, as JSON."""
+        return self._text(self._request(["shared_read", None, int(ident)]), "null")
 
     def measure(self, surface: int, tag: int) -> str:
         """The shadow and window frames of a view, as JSON (``"null"`` when unknown)."""

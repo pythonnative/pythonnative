@@ -123,6 +123,7 @@ void Surface::reset_tree() {
     portals_.clear();
     detached_roots_.clear();
     requested_.clear();
+    animated_layout_.clear();
 }
 
 const ShadowNode* Surface::node(int64_t tag) const {
@@ -357,7 +358,40 @@ void Surface::restyle(ShadowNode& node, const std::vector<std::string>& touched)
         YGNodeStyleSetOverflow(node.yoga, YGOverflowHidden);
         if (find_member(node.props, "flex_shrink") == nullptr) YGNodeStyleSetFlexShrink(node.yoga, 1);
     }
+    // Layout props an animated style drives win over the committed ones.
+    if (auto overrides = animated_layout_.find(node.tag); overrides != animated_layout_.end()) {
+        for (const auto& [key, value] : overrides->second) apply_style(node.yoga, key, &value);
+    }
     refresh_measure(node);
+}
+
+void Surface::animate_layout(int64_t tag, const std::string& key, const Value& value) {
+    auto found = nodes_.find(tag);
+    if (found == nodes_.end() || !is_layout_style(key)) return;
+    ShadowNode& node = *found->second;
+    if (value.is_null()) {
+        auto overrides = animated_layout_.find(tag);
+        if (overrides == animated_layout_.end()) return;
+        remove_member(overrides->second, key);
+        if (overrides->second.empty()) animated_layout_.erase(overrides);
+        restyle(node, {key});
+        return;
+    }
+    set_member(animated_layout_[tag], key, value);
+    apply_style(node.yoga, key, &value);
+}
+
+Value Surface::window_json() const {
+    return Value::array({Value::number(viewport_.width), Value::number(viewport_.height)});
+}
+
+int64_t Surface::screen_of(const ShadowNode& node) const {
+    for (const ShadowNode* current = &node; current != nullptr;) {
+        if (current->component->name == "Screen") return current->tag;
+        if (current->parent == 0) break;
+        current = this->node(current->parent);
+    }
+    return 0;
 }
 
 ShadowNode& Surface::create_node(int64_t tag, const Component& component, const Object& props) {
@@ -464,6 +498,7 @@ void Surface::destroy_node(ShadowNode& node) {
     containers_.erase(node.tag);
     lists_.erase(node.tag);
     touched_.erase(node.tag);
+    animated_layout_.erase(node.tag);
     YGNodeFree(node.yoga);
     node.yoga = nullptr;
     nodes_.erase(node.tag);
@@ -770,7 +805,6 @@ void Surface::end_transaction(Transaction& transaction, ByteWriter& out, uint32_
 
 void Surface::write_frames(Transaction& transaction, ByteWriter& out, uint32_t& count,
                            const std::vector<int64_t>& changed) {
-    (void)transaction;
     std::unordered_set<int64_t> roots(viewport_.roots.begin(), viewport_.roots.end());
     std::unordered_set<int64_t> seen;
     std::vector<int64_t> pending(changed.begin(), changed.end());
@@ -789,8 +823,21 @@ void Surface::write_frames(Transaction& transaction, ByteWriter& out, uint32_t& 
         if (!node.mounted || !node.has_frame || roots.count(tag) != 0) continue;
         Frame frame = mounted_frame_of(node);
         if (node.has_mounted_frame && same_frame(frame, node.mounted_frame)) continue;
+        Frame previous = node.mounted_frame;
+        bool moved = node.has_mounted_frame && fresh_.count(tag) == 0;
         node.mounted_frame = frame;
         node.has_mounted_frame = true;
+        if (const Value* spec = find_member(node.props, "layout"); moved && spec != nullptr && spec->is_object()) {
+            auto encode = [](const Frame& f) {
+                return Value::array({Value::number(f[0]), Value::number(f[1]), Value::number(f[2]), Value::number(f[3])});
+            };
+            transaction.records.push_back(Value::object({{"kind", Value::string("layout")},
+                                                         {"tag", Value::integer(tag)},
+                                                         {"spec", *spec},
+                                                         {"from", encode(previous)},
+                                                         {"to", encode(frame)},
+                                                         {"window", window_json()}}));
+        }
         out.u8(kMountFrame);
         out.i64(tag);
         out.f64(frame[0]);
@@ -799,6 +846,42 @@ void Surface::write_frames(Transaction& transaction, ByteWriter& out, uint32_t& 
         out.f64(frame[3]);
         ++count;
     }
+}
+
+void Surface::plan_exits(std::vector<int64_t>& destroyed) {
+    if (departed_.empty()) return;
+    std::unordered_map<int64_t, const Departed*> by_tag;
+    for (const Departed& departed : departed_) by_tag[departed.tag] = &departed;
+    // Group each removed view under the outermost removed view above it.
+    std::unordered_map<int64_t, std::vector<int64_t>> groups;
+    std::vector<int64_t> tops;
+    for (const Departed& departed : departed_) {
+        const Departed* top = &departed;
+        while (true) {
+            auto above = by_tag.find(top->mounted_parent);
+            if (above == by_tag.end()) break;
+            top = above->second;
+        }
+        auto [entry, created] = groups.try_emplace(top->tag);
+        if (created) tops.push_back(top->tag);
+        entry->second.push_back(departed.tag);
+    }
+    std::unordered_set<int64_t> leaving;
+    for (int64_t tag : tops) {
+        const Departed& top = *by_tag.at(tag);
+        bool animated = top.exiting.is_object() && !top.skip;
+        if (!top.host_owned && !animated) continue;
+        Exit exit;
+        exit.tag = tag;
+        exit.host_owned = top.host_owned;
+        exit.spec = top.exiting;
+        exit.frame = top.frame;
+        exit.subtree = groups[tag];  // removal order: children before parents
+        for (int64_t member : exit.subtree) leaving.insert(member);
+        exits_.push_back(std::move(exit));
+    }
+    destroyed.erase(std::remove_if(destroyed.begin(), destroyed.end(), [&](int64_t tag) { return leaving.count(tag) != 0; }),
+                    destroyed.end());
 }
 
 void Surface::write_mount(Transaction& transaction, bool reset, const std::vector<int64_t>& created,
@@ -823,6 +906,28 @@ void Surface::write_mount(Transaction& transaction, bool reset, const std::vecto
         change.kind = MirrorChange::Kind::Delete;
         change.tag = tag;
         transaction.mirror.push_back(std::move(change));
+    }
+    for (const Exit& exit : exits_) {
+        out.u8(kMountExit);
+        out.i64(exit.tag);
+        out.u8(exit.host_owned ? 1 : 0);
+        ++count;
+        MirrorChange change;
+        change.kind = MirrorChange::Kind::Exit;
+        change.tag = exit.tag;
+        change.subtree = exit.subtree;
+        transaction.mirror.push_back(std::move(change));
+        Array subtree;
+        for (int64_t member : exit.subtree) subtree.push_back(Value::integer(member));
+        transaction.records.push_back(Value::object(
+            {{"kind", Value::string("exit")},
+             {"tag", Value::integer(exit.tag)},
+             {"owner", Value::integer(exit.host_owned ? 1 : 0)},
+             {"spec", exit.spec},
+             {"frame", Value::array({Value::number(exit.frame[0]), Value::number(exit.frame[1]),
+                                     Value::number(exit.frame[2]), Value::number(exit.frame[3])})},
+             {"window", window_json()},
+             {"subtree", Value::array(std::move(subtree))}}));
     }
     // Decide which surviving views are mounted, oldest first.
     std::vector<int64_t> appeared, vanished;
@@ -865,6 +970,7 @@ void Surface::write_mount(Transaction& transaction, bool reset, const std::vecto
         change.tag = tag;
         change.component = node.component->id;
         change.props = node.props;
+        if (find_member(node.props, "shared_tag") != nullptr) change.screen = screen_of(node);
         auto patch = list_patches_.find(tag);
         if (patch != list_patches_.end()) change.list = patch->second;
         transaction.mirror.push_back(std::move(change));
@@ -897,6 +1003,7 @@ void Surface::write_mount(Transaction& transaction, bool reset, const std::vecto
         change.tag = tag;
         change.props = std::move(normalized);
         for (const Value& name : removed) change.removed.push_back(name.as_string());
+        if (find_member(node.props, "shared_tag") != nullptr) change.screen = screen_of(node);
         auto patch = list_patches_.find(tag);
         if (patch != list_patches_.end()) change.list = patch->second;
         transaction.mirror.push_back(std::move(change));
@@ -968,8 +1075,47 @@ void Surface::write_mount(Transaction& transaction, bool reset, const std::vecto
     std::vector<int64_t> framed = frames;
     framed.insert(framed.end(), appeared.begin(), appeared.end());
     framed.insert(framed.end(), moved.begin(), moved.end());
+    fresh_ = fresh;
     write_frames(transaction, out, count, framed);
+    fresh_.clear();
+    write_records(transaction, appeared, created);
     end_transaction(transaction, out, count);
+}
+
+void Surface::write_records(Transaction& transaction, const std::vector<int64_t>& appeared,
+                            const std::vector<int64_t>& created) {
+    std::unordered_set<int64_t> born(created.begin(), created.end());
+    for (int64_t tag : appeared) {
+        if (born.count(tag) == 0) continue;
+        const ShadowNode& node = *nodes_.at(tag);
+        const Value* spec = find_member(node.props, "entering");
+        if (spec == nullptr || !spec->is_object()) continue;
+        bool skip = false;
+        for (const ShadowNode* current = &node; current != nullptr && !skip;) {
+            const ShadowNode* parent = current->parent != 0 ? this->node(current->parent) : nullptr;
+            // A list row mounted with its cell isn't entering; only later additions are.
+            if (current->detached_root && parent != nullptr && parent->component->name == "VirtualList" &&
+                born.count(current->tag) != 0) {
+                skip = true;
+            }
+            if (parent == nullptr) break;
+            if (born.count(parent->tag) != 0) {
+                const Value* outer = find_member(parent->props, "entering");
+                const Value* config = find_member(parent->props, "skip_entering");
+                if ((outer != nullptr && outer->is_object()) || (config != nullptr && config->as_bool())) skip = true;
+            }
+            current = parent;
+        }
+        if (skip) continue;
+        const Frame& frame = node.mounted_frame;
+        transaction.records.push_back(
+            Value::object({{"kind", Value::string("entering")},
+                           {"tag", Value::integer(tag)},
+                           {"spec", *spec},
+                           {"frame", Value::array({Value::number(frame[0]), Value::number(frame[1]),
+                                                   Value::number(frame[2]), Value::number(frame[3])})},
+                           {"window", window_json()}}));
+    }
 }
 
 std::string Surface::layout_json(const std::vector<std::array<double, 5>>& frames, double duration_ns,
@@ -1030,6 +1176,8 @@ std::string Surface::commit(const Value& envelope, Transaction& transaction) {
     }
     touched_.clear();
     layout_dirty_tags_.clear();
+    departed_.clear();
+    exits_.clear();
     const Contracts& contracts = core_.contracts();
     for (const Value& op : envelope.find("ops")->as_array()) {
         const Array& parts = op.as_array();
@@ -1054,7 +1202,26 @@ std::string Surface::commit(const Value& envelope, Transaction& transaction) {
         } else {
             ShadowNode& node = *nodes_.at(tag);
             if (node.parent != 0) structural.insert(node.parent);
-            if (node.mounted) destroyed.push_back(tag);
+            if (node.mounted) {
+                destroyed.push_back(tag);
+                Departed departed;
+                departed.tag = tag;
+                departed.mounted_parent = mounted_parent_of(node);
+                const ShadowNode* parent = node.parent != 0 ? this->node(node.parent) : nullptr;
+                departed.host_owned = (node.component->name == "Screen" && parent != nullptr &&
+                                       parent->component->name == "ScreenStack") ||
+                                      node.component->name == "Modal";
+                if (const Value* exiting = find_member(node.props, "exiting")) departed.exiting = *exiting;
+                departed.frame = node.mounted_frame;
+                for (const ShadowNode* up = parent; up != nullptr; up = up->parent != 0 ? this->node(up->parent) : nullptr) {
+                    const Value* config = find_member(up->props, "skip_exiting");
+                    if (config != nullptr && config->as_bool()) {
+                        departed.skip = true;
+                        break;
+                    }
+                }
+                departed_.push_back(std::move(departed));
+            }
             if (int64_t parent = mounted_parent_of(node); parent != 0) structural.insert(parent);
             created.erase(std::remove(created.begin(), created.end(), tag), created.end());
             updated.erase(std::remove(updated.begin(), updated.end(), tag), updated.end());
@@ -1062,6 +1229,7 @@ std::string Surface::commit(const Value& envelope, Transaction& transaction) {
         }
     }
     for (int64_t tag : destroyed) structural.erase(tag);
+    plan_exits(destroyed);
     revision_ = revision->as_int();
     if (const Value* request = envelope.find("layout")) {
         viewport_.roots.clear();
