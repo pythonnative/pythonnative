@@ -1041,10 +1041,9 @@ What landed with this RFC, and what's still to run:
   (`MotionRobolectricTest` and the mount decoder test; 96 pass) cover
   write decoding, `exit` handling, insert indices that skip exiting
   views, transform precedence, and portals mounted in the same commit as
-  their screen. `tests/browser/motion.mjs` covers the same cases for the
-  preview, but it needs the WebAssembly core rebuilt with Emscripten
-  4.0.10 (`python scripts/build-core-wasm.py`), which hasn't run on this
-  branch yet.
+  their screen. `tests/browser/motion.mjs` and the Motion cases in
+  `tests/browser/renderer.mjs` cover the preview against the WebAssembly
+  core, rebuilt with Emscripten 4.0.10.
 - **End to end:** a Motion category of 14 screens in the E2E suite, with
   Maestro flows for each: the three drivers, easing, interpolation,
   composition, frame callbacks, the collapsing header, a drag that keeps
