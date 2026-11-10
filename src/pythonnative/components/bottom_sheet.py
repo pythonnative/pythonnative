@@ -130,7 +130,9 @@ def BottomSheet(
     # A detent's offset is how far the sheet sits below its fully open position.
     offsets: Tuple[float, ...] = tuple(tallest - height for height in heights)
     closed = tallest + 48.0  # far enough down that the shadow is hidden too
-    stops = offsets + ((closed,) if close_on_drag_down else ())
+    # A release decides by where the sheet looks closed (its top at the
+    # bottom edge); a closing sheet then parks lower, out of sight.
+    stops = offsets + ((tallest,) if close_on_drag_down else ())
     lowest = offsets[0]
 
     def offset_for(position: int) -> float:
@@ -193,6 +195,8 @@ def BottomSheet(
     @worklet
     def release(event: Any) -> None:
         target = snap_point(translate.value, event.velocity_y, stops)
+        if target >= tallest:
+            target = closed
         translate.value = with_spring(
             target, velocity=event.velocity_y, damping=_SPRING_DAMPING, stiffness=_SPRING_STIFFNESS
         )

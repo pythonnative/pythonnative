@@ -522,3 +522,20 @@ def test_bottom_sheet_follows_a_window_that_changes_size(pn_clock: FakeClock) ->
         assert tree.presented_style(surface)["transform"] == [{"translate_y": 200.0}]
     finally:
         sheet_module.use_window_dimensions = original
+
+
+def test_a_short_slow_drag_below_the_lowest_detent_closes_the_sheet(pn_clock: FakeClock) -> None:
+    """Closing is decided at the sheet's visual bottom, not the lower spot it parks at."""
+    closed: List[bool] = []
+    tree = render(
+        pn.View(
+            pn.BottomSheet(pn.Text("x"), snap_points=(200, 400), index=0, on_close=lambda: closed.append(True)),
+            style={"height": 800},
+        )
+    )
+    handle = tree.get_by_role("adjustable")
+    # From 200pt below fully open, 120pt more puts the sheet past halfway to
+    # its bottom edge (400pt), so it closes.
+    tree.drag(handle, dy=120, duration=2.0)
+    settle_animations(tree, pn_clock)
+    assert closed == [True]
