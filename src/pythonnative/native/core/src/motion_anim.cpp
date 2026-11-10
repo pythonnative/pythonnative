@@ -334,7 +334,8 @@ public:
         velocity_ = velocity;
         reduce_ = reduce_motion;
         remaining_ = std::max(0.0, number_or(descriptor_.find("delay"), 0)) / 1000.0;
-        if (remaining_ <= 0 || reduce_) begin_child();
+        bool skip = reduced(descriptor_, reduce_motion);
+        if (remaining_ <= 0 || skip) begin_child();
     }
 
     bool step(double dt, std::vector<Completion>& completions) override {
@@ -435,7 +436,7 @@ public:
         const MValue* reverse = descriptor_.find("reverse");
         reverse_ = reverse != nullptr && reverse->truthy();
         iteration_ = 0;
-        if (reduce_) {
+        if (reduced(descriptor_, reduce_motion)) {
             // Reduced motion: a finite repeat lands where it would end; an endless one stays put.
             done_ = true;
             if (times_ > 0) {
@@ -461,7 +462,10 @@ public:
             }
             return true;
         }
-        while (active_) {
+        // Instant iterations (a zero duration) yield after a few, so an endless
+        // repeat can't spin the UI thread inside one frame.
+        for (int spins = 0; active_; ++spins) {
+            if (spins >= 16) return false;
             bool finished = active_->step(dt, completions);
             current_ = active_->value();
             velocity_ = active_->velocity();

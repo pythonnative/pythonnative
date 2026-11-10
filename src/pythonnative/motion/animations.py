@@ -376,6 +376,7 @@ class _Decay(Animation):
 class _Delay(Animation):
     delay_ms: float
     animation: Animation
+    reduce_motion: ReduceMotion = "system"
 
     def __pn_wire__(self) -> Dict[str, Any]:
         return {
@@ -383,6 +384,7 @@ class _Delay(Animation):
             "type": "delay",
             "delay": self.delay_ms,
             "animation": self.animation.__pn_wire__(),
+            "reduce_motion": self.reduce_motion,
         }
 
 
@@ -400,6 +402,7 @@ class _Repeat(Animation):
     times: Optional[int] = None
     reverse: bool = False
     on_finish: Optional[Callable[[bool], None]] = None
+    reduce_motion: ReduceMotion = "system"
 
     def __pn_wire__(self) -> Dict[str, Any]:
         return {
@@ -409,6 +412,7 @@ class _Repeat(Animation):
             "times": self.times,
             "reverse": self.reverse,
             "on_finish": _callback_wire(self.on_finish),
+            "reduce_motion": self.reduce_motion,
         }
 
 
@@ -487,9 +491,13 @@ def with_decay(
     return _Decay(velocity, deceleration, clamp, rubber_band_factor, reduce_motion, on_finish)
 
 
-def with_delay(delay_ms: float, animation: T) -> T:
-    """Start ``animation`` after ``delay_ms`` milliseconds."""
-    return _Delay(delay_ms, animation)  # type: ignore[arg-type,return-value]
+def with_delay(delay_ms: float, animation: T, *, reduce_motion: ReduceMotion = "system") -> T:
+    """Start ``animation`` after ``delay_ms`` milliseconds.
+
+    Under reduced motion the delay is skipped; ``reduce_motion="never"``
+    keeps it. The inner animation follows its own ``reduce_motion``.
+    """
+    return _Delay(delay_ms, animation, reduce_motion)  # type: ignore[arg-type,return-value]
 
 
 def with_sequence(*animations: Any) -> Any:
@@ -503,12 +511,15 @@ def with_repeat(
     times: Optional[int] = None,
     reverse: bool = False,
     on_finish: Optional[Callable[[bool], None]] = None,
+    reduce_motion: ReduceMotion = "system",
 ) -> T:
     """Repeat ``animation`` ``times`` times, or forever when ``times`` is ``None``.
 
     With ``reverse``, every other run heads back to where the first began.
+    Under reduced motion, a finite repeat jumps to where it would end and an
+    endless one stays put; ``reduce_motion="never"`` keeps it running.
     """
-    return _Repeat(animation, times, reverse, on_finish)  # type: ignore[arg-type,return-value]
+    return _Repeat(animation, times, reverse, on_finish, reduce_motion)  # type: ignore[arg-type,return-value]
 
 
 # ======================================================================

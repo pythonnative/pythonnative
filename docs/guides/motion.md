@@ -341,9 +341,9 @@ pn.with_repeat(pn.with_timing(360, duration=1000, easing=pn.Easing.linear), time
 | [`with_timing(to, *, duration=300, easing=None)`][pythonnative.with_timing] | Moves to `to` over `duration` milliseconds along `easing` (ease-in-out by default) |
 | [`with_spring(to, *, ...)`][pythonnative.with_spring] | Springs to `to`, starting at `velocity` units per second |
 | [`with_decay(*, velocity, deceleration=0.998, clamp=None, rubber_band_factor=0.6)`][pythonnative.with_decay] | Coasts from the current value at `velocity` until it stops; with `clamp=(lower, upper)`, it rubber-bands back from a bound it crosses, or stops at it when `rubber_band_factor` is 0 |
-| [`with_delay(delay_ms, animation)`][pythonnative.with_delay] | Starts `animation` after a delay |
+| [`with_delay(delay_ms, animation, *, reduce_motion="system")`][pythonnative.with_delay] | Starts `animation` after a delay |
 | [`with_sequence(*animations)`][pythonnative.with_sequence] | Runs animations one after another, each from where the last ended |
-| [`with_repeat(animation, *, times=None, reverse=False)`][pythonnative.with_repeat] | Repeats `times` times, or forever when `times` is `None`; with `reverse`, every other run heads back |
+| [`with_repeat(animation, *, times=None, reverse=False, reduce_motion="system")`][pythonnative.with_repeat] | Repeats `times` times, or forever when `times` is `None`; with `reverse`, every other run heads back |
 
 `with_timing` and `with_spring` animate numbers and colors; the other
 drivers animate numbers. Velocities are in units per second, so a
@@ -400,11 +400,17 @@ misspelled name raises `ValueError`.
 
 ### Reduce motion
 
-Every animation and layout animation takes `reduce_motion`: `"system"`
-(the default) follows the platform's accessibility setting, `"always"`
-always reduces, and `"never"` ignores the setting. A reduced animation
-jumps to its final value and still reports completion, so code that
-awaits it, or waits for its `on_finish`, keeps working. To branch on
+Every animation except `with_sequence`, and every layout animation,
+takes `reduce_motion`: `"system"` (the default) follows the platform's
+accessibility setting, `"always"` always reduces, and `"never"` ignores
+the setting. On Android, turning system animations off counts as reduce
+motion. A reduced animation jumps to its final value and still reports
+completion, so code that awaits it, or waits for its `on_finish`, keeps
+working. A reduced `with_delay` skips its delay, and a reduced
+`with_repeat` lands where its last run would end (an endless one stays
+put). A sequence and a delay leave their animations to their own
+settings, while a repeat that isn't reduced runs every iteration in
+full. To branch on
 the setting in a render, read
 [`use_reduce_motion`][pythonnative.use_reduce_motion].
 

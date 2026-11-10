@@ -657,6 +657,44 @@ def test_reduce_motion_jumps_to_the_end() -> None:
         surface.core.set_reduce_motion(False)
 
 
+def test_repeat_and_delay_can_opt_out_of_reduce_motion() -> None:
+    surface = Surface()
+    surface.core.set_reduce_motion(True)
+    try:
+        step = {"__animation__": True, "type": "timing", "to": 1, "duration": 100, "reduce_motion": "never"}
+        kept = {"__animation__": True, "type": "repeat", "animation": step, "times": 2, "reduce_motion": "never"}
+        reduced = {"__animation__": True, "type": "repeat", "animation": step, "times": 2}
+        delayed = {"__animation__": True, "type": "delay", "delay": 100, "animation": step, "reduce_motion": "never"}
+        _motion(
+            surface,
+            {"op": "shared", "id": 21, "value": 0},
+            {"op": "shared", "id": 22, "value": 0},
+            {"op": "shared", "id": 23, "value": 0},
+            {"op": "animate", "id": 21, "animation": kept, "token": 1},
+            {"op": "animate", "id": 22, "animation": reduced, "token": 2},
+            {"op": "animate", "id": 23, "animation": delayed, "token": 3},
+        )
+        _run_frames(surface, 0, 2)
+        # The system setting finishes a repeat that doesn't opt out at once.
+        assert _finished(surface) == {2: True}
+        # The opted-out repeat is still running, and the delay hasn't let its child start.
+        assert 0 < json.loads(surface.core.shared_read(21)) < 1
+        assert json.loads(surface.core.shared_read(23)) == 0
+        _run_frames(surface, 50, 30)
+        assert _finished(surface) == {1: True, 2: True, 3: True}
+    finally:
+        surface.core.set_reduce_motion(False)
+
+
+def test_an_endless_instant_repeat_yields_each_frame() -> None:
+    surface = Surface()
+    instant = {"__animation__": True, "type": "timing", "to": 1, "duration": 0}
+    endless = {"__animation__": True, "type": "repeat", "animation": instant, "times": None}
+    _motion(surface, {"op": "shared", "id": 24, "value": 0}, {"op": "animate", "id": 24, "animation": endless})
+    _run_frames(surface, 0, 3)  # returns instead of spinning inside one frame
+    _motion(surface, {"op": "cancel", "id": 24})
+
+
 def test_invalid_motion_requests_are_refused() -> None:
     surface = Surface()
     for request in (

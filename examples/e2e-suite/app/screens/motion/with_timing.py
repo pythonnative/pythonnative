@@ -7,6 +7,11 @@ resolves to ``True`` once the core's driver reaches the target, and the
 demo mirrors that into the status line. The interrupt button starts a
 slow fade and writes a plain value partway through, so the awaited
 animation reports ``False``.
+
+Every animation here passes ``reduce_motion="never"``. CI's Android
+emulator runs with system animations off, which PythonNative treats as
+reduce motion, and this demo needs its animations to still be running
+when Maestro checks them.
 """
 
 from __future__ import annotations
@@ -27,13 +32,13 @@ def WithTimingDemo() -> pn.Node:
 
     async def run() -> None:
         set_status("running")
-        done = await opacity.animate(pn.with_timing(1.0, duration=300))
+        done = await opacity.animate(pn.with_timing(1.0, duration=300, reduce_motion="never"))
         set_finished("yes" if done else "no")
         set_status("done" if done else "interrupted")
 
     async def interrupt() -> None:
         set_status("running")
-        slow = asyncio.ensure_future(opacity.animate(pn.with_timing(0.0, duration=2000)))
+        slow = asyncio.ensure_future(opacity.animate(pn.with_timing(0.0, duration=2000, reduce_motion="never")))
         await asyncio.sleep(0.2)
         opacity.value = 0.5
         done = await slow
@@ -41,7 +46,7 @@ def WithTimingDemo() -> pn.Node:
         set_status("done" if done else "interrupted")
 
     async def reset() -> None:
-        await opacity.animate(pn.with_timing(0.2, duration=150, easing=pn.Easing.linear))
+        await opacity.animate(pn.with_timing(0.2, duration=150, easing=pn.Easing.linear, reduce_motion="never"))
         set_finished("unknown")
         set_status("idle")
 

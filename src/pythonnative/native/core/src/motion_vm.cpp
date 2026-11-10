@@ -1160,10 +1160,11 @@ bool VM::intrinsic(int32_t id, Seq& positional, Map& keywords, MValue& result, W
         return true;
     }
     if (name == "with_delay") {
-        if (!bind("with_delay", {{"delay_ms", nullptr}, {"animation", nullptr}}, 2, 2, positional, keywords, args, error)) {
+        if (!bind("with_delay", {{"delay_ms", nullptr}, {"animation", nullptr}, {"reduce_motion", &system}}, 2, 2,
+                  positional, keywords, args, error)) {
             return false;
         }
-        result = animation("delay", {{"delay", args[0]}, {"animation", args[1]}});
+        result = animation("delay", {{"delay", args[0]}, {"animation", args[1]}, {"reduce_motion", args[2]}});
         return true;
     }
     if (name == "with_sequence") {
@@ -1173,12 +1174,14 @@ bool VM::intrinsic(int32_t id, Seq& positional, Map& keywords, MValue& result, W
     }
     if (name == "with_repeat") {
         static const MValue no = MValue::boolean(false);
-        if (!bind("with_repeat", {{"animation", nullptr}, {"times", &none}, {"reverse", &no}, {"on_finish", &none}}, 1, 1,
-                  positional, keywords, args, error)) {
+        if (!bind("with_repeat",
+                  {{"animation", nullptr}, {"times", &none}, {"reverse", &no}, {"on_finish", &none},
+                   {"reduce_motion", &system}},
+                  1, 1, positional, keywords, args, error)) {
             return false;
         }
         result = animation("repeat", {{"animation", args[0]}, {"times", args[1]}, {"reverse", args[2]},
-                                      {"on_finish", args[3]}});
+                                      {"on_finish", args[3]}, {"reduce_motion", args[4]}});
         return true;
     }
     if (name == "interpolate") {

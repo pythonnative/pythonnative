@@ -11,6 +11,11 @@ It covers [`pn.with_sequence`][pythonnative.with_sequence],
   [`run_on_python`][pythonnative.run_on_python].
 - The loop spins a box forever (``times=None``) until ``cancel()`` stops
   it where it is.
+
+Every animation here passes ``reduce_motion="never"``. CI's Android
+emulator runs with system animations off, which PythonNative treats as
+reduce motion, and this demo needs its animations to still be running
+when Maestro checks them.
 """
 
 from __future__ import annotations
@@ -48,20 +53,28 @@ def CompositionDemo() -> pn.Node:
         set_sequence("running")
         done = await pop.animate(
             pn.with_sequence(
-                pn.with_timing(1.3, duration=150),
-                pn.with_delay(100, pn.with_timing(1.0, duration=150)),
+                pn.with_timing(1.3, duration=150, reduce_motion="never"),
+                pn.with_delay(100, pn.with_timing(1.0, duration=150, reduce_motion="never"), reduce_motion="never"),
             )
         )
         set_sequence("done" if done else "interrupted")
 
     def run_repeat() -> None:
         set_repeat("running")
-        pulse.value = pn.with_repeat(pn.with_timing(0.2, duration=100), times=4, reverse=True, on_finish=repeat_done)
+        pulse.value = pn.with_repeat(
+            pn.with_timing(0.2, duration=100, reduce_motion="never"),
+            times=4,
+            reverse=True,
+            on_finish=repeat_done,
+            reduce_motion="never",
+        )
 
     def start_loop() -> None:
         set_loop("running")
         set_loop_moved("unknown")
-        spin.value = pn.with_repeat(pn.with_timing(360.0, duration=900, easing=pn.Easing.linear))
+        spin.value = pn.with_repeat(
+            pn.with_timing(360.0, duration=900, easing=pn.Easing.linear, reduce_motion="never"), reduce_motion="never"
+        )
 
     def stop_loop() -> None:
         spin.cancel()

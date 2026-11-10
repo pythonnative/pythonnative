@@ -8,6 +8,11 @@ the native view until the exit animation ends, so Maestro waits for the
 removed chip's label to disappear. The chips on screen when the demo
 opens sit inside a ``LayoutAnimationConfig(skip_entering=True)``, so they
 don't animate in with the screen.
+
+Every animation here passes ``reduce_motion="never"``. CI's Android
+emulator runs with system animations off, which PythonNative treats as
+reduce motion, and this demo needs its animations to still be running
+when Maestro checks them.
 """
 
 from __future__ import annotations
@@ -18,9 +23,9 @@ import pythonnative as pn
 from app.screens.scaffold import ButtonsRow, DemoScreen, DemoSection, Hint, ResultText
 from pythonnative.motion import FadeOut, LayoutAnimationConfig, LinearTransition, ZoomIn
 
-_ENTER = ZoomIn(duration=250)
-_EXIT = FadeOut(duration=200)
-_MOVE = LinearTransition(spring=pn.Spring(damping=18, stiffness=180))
+_ENTER = ZoomIn(duration=250, reduce_motion="never")
+_EXIT = FadeOut(duration=200, reduce_motion="never")
+_MOVE = LinearTransition(spring=pn.Spring(damping=18, stiffness=180), reduce_motion="never")
 
 
 @pn.component

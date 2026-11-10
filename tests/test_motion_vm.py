@@ -248,6 +248,25 @@ def test_animation_descriptors_built_in_a_worklet_match_python() -> None:
     assert reply["value"] == expected.__pn_wire__()
 
 
+def test_repeat_and_delay_descriptors_carry_reduce_motion() -> None:
+    import pythonnative as pn
+
+    fn = make(
+        "def f(x):\n"
+        "    step = pn.with_timing(x, duration=100, reduce_motion='never')\n"
+        "    return pn.with_repeat(pn.with_delay(20, step, reduce_motion='never'), times=3, reduce_motion='never')\n",
+        {"pn": pn},
+    )
+    expected: Any = pn.with_repeat(
+        pn.with_delay(20, pn.with_timing(5, duration=100, reduce_motion="never"), reduce_motion="never"),
+        times=3,
+        reduce_motion="never",
+    )
+    assert in_core(fn, 5)["value"] == expected.__pn_wire__()
+    default: Any = pn.with_repeat(pn.with_timing(1))
+    assert default.__pn_wire__()["reduce_motion"] == "system"
+
+
 _VALID_PROGRAM: Dict[str, Any] = {
     "name": "f",
     "file": "f.py",

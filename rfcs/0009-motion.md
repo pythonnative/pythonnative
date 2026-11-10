@@ -383,9 +383,10 @@ pn.with_spring(to, *, damping=10, stiffness=100, mass=1, velocity=0, overshoot_c
                reduce_motion="system", on_finish=None)
 pn.with_decay(*, velocity, deceleration=0.998, clamp=None, rubber_band_factor=0.6,
               reduce_motion="system", on_finish=None)
-pn.with_delay(delay_ms, animation)
+pn.with_delay(delay_ms, animation, *, reduce_motion="system")
 pn.with_sequence(*animations)
-pn.with_repeat(animation, *, times=None, reverse=False)  # None repeats forever
+pn.with_repeat(animation, *, times=None, reverse=False, reduce_motion="system",
+               on_finish=None)  # None repeats forever
 ```
 
 These are frozen dataclasses. They're built in Python and sent with a
@@ -398,7 +399,10 @@ rubber-bands past its bounds when `rubber_band_factor` is nonzero.
 
 `reduce_motion` is `"system"` (follow the accessibility setting), `"always"`,
 or `"never"`. A reduced animation jumps to its final value and still
-reports completion.
+reports completion. A reduced delay is skipped, and a reduced repeat lands
+where its last run would end. A sequence and a delay leave their
+animations to their own settings, while a repeat that isn't reduced runs
+every iteration in full.
 
 `pn.Easing` keeps its named curves, `Easing.bezier`, and sampled Python
 callables, and moves to `pythonnative.motion`.
