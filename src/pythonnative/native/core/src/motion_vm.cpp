@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cfenv>
 #include <cmath>
+#include <numbers>
 #include <cstdio>
 #include <cstring>
 #include <limits>
@@ -1072,8 +1073,8 @@ bool VM::intrinsic(int32_t id, Seq& positional, Map& keywords, MValue& result, W
             double total = 0;
             for (const MValue& item : positional) total += item.as_double() * item.as_double();
             result = MValue::number(std::sqrt(total));
-        } else if (fn == "degrees") result = MValue::number(x * 180.0 / M_PI);
-        else if (fn == "radians") result = MValue::number(x * M_PI / 180.0);
+        } else if (fn == "degrees") result = MValue::number(x * 180.0 / std::numbers::pi);
+        else if (fn == "radians") result = MValue::number(x * std::numbers::pi / 180.0);
         else if (fn == "copysign") result = MValue::number(std::copysign(x, y));
         else if (fn == "fmod") { if (y == 0) return domain(); result = MValue::number(std::fmod(x, y)); }
         else if (fn == "isfinite") result = MValue::boolean(std::isfinite(x));

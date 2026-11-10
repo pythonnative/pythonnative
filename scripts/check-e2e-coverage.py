@@ -149,6 +149,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "start_resource",  # non-hook Resource constructor; driven by the lazy demo and unit tests
     "sdk",  # module re-export; custom_component demo covers it
     "icons",  # module re-export; the Icon demo drives icon_names / is_icon_name
+    "motion",  # module re-export; the Motion category demos drive its presets and hooks
     "svg",  # module re-export; the Svg demo drives svg.load and the shape classes
     "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
     "Props",  # tested in custom_component demo and SDK unit tests

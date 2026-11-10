@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 namespace pn::motion {
 
@@ -210,8 +211,8 @@ private:
             // response and damping-fraction model.
             double response = duration->as_double() / 1000.0;
             double ratio = number_or(descriptor_.find("damping_ratio"), 1.0);
-            stiffness_ = std::pow(2 * M_PI / response, 2) * mass_;
-            damping_ = 4 * M_PI * ratio * mass_ / response;
+            stiffness_ = std::pow(2 * std::numbers::pi / response, 2) * mass_;
+            damping_ = 4 * std::numbers::pi * ratio * mass_ / response;
         } else {
             stiffness_ = number_or(descriptor_.find("stiffness"), 100);
             double ratio = number_or(descriptor_.find("damping_ratio"), -1);

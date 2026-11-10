@@ -411,6 +411,8 @@ commit([['u',21,{dismiss_on_backdrop:false},[]]]);
 reopened.sheet.click();
 assert(emitted(21, 'on_request_close').length === 1, 'dismiss_on_backdrop=False ignores backdrop taps');
 commit([['d',22], ['d',21]]);
+// A visible modal dismisses before the core removes it (RFC 0009); later cases reuse its tags.
+await until(() => !renderer.views.has(21) && !renderer.views.has(22));
 overlay.style.cssText = '';
 
 // VirtualList: on_scroll only when wired.
@@ -632,7 +634,8 @@ core.motion(1, JSON.stringify({op:'release', shared:[7001]})); mount.drain();
 assert(core.sharedRead(7001) === 'null', 'a released shared value stops publishing');
 const fade = (type) => ({type, duration:80, delay:0, easing:'linear', reduce_motion:'never'});
 const motionLayout = {roots:[740], width:200, height:200, selective:false};
-commit([['c',740,'View',{width:200, height:200}], ['c',741,'View',{height:20}], ['i',740,741,0]], motionLayout);
+// The siblings paint, so the core doesn't flatten them away.
+commit([['c',740,'View',{width:200, height:200}], ['c',741,'View',{height:20, background_color:'#ff0000'}], ['i',740,741,0]], motionLayout);
 const motionRoot = renderer.views.get(740); stage.append(motionRoot.el);
 commit([['c',742,'View',{height:20, entering:fade('fade_in'), exiting:fade('fade_out')}], ['i',740,742,1]], motionLayout);
 const entering = renderer.views.get(742);
@@ -641,7 +644,7 @@ await sleep(250); await frames(2);
 assert(entering.el.style.opacity === '' || Number(entering.el.style.opacity) === 1, `the entering animation ends at the view's own opacity: ${entering.el.style.opacity}`);
 commit([['d',742]]);
 assert(renderer.views.get(742) === entering && entering.exiting && entering.el.parentNode === motionRoot.el && entering.el.style.pointerEvents === 'none', 'a removed view with exiting stays in place without touches');
-commit([['c',743,'View',{height:20}], ['i',740,743,1]], motionLayout);
+commit([['c',743,'View',{height:20, background_color:'#0000ff'}], ['i',740,743,1]], motionLayout);
 assert(motionRoot.children.map(child => child.tag).join() === '741,742,743', `inserts skip the exiting view: ${motionRoot.children.map(child => child.tag)}`);
 await sleep(250); await frames(2);
 assert(!renderer.views.has(742) && !entering.el.isConnected, 'the core removes the view when its exit animation finishes');

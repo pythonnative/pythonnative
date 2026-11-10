@@ -58,12 +58,10 @@ def test_parameters_must_be_positional() -> None:
 
 
 def test_captures_fold_attribute_chains_but_not_value() -> None:
-    program = compile_source(
-        """
+    program = compile_source("""
         def f(event):
             return styles.colors.accent, SNAP[2], offset.value, pn.with_spring(0), event.y
-        """
-    )
+        """)
     described = {(capture.describe(), capture.mode) for capture in program.captures}
     assert ("styles.colors.accent", "value") in described
     assert ("SNAP[2]", "value") in described
@@ -120,9 +118,7 @@ def test_worklet_only_apis_need_a_marker() -> None:
 
 
 def test_find_worklets_covers_decorators_lambdas_and_keywords() -> None:
-    tree = ast.parse(
-        textwrap.dedent(
-            """
+    tree = ast.parse(textwrap.dedent("""
             @pn.worklet
             def a(): ...
             @worklet
@@ -131,9 +127,7 @@ def test_find_worklets_covers_decorators_lambdas_and_keywords() -> None:
             style = pn.use_animated_style(lambda: {})
             pn.with_timing(1, on_finish=lambda done: None)
             ignored = map(lambda v: v, [])
-            """
-        )
-    )
+            """))
     found = list(find_worklets(tree))
     assert sorted(getattr(node, "name", "<lambda>") for node in found) == ["<lambda>", "<lambda>", "a", "b"]
 
@@ -153,8 +147,7 @@ def test_release_tables_replace_source(tmp_path: Path, monkeypatch: pytest.Monke
     """A release build ships no source: the precompiled table is what compiles worklets."""
     package = tmp_path / "app"
     package.mkdir()
-    source = textwrap.dedent(
-        """
+    source = textwrap.dedent("""
         import pythonnative as pn
 
         @pn.worklet
@@ -162,8 +155,7 @@ def test_release_tables_replace_source(tmp_path: Path, monkeypatch: pytest.Monke
             return x * 2
 
         triple = pn.worklet(lambda x: x * 3)
-        """
-    )
+        """)
     (package / "motions.py").write_text(source)
     assert precompile_tree(package, "app") == []
     table = json.loads((package / "pn_worklets.json").read_text())

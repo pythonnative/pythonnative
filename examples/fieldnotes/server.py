@@ -248,7 +248,9 @@ class SyncServer:
     async def _websocket(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, headers: Mapping[str, str]
     ) -> None:
-        accept = base64.b64encode(hashlib.sha1(headers["sec-websocket-key"].encode() + _GUID).digest()).decode()  # noqa: S324
+        accept = base64.b64encode(
+            hashlib.sha1(headers["sec-websocket-key"].encode() + _GUID).digest()
+        ).decode()  # noqa: S324
         writer.write(
             (
                 "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
