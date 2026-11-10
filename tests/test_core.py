@@ -695,6 +695,25 @@ def test_an_endless_instant_repeat_yields_each_frame() -> None:
     _motion(surface, {"op": "cancel", "id": 24})
 
 
+def test_a_finished_animation_publishes_its_value_before_reporting() -> None:
+    """Python reads the value as soon as its await resolves, so it must already be published."""
+    surface = Surface()
+    seen: List[Any] = []
+
+    def record(kind: str, tag: int, name: str, payload: str) -> None:
+        body = json.loads(payload or "null")
+        if kind == "motion" and body.get("type") == "finished":
+            seen.append(json.loads(surface.core.shared_read(25)))
+
+    surface.transport.set_callback(record)
+    quick = {"__animation__": True, "type": "timing", "to": 2, "duration": 50}
+    _motion(
+        surface, {"op": "shared", "id": 25, "value": 0}, {"op": "animate", "id": 25, "animation": quick, "token": 9}
+    )
+    _run_frames(surface, 0, 10)
+    assert seen == [2]
+
+
 def test_invalid_motion_requests_are_refused() -> None:
     surface = Surface()
     for request in (

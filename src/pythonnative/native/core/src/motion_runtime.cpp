@@ -508,6 +508,9 @@ void Runtime::run_completions() {
         }
         std::vector<std::tuple<int64_t, bool, int64_t>> tokens;
         tokens.swap(finished_tokens_);
+        // Python reads a shared value as soon as its await resolves, so the
+        // final value has to be published before the message that resolves it.
+        if (!tokens.empty()) publish(true);
         for (const auto& [token, finished, surface] : tokens) {
             emit(surface, "{\"type\":\"finished\",\"token\":" + std::to_string(token) +
                               ",\"finished\":" + (finished ? "true" : "false") + "}");
@@ -529,10 +532,11 @@ void Runtime::report(const Failure& failure, int64_t binding) {
     emit(surface_, payload);
 }
 
-void Runtime::publish() {
+void Runtime::publish(bool wait) {
     if (unpublished_.empty()) return;
-    std::unique_lock<std::mutex> lock(published_mutex_, std::try_to_lock);
-    if (!lock.owns_lock()) return;  // a reader holds it; publish after the next frame or event
+    std::unique_lock<std::mutex> lock(published_mutex_, std::defer_lock);
+    if (wait) lock.lock();
+    else if (!lock.try_lock()) return;  // a reader holds it; publish after the next frame or event
     for (int64_t id : unpublished_) {
         auto found = shared_.find(id);
         if (found != shared_.end()) published_[id] = to_json(to_wire(found->second.value));

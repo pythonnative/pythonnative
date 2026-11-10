@@ -159,7 +159,9 @@ private:
     void track(Binding& binding, std::set<int64_t> deps);
     void report(const Failure& failure, int64_t binding);
     void run_completions();
-    void publish();
+    /// Publish changed shared values for Python. `wait` blocks for a reader
+    /// instead of leaving the values for the next frame.
+    void publish(bool wait = false);
 
     // Animated styles.
     void apply_style(Binding& binding, const MValue& style);
