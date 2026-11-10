@@ -201,7 +201,7 @@ def test_captures_and_linked_worklets() -> None:
     from pythonnative.motion import SharedValue
 
     level = SharedValue(4)
-    table = {"scale": 3, "points": (10, 20)}
+    table: Dict[str, Any] = {"scale": 3, "points": (10, 20)}
 
     @worklet
     def helper(x: float) -> float:

@@ -114,7 +114,7 @@ def test_worklet_only_apis_need_a_marker() -> None:
 
     with pytest.raises(TypeError, match="@pn.worklet function or an inline lambda"):
         require_worklet(plain, "use_animated_style")
-    assert require_worklet(lambda: None, "use_animated_style")
+    assert require_worklet(lambda: None, "use_animated_style") is not None
 
 
 def test_find_worklets_covers_decorators_lambdas_and_keywords() -> None:

@@ -51,7 +51,7 @@ def test_shared_values_read_write_and_await_from_python(pn_clock: FakeClock) -> 
     async def run() -> None:
         results.append(await offset.animate(pn.with_timing(1.0, duration=100)))
 
-    task = pn.runtime.get_loop().create_task(run())  # type: ignore[attr-defined]
+    task = pn.runtime.get_loop().create_task(run())
     settle_animations(tree, pn_clock)
     assert task.done() and results == [True]
     assert offset.value == 1.0
@@ -73,7 +73,7 @@ def test_interrupted_awaits_report_false(pn_clock: FakeClock) -> None:
     async def run() -> None:
         results.append(await value.animate(pn.with_timing(10.0, duration=1000)))
 
-    pn.runtime.get_loop().create_task(run())  # type: ignore[attr-defined]
+    pn.runtime.get_loop().create_task(run())
     pn_clock.advance(0.1)
     tree.settle()
     value.value = 3.0
@@ -380,6 +380,7 @@ def test_bottom_sheet_snaps_by_position_and_velocity(pn_clock: FakeClock) -> Non
     )
     handle = tree.get_by_role("adjustable")
     surface = handle.parent
+    assert surface is not None
     assert tree.presented_style(surface)["transform"] == [{"translate_y": 200.0}]
     tree.drag(handle, dy=-150, duration=0.3)
     settle_animations(tree, pn_clock)
@@ -406,6 +407,7 @@ def test_swipeable_opens_past_its_threshold_and_closes(pn_clock: FakeClock) -> N
         )
     )
     row = tree.get_by_text("row").parent
+    assert row is not None
     tree.drag(row, dx=-20, duration=0.5)  # slow and short: springs back
     settle_animations(tree, pn_clock)
     tree.drag(row, dx=-70, duration=0.2)
@@ -429,7 +431,9 @@ def test_drawer_opens_with_an_edge_swipe(pn_clock: FakeClock) -> None:
     assert edges
     tree.drag(edges[0], dx=150, duration=0.2)
     settle_animations(tree, pn_clock)
-    panel = tree.get_by_text("Settings").parent.parent
+    label = tree.get_by_text("Settings").parent
+    panel = label.parent if label is not None else None
+    assert panel is not None
     assert tree.presented_style(panel)["transform"] == [{"translate_x": 0.0}]
 
 
@@ -456,6 +460,7 @@ def test_run_on_python_calls_in_flight_survive_a_rerender(pn_clock: FakeClock) -
     # The UI thread sends the call, but Python re-renders before handling it.
     messages: List[Any] = []
     original = native.callback
+    assert original is not None
     native.callback = lambda *message: messages.append(message)
     tree.drag(row, dx=40)
     native.callback = original
@@ -504,10 +509,11 @@ def test_bottom_sheet_follows_a_window_that_changes_size(pn_clock: FakeClock) ->
     sizes = [WindowDimensions(width=390, height=600, scale=3, font_scale=1)]
     original = sheet_module.use_window_dimensions
 
-    sheet_module.use_window_dimensions = lambda: sizes[-1]  # type: ignore[assignment]
+    sheet_module.use_window_dimensions = lambda: sizes[-1]
     try:
         tree = render(App(600))
         surface = tree.get_by_role("adjustable").parent
+        assert surface is not None
         sizes.append(WindowDimensions(width=390, height=800, scale=3, font_scale=1))
         tree.rerender(App(800))
         settle_animations(tree, pn_clock)
@@ -515,4 +521,4 @@ def test_bottom_sheet_follows_a_window_that_changes_size(pn_clock: FakeClock) ->
         # 50% of 800 is the tallest detent now, so the 200pt detent sits 200pt down.
         assert tree.presented_style(surface)["transform"] == [{"translate_y": 200.0}]
     finally:
-        sheet_module.use_window_dimensions = original  # type: ignore[assignment]
+        sheet_module.use_window_dimensions = original

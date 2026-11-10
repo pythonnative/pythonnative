@@ -521,6 +521,38 @@ bool order(const MValue& a, const MValue& b, int& result, WorkletError& error, c
     return false;
 }
 
+// Checked 64-bit arithmetic: true when the result overflows. GCC and Clang
+// have builtins; MSVC gets the portable checks.
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(PN_PORTABLE_OVERFLOW)
+bool add_overflow(int64_t a, int64_t b, int64_t* out) { return __builtin_add_overflow(a, b, out); }
+bool sub_overflow(int64_t a, int64_t b, int64_t* out) { return __builtin_sub_overflow(a, b, out); }
+bool mul_overflow(int64_t a, int64_t b, int64_t* out) { return __builtin_mul_overflow(a, b, out); }
+#else
+constexpr int64_t kMin = std::numeric_limits<int64_t>::min();
+constexpr int64_t kMax = std::numeric_limits<int64_t>::max();
+bool add_overflow(int64_t a, int64_t b, int64_t* out) {
+    if ((b > 0 && a > kMax - b) || (b < 0 && a < kMin - b)) return true;
+    *out = a + b;
+    return false;
+}
+bool sub_overflow(int64_t a, int64_t b, int64_t* out) {
+    if ((b < 0 && a > kMax + b) || (b > 0 && a < kMin + b)) return true;
+    *out = a - b;
+    return false;
+}
+bool mul_overflow(int64_t a, int64_t b, int64_t* out) {
+    if (a == 0 || b == 0) {
+        *out = 0;
+        return false;
+    }
+    if ((a == -1 && b == kMin) || (b == -1 && a == kMin)) return true;
+    int64_t product = static_cast<int64_t>(static_cast<uint64_t>(a) * static_cast<uint64_t>(b));
+    if (product / b != a) return true;
+    *out = product;
+    return false;
+}
+#endif
+
 }  // namespace
 
 bool binary(BinaryOp op, const MValue& a, const MValue& b, MValue& out, WorkletError& error) {
@@ -531,15 +563,15 @@ bool binary(BinaryOp op, const MValue& a, const MValue& b, MValue& out, WorkletE
             int64_t x = a.as_int(), y = b.as_int(), r = 0;
             switch (op) {
                 case kAdd:
-                    if (!__builtin_add_overflow(x, y, &r)) { out = MValue::integer(r); return true; }
+                    if (!add_overflow(x, y, &r)) { out = MValue::integer(r); return true; }
                     out = number_result(static_cast<double>(x) + static_cast<double>(y));
                     return true;
                 case kSub:
-                    if (!__builtin_sub_overflow(x, y, &r)) { out = MValue::integer(r); return true; }
+                    if (!sub_overflow(x, y, &r)) { out = MValue::integer(r); return true; }
                     out = number_result(static_cast<double>(x) - static_cast<double>(y));
                     return true;
                 case kMul:
-                    if (!__builtin_mul_overflow(x, y, &r)) { out = MValue::integer(r); return true; }
+                    if (!mul_overflow(x, y, &r)) { out = MValue::integer(r); return true; }
                     out = number_result(static_cast<double>(x) * static_cast<double>(y));
                     return true;
                 case kTrueDiv:
@@ -575,9 +607,9 @@ bool binary(BinaryOp op, const MValue& a, const MValue& b, MValue& out, WorkletE
                     int64_t exponent = y;
                     bool overflow = false;
                     while (exponent > 0 && !overflow) {
-                        if (exponent & 1) overflow = __builtin_mul_overflow(result, base, &result);
+                        if (exponent & 1) overflow = mul_overflow(result, base, &result);
                         exponent >>= 1;
-                        if (exponent > 0 && !overflow) overflow = __builtin_mul_overflow(base, base, &base);
+                        if (exponent > 0 && !overflow) overflow = mul_overflow(base, base, &base);
                     }
                     if (overflow) out = number_result(std::pow(static_cast<double>(x), static_cast<double>(y)));
                     else out = MValue::integer(result);
