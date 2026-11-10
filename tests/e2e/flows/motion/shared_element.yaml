@@ -7,9 +7,13 @@
 #
 # Maestro can't see the flight itself; it asserts that the push and the
 # pop both land with their content, which a broken flight (a hidden
-# source, a hero left in the overlay) would not. On iOS the flow also
-# pops with the interactive back swipe, which drives the flight from
-# the percent-driven transition.
+# source, a hero left in the overlay) would not.
+#
+# The flow doesn't cover the interactive back swipe on iOS. XCTest's
+# synthesized touches don't count as screen-edge touches on the iOS 18
+# simulator, so neither UIKit's back swipe nor the shared-element edge
+# pan starts. On iOS 26 the full-screen content swipe pops instead,
+# which doesn't run the percent-driven transition either.
 appId: ${APP_ID}
 ---
 - runFlow:
@@ -29,23 +33,6 @@ appId: ${APP_ID}
     visible: "Showing: list"
     timeout: 5000
 - assertVisible: "Thumb"
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - tapOn: "Open detail"
-      - extendedWaitUntil:
-          visible: "Showing: detail"
-          timeout: 5000
-      # Start at the left edge for the navigation controller's back swipe.
-      - swipe:
-          start: "1%, 50%"
-          end: "90%, 50%"
-          duration: 600
-      - extendedWaitUntil:
-          visible: "Showing: list"
-          timeout: 5000
-      - assertVisible: "Thumb"
 - runFlow:
     file: ../../helpers/close_demo.yaml
     env:

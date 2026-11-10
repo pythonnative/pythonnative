@@ -1052,15 +1052,17 @@ What landed with this RFC, and what's still to run:
   Maestro flows for each: the three drivers, easing, interpolation,
   composition, frame callbacks, the collapsing header, a drag that keeps
   tracking while Python is deliberately busy, layout animations, list
-  item animations, a shared-element push and pop (plus the iOS back
-  swipe), a bottom sheet, and a swipeable row. The drawer keeps its
-  navigation flow. `tests/test_e2e_suite_renders.py` renders every screen
-  headlessly, and `scripts/check-e2e-coverage.py` tracks the new sources.
-  The flows haven't run under Maestro on this branch; the release build
-  was checked by hand on the iOS simulator (precompiled worklets load, the
-  swipeable row and card drag track while Python sleeps for 10 seconds,
-  the shared element flies on push and pop, chips animate in and out,
-  and the sheet opens).
+  item animations, a shared-element push and pop, a bottom sheet, and a
+  swipeable row. No flow covers the interactive shared-element pop on
+  iOS: XCTest's synthesized touches don't start screen-edge recognizers
+  on the iOS 18 simulator CI uses. The drawer keeps its navigation flow.
+  `tests/test_e2e_suite_renders.py` renders every screen headlessly, and
+  `scripts/check-e2e-coverage.py` tracks the new sources. The flows run
+  in CI on an Android emulator and an iOS simulator. The release build
+  was also checked by hand on the iOS simulator (precompiled worklets
+  load, the swipeable row and card drag track while Python sleeps for 10
+  seconds, the shared element flies on push and pop, chips animate in
+  and out, and the sheet opens).
 - **Performance:** `scripts/benchmark-runtime.py` adds
   `motion_frame_200_styles_us`, recorded in
   `rfcs/benchmarks/0009-motion.json` with a same-machine comparison
