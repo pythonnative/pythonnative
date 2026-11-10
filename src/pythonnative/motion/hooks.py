@@ -63,7 +63,7 @@ def use_shared_value(initial: T) -> SharedValue[T]:
     def mount() -> Callable[[], None]:
         return lambda: runtime.release_shared(shared)
 
-    use_effect(mount, [])
+    use_effect(mount, [])  # pn: ignore[PN103] releases on unmount; the ref and backend are stable
     return shared
 
 
@@ -99,7 +99,7 @@ def use_derived_value(worklet: Callable[[], T]) -> SharedValue[T]:
 
         return release
 
-    use_effect(mount, [])
+    use_effect(mount, [])  # pn: ignore[PN103] releases on unmount; the ref and backend are stable
     return shared
 
 
@@ -127,7 +127,7 @@ def use_animated_style(worklet: Callable[[], Style]) -> AnimatedStyle:
     def mount() -> Callable[[], None]:
         return lambda: runtime.release_binding(backend, style.binding)
 
-    use_effect(mount, [])
+    use_effect(mount, [])  # pn: ignore[PN103] releases on unmount; the ref and backend are stable
     return style
 
 
@@ -157,7 +157,7 @@ def use_animated_reaction(prepare: Callable[[], T], react: Callable[[T, Optional
     def mount() -> Callable[[], None]:
         return lambda: runtime.release_binding(backend, binding)
 
-    use_effect(mount, [])
+    use_effect(mount, [])  # pn: ignore[PN103] releases on unmount; the ref and backend are stable
 
 
 def use_frame_callback(worklet: Callable[[FrameInfo], None], *, active: bool = True) -> None:
@@ -182,4 +182,4 @@ def use_frame_callback(worklet: Callable[[FrameInfo], None], *, active: bool = T
     def mount() -> Callable[[], None]:
         return lambda: runtime.release_binding(backend, binding)
 
-    use_effect(mount, [])
+    use_effect(mount, [])  # pn: ignore[PN103] releases on unmount; the ref and backend are stable
