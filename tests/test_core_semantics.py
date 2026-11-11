@@ -785,6 +785,50 @@ def test_warn_once_dedupes_by_key(dev_mode: Any) -> None:
     assert diagnostics.get_warnings() == ["message one"]
 
 
+def test_warn_once_without_key_dedupes_by_message(dev_mode: Any, capsys: pytest.CaptureFixture[str]) -> None:
+    diagnostics.warn_once("same message")
+    diagnostics.warn_once("same message")
+    diagnostics.warn_once("other message")
+    assert diagnostics.get_warnings() == ["same message", "other message"]
+    assert capsys.readouterr().err.count("[PN] WARN: same message") == 1
+
+
+def test_warning_log_keeps_newest_200_oldest_first(dev_mode: Any) -> None:
+    for i in range(201):
+        diagnostics.warn(f"warning {i}")
+    assert diagnostics.get_warnings() == [f"warning {i}" for i in range(1, 201)]
+
+
+def test_get_warnings_returns_an_isolated_snapshot(dev_mode: Any) -> None:
+    diagnostics.warn("first")
+    snapshot = diagnostics.get_warnings()
+    snapshot.append("injected")
+    snapshot.clear()
+    assert diagnostics.get_warnings() == ["first"]
+    diagnostics.warn("second")
+    assert snapshot == []
+    assert diagnostics.get_warnings() == ["first", "second"]
+
+
+def test_clear_warnings_empties_log_and_resets_dedupe(dev_mode: Any) -> None:
+    diagnostics.warn_once("again", key="k")
+    diagnostics.warn_once("again", key="k")
+    assert diagnostics.get_warnings() == ["again"]
+    diagnostics.clear_warnings()
+    assert diagnostics.get_warnings() == []
+    diagnostics.warn_once("again", key="k")
+    assert diagnostics.get_warnings() == ["again"]
+
+
+def test_warn_once_in_production_does_not_consume_its_key(dev_mode: Any) -> None:
+    diagnostics.set_dev_mode(False)
+    diagnostics.warn_once("later", key="k")
+    assert diagnostics.get_warnings() == []
+    diagnostics.set_dev_mode(True)
+    diagnostics.warn_once("later", key="k")
+    assert diagnostics.get_warnings() == ["later"]
+
+
 def test_report_error_routes_to_last_reporter(dev_mode: Any) -> None:
     seen: List[Tuple[str, str]] = []
     owner_a = object()
