@@ -246,8 +246,9 @@ between components. Include every input that identifies that result in the key.
 Without an explicit key, the query belongs to its hook instance and refetches
 when its dependency list changes; unrelated closures never share results just
 because they were defined on the same source line. An optional `client` argument
-accepts a `pythonnative.query.QueryClient` with configurable capacity and stale
-time. The last subscriber leaving cancels pending work.
+accepts a [`QueryClient`][pythonnative.query.QueryClient] with configurable
+capacity and stale time (see the [query cache reference](../api/query.md)). The
+last subscriber leaving cancels pending work.
 
 ## Side-effecting actions: `use_mutation`
 
