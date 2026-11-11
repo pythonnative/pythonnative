@@ -1439,14 +1439,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3058,14 +3058,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4859,7 +4859,7 @@ scheme, and console state are remembered per browser.</p>
    the page and for dev clients.</li>
 <li>Installs a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WebTransport&lt;/span&gt;" href="../../api/devserver/#pythonnative.bridge.web.WebTransport"><code>WebTransport</code></a> as
    the bridge transport. It forwards the calls a device transport makes
-   into the renderer core (commits, layout reads, commands, and animation
+   into the renderer core (commits, layout reads, commands, and motion
    requests) over the WebSocket to the core in the page, and the core's
    messages come back as callbacks. Commits acknowledge exact revisions
    with the frames of observed views.</li>
@@ -4893,7 +4893,12 @@ screen remains a logical child of the application's shared tree;
 <code>navigate(...)</code> selects or adds a route, <code>go_back()</code> pops, and covered
 screens keep their state.
 Pushes and pops animate with the screen's <code>animation</code> and
-<code>presentation</code> options.</p>
+<code>presentation</code> options. A popped screen or a closing modal keeps its
+real content while it animates out: the core hands the page an <code>exit</code>
+for it, and the page releases the view when its transition ends.
+Views that share a <code>shared_tag</code> fly between the two screens of a push
+or pop in the page's overlay layer, timed with the screen transition
+(see <a href="../motion/#shared-element-transitions">Shared-element transitions</a>).</p>
 <p>Each stack draws a navigation bar from the top screen's options, the way
 the native stacks do: <code>title</code>, <code>header_shown</code>, <code>header_large_title</code>,
 <code>header_back_visible</code>, <code>header_back_title</code>, <code>header_tint_color</code>,
@@ -4947,15 +4952,20 @@ and logic rather than pixel-perfect platform chrome.</p>
 <li>Text wrapping and intrinsic sizing.</li>
 <li>Colors (hex, rgb(a), named, <code>{"light", "dark"}</code>), border radius,
   borders, opacity, shadows, and overflow clipping.</li>
-<li><code>Animated</code> timing, spring, and decay, run by the core's animator in
-  the page, the same code the mobile apps use; transforms, opacity, and
-  colors update on the page's animation frames.</li>
+<li><a href="../motion/">Motion</a>: worklets, shared values, animations, animated
+  styles, and layout animations run in the WebAssembly core in the page,
+  the same code the mobile apps use, and the page applies the core's
+  writes on its animation frames. <code>BottomSheet</code>, <code>Swipeable</code>, and the
+  drawer follow the mouse or trackpad.</li>
 <li>Gestures: the page forwards pointer events to the core's
   <a href="../gestures/">gesture engine</a>, the one Android uses. iOS uses UIKit's
   recognizers.</li>
 <li>Scrolling, <code>FlatList</code> / <code>SectionList</code> windowing, pull to refresh
   (drag the content down at the top, or scroll up past it with a
-  trackpad or mouse wheel), and scroll-driven <code>Animated.event</code> bindings.</li>
+  trackpad or mouse wheel), and scroll worklets (<code>on_scroll</code> marked
+  <code>@pn.worklet</code>). <code>FlatList</code> and <code>SectionList</code> item animations
+  (<code>item_entering</code>, <code>item_exiting</code>, and <code>item_layout</code>) run as FLIP
+  animations on the row elements.</li>
 <li>Navigation transitions: card pushes slide over a parallaxing screen,
   modals slide up, and <code>Modal</code> honors <code>animation_type</code>.</li>
 </ul>

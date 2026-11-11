@@ -1262,14 +1262,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3003,14 +3003,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animated/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4747,10 +4747,13 @@ WebAssembly and mounts DOM widgets.</p>
   its navigators.</li>
 <li><strong>State</strong> lives in hooks for a component and in a typed
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Store&lt;/span&gt;" href="../store/#pythonnative.store.Store"><code>Store</code></a> for the app.</li>
-<li><strong>Animations</strong> use the <code>Animated</code> namespace. Serialized graphs
-  connect values, arithmetic, interpolation, and style bindings.
-  Native timing, spring, decay, scroll, and gesture drivers update
-  supported bindings without Python work on every frame.</li>
+<li><strong>Motion</strong> (RFC 0009): <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;worklet&lt;/span&gt;" href="../motion/#pythonnative.motion.worklets.worklet"><code>worklet</code></a> functions run
+  on the UI thread inside the renderer core. They read and write
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SharedValue&lt;/span&gt;" href="../motion/#pythonnative.motion.shared.SharedValue"><code>SharedValue</code></a>s, which
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_style&lt;/span&gt;" href="../motion/#pythonnative.motion.hooks.use_animated_style"><code>use_animated_style</code></a> turns into
+  styles and <code>with_timing</code> / <code>with_spring</code> / <code>with_decay</code> animate.
+  Event props and gesture callbacks take worklets, and views take
+  <code>entering=</code>, <code>exiting=</code>, <code>layout=</code>, and <code>shared_tag=</code>.</li>
 <li><strong>Gestures</strong> attach to any view via the <code>gestures=</code> prop using
   descriptors from <code>pythonnative.gestures</code>
   (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Tap&lt;/span&gt;
@@ -4904,7 +4907,7 @@ WebAssembly and mounts DOM widgets.</p>
 <tr>
 <td>Shared props</td>
 <td><a href="../components/#shared-props">Components</a></td>
-<td><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AccessibilityProps&lt;/span&gt;" href="../components/#pythonnative.components.props.AccessibilityProps"><code>AccessibilityProps</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewProps&lt;/span&gt;" href="../components/#pythonnative.components.props.ViewProps"><code>ViewProps</code></a></td>
+<td><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AccessibilityProps&lt;/span&gt;" href="../components/#pythonnative.components.props.AccessibilityProps"><code>AccessibilityProps</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;CommonProps&lt;/span&gt;" href="../components/#pythonnative.components.props.CommonProps"><code>CommonProps</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;MotionProps&lt;/span&gt;" href="../components/#pythonnative.components.props.MotionProps"><code>MotionProps</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ViewProps&lt;/span&gt;" href="../components/#pythonnative.components.props.ViewProps"><code>ViewProps</code></a></td>
 </tr>
 <tr>
 <td>Typed event payloads</td>
@@ -5062,24 +5065,24 @@ WebAssembly and mounts DOM widgets.</p>
 <td><code>Asset</code>, <code>asset</code>, <code>icons</code>, <code>svg</code></td>
 </tr>
 <tr>
-<td>Animations</td>
-<td><a href="../animated/">Animated</a></td>
-<td><code>Animated</code>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="../animated/#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimationResult&lt;/span&gt;
+<td>Motion</td>
+<td><a href="../motion/">Motion</a></td>
+<td><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;worklet&lt;/span&gt;" href="../motion/#pythonnative.motion.worklets.worklet"><code>worklet</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SharedValue&lt;/span&gt;" href="../motion/#pythonnative.motion.shared.SharedValue"><code>SharedValue</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedStyle&lt;/span&gt;" href="../style/#pythonnative.style.AnimatedStyle"><code>AnimatedStyle</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FrameInfo&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../animated/#pythonnative.animated.AnimationResult"><code>AnimationResult</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Easing&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../animated/#pythonnative.animated.Easing"><code>Easing</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EasingSpec&lt;/span&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.hooks.FrameInfo"><code>FrameInfo</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_shared_value&lt;/span&gt;" href="../motion/#pythonnative.motion.hooks.use_shared_value"><code>use_shared_value</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_derived_value&lt;/span&gt;" href="../motion/#pythonnative.motion.hooks.use_derived_value"><code>use_derived_value</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_style&lt;/span&gt;" href="../motion/#pythonnative.motion.hooks.use_animated_style"><code>use_animated_style</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_reaction&lt;/span&gt;" href="../motion/#pythonnative.motion.hooks.use_animated_reaction"><code>use_animated_reaction</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_frame_callback&lt;/span&gt;" href="../motion/#pythonnative.motion.hooks.use_frame_callback"><code>use_frame_callback</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_timing&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.with_timing"><code>with_timing</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_spring&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.with_spring"><code>with_spring</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_decay&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.with_decay"><code>with_decay</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_delay&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.with_delay"><code>with_delay</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_sequence&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.with_sequence"><code>with_sequence</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_repeat&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.with_repeat"><code>with_repeat</code></a>, <a class="autorefs autorefs-internal" href="../motion/#pythonnative.Easing"><code>Easing</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Spring&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../animated/#pythonnative.animated.EasingSpec"><code>EasingSpec</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_value&lt;/span&gt;" href="../animated/#pythonnative.animated.use_animated_value"><code>use_animated_value</code></a></td>
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.animations.Spring"><code>Spring</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;interpolate&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.interpolate"><code>interpolate</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;interpolate_color&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.interpolate_color"><code>interpolate_color</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;clamp&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.clamp"><code>clamp</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;snap_point&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.snap_point"><code>snap_point</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;run_on_python&lt;/span&gt;" href="../motion/#pythonnative.motion.animations.run_on_python"><code>run_on_python</code></a></td>
+</tr>
+<tr>
+<td>Components built on Motion</td>
+<td><a href="../components/#components-built-on-motion">Components</a></td>
+<td><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;BottomSheet&lt;/span&gt;" href="../components/#pythonnative.components.bottom_sheet.BottomSheet"><code>BottomSheet</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BottomSheetHandle&lt;/span&gt;" href="../components/#pythonnative.components.bottom_sheet.BottomSheetHandle"><code>BottomSheetHandle</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Swipeable&lt;/span&gt;" href="../components/#pythonnative.components.swipeable.Swipeable"><code>Swipeable</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SwipeableHandle&lt;/span&gt;" href="../components/#pythonnative.components.swipeable.SwipeableHandle"><code>SwipeableHandle</code></a></td>
 </tr>
 <tr>
 <td>Gestures</td>
@@ -5325,14 +5328,59 @@ WebAssembly and mounts DOM widgets.</p>
   &lt;/span&gt;" href="../gestures/#pythonnative.gestures.GestureEvent"><code>GestureEvent</code></a></td>
 </tr>
 <tr>
-<td>Animation constants</td>
-<td><a href="../animated/">Animated</a></td>
-<td><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;ANIMATABLE_PROPS&lt;/span&gt;
+<td>Layout animations, shared elements, and worklet errors</td>
+<td><a href="../motion/">Motion</a></td>
+<td><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FadeIn&lt;/span&gt;
 
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../animated/#pythonnative.animated.ANIMATABLE_PROPS"><code>ANIMATABLE_PROPS</code></a></td>
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.FadeIn"><code>FadeIn</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FadeOut&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.FadeOut"><code>FadeOut</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SlideIn&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.SlideIn"><code>SlideIn</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SlideOut&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.SlideOut"><code>SlideOut</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ZoomIn&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.ZoomIn"><code>ZoomIn</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ZoomOut&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.ZoomOut"><code>ZoomOut</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;LinearTransition&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.LinearTransition"><code>LinearTransition</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FadingTransition&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.FadingTransition"><code>FadingTransition</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Keyframes&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.layout.Keyframes"><code>Keyframes</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;LayoutAnimationConfig&lt;/span&gt;" href="../motion/#pythonnative.motion.layout.LayoutAnimationConfig"><code>LayoutAnimationConfig</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SharedTransition&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../motion/#pythonnative.motion.transitions.SharedTransition"><code>SharedTransition</code></a>, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WorkletError&lt;/span&gt;" href="../motion/#pythonnative.motion.compiler.WorkletError"><code>WorkletError</code></a> (all in <code>pythonnative.motion</code>)</td>
 </tr>
 <tr>
 <td>Extension SDK</td>

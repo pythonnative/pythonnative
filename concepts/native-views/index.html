@@ -1411,14 +1411,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3030,14 +3030,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4809,7 +4809,7 @@ view. The hooks mirror the mount transaction:</p>
 </tr>
 <tr>
 <td><code>destroy(view)</code></td>
-<td>On delete. Unwires gestures and animations, then removes the view.</td>
+<td>On delete, or when an exit finishes. Unwires gestures and animations, then removes the view.</td>
 </tr>
 <tr>
 <td><code>setFrame(view, x, y, w, h)</code></td>
@@ -4827,8 +4827,14 @@ view. The hooks mirror the mount transaction:</p>
 </table>
 <p>The core interprets flex, margin, and padding props with Yoga. Managers
 apply visual props, apply the frames the core computed, and measure the
-controls that only the platform can size. Animated values arrive as prop
-writes from the core's animator on each display frame.</p>
+controls that only the platform can size. <a href="../../guides/motion/">Motion</a>
+reaches managers as writes from the core on each display frame and after
+each event: a paint property applied through the same path as a prop
+update (a <code>null</code> value restores the static one), a frame for a layout
+animation applied through <code>setFrame</code>, or the removal of a view whose
+exit animation finished. A view that's exiting stays mounted but gets
+no touches, and the mounting layer leaves it out when it resolves the
+indices of later insertions.</p>
 <p>Managers fire events by tag through <code>PNEvents.emit(view, "on_change",
 [value])</code> (Swift) or <code>PNEvents.fire(view, "on_change", value)</code>
 (Kotlin). The bridge routes them to
@@ -4846,14 +4852,15 @@ swaps the Python-side callback and the already-wired native listener
 picks it up on the next dispatch.</p>
 <h2 id="the-backend">The backend<a class="headerlink" href="#the-backend" title="Permanent link">&para;</a></h2>
 <p>The backend protocol is what the reconciler talks to: <code>apply_mutations</code>,
-<code>resolve_view</code>, <code>command</code>, <code>measure_in_window</code>, and the animation hooks
-(<code>install_animation_graph</code>, <code>set_animated_property</code>, <code>start_animation</code>,
-<code>cancel_animation</code>). The implementation is chosen lazily by
+<code>resolve_view</code>, <code>command</code>, and <code>measure_in_window</code>. Motion doesn't add
+methods to it: the motion runtime sends its requests (programs, shared
+values, and bindings) through the backend's transport, behind the
+commits that reference them. The implementation is chosen lazily by
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;get_backend&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.get_backend"><code>get_backend</code></a>:</p>
 <ul>
 <li>On iOS and Android, a
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;BridgeBackend&lt;/span&gt;" href="../../api/native_views/#pythonnative.native_views.bridge_backend.BridgeBackend"><code>BridgeBackend</code></a>
-  forwards every commit, layout read, command, and animation request to
+  forwards every commit, layout read, command, and motion request to
   the renderer core. Before its first commit it imports the
   <code>pythonnative.handlers</code> entry points so plugin component schemas are
   registered.</li>

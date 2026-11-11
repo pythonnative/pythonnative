@@ -1262,14 +1262,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -2884,14 +2884,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animated/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4716,7 +4716,7 @@ catches and how to suppress a finding.</p>
         <p>Static checks for the rules of hooks, behind <code>pn lint</code>.</p>
 <p>The linter parses Python source with the standard library's <code>ast</code> module,
 so it has no dependencies and never imports or runs the code it checks.
-It reports four rules:</p>
+It reports four rules for hooks:</p>
 <ul>
 <li><code>PN101</code>: a hook is called conditionally: inside an <code>if</code>, a loop, a
   <code>try</code>, a <code>match</code>, a comprehension, a lambda, a conditional
@@ -4728,6 +4728,18 @@ It reports four rules:</p>
   literal dependency list leaves out.</li>
 <li><code>PN104</code>: <code>key=</code> is passed to a module-level <code>@component</code>; use
   <code>.with_key(...)</code> on the returned element instead.</li>
+</ul>
+<p>And three rules for worklets (RFC 0009):</p>
+<ul>
+<li><code>PN201</code>: a worklet uses Python the UI thread can't run (the
+  compiler's message, at the construct's position).</li>
+<li><code>PN202</code>: an API that only accepts worklets (<code>use_animated_style</code>,
+  <code>use_derived_value</code>, <code>use_animated_reaction</code>, <code>use_frame_callback</code>)
+  receives a name that isn't a <code>@worklet</code> function. It would run in
+  development, where any source compiles, and fail in a release build,
+  which only precompiles marked worklets and inline lambdas.</li>
+<li><code>PN203</code>: a shared value's <code>.value</code> is read while rendering; the
+  render doesn't rerun when it changes.</li>
 </ul>
 <p>A syntax error is reported as <code>PN000</code>. A trailing <code># pn: ignore</code>
 comment silences every finding on its line, and
@@ -4868,7 +4880,10 @@ comment silences every finding on its line, and
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">"PN102"</span><span class="p">:</span> <span class="s2">"hook called outside a component or custom hook"</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">"PN103"</span><span class="p">:</span> <span class="s2">"dependency list is missing a name the callback reads"</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="s2">"PN104"</span><span class="p">:</span> <span class="s2">"key= passed to a user component"</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">}</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s2">"PN201"</span><span class="p">:</span> <span class="s2">"a worklet uses Python the UI thread can't run"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="s2">"PN202"</span><span class="p">:</span> <span class="s2">"a worklet-only API receives a function that isn't marked @worklet"</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="s2">"PN203"</span><span class="p">:</span> <span class="s2">"a shared value is read during render"</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">}</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">

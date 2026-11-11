@@ -1567,14 +1567,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3186,14 +3186,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -5053,7 +5053,8 @@ screens) and expresses it in ordinary, typed Python:</p>
 real <code>UIViewController</code> on iOS or a <code>Fragment</code> on Android, at every
 nesting level, so you get the platform's transitions, swipe-back, and
 state preservation for free. Tab bars are native too. The drawer is
-drawn in Python on every platform. Without a native host (headless
+drawn in Python on every platform and follows the finger with
+<a href="../motion/">Motion</a> worklets. Without a native host (headless
 tests) the stack draws a themed header itself.</p>
 <h2 id="a-complete-example">A complete example<a class="headerlink" href="#a-complete-example" title="Permanent link">&para;</a></h2>
 <p>Save a module at <code>app/main.py</code> that defines an <code>App</code> component:</p>
@@ -5215,7 +5216,10 @@ switches tabs too.</p>
 <h3 id="drawer">Drawer<a class="headerlink" href="#drawer" title="Permanent link">&para;</a></h3>
 <p>A drawer is like tabs with a slide-in menu instead of a tab bar. Like
 tabs, drawer screens other than <code>initial</code> must be callable without
-arguments.</p>
+arguments. The menu stays mounted and follows the finger: swipe from
+the left edge to pull it open, and drag it, or tap the dimmed screen,
+to close it. The drag and the spring run on the UI thread as
+<a href="../motion/#the-drawer">worklets</a>.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.navigation</span><span class="w"> </span><span class="kn">import</span> <span class="n">DrawerNavigation</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
@@ -5233,7 +5237,10 @@ arguments.</p>
 </span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">FeedScreen</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"My feed"</span><span class="p">),</span>
 </span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Screen</span><span class="p">(</span><span class="n">ProfileScreen</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"Profile"</span><span class="p">),</span>
 </span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">drawer_width</span><span class="o">=</span><span class="mi">280</span><span class="p">,</span>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="p">)</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="n">drawer_type</span><span class="o">=</span><span class="s2">"front"</span><span class="p">,</span>   <span class="c1"># or "slide", which pushes the screen aside with the menu</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">swipe_edge_width</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span>   <span class="c1"># how far from the left edge an opening swipe can start</span>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    <span class="n">swipe_enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="p">)</span>
 </span></code></pre></div>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DrawerNavigation&lt;/span&gt;" href="../../api/navigation/#pythonnative.navigation.handle.DrawerNavigation"><code>DrawerNavigation</code></a> adds
 <code>open_drawer()</code>, <code>close_drawer()</code>, <code>toggle_drawer()</code>,
@@ -5553,6 +5560,12 @@ pop the screen; Android's system back is always available). Predictive
 back on Android is enabled at the activity level: the system back
 preview appears once Python reports that the stack can't pop; screens
 themselves don't animate with the gesture.</p>
+<p>A popped screen keeps its content until its transition finishes, so it
+slides away intact. To carry an element across a push, give a view on
+each screen the same <code>shared_tag</code>; it flies from one place to the other
+while the screens move, and on iOS the back swipe drives it
+interactively. See
+<a href="../motion/#shared-element-transitions">Shared-element transitions</a>.</p>
 <h2 id="theming">Theming<a class="headerlink" href="#theming" title="Permanent link">&para;</a></h2>
 <p>Navigators draw their chrome from the app's
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Theme&lt;/span&gt;

@@ -1262,14 +1262,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -2881,14 +2881,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -5067,12 +5067,15 @@ identity for the function so it can keep state across re-renders.</p>
 <li><strong>State-driven</strong> (e.g., a fade triggered by a button press): keep
   the value in <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_state&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_state"><code>use_state</code></a> and let the
   reconciler push updates. Fine up to a few updates per second.</li>
-<li><strong>Frame-driven</strong> (e.g., a spring animation): bind an
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> into an
-  <code>Animated.View</code> style and drive it with <code>Animated.spring</code> or
-  <code>Animated.timing</code>. Native animation graphs update supported bindings
-  without running Python on every frame. See the
-  <a href="../../guides/animations/">Animations guide</a> for examples and fallback cases.</li>
+<li><strong>Frame-driven</strong> (e.g., a spring, or a view that follows a finger):
+  keep the value in a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_shared_value&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_shared_value"><code>use_shared_value</code></a>,
+  turn it into a style with
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_style&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_animated_style"><code>use_animated_style</code></a>, and animate it
+  with <code>pn.with_spring</code> or <code>pn.with_timing</code>. Scroll and gesture handlers
+  marked <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;worklet&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.worklets.worklet"><code>@pn.worklet</code></a> run on the UI thread, so
+  no Python runs on any frame. For views that appear, disappear, or
+  move, use the <code>entering=</code>, <code>exiting=</code>, and <code>layout=</code> props. See the
+  <a href="../../guides/motion/">Motion guide</a>.</li>
 </ul>
 <h2 id="is-there-asyncawait-support">Is there async/await support?<a class="headerlink" href="#is-there-asyncawait-support" title="Permanent link">&para;</a></h2>
 <p>Yes, and it's the core of the framework. PythonNative runs a single

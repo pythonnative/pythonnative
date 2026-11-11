@@ -1265,14 +1265,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3085,14 +3085,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -5205,31 +5205,33 @@ data + form + persistence + animations" shape:</p>
 </span><span id="__span-15-16"><a id="__codelineno-15-16" name="__codelineno-15-16" href="#__codelineno-15-16"></a>    <span class="n">state</span><span class="p">,</span> <span class="n">create</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_mutation</span><span class="p">(</span><span class="n">api</span><span class="o">.</span><span class="n">create_post</span><span class="p">)</span>
 </span><span id="__span-15-17"><a id="__codelineno-15-17" name="__codelineno-15-17" href="#__codelineno-15-17"></a>    <span class="n">version</span><span class="p">,</span> <span class="n">set_version</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </span><span id="__span-15-18"><a id="__codelineno-15-18" name="__codelineno-15-18" href="#__codelineno-15-18"></a>
-</span><span id="__span-15-19"><a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a>    <span class="n">opacity</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
-</span><span id="__span-15-20"><a id="__codelineno-15-20" name="__codelineno-15-20" href="#__codelineno-15-20"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">use_effect</span><span class="p">(</span>
-</span><span id="__span-15-21"><a id="__codelineno-15-21" name="__codelineno-15-21" href="#__codelineno-15-21"></a>        <span class="k">lambda</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">timing</span><span class="p">(</span><span class="n">opacity</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">300</span><span class="p">),</span>
-</span><span id="__span-15-22"><a id="__codelineno-15-22" name="__codelineno-15-22" href="#__codelineno-15-22"></a>        <span class="p">[],</span>
-</span><span id="__span-15-23"><a id="__codelineno-15-23" name="__codelineno-15-23" href="#__codelineno-15-23"></a>    <span class="p">)</span>
-</span><span id="__span-15-24"><a id="__codelineno-15-24" name="__codelineno-15-24" href="#__codelineno-15-24"></a>
-</span><span id="__span-15-25"><a id="__codelineno-15-25" name="__codelineno-15-25" href="#__codelineno-15-25"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">submit</span><span class="p">():</span>
-</span><span id="__span-15-26"><a id="__codelineno-15-26" name="__codelineno-15-26" href="#__codelineno-15-26"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">draft</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
-</span><span id="__span-15-27"><a id="__codelineno-15-27" name="__codelineno-15-27" href="#__codelineno-15-27"></a>            <span class="k">return</span>
-</span><span id="__span-15-28"><a id="__codelineno-15-28" name="__codelineno-15-28" href="#__codelineno-15-28"></a>        <span class="k">await</span> <span class="n">create</span><span class="p">({</span><span class="s2">"author_id"</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">:</span> <span class="n">draft</span><span class="p">})</span>
-</span><span id="__span-15-29"><a id="__codelineno-15-29" name="__codelineno-15-29" href="#__codelineno-15-29"></a>        <span class="n">set_draft</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
-</span><span id="__span-15-30"><a id="__codelineno-15-30" name="__codelineno-15-30" href="#__codelineno-15-30"></a>        <span class="n">set_version</span><span class="p">(</span><span class="n">version</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># refetch the list resource</span>
-</span><span id="__span-15-31"><a id="__codelineno-15-31" name="__codelineno-15-31" href="#__codelineno-15-31"></a>
-</span><span id="__span-15-32"><a id="__codelineno-15-32" name="__codelineno-15-32" href="#__codelineno-15-32"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-15-33"><a id="__codelineno-15-33" name="__codelineno-15-33" href="#__codelineno-15-33"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">draft</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">set_draft</span><span class="p">),</span>
-</span><span id="__span-15-34"><a id="__codelineno-15-34" name="__codelineno-15-34" href="#__codelineno-15-34"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span>
-</span><span id="__span-15-35"><a id="__codelineno-15-35" name="__codelineno-15-35" href="#__codelineno-15-35"></a>            <span class="s2">"Post"</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">state</span><span class="o">.</span><span class="n">loading</span> <span class="k">else</span> <span class="s2">"Posting…"</span><span class="p">,</span>
-</span><span id="__span-15-36"><a id="__codelineno-15-36" name="__codelineno-15-36" href="#__codelineno-15-36"></a>            <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">run_async</span><span class="p">(</span><span class="n">submit</span><span class="p">()),</span>
-</span><span id="__span-15-37"><a id="__codelineno-15-37" name="__codelineno-15-37" href="#__codelineno-15-37"></a>        <span class="p">),</span>
-</span><span id="__span-15-38"><a id="__codelineno-15-38" name="__codelineno-15-38" href="#__codelineno-15-38"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Suspense</span><span class="p">(</span>
-</span><span id="__span-15-39"><a id="__codelineno-15-39" name="__codelineno-15-39" href="#__codelineno-15-39"></a>            <span class="n">PostList</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="n">version</span><span class="p">),</span>
-</span><span id="__span-15-40"><a id="__codelineno-15-40" name="__codelineno-15-40" href="#__codelineno-15-40"></a>            <span class="n">fallback</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">ActivityIndicator</span><span class="p">(),</span>
-</span><span id="__span-15-41"><a id="__codelineno-15-41" name="__codelineno-15-41" href="#__codelineno-15-41"></a>        <span class="p">),</span>
-</span><span id="__span-15-42"><a id="__codelineno-15-42" name="__codelineno-15-42" href="#__codelineno-15-42"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"opacity"</span><span class="p">:</span> <span class="n">opacity</span><span class="p">,</span> <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"gap"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span>
-</span><span id="__span-15-43"><a id="__codelineno-15-43" name="__codelineno-15-43" href="#__codelineno-15-43"></a>    <span class="p">)</span>
+</span><span id="__span-15-19"><a id="__codelineno-15-19" name="__codelineno-15-19" href="#__codelineno-15-19"></a>    <span class="n">opacity</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_shared_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+</span><span id="__span-15-20"><a id="__codelineno-15-20" name="__codelineno-15-20" href="#__codelineno-15-20"></a>
+</span><span id="__span-15-21"><a id="__codelineno-15-21" name="__codelineno-15-21" href="#__codelineno-15-21"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fade_in</span><span class="p">():</span>
+</span><span id="__span-15-22"><a id="__codelineno-15-22" name="__codelineno-15-22" href="#__codelineno-15-22"></a>        <span class="k">await</span> <span class="n">opacity</span><span class="o">.</span><span class="n">animate</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">with_timing</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">300</span><span class="p">))</span>
+</span><span id="__span-15-23"><a id="__codelineno-15-23" name="__codelineno-15-23" href="#__codelineno-15-23"></a>
+</span><span id="__span-15-24"><a id="__codelineno-15-24" name="__codelineno-15-24" href="#__codelineno-15-24"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">use_effect</span><span class="p">(</span><span class="n">fade_in</span><span class="p">,</span> <span class="p">[])</span>
+</span><span id="__span-15-25"><a id="__codelineno-15-25" name="__codelineno-15-25" href="#__codelineno-15-25"></a>    <span class="n">faded</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_style</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="p">{</span><span class="s2">"opacity"</span><span class="p">:</span> <span class="n">opacity</span><span class="o">.</span><span class="n">value</span><span class="p">})</span>
+</span><span id="__span-15-26"><a id="__codelineno-15-26" name="__codelineno-15-26" href="#__codelineno-15-26"></a>
+</span><span id="__span-15-27"><a id="__codelineno-15-27" name="__codelineno-15-27" href="#__codelineno-15-27"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">submit</span><span class="p">():</span>
+</span><span id="__span-15-28"><a id="__codelineno-15-28" name="__codelineno-15-28" href="#__codelineno-15-28"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">draft</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+</span><span id="__span-15-29"><a id="__codelineno-15-29" name="__codelineno-15-29" href="#__codelineno-15-29"></a>            <span class="k">return</span>
+</span><span id="__span-15-30"><a id="__codelineno-15-30" name="__codelineno-15-30" href="#__codelineno-15-30"></a>        <span class="k">await</span> <span class="n">create</span><span class="p">({</span><span class="s2">"author_id"</span><span class="p">:</span> <span class="n">user_id</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">:</span> <span class="n">draft</span><span class="p">})</span>
+</span><span id="__span-15-31"><a id="__codelineno-15-31" name="__codelineno-15-31" href="#__codelineno-15-31"></a>        <span class="n">set_draft</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+</span><span id="__span-15-32"><a id="__codelineno-15-32" name="__codelineno-15-32" href="#__codelineno-15-32"></a>        <span class="n">set_version</span><span class="p">(</span><span class="n">version</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># refetch the list resource</span>
+</span><span id="__span-15-33"><a id="__codelineno-15-33" name="__codelineno-15-33" href="#__codelineno-15-33"></a>
+</span><span id="__span-15-34"><a id="__codelineno-15-34" name="__codelineno-15-34" href="#__codelineno-15-34"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-15-35"><a id="__codelineno-15-35" name="__codelineno-15-35" href="#__codelineno-15-35"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">draft</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">set_draft</span><span class="p">),</span>
+</span><span id="__span-15-36"><a id="__codelineno-15-36" name="__codelineno-15-36" href="#__codelineno-15-36"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span>
+</span><span id="__span-15-37"><a id="__codelineno-15-37" name="__codelineno-15-37" href="#__codelineno-15-37"></a>            <span class="s2">"Post"</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">state</span><span class="o">.</span><span class="n">loading</span> <span class="k">else</span> <span class="s2">"Posting…"</span><span class="p">,</span>
+</span><span id="__span-15-38"><a id="__codelineno-15-38" name="__codelineno-15-38" href="#__codelineno-15-38"></a>            <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">run_async</span><span class="p">(</span><span class="n">submit</span><span class="p">()),</span>
+</span><span id="__span-15-39"><a id="__codelineno-15-39" name="__codelineno-15-39" href="#__codelineno-15-39"></a>        <span class="p">),</span>
+</span><span id="__span-15-40"><a id="__codelineno-15-40" name="__codelineno-15-40" href="#__codelineno-15-40"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Suspense</span><span class="p">(</span>
+</span><span id="__span-15-41"><a id="__codelineno-15-41" name="__codelineno-15-41" href="#__codelineno-15-41"></a>            <span class="n">PostList</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="n">version</span><span class="p">),</span>
+</span><span id="__span-15-42"><a id="__codelineno-15-42" name="__codelineno-15-42" href="#__codelineno-15-42"></a>            <span class="n">fallback</span><span class="o">=</span><span class="n">pn</span><span class="o">.</span><span class="n">ActivityIndicator</span><span class="p">(),</span>
+</span><span id="__span-15-43"><a id="__codelineno-15-43" name="__codelineno-15-43" href="#__codelineno-15-43"></a>        <span class="p">),</span>
+</span><span id="__span-15-44"><a id="__codelineno-15-44" name="__codelineno-15-44" href="#__codelineno-15-44"></a>        <span class="n">style</span><span class="o">=</span><span class="p">[{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span> <span class="s2">"gap"</span><span class="p">:</span> <span class="mi">8</span><span class="p">},</span> <span class="n">faded</span><span class="p">],</span>
+</span><span id="__span-15-45"><a id="__codelineno-15-45" name="__codelineno-15-45" href="#__codelineno-15-45"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>Each piece (fetch, animation, persistence, mutation) is its own
 hook with its own lifecycle, and <code>asyncio</code> is the glue, running on the

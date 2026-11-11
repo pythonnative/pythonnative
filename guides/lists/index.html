@@ -1265,14 +1265,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -1462,6 +1462,17 @@
     <span class="md-ellipsis">
       
         Grids, headers, and empty states
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#animating-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Animating rows
       
     </span>
   </a>
@@ -3052,14 +3063,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4696,6 +4707,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#animating-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Animating rows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#inverted-lists" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4954,6 +4976,26 @@ it mounts.</p>
 <li><code>list_header=</code> / <code>list_footer=</code> render once before/after all rows.</li>
 <li><code>list_empty=</code> renders when <code>data</code> is empty.</li>
 </ul>
+<h2 id="animating-rows">Animating rows<a class="headerlink" href="#animating-rows" title="Permanent link">&para;</a></h2>
+<p>Rows belong to the native list, which recycles them, so a row's own
+<code>entering</code> and <code>exiting</code> props don't apply. List-level props animate
+rows when the data changes, never when you scroll:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.motion</span><span class="w"> </span><span class="kn">import</span> <span class="n">FadeIn</span><span class="p">,</span> <span class="n">FadeOut</span><span class="p">,</span> <span class="n">LinearTransition</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">pn</span><span class="o">.</span><span class="n">FlatList</span><span class="p">(</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">data</span><span class="o">=</span><span class="n">entries</span><span class="p">,</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">entry</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">EntryRow</span><span class="p">(</span><span class="n">entry</span><span class="p">),</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">key_extractor</span><span class="o">=</span><span class="k">lambda</span> <span class="n">entry</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">entry</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">item_entering</span><span class="o">=</span><span class="n">FadeIn</span><span class="p">(</span><span class="n">duration</span><span class="o">=</span><span class="mi">200</span><span class="p">),</span>   <span class="c1"># rows added to the data</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">item_exiting</span><span class="o">=</span><span class="n">FadeOut</span><span class="p">(</span><span class="n">duration</span><span class="o">=</span><span class="mi">150</span><span class="p">),</span>   <span class="c1"># rows removed from it</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">item_layout</span><span class="o">=</span><span class="n">LinearTransition</span><span class="p">(),</span>       <span class="c1"># rows that move</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><code>SectionList</code> takes the same three props. Each takes a preset from
+<code>pythonnative.motion</code>, run with the list's own machinery on each
+platform; see <a href="../motion/#list-items">List items</a> in the Motion guide.
+To slide a row aside to reveal actions, wrap it in a
+<a href="../motion/#swipeable"><code>Swipeable</code></a>.</p>
 <h2 id="inverted-lists">Inverted lists<a class="headerlink" href="#inverted-lists" title="Permanent link">&para;</a></h2>
 <p><code>inverted=True</code> renders the list bottom-up (or right-to-left when
 <code>horizontal</code>), so rows appended to <code>data</code> appear at the visible end,
@@ -4961,30 +5003,30 @@ the chat-transcript layout. It is implemented in Python on top of the
 same <code>VirtualList</code> contract: a mirror transform (<code>scale_y: -1</code>, or
 <code>scale_x: -1</code> for horizontal lists) is applied to the container and to
 each row, so no native change is involved.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">FlatList</span><span class="p">(</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">data</span><span class="o">=</span><span class="n">messages</span><span class="p">,</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">inverted</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">Bubble</span><span class="p">(</span><span class="n">message</span><span class="o">=</span><span class="n">m</span><span class="p">),</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">key_extractor</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">FlatList</span><span class="p">(</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">data</span><span class="o">=</span><span class="n">messages</span><span class="p">,</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">inverted</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">Bubble</span><span class="p">(</span><span class="n">message</span><span class="o">=</span><span class="n">m</span><span class="p">),</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">key_extractor</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">m</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="section-lists">Section lists<a class="headerlink" href="#section-lists" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;SectionList&lt;/span&gt;" href="../../api/components/#pythonnative.components.SectionList"><code>SectionList</code></a> flattens an iterable of
 <code>Section</code> records into a single virtualized
 list, dispatching to either <code>render_section_header</code> or <code>render_item</code>
 depending on the row's kind.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">sections</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Section</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">"a"</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"A"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="s2">"Apple"</span><span class="p">,</span> <span class="s2">"Avocado"</span><span class="p">]),</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Section</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">"b"</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"B"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="s2">"Banana"</span><span class="p">,</span> <span class="s2">"Blueberry"</span><span class="p">]),</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">]</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="n">pn</span><span class="o">.</span><span class="n">SectionList</span><span class="p">(</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">sections</span><span class="o">=</span><span class="n">sections</span><span class="p">,</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="n">item_height</span><span class="o">=</span><span class="mi">44</span><span class="p">,</span>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="n">section_header_height</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="n">render_section_header</span><span class="o">=</span><span class="k">lambda</span> <span class="n">s</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">title</span><span class="p">),</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">,</span> <span class="n">_i</span><span class="p">,</span> <span class="n">_s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">item</span><span class="p">),</span>
-</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">sections</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Section</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">"a"</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"A"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="s2">"Apple"</span><span class="p">,</span> <span class="s2">"Avocado"</span><span class="p">]),</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">pn</span><span class="o">.</span><span class="n">Section</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">"b"</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"B"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="p">[</span><span class="s2">"Banana"</span><span class="p">,</span> <span class="s2">"Blueberry"</span><span class="p">]),</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p">]</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">pn</span><span class="o">.</span><span class="n">SectionList</span><span class="p">(</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">sections</span><span class="o">=</span><span class="n">sections</span><span class="p">,</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">item_height</span><span class="o">=</span><span class="mi">44</span><span class="p">,</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="n">section_header_height</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="n">render_section_header</span><span class="o">=</span><span class="k">lambda</span> <span class="n">s</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">title</span><span class="p">),</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>    <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">,</span> <span class="n">_i</span><span class="p">,</span> <span class="n">_s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">item</span><span class="p">),</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Headers and items can have different extents, and variable-height
 rows work exactly as in <code>FlatList</code> (exact via <code>get_item_height</code>, or
@@ -4995,13 +5037,13 @@ top of the native list and lets the next header push it away. Native layout
 owns this movement, including while Python is busy. Python retains the active
 header in its bounded mounted window. No application <code>on_scroll</code> handler is
 needed.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">SectionList</span><span class="p">(</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">sections</span><span class="o">=</span><span class="n">sections</span><span class="p">,</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">sticky_section_headers</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="n">section_header_height</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">render_section_header</span><span class="o">=</span><span class="k">lambda</span> <span class="n">s</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">}),</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">,</span> <span class="n">_i</span><span class="p">,</span> <span class="n">_s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">item</span><span class="p">),</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">SectionList</span><span class="p">(</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="n">sections</span><span class="o">=</span><span class="n">sections</span><span class="p">,</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">sticky_section_headers</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">section_header_height</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">render_section_header</span><span class="o">=</span><span class="k">lambda</span> <span class="n">s</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#FFF"</span><span class="p">}),</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">render_item</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">,</span> <span class="n">_i</span><span class="p">,</span> <span class="n">_s</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">item</span><span class="p">),</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Give the header an opaque background so rows don't show through it.</p>
 <h2 id="performance-notes">Performance notes<a class="headerlink" href="#performance-notes" title="Permanent link">&para;</a></h2>

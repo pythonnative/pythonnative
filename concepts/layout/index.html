@@ -1428,14 +1428,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3047,14 +3047,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4845,7 +4845,9 @@ from props on any thread, or <code>"container"</code>. See
 mounted. Each contract field says whether it allows flattening. Layout
 style keys do, apart from <code>display</code> and border widths; everything else
 blocks it, including paint props (background, border, shadow, opacity,
-transform, <code>overflow</code>), event handlers, gestures, animated bindings, and
+transform, <code>overflow</code>), event handlers, gestures, Motion props
+(an animated style, worklet event handlers, <code>entering</code>, <code>exiting</code>,
+<code>layout</code>, and <code>shared_tag</code>), and
 accessibility and test props, which screen readers and Maestro use to
 address views. An <code>on_layout</code> callback or a ref doesn't block flattening,
 because the core answers layout events and <code>measure_in_window</code> from its

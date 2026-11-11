@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://pythonnative.com/guides/gestures/">
       
       
-        <link rel="prev" href="../animations/">
+        <link rel="prev" href="../motion/">
       
       
         <link rel="next" href="../lists/">
@@ -1265,14 +1265,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -1379,6 +1379,17 @@
     <span class="md-ellipsis">
       
         Fling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gesture-worklets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gesture worklets
       
     </span>
   </a>
@@ -3047,14 +3058,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4636,6 +4647,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#gesture-worklets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gesture worklets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#drag-with-spring-back" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4831,15 +4853,25 @@ channel as <code>on_press</code> et al.</p>
 <p>Recognition itself runs on the platform's UI thread, never in Python:</p>
 <ul>
 <li><strong>iOS</strong> attaches real <code>UIGestureRecognizer</code> instances, which
-  coordinate with scroll views, the back swipe, and system gestures.</li>
+  coordinate with scroll views, the back swipe, and system gestures. On
+  iOS 26, the back swipe that starts anywhere on a pushed screen waits
+  for a <code>Pan</code> that horizontal movement can begin, so a sideways drag
+  moves the content instead of popping the screen.</li>
 <li><strong>Android</strong>, <strong>the browser preview</strong>, and <strong>headless tests</strong> forward
   pointer events to the renderer core's gesture engine, the same C++
   recognizers, velocity tracking, activation and failure offsets, and
   composition rules on every one of them.</li>
 </ul>
-<p>A recognized gesture reaches Python as an ordinary event and updates any
-animated bindings (<code>Animated.event</code>) in the core first, so a drag keeps
-moving while Python is busy.</p>
+<p>A recognized gesture runs its callbacks in one of two places:</p>
+<ul>
+<li>A callback marked <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;worklet&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.worklets.worklet"><code>@pn.worklet</code></a> runs on the
+  UI thread, inside the renderer core, as soon as the platform reports
+  the gesture. It never waits for Python, so a drag keeps moving, and a
+  release decides where to settle, while Python is busy. See
+  <a href="#gesture-worklets">Gesture worklets</a>.</li>
+<li>Any other callback, including a <code>lambda</code>, reaches Python as an
+  ordinary event and runs on the application thread.</li>
+</ul>
 <p>Gestures listed side by side in the <code>gestures=</code> list recognize
 <em>simultaneously</em>. Use the composition combinators below when you need
 them to compete instead.</p>
@@ -4895,57 +4927,96 @@ directional gesture with a velocity threshold; <code>Fling</code> mirrors React
 Native Gesture Handler's fling semantics (including the multi-pointer
 requirement) and is what you want for "two-finger swipe down to
 close."</p>
+<h2 id="gesture-worklets">Gesture worklets<a class="headerlink" href="#gesture-worklets" title="Permanent link">&para;</a></h2>
+<p>Every callback slot takes a worklet: a function marked
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;worklet&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.worklets.worklet"><code>@pn.worklet</code></a>, written in the subset of Python
+the core can run (see <a href="../motion/#worklets">Worklets</a>). The worklet
+receives the same <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureEvent&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureEvent"><code>GestureEvent</code></a>
+fields a Python callback does, reads and writes
+<a href="../motion/#shared-values">shared values</a>, and can start animations.
+Gesture worklets run on every platform: on Android, in the browser
+preview, and in tests the core's gesture engine calls them, and on iOS
+UIKit's recognizers report through the core, which runs them before
+anything reaches Python.</p>
+<p>A recognizer can mix the two kinds. Keep the per-frame work in
+worklets and hand anything that needs Python, like saving a position
+or navigating, to a Python callback or to
+<a href="../motion/#calling-python-from-a-worklet"><code>run_on_python</code></a>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">on_change</span><span class="o">=</span><span class="n">drag</span><span class="p">,</span>                                       <span class="c1"># a worklet: every frame, on the UI thread</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">on_end</span><span class="o">=</span><span class="k">lambda</span> <span class="n">event</span><span class="p">:</span> <span class="n">save_offset</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">translation_x</span><span class="p">),</span>  <span class="c1"># Python, once</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">)</span>
+</span></code></pre></div>
 <h2 id="drag-with-spring-back">Drag with spring-back<a class="headerlink" href="#drag-with-spring-back" title="Permanent link">&para;</a></h2>
 <p>The classic pattern: pan moves the view, release springs it home.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="kn">import</span> <span class="n">gestures</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">Draggable</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">tx</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">ty</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">on_pan</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="n">tx</span><span class="o">.</span><span class="n">set_value</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">translation_x</span><span class="p">)</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="n">ty</span><span class="o">.</span><span class="n">set_value</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">translation_y</span><span class="p">)</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">on_end</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">spring</span><span class="p">(</span><span class="n">tx</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">spring</span><span class="p">(</span><span class="n">ty</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Drag me"</span><span class="p">),</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>        <span class="n">style</span><span class="o">=</span><span class="p">{</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>            <span class="s2">"transform"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"translate_x"</span><span class="p">:</span> <span class="n">tx</span><span class="p">},</span> <span class="p">{</span><span class="s2">"translate_y"</span><span class="p">:</span> <span class="n">ty</span><span class="p">}],</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>            <span class="s2">"padding"</span><span class="p">:</span> <span class="mi">24</span><span class="p">,</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>            <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#D1FAE5"</span><span class="p">,</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>            <span class="s2">"border_radius"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>        <span class="p">},</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>        <span class="n">gestures</span><span class="o">=</span><span class="p">[</span><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">on_change</span><span class="o">=</span><span class="n">on_pan</span><span class="p">,</span> <span class="n">on_end</span><span class="o">=</span><span class="n">on_end</span><span class="p">)],</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    <span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="kn">import</span> <span class="n">gestures</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">Draggable</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">x</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_shared_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">y</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_shared_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="nd">@pn</span><span class="o">.</span><span class="n">worklet</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">drag</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">gestures</span><span class="o">.</span><span class="n">GestureEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="n">x</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">translation_x</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        <span class="n">y</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">translation_y</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="nd">@pn</span><span class="o">.</span><span class="n">worklet</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">release</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">gestures</span><span class="o">.</span><span class="n">GestureEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>        <span class="n">x</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">with_spring</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">velocity</span><span class="o">=</span><span class="n">event</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">)</span>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>        <span class="n">y</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">with_spring</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">velocity</span><span class="o">=</span><span class="n">event</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">)</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    <span class="n">moved</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_style</span><span class="p">(</span>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>        <span class="k">lambda</span><span class="p">:</span> <span class="p">{</span><span class="s2">"transform"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"translate_x"</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">value</span><span class="p">},</span> <span class="p">{</span><span class="s2">"translate_y"</span><span class="p">:</span> <span class="n">y</span><span class="o">.</span><span class="n">value</span><span class="p">}]}</span>
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>    <span class="p">)</span>
+</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Drag me"</span><span class="p">),</span>
+</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>        <span class="n">style</span><span class="o">=</span><span class="p">[{</span><span class="s2">"padding"</span><span class="p">:</span> <span class="mi">24</span><span class="p">,</span> <span class="s2">"background_color"</span><span class="p">:</span> <span class="s2">"#D1FAE5"</span><span class="p">,</span> <span class="s2">"border_radius"</span><span class="p">:</span> <span class="mi">12</span><span class="p">},</span> <span class="n">moved</span><span class="p">],</span>
+</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>        <span class="n">gestures</span><span class="o">=</span><span class="p">[</span><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">on_change</span><span class="o">=</span><span class="n">drag</span><span class="p">,</span> <span class="n">on_end</span><span class="o">=</span><span class="n">release</span><span class="p">)],</span>
+</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p><code>Pan</code> activates once the pointer travels <code>min_distance</code> points (10 by
 default, unless another activation criterion is set), reports
 <code>on_change</code> with translation measured from the activation point, and
-<code>on_end</code> with release velocity, ready to feed into
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Animated&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/animated/#pythonnative.animated.Animated"><code>Animated.decay</code></a> for a fling.</p>
+<code>on_end</code> with release velocity in points per second, which carries
+straight into <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_spring&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.animations.with_spring"><code>with_spring</code></a> or
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_decay&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.animations.with_decay"><code>with_decay</code></a> for a fling.</p>
+<p>To continue a drag from where the last one left off, record the
+starting offset in <code>on_begin</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">start</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_shared_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">worklet</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">begin</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">gestures</span><span class="o">.</span><span class="n">GestureEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">start</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">value</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">worklet</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="k">def</span><span class="w"> </span><span class="nf">drag</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">gestures</span><span class="o">.</span><span class="n">GestureEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="n">x</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">start</span><span class="o">.</span><span class="n">value</span> <span class="o">+</span> <span class="n">event</span><span class="o">.</span><span class="n">translation_x</span>
+</span></code></pre></div>
+<p>For release decisions, such as snapping to the nearest of several
+points, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;snap_point&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.animations.snap_point"><code>snap_point</code></a> projects the release
+with its velocity. <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;BottomSheet&lt;/span&gt;" href="../../api/components/#pythonnative.components.bottom_sheet.BottomSheet"><code>BottomSheet</code></a> and
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Swipeable&lt;/span&gt;" href="../../api/components/#pythonnative.components.swipeable.Swipeable"><code>Swipeable</code></a> are built this way.</p>
 <h3 id="activation-offsets">Activation offsets<a class="headerlink" href="#activation-offsets" title="Permanent link">&para;</a></h3>
 <p>Inside a scrolling list a plain <code>Pan</code> fights the scroll view. <code>Pan</code>
 adds React Native Gesture Handler's activation criteria, applied the
 same way on iOS, Android, and in the browser preview:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># A horizontal swipe-to-dismiss row inside a vertical list.</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">active_offset_x</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>   <span class="c1"># activate once the finger moves 20 pt left or right</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">fail_offset_y</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">15</span><span class="p">,</span> <span class="mi">15</span><span class="p">),</span>     <span class="c1"># give up if it moves 15 pt up or down first</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">max_pointers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">on_change</span><span class="o">=</span><span class="n">drag</span><span class="p">,</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># A horizontal swipe-to-dismiss row inside a vertical list.</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">active_offset_x</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>   <span class="c1"># activate once the finger moves 20 pt left or right</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">fail_offset_y</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">15</span><span class="p">,</span> <span class="mi">15</span><span class="p">),</span>     <span class="c1"># give up if it moves 15 pt up or down first</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">max_pointers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">on_change</span><span class="o">=</span><span class="n">drag</span><span class="p">,</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Before activation, with <code>dx</code> and <code>dy</code> the travel from where the finger
 touched down: crossing <code>fail_offset_x</code> or <code>fail_offset_y</code> fails the
@@ -4997,11 +5068,11 @@ fail a pending pan and cancel an active one.</p>
 kinds; <code>Swipe(direction=None)</code> and <code>Fling(direction=None)</code> accept any
 direction.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Tap</span><span class="p">(</span><span class="n">n_taps</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>                      <span class="c1"># double-tap</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">gestures</span><span class="o">.</span><span class="n">LongPress</span><span class="p">(</span><span class="n">min_duration_ms</span><span class="o">=</span><span class="mi">350</span><span class="p">)</span>     <span class="c1"># quicker activation</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">min_distance</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">min_pointers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Swipe</span><span class="p">(</span><span class="n">direction</span><span class="o">=</span><span class="s2">"left"</span><span class="p">,</span> <span class="n">min_velocity</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">on_change</span><span class="o">=</span><span class="n">drag</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="n">can_drag</span><span class="p">)</span>   <span class="c1"># keep the slot, stop recognizing</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Tap</span><span class="p">(</span><span class="n">n_taps</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>                      <span class="c1"># double-tap</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">gestures</span><span class="o">.</span><span class="n">LongPress</span><span class="p">(</span><span class="n">min_duration_ms</span><span class="o">=</span><span class="mi">350</span><span class="p">)</span>     <span class="c1"># quicker activation</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">min_distance</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">min_pointers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Swipe</span><span class="p">(</span><span class="n">direction</span><span class="o">=</span><span class="s2">"left"</span><span class="p">,</span> <span class="n">min_velocity</span><span class="o">=</span><span class="mi">200</span><span class="p">)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">gestures</span><span class="o">.</span><span class="n">Pan</span><span class="p">(</span><span class="n">on_change</span><span class="o">=</span><span class="n">drag</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="n">can_drag</span><span class="p">)</span>   <span class="c1"># keep the slot, stop recognizing</span>
 </span></code></pre></div>
 <p>Every descriptor accepts <code>enabled=False</code>. A disabled gesture stays in
 the list, so sibling indices and composition nodes are unchanged, but
@@ -5012,17 +5083,17 @@ arbitration, so a later <code>Exclusive</code> member doesn't wait for it. Toggl
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;GestureState&lt;/span&gt;" href="../../api/gestures/#pythonnative.gestures.GestureState"><code>GestureState</code></a> enum member
 (<code>BEGAN</code>, <code>CHANGED</code>, <code>ENDED</code>, <code>CANCELLED</code>), which matters mostly when
 you share one handler across slots:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.gestures</span><span class="w"> </span><span class="kn">import</span> <span class="n">GestureState</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_pan</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">match</span> <span class="n">event</span><span class="o">.</span><span class="n">state</span><span class="p">:</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">BEGAN</span><span class="p">:</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>            <span class="n">grab</span><span class="p">()</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CHANGED</span><span class="p">:</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>            <span class="n">move</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">translation_x</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">translation_y</span><span class="p">)</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">ENDED</span> <span class="o">|</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">:</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>            <span class="n">release</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.gestures</span><span class="w"> </span><span class="kn">import</span> <span class="n">GestureState</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_pan</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">match</span> <span class="n">event</span><span class="o">.</span><span class="n">state</span><span class="p">:</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">BEGAN</span><span class="p">:</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>            <span class="n">grab</span><span class="p">()</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CHANGED</span><span class="p">:</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>            <span class="n">move</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">translation_x</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">translation_y</span><span class="p">)</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>        <span class="k">case</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">ENDED</span> <span class="o">|</span> <span class="n">GestureState</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">:</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>            <span class="n">release</span><span class="p">()</span>
 </span></code></pre></div>
 <p>It is a <code>str</code> enum, so <code>event.state == "ended"</code> also works.</p>
 <h2 id="gestures-vs-pressable">Gestures vs. <code>Pressable</code><a class="headerlink" href="#gestures-vs-pressable" title="Permanent link">&para;</a></h2>
@@ -5039,38 +5110,44 @@ feeds <code>(phase, pointer, x, y, window_x, window_y, time)</code> events to a
 mounted view's gestures, with phases from <code>pythonnative.bridge.core</code>
 (<code>POINTER_DOWN</code>, <code>POINTER_MOVE</code>, <code>POINTER_UP</code>, <code>POINTER_CANCEL</code>) and
 times in seconds:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="kn">import</span> <span class="n">gestures</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.bridge.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">POINTER_DOWN</span><span class="p">,</span> <span class="n">POINTER_UP</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_tap_counts</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>    <span class="n">taps</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>            <span class="n">test_id</span><span class="o">=</span><span class="s2">"card"</span><span class="p">,</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">100</span><span class="p">},</span>
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>            <span class="n">gestures</span><span class="o">=</span><span class="p">[</span><span class="n">gestures</span><span class="o">.</span><span class="n">Tap</span><span class="p">(</span><span class="n">on_tap</span><span class="o">=</span><span class="n">taps</span><span class="o">.</span><span class="n">append</span><span class="p">)],</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>        <span class="p">)</span>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="p">)</span>
-</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="n">card</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"card"</span><span class="p">)</span>
-</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>    <span class="n">result</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">native</span><span class="o">.</span><span class="n">pointer</span><span class="p">(</span>
-</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>        <span class="n">card</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span>
-</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>        <span class="p">[(</span><span class="n">POINTER_DOWN</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="n">POINTER_UP</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)],</span>
-</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>    <span class="p">)</span>
-</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>    <span class="n">result</span><span class="o">.</span><span class="n">settle</span><span class="p">()</span>
-</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">taps</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="kn">import</span> <span class="n">gestures</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.bridge.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">POINTER_DOWN</span><span class="p">,</span> <span class="n">POINTER_UP</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_tap_counts</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">taps</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">render</span><span class="p">(</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>            <span class="n">test_id</span><span class="o">=</span><span class="s2">"card"</span><span class="p">,</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>            <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="mi">100</span><span class="p">},</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>            <span class="n">gestures</span><span class="o">=</span><span class="p">[</span><span class="n">gestures</span><span class="o">.</span><span class="n">Tap</span><span class="p">(</span><span class="n">on_tap</span><span class="o">=</span><span class="n">taps</span><span class="o">.</span><span class="n">append</span><span class="p">)],</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>        <span class="p">)</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="p">)</span>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>    <span class="n">card</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">get_by_test_id</span><span class="p">(</span><span class="s2">"card"</span><span class="p">)</span>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>    <span class="n">result</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">native</span><span class="o">.</span><span class="n">pointer</span><span class="p">(</span>
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>        <span class="n">card</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span>
+</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>        <span class="p">[(</span><span class="n">POINTER_DOWN</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="n">POINTER_UP</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)],</span>
+</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>    <span class="p">)</span>
+</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>    <span class="n">result</span><span class="o">.</span><span class="n">settle</span><span class="p">()</span>
+</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">taps</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
 </span></code></pre></div>
 <p>Time-based recognizers (long press, multi-tap windows) advance with
 <code>FakeTransport.poll_gestures(tag, time)</code>; <code>gesture_deadline(tag)</code> says
-when they next need it. <code>tests/gesture_harness.py</code> and
+when they next need it.</p>
+<p>For drags, <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;drag&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.RenderResult.drag"><code>RenderResult.drag</code></a>
+builds the pointer stream for you, and <code>presented_style</code> shows where
+gesture worklets moved the view:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">tree</span><span class="o">.</span><span class="n">drag</span><span class="p">(</span><span class="n">card</span><span class="p">,</span> <span class="n">dx</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>  <span class="c1"># down at the center, ten moves, up</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">assert</span> <span class="n">tree</span><span class="o">.</span><span class="n">presented_style</span><span class="p">(</span><span class="n">card</span><span class="p">)[</span><span class="s2">"transform"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"translate_x"</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">40</span>
+</span></code></pre></div>
+<p>See <a href="../motion/#testing">Testing</a> in the Motion guide. <code>tests/gesture_harness.py</code> and
 <code>tests/test_gestures.py</code> in the repository have more patterns. iOS
 recognizers have their own tests in the native test suite.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Pair gestures with the <a href="../animations/">Animated API</a> for
-  physics-driven UI.</li>
+<li>Drive motion from gestures with worklets: <a href="../motion/">Motion</a>.</li>
 <li>API reference: <a href="../../api/gestures/">Gestures</a>.</li>
 </ul>
 

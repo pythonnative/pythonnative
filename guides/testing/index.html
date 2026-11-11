@@ -1265,14 +1265,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3136,14 +3136,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -5128,6 +5128,13 @@ raised by the predicate counts as "not yet", so both <code>get_by_*</code> and
 <li><code>settle()</code> pumps the framework loop until async work is done.</li>
 <li><code>unmount()</code> tears down and runs effect cleanups; <code>RenderResult</code> is
   also a context manager.</li>
+<li><code>drag(target, dx=0, dy=0, duration=0.25, steps=10)</code> drags a finger
+  across a view's gestures through the core's gesture engine, running
+  gesture worklets in the core and Python callbacks here.</li>
+<li><code>presented_style(target)</code> and <code>presented_frame(target)</code> return a
+  view's style and frame as the platform shows them, with
+  <a href="../motion/">Motion</a>'s animated styles and layout animations applied.
+  See <a href="../motion/#testing">Testing</a> in the Motion guide.</li>
 </ul>
 <h3 id="virtual-time">Virtual time<a class="headerlink" href="#virtual-time" title="Permanent link">&para;</a></h3>
 <p>Timers (<code>asyncio.sleep</code>, <code>call_later</code>, <code>asyncio.timeout</code>) on the
@@ -5148,7 +5155,9 @@ form for code outside pytest:</p>
 </span></code></pre></div>
 <p>The clock patches the loop's <code>time()</code> rather than <code>asyncio.sleep</code>, so
 the framework's own timers (transitions, animations, debounced hooks)
-advance together with the app's. <code>advance()</code> steps timer by timer, so
+advance together with the app's. The test core's display frames run on
+the same clock, so Motion's animations, layout animations, and exits
+finish during <code>advance()</code> too. <code>advance()</code> steps timer by timer, so
 a re-arming timer fires the right number of times.</p>
 <h2 id="testing-hooks-in-isolation">Testing hooks in isolation<a class="headerlink" href="#testing-hooks-in-isolation" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pythonnative.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">render_hook</span>
@@ -5336,7 +5345,7 @@ mounted tree, so tests can assert on what a device would receive.</p>
 <tbody>
 <tr>
 <td><code>native.views</code>, <code>find(type)</code>, <code>roots()</code></td>
-<td>Mounted <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeNativeView&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.fake.FakeNativeView"><code>FakeNativeView</code></a>s with merged props, mounted children, frames relative to the nearest mounted ancestor, and animated values</td>
+<td>Mounted <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeNativeView&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.fake.FakeNativeView"><code>FakeNativeView</code></a>s with merged props, mounted children, frames relative to the nearest mounted ancestor, the paint props motion wrote (<code>animated</code>), and whether the view is exiting</td>
 </tr>
 <tr>
 <td><code>native.transactions</code></td>
@@ -5352,8 +5361,13 @@ mounted tree, so tests can assert on what a device would receive.</p>
 <td><code>(tag, name, args)</code> view commands in the order the UI thread ran them</td>
 </tr>
 <tr>
-<td><code>native.writes</code> (also <code>backend.animated</code>)</td>
-<td><code>(tag, prop, value)</code> animated prop writes from the core's animator</td>
+<td><code>native.writes</code></td>
+<td>Every <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;MotionWrite&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.core.MotionWrite"><code>MotionWrite</code></a> the core produced (<code>prop</code>, <code>frame</code>, and <code>remove</code> records); <code>backend.animated</code> lists the <code>prop</code> writes as <code>(tag, prop, value)</code></td>
 </tr>
 <tr>
 <td><code>native.calls</code></td>
@@ -5379,8 +5393,8 @@ mounted tree, so tests can assert on what a device would receive.</p>
 <a href="../gestures/#testing">Gestures</a>), <code>report_container</code> and
 <code>report_intrinsic</code> report native sizes and relayout, and
 <code>emit_module_event</code>, <code>resolve_pending</code>, and <code>host_event</code> deliver module
-and host messages. Animations advance on the framework loop's clock, so a
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeClock&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeClock"><code>FakeClock</code></a> drives them. Every
+and host messages. Display frames advance on the framework loop's clock,
+so a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;FakeClock&lt;/span&gt;" href="../../api/testing/#pythonnative.testing.FakeClock"><code>FakeClock</code></a> drives animations. Every
 <code>FakeTransport</code> owns its own core surface, so several can live in one
 test. <code>tests/test_bridge.py</code> in the repository is the reference for this
 style.</p>

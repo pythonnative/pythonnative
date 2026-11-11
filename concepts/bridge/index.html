@@ -965,10 +965,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commands-animations-and-layout-reads" class="md-nav__link">
+  <a href="#commands-motion-and-layout-reads" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Commands, animations, and layout reads
+        Commands, motion, and layout reads
       
     </span>
   </a>
@@ -987,10 +987,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#modules-contracts-and-animations" class="md-nav__link">
+  <a href="#modules-contracts-and-motion" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Modules, contracts, and animations
+        Modules, contracts, and motion
       
     </span>
   </a>
@@ -1428,14 +1428,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3047,14 +3047,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4664,10 +4664,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#commands-animations-and-layout-reads" class="md-nav__link">
+  <a href="#commands-motion-and-layout-reads" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Commands, animations, and layout reads
+        Commands, motion, and layout reads
       
     </span>
   </a>
@@ -4686,10 +4686,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#modules-contracts-and-animations" class="md-nav__link">
+  <a href="#modules-contracts-and-motion" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Modules, contracts, and animations
+        Modules, contracts, and motion
       
     </span>
   </a>
@@ -4753,7 +4753,7 @@
 
 <h1 id="the-native-bridge">The native bridge<a class="headerlink" href="#the-native-bridge" title="Permanent link">&para;</a></h1>
 <p>Python reaches the native side through two channels. Commits, layout
-reads, view commands, and animation requests go to the <strong>renderer core</strong>,
+reads, view commands, and motion requests go to the <strong>renderer core</strong>,
 a C++20 library with a C ABI (<code>native/core/include/pn_core.h</code>) that every
 target links: the iOS app binary, Android's <code>libpncore.so</code>, the
 <code>pythonnative._core</code> extension that tests and tooling load on the
@@ -4763,12 +4763,13 @@ module calls go to the platform runtime: Swift in
 <code>src/pythonnative/native/android</code>. App templates stage and embed both.</p>
 <p>Python owns component state, reconciliation, and logical relationships.
 The core owns validation, the shadow tree, layout, view flattening, list
-datasets, animation graphs, and (on Android, in the browser, and in tests)
-gesture recognition. The platform's mounting layer owns widgets, text
-drawing, input, scrolling, navigation containers, accessibility, and the
-frame clock. Python binds the core with <code>ctypes</code>
-(<a href="../../api/bridge/#renderer-core"><code>pythonnative.bridge.core</code></a>); the
-protocol version is 7.</p>
+datasets, the motion runtime (worklets, shared values, animations, and
+layout animations; see <a href="../../guides/motion/">Motion</a>), and (on Android,
+in the browser, and in tests) gesture recognition. The platform's
+mounting layer owns widgets, text drawing, input, scrolling, navigation
+containers, accessibility, and the frame clock. Python binds the core
+with <code>ctypes</code> (<a href="../../api/bridge/#renderer-core"><code>pythonnative.bridge.core</code></a>);
+the protocol version is 8.</p>
 <h2 id="threads-and-the-deadlock-rule">Threads and the deadlock rule<a class="headerlink" href="#threads-and-the-deadlock-rule" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -4781,7 +4782,7 @@ protocol version is 7.</p>
 <tbody>
 <tr>
 <td>Python application loop</td>
-<td><code>pn_core_measure</code>, <code>pn_core_command</code>, <code>pn_core_animate</code> (short, under the core lock)</td>
+<td><code>pn_core_measure</code>, <code>pn_core_command</code>, <code>pn_core_motion</code> (short, under the core lock), <code>pn_core_shared_read</code> (a published snapshot)</td>
 <td>the core lock</td>
 </tr>
 <tr>
@@ -4796,7 +4797,7 @@ protocol version is 7.</p>
 </tr>
 <tr>
 <td>Platform UI thread</td>
-<td><code>pn_core_mount_next</code>, <code>pn_core_mount_finished</code>, <code>pn_core_animation_frame</code>, <code>pn_core_take_writes</code>, <code>pn_core_event</code>, <code>pn_core_pointer</code>, <code>pn_core_report_*</code>, list reads</td>
+<td><code>pn_core_mount_next</code>, <code>pn_core_mount_finished</code>, <code>pn_core_animation_frame</code>, <code>pn_core_take_writes</code>, <code>pn_core_event</code>, <code>pn_core_pointer</code>, <code>pn_core_exit_finished</code>, <code>pn_core_shared_elements</code>, <code>pn_core_report_*</code>, list reads</td>
 <td>nothing</td>
 </tr>
 </tbody>
@@ -4804,7 +4805,8 @@ protocol version is 7.</p>
 <p>The rule that keeps this deadlock-free: <strong>the UI thread never waits on
 another thread and never takes the core's commit lock.</strong> It takes mount
 transactions from a queue, owns the mount-side state (list data sources,
-animated values, gesture recognizers), and posts everything else
+the motion runtime's shared values and bindings, gesture recognizers),
+and runs worklets there. It posts everything else
 (container sizes, loaded image sizes, re-measure requests) to the core
 without blocking. The core asks the platform to run that deferred work
 through its <code>schedule_work</code> callback, on any thread but the UI thread.
@@ -4825,11 +4827,11 @@ Any other thread may therefore wait on the UI thread.</p>
    One transaction mounts at a time.</li>
 </ol>
 <p>Effects therefore run after the core accepts and lays out a commit, not
-after widgets exist. Commands and animation requests those effects issue
+after widgets exist. Commands and motion requests those effects issue
 queue behind the commit's mount, so they always reach the widgets it
 creates.</p>
 <p>Native never waits for Python, and Python never answers a callback:
-every message (<code>event</code>, <code>host</code>, <code>module</code>, <code>animation</code>, <code>layout</code>, and
+every message (<code>event</code>, <code>host</code>, <code>module</code>, <code>motion</code>, <code>layout</code>, and
 <code>command</code>) is queued and delivered in order to the application loop.
 Navigation back requests and recycled-row requests are asynchronous.
 Messages sent before Python has started, such as a screen's <code>create</code>
@@ -4839,12 +4841,13 @@ publishes it (<code>Host.set_state</code>) and hand it back in the next <code>cr
 payload as <code>restored_state</code>. Viewport metrics (size, insets, keyboard
 height, color scheme, scale, and font scale) travel on the <code>layout</code> and
 <code>resume</code> host events. Adjacent continuous scroll and gesture samples can
-be coalesced; discrete input preserves order. Animated event bindings
-evaluate in the core before the event is queued to Python.</p>
+be coalesced; discrete input preserves order. An event or gesture whose
+handler is a worklet runs in the core and isn't queued to Python at
+all.</p>
 <h2 id="commits">Commits<a class="headerlink" href="#commits" title="Permanent link">&para;</a></h2>
 <p>A surface commit has this shape:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span><span class="p">,</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"application"</span><span class="p">:</span><span class="w"> </span><span class="s2">"3f2a9c41-6c1e-4b8a-9d55-0d1f7e2b8c10"</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">"surface"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">"revision"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
@@ -5017,6 +5020,10 @@ emitted only when subscribed.</p>
 <td><code>7</code> command</td>
 <td><code>i64</code> tag, <code>str</code> name, <code>value</code> arguments, <code>i64</code> call id</td>
 </tr>
+<tr>
+<td><code>8</code> exit</td>
+<td><code>i64</code> tag, <code>u8</code> owner: <code>0</code> when the core animates the view out (an <code>exiting</code> animation) and later sends a <code>remove</code> write, or <code>1</code> when the platform does (a leaving stack screen or a closing modal) and calls <code>pn_core_exit_finished</code></td>
+</tr>
 </tbody>
 </table>
 <p>A <code>str</code> is a <code>u32</code> byte length followed by UTF-8. A <code>value</code> is a <code>u8</code>
@@ -5032,8 +5039,14 @@ to that ancestor. A commit that replaces the application identity starts
 with a reset. Relayouts that native changes cause (a container resizes,
 an image loads) produce frame-only transactions, and Python receives
 the observed frames as a <code>layout</code> message.</p>
-<p>Animation requests don't occupy ops: the core attaches them to a
-transaction and runs them when the platform reports that transaction
+<p>An <code>exit</code> replaces the <code>delete</code> of the outermost removed view that has
+an exit animation, and the deletes of its descendants are dropped. The
+platform keeps the view and its subtree where they are but stops
+routing touches to them, and it skips exiting siblings when it resolves
+the index of a later <code>insert</code>. Tags come from a counter that never
+reuses one, so a view that's still exiting can't collide with a new one.</p>
+<p>Motion requests don't occupy ops: the core attaches them to a
+transaction and applies them when the platform reports that transaction
 mounted.
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;decode_transaction&lt;/span&gt;" href="../../api/bridge/#pythonnative.bridge.core.decode_transaction"><code>pythonnative.bridge.core.decode_transaction</code></a>
 is the reference decoder, and the Swift, Kotlin, and JavaScript mounting
@@ -5041,21 +5054,25 @@ layers each implement the same format.</p>
 <h2 id="events-and-controlled-input">Events and controlled input<a class="headerlink" href="#events-and-controlled-input" title="Permanent link">&para;</a></h2>
 <p>The platform passes each view event through <code>pn_core_event(surface, tag,
 name, arguments, edit_revision)</code>. The core stamps the mounted
-application, surface, revision, and a sequence number, feeds any
-animated event bindings, and queues an <code>event</code> message whose payload is
+application, surface, revision, and a sequence number, and queues an <code>event</code> message whose payload is
 <code>{"application", "surface", "revision", "sequence", "args",
-"edit_revision"}</code>. The backend rejects callbacks from earlier
+"edit_revision"}</code>. When the view's <code>_pn_motion</code> prop binds the event to a
+worklet, the core runs the worklet instead and queues nothing. The
+backend rejects callbacks from earlier
 applications, destroyed tags, future revisions, and replayed sequences.
 Event payloads for <code>on_layout</code>, <code>on_scroll</code>, <code>on_selection_change</code>,
 <code>on_key_press</code>, and <code>on_content_size_change</code> are reconstructed into the
 frozen dataclasses in <code>pythonnative.components.events</code> before the
 callback runs. Gesture callbacks arrive as <code>gesture:N</code> events, where <code>N</code>
-indexes the view's <code>gestures</code> list.</p>
+indexes the view's <code>gestures</code> list. A gesture spec whose callbacks are
+worklets carries their handler bindings under <code>"worklets"</code>, keyed by
+gesture state, and the core runs them for both its own gesture engine
+and the events iOS's UIKit recognizers report.</p>
 <p>Text changes also carry an edit revision. Python echoes the latest revision it
 has processed with controlled <code>value</code> updates. A native input ignores older
 echoes, preserves the selection where possible, and avoids replacing an active
 IME composition. Typing therefore doesn't wait for Python rendering.</p>
-<h2 id="commands-animations-and-layout-reads">Commands, animations, and layout reads<a class="headerlink" href="#commands-animations-and-layout-reads" title="Permanent link">&para;</a></h2>
+<h2 id="commands-motion-and-layout-reads">Commands, motion, and layout reads<a class="headerlink" href="#commands-motion-and-layout-reads" title="Permanent link">&para;</a></h2>
 <p><code>pn_core_command(surface, tag, name, arguments, call_id)</code> validates the
 arguments against the component's contract and queues the command behind
 pending mounts. It returns <code>{"ok": true, "queued": true}</code> or an error: a
@@ -5065,12 +5082,19 @@ UI thread runs the command and answers with a <code>command</code> message,
 <code>{"call_id", "ok", "value"}</code>, which resolves the future the handle method
 awaits. A ref's handle addresses a live tag; commands against a destroyed
 tag raise an error.</p>
-<p><code>pn_core_animate(surface, tag, request)</code> validates an animation request
-(<code>graph</code>, <code>start</code>, <code>cancel</code>, or <code>set</code>) and queues it the same way. The
-core reports each driver's end as an <code>animation</code> message, <code>{"id",
-"finished", "value"}</code>, and a driver started with <code>report: true</code> (a value
-with Python listeners or no bound view) also sends <code>{"id", "value"}</code> every
-frame.</p>
+<p><code>pn_core_motion(surface, request)</code> validates a motion request and queues
+it the same way. A request's <code>op</code> is <code>program</code> (install a compiled
+worklet), <code>shared</code> (define a shared value), <code>set</code>, <code>animate</code>, or
+<code>cancel</code> (write a shared value), <code>bind</code> (a derived value, reaction,
+frame callback, animated style, or event handler), <code>release</code> (forget
+shared values or bindings), or <code>batch</code> (several requests at once). Python
+sends the requests it has queued as one batch, just before the commit
+that references them or on the application loop's next turn.
+<code>pn_core_shared_read(id)</code> returns the latest value the UI thread
+published for a shared value, as JSON, without waiting for it. The core
+sends <code>motion</code> messages back: <code>finished</code> when an awaited animation
+settles, <code>call</code> for each <code>run_on_python</code>, and <code>error</code> when a worklet
+fails, with its file, line, and the exception it raised.</p>
 <p><code>pn_core_measure(surface, tag)</code> reads the shadow tree, flattened views
 included, and returns <code>{"frame": [x, y, w, h], "window": [x, y, w, h]}</code>.
 <code>ViewHandle.measure_in_window</code> uses it.</p>
@@ -5094,7 +5118,7 @@ containers preserve the first visible key and its offset across dataset changes;
 iOS also preserves it as measured row heights replace estimates. Global and
 section headers don't change public item indices. Row instances can unmount
 outside the window, so persistent item state belongs in app data.</p>
-<h2 id="modules-contracts-and-animations">Modules, contracts, and animations<a class="headerlink" href="#modules-contracts-and-animations" title="Permanent link">&para;</a></h2>
+<h2 id="modules-contracts-and-motion">Modules, contracts, and motion<a class="headerlink" href="#modules-contracts-and-motion" title="Permanent link">&para;</a></h2>
 <p>Module calls carry a call ID and arguments. A module can settle inline or return
 <code>pending</code> and settle later. Cancellation removes the Python waiter and notifies
 the native promise. Swift <code>PNPromise.onCancel</code> and Kotlin <code>Promise.onCancel</code>
@@ -5125,12 +5149,18 @@ rejects commits until contracts are loaded. Startup checks the protocol
 version and the contract fingerprint compiled into the native library, and
 a mismatch fails with "Native component contracts changed. Rebuild the app
 with 'pn run'."</p>
-<p>Animation graphs describe values, arithmetic, interpolation, colors, and
-clamping. The core runs timing, spring, and decay drivers and evaluates
-connected bindings. The platform's frame clock calls
-<code>pn_core_animation_frame(timestamp_ms)</code>, which returns whether more frames
-are needed, and then <code>pn_core_take_writes</code>, which returns the frame's
-animated prop writes:</p>
+<p>Worklets reach the core as programs: stack-machine code that Python
+compiles from each worklet's syntax tree, with a constant table and the
+names it captures. The core verifies every program when it's installed
+(operand indices, jump targets, and stack depth) and runs it
+in a small VM with an instruction budget per run. The motion runtime
+holds shared values, the bindings that read them, and the animation
+drivers that write them. The platform's frame clock calls
+<code>pn_core_animation_frame(timestamp_ms)</code>, which advances drivers and runs
+derived values, reactions, frame callbacks, and animated styles in that
+order, and returns whether more frames are needed. The platform then
+calls <code>pn_core_take_writes</code>, also after each event and each mount, which
+returns what changed:</p>
 <table>
 <thead>
 <tr>
@@ -5144,22 +5174,41 @@ animated prop writes:</p>
 <td><code>u32</code> write count</td>
 </tr>
 <tr>
-<td>Each write</td>
-<td><code>i64</code> tag, <code>str</code> prop, <code>value</code></td>
+<td><code>0</code> prop</td>
+<td><code>i64</code> tag, <code>str</code> prop, <code>value</code>: a paint property; <code>null</code> restores the static value</td>
+</tr>
+<tr>
+<td><code>1</code> frame</td>
+<td><code>i64</code> tag, <code>f64</code> x, y, width, height: a layout animation's frame</td>
+</tr>
+<tr>
+<td><code>2</code> remove</td>
+<td><code>u32</code> count, <code>i64</code> tags: exits that finished; destroy each view, children first</td>
 </tr>
 </tbody>
 </table>
-<p>The platform applies each write to the view's animated property. The core
-asks for frames through the <code>request_frames</code> callback. Scroll and gesture
-mappings feed graph values directly, so visual updates continue while the
-Python application thread is busy.</p>
+<p>Each record starts with its <code>u8</code> kind. Layout properties an animated
+style writes don't appear here: the core posts them to its layout
+worker, which relayouts and sends the new frames through the normal
+mount queue. The core asks for frames through the <code>request_frames</code>
+callback, and <code>pn_core_set_reduce_motion</code> tells it the platform's
+reduce-motion setting.</p>
+<p>Two calls serve the platform's screen transitions.
+<code>pn_core_exit_finished(surface, tag)</code> reports that a leaving screen or
+modal (an <code>exit</code> op with owner <code>1</code>) finished its native transition, and
+the core answers with its <code>remove</code> write.
+<code>pn_core_shared_elements(surface, from_screen, to_screen)</code> returns the
+mounted views the two screens share by <code>shared_tag</code>, as
+<code>{"name", "source", "target", "transition", "source_style",
+"target_style"}</code> records, and the platform flies each pair in its own
+overlay while the screens move.</p>
 <h2 id="the-browser-preview">The browser preview<a class="headerlink" href="#the-browser-preview" title="Permanent link">&para;</a></h2>
 <p>Under <code>pn preview</code> the renderer core runs in the page, compiled to
 WebAssembly (<code>devserver/static/core/pn_core.wasm</code>), and
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;WebTransport&lt;/span&gt;" href="../../api/devserver/#pythonnative.bridge.web.WebTransport"><code>WebTransport</code></a> forwards each call
 Python makes into the core over the dev server's WebSocket.
-<code>load_contracts</code>, <code>commit</code>, <code>layout</code>, <code>command</code>, <code>animate</code>, and <code>measure</code>
-become requests that the page answers with the core's own JSON reply.
+<code>load_contracts</code>, <code>commit</code>, <code>layout</code>, <code>command</code>, <code>motion</code>, <code>shared_read</code>,
+and <code>measure</code> become requests that the page answers with the core's own JSON reply.
 Envelopes travel as the text Python serialized, so the core parses each one
 once. Everything the core emits, and every command result, comes back as a
 callback, as on device. Python waits for each reply on the calling thread

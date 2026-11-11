@@ -1265,14 +1265,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -2986,14 +2986,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4809,7 +4809,7 @@ property. Physical setters restore a declared default or the platform default.
 A reset doesn't recreate the logical tag. Only fields marked <code>recreate</code>, such
 as <code>TextInput.multiline</code> and <code>ProgressBar.indeterminate</code>, replace the physical
 widget, retaining logical ownership and supported focus/selection state.</p>
-<p><code>NativeField</code> also declares layout invalidation, animation, and platform support.
+<p><code>NativeField</code> also declares layout invalidation, widget recreation, flattening, and platform support.
 <code>Platform.supports("Image", "source")</code> or
 <code>Platform.supports("Notifications", "set_badge")</code> inspects the compiled
 contract, which answers <code>False</code> for <code>set_badge</code> on Android, because the

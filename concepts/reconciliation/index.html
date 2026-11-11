@@ -1455,14 +1455,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3074,14 +3074,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4864,7 +4864,8 @@ tree:</p>
 application thread. Async components capture their provider environment across
 awaits. Changes to their inputs cancel obsolete work before it can publish.
 Expensive Python work delays callbacks and commits.
-Native scrolling and supported animation drivers run independently; see
+Native scrolling and <a href="../../guides/motion/">Motion</a> (animations and
+worklets on the UI thread) run independently; see
 <a href="../architecture/#runtime-limits">Runtime limits</a>.</p>
 <h2 id="commits-are-transactions">Commits are transactions<a class="headerlink" href="#commits-are-transactions" title="Permanent link">&para;</a></h2>
 <p>Rendering records changes in an undo journal and stages native operations,
@@ -5033,17 +5034,11 @@ for usage patterns.</p>
 <p>For animation-driven values that change every frame (60+ Hz), going
 through <code>set_state</code> is wasteful. Two ways to bypass:</p>
 <ul>
-<li>Use the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;Animated&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/animated/#pythonnative.animated.Animated"><code>Animated</code></a> API: an
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> bound into an
-  <code>Animated.View</code> style drives the native property directly, and
-  when the platform can run the animation natively, no Python code
-  runs per frame at all. See the
-  <a href="../../guides/animations/">Animations guide</a>.</li>
+<li>Use <a href="../../guides/motion/">Motion</a>: a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SharedValue&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.shared.SharedValue"><code>SharedValue</code></a> read by
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_style&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_animated_style"><code>use_animated_style</code></a> drives the
+  native property from the UI thread, and worklets handle scroll and
+  gesture events there, so no Python code runs per frame at all.</li>
 <li>Use <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_ref&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_ref"><code>use_ref</code></a> to receive a typed
   <a href="../../api/handles/">handle</a> for a mounted view and drive it
   imperatively (<code>scroll_to</code>, <code>focus</code>, a custom component's <code>command</code>)

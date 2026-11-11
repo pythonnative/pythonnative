@@ -1400,14 +1400,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3019,14 +3019,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4707,7 +4707,7 @@ screens, overlays, and visible list rows.</p>
     E --&gt;|events, pointers, container sizes| C
     C --&gt;|stamped events, frames, command results| A
     F[Frame clock] --&gt; C
-    C --&gt;|animated prop writes| E</code></pre>
+    C --&gt;|motion writes| E</code></pre>
 <h2 id="the-authoring-model">The authoring model<a class="headerlink" href="#the-authoring-model" title="Permanent link">&para;</a></h2>
 <p>Application code is ordinary, typed Python. Components are functions
 whose signatures are their prop lists, and they return a
@@ -4777,7 +4777,7 @@ WebAssembly. Python reaches it through a C ABI with <code>ctypes</code>.</p>
 </tr>
 <tr>
 <td>Renderer core (C++)</td>
-<td>Contract tables and validation, surfaces and revisions, the shadow tree, Yoga style mapping and layout, view flattening, mount diffing, list datasets, animation graphs and drivers, gesture recognition (Android, browser, and tests), event identity stamping</td>
+<td>Contract tables and validation, surfaces and revisions, the shadow tree, Yoga style mapping and layout, view flattening, mount diffing, list datasets, the motion runtime (the worklet VM, shared values, animation drivers, animated styles, layout animations, and exits), gesture recognition (Android, browser, and tests), event identity stamping</td>
 </tr>
 <tr>
 <td>Platform (UI thread)</td>
@@ -4831,11 +4831,13 @@ Off device, each capability registers a Python fallback, so tests and the
 browser preview run the same code. On a device whose build leaves a capability out,
 calling it raises <code>plugin_not_enabled</code>.</p>
 <h2 id="contracts-and-tooling">Contracts and tooling<a class="headerlink" href="#contracts-and-tooling" title="Permanent link">&para;</a></h2>
-<p>The bridge protocol (version 7) validates commits in the core before mutation
+<p>The bridge protocol (version 8) validates commits in the core before mutation
 and acknowledges exact revisions. Events carry application and revision
 identities, which the core stamps. Controlled inputs additionally acknowledge
-native edit revisions to avoid overwriting newer typing. The core's animation
-graphs perform frame updates independently of Python callbacks.</p>
+native edit revisions to avoid overwriting newer typing. Worklets, animation
+drivers, and layout animations run in the core on the UI thread, so frame
+updates and gesture responses never wait for Python callbacks (see
+<a href="../../guides/motion/">Motion</a>).</p>
 <p>The SDK compiles dataclass props and protocol methods into portable contracts.
 The core compiles the merged contract document into indexed tables at startup
 and validates every commit, command, and module call against them; typed Swift
@@ -4873,8 +4875,8 @@ minute shows a fallback screen, so a broken tree can't loop forever.
 error with its phase, in development and release builds alike.
 Reconciliation reduces work at dirty component roots but doesn't time-slice
 arbitrary Python render functions. Long computations delay Python callbacks
-and commits even while native scrolling and the core's animation drivers
-continue.
+and commits even while native scrolling and the core's worklets and animation
+drivers continue.
 Use cooperative async work, move blocking I/O off the application thread,
 and keep expensive computation out of render functions.</p>
 <p>Shared layout rules don't imply identical fonts or control sizes. Test
@@ -4931,8 +4933,8 @@ validate device signing, store submission, or performance on physical devices.</
 <td><code>navigation/</code>, <code>components/lists.py</code></td>
 </tr>
 <tr>
-<td>Animation graphs</td>
-<td><code>animated.py</code>, <code>animation_graph.py</code></td>
+<td>Motion (worklets, shared values, animations, layout animations)</td>
+<td><code>motion/</code>, <code>components/bottom_sheet.py</code>, <code>components/swipeable.py</code>; the core's <code>motion_vm</code>, <code>motion_runtime</code>, and <code>motion_anim</code> in <code>native/core/src/</code></td>
 </tr>
 <tr>
 <td>Contracts and plugins</td>

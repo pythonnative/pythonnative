@@ -1262,14 +1262,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -2884,14 +2884,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animated/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -3865,6 +3865,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.style.MOTION_STYLE_KEY" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;MOTION_STYLE_KEY
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.style.ABSOLUTE_FILL" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4067,6 +4078,17 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Style
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.style.AnimatedStyle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;AnimatedStyle
       
     </span>
   </a>
@@ -5081,6 +5103,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pythonnative.style.MOTION_STYLE_KEY" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;MOTION_STYLE_KEY
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.style.ABSOLUTE_FILL" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5283,6 +5316,17 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;Style
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.style.AnimatedStyle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;AnimatedStyle
       
     </span>
   </a>
@@ -6370,16 +6414,45 @@ unmasked password keyboard.</p>
   </span>
 
 <a href="#pythonnative.style.StyleProp" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">StyleProp</span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Union&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Union">Union</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Style&lt;/span&gt; (&lt;code&gt;pythonnative.style.Style&lt;/code&gt;)" href="#pythonnative.style.Style">Style</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Sequence">Sequence</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Style&lt;/span&gt; (&lt;code&gt;pythonnative.style.Style&lt;/code&gt;)" href="#pythonnative.style.Style">Style</a></span><span class="p">]],</span> <span class="kc">None</span><span class="p">]</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">StyleProp</span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Union&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Union">Union</a></span><span class="p">[</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Style&lt;/span&gt; (&lt;code&gt;pythonnative.style.Style&lt;/code&gt;)" href="#pythonnative.style.Style">Style</a></span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedStyle&lt;/span&gt; (&lt;code&gt;pythonnative.style.AnimatedStyle&lt;/code&gt;)" href="#pythonnative.style.AnimatedStyle">AnimatedStyle</a></span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Sequence">Sequence</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Union&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Union">Union</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Style&lt;/span&gt; (&lt;code&gt;pythonnative.style.Style&lt;/code&gt;)" href="#pythonnative.style.Style">Style</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedStyle&lt;/span&gt; (&lt;code&gt;pythonnative.style.AnimatedStyle&lt;/code&gt;)" href="#pythonnative.style.AnimatedStyle">AnimatedStyle</a></span><span class="p">,</span> <span class="kc">None</span><span class="p">]],</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
         <p>Public type for the <code>style</code> parameter on every component factory.</p>
-<p>Accepts a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Style&lt;/span&gt;" href="#pythonnative.style.Style"><code>Style</code></a> TypedDict, a sequence of them
-with <code>None</code> entries skipped, or <code>None</code>. <code>Style</code> is a <code>TypedDict</code>,
-so a plain dict literal type-checks against it and still works at
-runtime.</p>
+<p>Accepts a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Style&lt;/span&gt;" href="#pythonnative.style.Style"><code>Style</code></a> TypedDict, an
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedStyle&lt;/span&gt;" href="#pythonnative.style.AnimatedStyle"><code>AnimatedStyle</code></a>, a sequence of them with
+<code>None</code> entries skipped, or <code>None</code>. <code>Style</code> is a <code>TypedDict</code>, so a
+plain dict literal type-checks against it and still works at runtime.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="pythonnative.style.MOTION_STYLE_KEY" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">MOTION_STYLE_KEY</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#pythonnative.style.MOTION_STYLE_KEY" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">MOTION_STYLE_KEY</span> <span class="o">=</span> <span class="s1">'_pn_motion_style'</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Where <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;resolve_style&lt;/span&gt;" href="#pythonnative.style.resolve_style"><code>resolve_style</code></a> collects animated style bindings.</p>
 
     </div>
 
@@ -7541,6 +7614,62 @@ reconciler unmodified, so third-party handlers can read them.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hello"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="n">title</span><span class="p">)</span>
 </span></code></pre></div>
 </details>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="pythonnative.style.AnimatedStyle" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">AnimatedStyle</span>
+
+
+<a href="#pythonnative.style.AnimatedStyle" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">AnimatedStyle</span><span class="p">(</span><span class="n">binding</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>A style the UI thread recomputes, from <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_style&lt;/span&gt;" href="../motion/#pythonnative.motion.hooks.use_animated_style"><code>use_animated_style</code></a>.</p>
+<p>Put it in a <code>style</code> list after the static styles it overrides. Keys it
+writes replace the same keys from the static style, including the whole
+<code>transform</code> list, and the static value comes back when it stops
+writing a key.</p>
+
 
 
 

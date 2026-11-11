@@ -1262,14 +1262,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3130,14 +3130,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4940,6 +4940,10 @@ when:</p>
 <li>a capability in <code>[plugins].use</code> needs a <code>[permissions]</code> entry that's
   missing, because iOS crashes an app that reaches a protected API without
   its usage string.</li>
+<li>a <a href="../motion/#release-builds">worklet</a> uses Python the UI thread can't
+  run. Release builds ship without source, so staging compiles every
+  worklet into <code>pn_worklets.json</code> first and lists each one that fails;
+  <code>pn lint</code> reports the same errors as <code>PN201</code>.</li>
 </ul>
 <p><code>--allow-unsigned</code> turns off the icon and signing checks for a smoke build
 that won't reach a store. On iOS it signs ad hoc and stops at the archive.

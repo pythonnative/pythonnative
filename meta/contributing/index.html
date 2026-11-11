@@ -1262,14 +1262,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -2881,14 +2881,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -5023,7 +5023,8 @@ way:</p>
 <li><code>audio/</code>, <code>background/</code>, <code>biometrics/</code>, <code>camera/</code>, <code>location/</code>, <code>maps/</code>, <code>notifications/</code>, <code>pickers/</code>, <code>purchases/</code>, <code>push/</code>, <code>sensors/</code>, <code>video/</code>: first-party capabilities (see <a href="#capabilities">Capabilities</a>)</li>
 <li><code>navigation/</code>: navigator values, screens, container, hooks, deep-link table, and the navigation ref</li>
 <li><code>theme.py</code>, <code>style.py</code>, <code>store.py</code>: the app <code>Theme</code>, <code>StyleSheet</code> namespaces and style resolution, and <code>Store</code></li>
-<li><code>lint.py</code>: the <code>pn lint</code> rules-of-hooks checker</li>
+<li><code>motion/</code>: worklets and their compiler, shared values, animations, layout animations, shared-element transitions, and release precompilation (RFC 0009); <code>BottomSheet</code> and <code>Swipeable</code> in <code>components/</code> are built on it</li>
+<li><code>lint.py</code>: the <code>pn lint</code> rules-of-hooks and worklet checker</li>
 <li><code>testing/</code>: the headless testing library and the shipped pytest plugin (<code>testing/pytest_plugin.py</code>)</li>
 <li><code>bridge/</code>: the <code>ctypes</code> binding to the renderer core, the fake platform headless tests run it through, and per-platform transports</li>
 <li><code>cli/</code>: <code>pn</code> command</li>
@@ -5159,7 +5160,6 @@ aren't.</p>
 <ul>
 <li>Module/directory scopes:</li>
 <li><code>alerts</code>: imperative Alert/Picker helpers (<code>alerts.py</code>)</li>
-<li><code>animated</code>: Animated namespace and animation primitives (<code>animated.py</code>)</li>
 <li><code>bootstrap</code>: on-device runtime start-up called by the templates (<code>bootstrap.py</code>)</li>
 <li><code>bridge</code>: wire codec, transports, handshake, and native-to-Python callback (<code>bridge/</code>)</li>
 <li><code>cli</code>: CLI tool and <code>pn</code> command (<code>src/pythonnative/cli/</code>)</li>
@@ -5175,7 +5175,8 @@ aren't.</p>
 <li><code>devclient</code>: on-device dev client that syncs sources and Fast Refreshes (<code>devclient.py</code>)</li>
 <li><code>hot_reload</code>: module reloader and Fast Refresh (<code>hot_reload.py</code>)</li>
 <li><code>journal</code>: render undo journal (<code>journal.py</code>)</li>
-<li><code>lint</code>: the <code>pn lint</code> rules-of-hooks checker (<code>lint.py</code>)</li>
+<li><code>lint</code>: the <code>pn lint</code> rules-of-hooks and worklet checker (<code>lint.py</code>)</li>
+<li><code>motion</code>: worklets, shared values, animations, layout animations, and shared elements (<code>motion/</code>, <code>components/bottom_sheet.py</code>, <code>components/swipeable.py</code>)</li>
 <li><code>mutations</code>: batched mutation ops between reconciler and native backends (<code>mutations.py</code>)</li>
 <li><code>native_modules</code>: native module registry, Python facades, and Python fallbacks (<code>native_modules/</code>)</li>
 <li><code>native_views</code>: view backend accessor and bridge backend (<code>native_views/</code>)</li>

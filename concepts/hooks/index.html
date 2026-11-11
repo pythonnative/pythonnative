@@ -930,10 +930,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#use_animated_value" class="md-nav__link">
+  <a href="#use_shared_value" class="md-nav__link">
     <span class="md-ellipsis">
       
-        use_animated_value
+        use_shared_value
       
     </span>
   </a>
@@ -1604,14 +1604,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3223,14 +3223,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4945,10 +4945,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#use_animated_value" class="md-nav__link">
+  <a href="#use_shared_value" class="md-nav__link">
     <span class="md-ellipsis">
       
-        use_animated_value
+        use_shared_value
       
     </span>
   </a>
@@ -5425,13 +5425,29 @@ event, <code>False</code> to pass it along:</p>
 </span></code></pre></div>
 <p>iOS has no system back button, so the handler never fires there;
 swipe-back is controlled by the navigation stack instead.</p>
-<h3 id="use_animated_value">use_animated_value<a class="headerlink" href="#use_animated_value" title="Permanent link">&para;</a></h3>
-<p>Create an <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> that's stable
-across renders. Equivalent to wrapping <code>pn.Animated.Value(initial)</code> in
-<code>use_memo(..., [])</code> but more discoverable:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">opacity</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">Animated</span><span class="o">.</span><span class="n">timing</span><span class="p">(</span><span class="n">opacity</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+<h3 id="use_shared_value">use_shared_value<a class="headerlink" href="#use_shared_value" title="Permanent link">&para;</a></h3>
+<p>Create a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SharedValue&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.shared.SharedValue"><code>SharedValue</code></a> that's stable across
+renders, like a ref, but that the UI thread owns. Worklets read and
+write it there, and
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_style&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_animated_style"><code>use_animated_style</code></a> turns it into a
+style without re-rendering:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">opacity</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_shared_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">faded</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_style</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="p">{</span><span class="s2">"opacity"</span><span class="p">:</span> <span class="n">opacity</span><span class="o">.</span><span class="n">value</span><span class="p">})</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">appear</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="k">await</span> <span class="n">opacity</span><span class="o">.</span><span class="n">animate</span><span class="p">(</span><span class="n">pn</span><span class="o">.</span><span class="n">with_timing</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">duration</span><span class="o">=</span><span class="mi">300</span><span class="p">))</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>
+</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="n">pn</span><span class="o">.</span><span class="n">use_effect</span><span class="p">(</span><span class="n">appear</span><span class="p">,</span> <span class="p">[])</span>
+</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">[</span><span class="n">styles</span><span class="o">.</span><span class="n">card</span><span class="p">,</span> <span class="n">faded</span><span class="p">])</span>
 </span></code></pre></div>
+<p>Reading <code>opacity.value</code> during render doesn't subscribe to it; read it
+in a worklet instead. The other Motion hooks
+(<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_derived_value&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_derived_value"><code>use_derived_value</code></a>,
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_reaction&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_animated_reaction"><code>use_animated_reaction</code></a>, and
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_frame_callback&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_frame_callback"><code>use_frame_callback</code></a>) take worklets
+and no dependency list; see the <a href="../../guides/motion/#hooks">Motion guide</a>.</p>
 <h3 id="use_context">use_context<a class="headerlink" href="#use_context" title="Permanent link">&para;</a></h3>
 <p>Read a value from the nearest <code>Provider</code> ancestor:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">Locale</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_context</span><span class="p">(</span><span class="s2">"en"</span><span class="p">)</span>

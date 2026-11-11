@@ -1262,14 +1262,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -2884,14 +2884,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animated/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -6848,10 +6848,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.bridge.web.WebTransport.animate" class="md-nav__link">
+  <a href="#pythonnative.bridge.web.WebTransport.motion" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;animate
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;motion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pythonnative.bridge.web.WebTransport.shared_read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;shared_read
       
     </span>
   </a>
@@ -10412,10 +10423,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pythonnative.bridge.web.WebTransport.animate" class="md-nav__link">
+  <a href="#pythonnative.bridge.web.WebTransport.motion" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;animate
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;motion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pythonnative.bridge.web.WebTransport.shared_read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;shared_read
       
     </span>
   </a>
@@ -22697,10 +22719,18 @@ asyncio loop; no asyncio loop is pumped by the browser transport.</p>
               </td>
             </tr>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;animate&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.animate&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.animate">animate</a></code></td>
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;motion&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.motion&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.motion">motion</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Queue an animation request behind pending mounts.</p>
+                  <p>Queue a motion request behind pending mounts (RFC 0009).</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;shared_read&lt;/span&gt; (&lt;code&gt;pythonnative.bridge.web.WebTransport.shared_read&lt;/code&gt;)" href="#pythonnative.bridge.web.WebTransport.shared_read">shared_read</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The latest value the page's UI thread published for a shared value, as JSON.</p>
                 </div>
               </td>
             </tr>
@@ -23093,17 +23123,37 @@ forgets what it loaded then, so the next commit loads them again.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="pythonnative.bridge.web.WebTransport.animate" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">animate</span>
+<h3 id="pythonnative.bridge.web.WebTransport.motion" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">motion</span>
 
 
-<a href="#pythonnative.bridge.web.WebTransport.animate" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">animate</span><span class="p">(</span><span class="n">surface</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">request_json</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span>
+<a href="#pythonnative.bridge.web.WebTransport.motion" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">motion</span><span class="p">(</span><span class="n">surface</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">request_json</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Queue an animation request behind pending mounts.</p>
+        <p>Queue a motion request behind pending mounts (RFC 0009).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="pythonnative.bridge.web.WebTransport.shared_read" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">shared_read</span>
+
+
+<a href="#pythonnative.bridge.web.WebTransport.shared_read" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">shared_read</span><span class="p">(</span><span class="n">ident</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The latest value the page's UI thread published for a shared value, as JSON.</p>
 
 
     </div>

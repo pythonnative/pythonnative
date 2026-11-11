@@ -1265,14 +1265,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../animations/" class="md-nav__link">
+      <a href="../motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -1788,6 +1788,39 @@
     <span class="md-ellipsis">
       
         PN104: user components take keys through .with_key()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pn201-worklets-must-compile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PN201: worklets must compile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pn202-worklet-only-apis-need-a-marked-worklet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PN202: worklet-only APIs need a marked worklet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pn203-shared-values-arent-read-during-render" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PN203: shared values aren't read during render
       
     </span>
   </a>
@@ -3058,14 +3091,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -4692,6 +4725,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pn201-worklets-must-compile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PN201: worklets must compile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pn202-worklet-only-apis-need-a-marked-worklet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PN202: worklet-only APIs need a marked worklet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pn203-shared-values-arent-read-during-render" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PN203: shared values aren't read during render
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pn000-the-file-couldnt-be-read" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4778,7 +4844,10 @@
 one render and not the next corrupts every hook after it. A stale
 dependency list is quieter: the effect keeps using the values from the
 render that created it. <code>pn lint</code> catches both before you run the app.
-It's the PythonNative counterpart of <code>eslint-plugin-react-hooks</code>.</p>
+It's the PythonNative counterpart of <code>eslint-plugin-react-hooks</code>. It
+also checks <a href="../motion/#worklets">worklets</a>, the functions that run on
+the UI thread, so a construct the core can't run shows up in your
+editor instead of on a device.</p>
 <p>The linter reads your source with Python's <code>ast</code> module. It never
 imports or runs your code, and it has no dependencies beyond
 PythonNative itself.</p>
@@ -4891,7 +4960,7 @@ nested function. These are exempt:</p>
 <li>names defined at module level, and builtins</li>
 <li>the setter from <code>value, set_value = pn.use_state(...)</code> and the
   dispatcher from <code>state, dispatch = pn.use_reducer(...)</code></li>
-<li>names assigned from <code>pn.use_ref(...)</code> or <code>pn.use_animated_value(...)</code></li>
+<li>names assigned from <code>pn.use_ref(...)</code> or <code>pn.use_shared_value(...)</code></li>
 <li>names assigned from <code>pn.use_memo(...)</code> or <code>pn.use_callback(...)</code> with a
   literal empty dependency list, which are computed once</li>
 <li>names bound by an import inside the component</li>
@@ -4924,15 +4993,68 @@ same file:</p>
 can't declare a parameter named <code>key</code> at all: <code>@pn.component</code> raises
 <code>TypeError</code> for one, and calling a component with <code>key=</code> raises
 <code>TypeError</code> at run time too.</p>
+<h3 id="pn201-worklets-must-compile">PN201: worklets must compile<a class="headerlink" href="#pn201-worklets-must-compile" title="Permanent link">&para;</a></h3>
+<p>Every function marked <code>@pn.worklet</code>, and every inline lambda passed to
+a worklet-only API or to <code>on_finish=</code>, <code>entering=</code>, <code>exiting=</code>, or
+<code>layout=</code>, is compiled the way the renderer core will compile it.
+<code>PN201</code> reports a construct outside the
+<a href="../motion/#the-language">worklet subset</a>, with the compiler's message,
+at the construct's position:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">worklet</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">settle</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">gestures</span><span class="o">.</span><span class="n">GestureEvent</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="k">while</span> <span class="n">offset</span><span class="o">.</span><span class="n">value</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># PN201: `while` loops can't run on the UI thread; use `for i in range(n)`</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="n">offset</span><span class="o">.</span><span class="n">value</span> <span class="o">-=</span> <span class="mi">1</span>
+</span></code></pre></div>
+<p>These are the same errors a release build reports when it precompiles
+worklets, so a clean <code>pn lint</code> means <code>pn build</code> won't stop on one.
+Errors that depend on what a worklet captures at run time, such as
+calling a plain Python function, are reported when the worklet is
+installed instead; see <a href="../motion/#errors">Errors</a>.</p>
+<h3 id="pn202-worklet-only-apis-need-a-marked-worklet">PN202: worklet-only APIs need a marked worklet<a class="headerlink" href="#pn202-worklet-only-apis-need-a-marked-worklet" title="Permanent link">&para;</a></h3>
+<p><code>use_animated_style</code>, <code>use_derived_value</code>, <code>use_animated_reaction</code>, and
+<code>use_frame_callback</code> only accept a <code>@pn.worklet</code> function or an inline
+lambda. <code>PN202</code> flags a name passed to one of them that isn't decorated
+in the same file:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Card</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="n">offset</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_shared_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fade</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Style</span><span class="p">:</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">"opacity"</span><span class="p">:</span> <span class="n">offset</span><span class="o">.</span><span class="n">value</span><span class="p">}</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="n">style</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_animated_style</span><span class="p">(</span><span class="n">fade</span><span class="p">)</span>  <span class="c1"># PN202: mark 'fade' with @pn.worklet</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="o">...</span>
+</span></code></pre></div>
+<p>The hook raises <code>TypeError</code> for it at run time too. Requiring the
+marker keeps code that would compile in development, where every
+function has its source, from failing in a release build, which only
+precompiles marked worklets and inline lambdas. Add <code>@pn.worklet</code>, or
+pass a lambda.</p>
+<h3 id="pn203-shared-values-arent-read-during-render">PN203: shared values aren't read during render<a class="headerlink" href="#pn203-shared-values-arent-read-during-render" title="Permanent link">&para;</a></h3>
+<p><code>PN203</code> flags a read of <code>.value</code> on a shared value (a name assigned
+from <code>pn.use_shared_value(...)</code> or <code>pn.use_derived_value(...)</code>) in a
+component's body:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Progress</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="n">progress</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_shared_value</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">progress</span><span class="o">.</span><span class="n">value</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span>  <span class="c1"># PN203: won't rerun when it changes</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="o">...</span>
+</span></code></pre></div>
+<p>The read works, but it returns the value at the moment of the render,
+and the component doesn't render again when the value changes. Read it
+in a worklet, such as a <code>use_animated_style</code> or <code>use_derived_value</code>
+lambda, or keep the number in state if text has to show it. Reads
+inside nested functions and lambdas aren't flagged, since those run
+later.</p>
 <h3 id="pn000-the-file-couldnt-be-read">PN000: the file couldn't be read<a class="headerlink" href="#pn000-the-file-couldnt-be-read" title="Permanent link">&para;</a></h3>
 <p>A file with a syntax error, or one that isn't valid UTF-8, produces a
 single <code>PN000</code> finding. The linter doesn't check the rest of it.</p>
 <h2 id="suppressing-a-finding">Suppressing a finding<a class="headerlink" href="#suppressing-a-finding" title="Permanent link">&para;</a></h2>
 <p>Add a <code># pn: ignore</code> comment to the line the finding is reported on.
 Name the codes in brackets to silence only those:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">config</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_memo</span><span class="p">(</span><span class="n">build_config</span><span class="p">,</span> <span class="p">[])</span>  <span class="c1"># pn: ignore[PN103]</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">use_effect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span> <span class="p">[])</span>  <span class="c1"># pn: ignore[PN101,PN103]</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">legacy</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># pn: ignore</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">config</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_memo</span><span class="p">(</span><span class="n">build_config</span><span class="p">,</span> <span class="p">[])</span>  <span class="c1"># pn: ignore[PN103]</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">pn</span><span class="o">.</span><span class="n">use_effect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span> <span class="p">[])</span>  <span class="c1"># pn: ignore[PN101,PN103]</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">legacy</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># pn: ignore</span>
 </span></code></pre></div>
 <p>Prefer the bracketed form so that a new problem on the same line still
 shows up. <code>PN000</code> can't be suppressed.</p>
@@ -4944,6 +5066,9 @@ shows up. <code>PN000</code> can't be suppressed.</p>
   alias that doesn't start with <code>use_</code>, isn't recognized.</li>
 <li><code>PN104</code> only knows about components defined at module level in the
   same file.</li>
+<li><code>PN202</code> only knows about worklets decorated in the same file. A
+  worklet imported from another module is flagged; suppress the finding
+  on that line.</li>
 <li><code>PN103</code> treats every local value as changing between renders. A
   value that you know is stable, such as a <code>use_memo(..., [])</code> result,
   still has to be listed or suppressed.</li>

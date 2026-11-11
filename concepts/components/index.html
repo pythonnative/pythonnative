@@ -1528,14 +1528,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/animations/" class="md-nav__link">
+      <a href="../../guides/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animations
+    Motion
   
 
     
@@ -3147,14 +3147,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/animated/" class="md-nav__link">
+      <a href="../../api/motion/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Animated
+    Motion
   
 
     
@@ -5099,13 +5099,18 @@ objects are created until the
   awaitable multi-button picker / action sheet (resolves to the
   selected label, or <code>None</code>).</li>
 </ul>
-<p><strong>Animations:</strong></p>
+<p><strong>Motion:</strong></p>
 <ul>
-<li><code>Animated.View</code> / <code>Animated.Text</code> / <code>Animated.Image</code>: components
-  whose <code>style</code> accepts <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a>
-  instances. Drive animations with <code>Animated.timing</code>,
-  <code>Animated.spring</code>, or <code>Animated.decay</code>. See the
-  <a href="../../guides/animations/">Animations guide</a>.</li>
+<li>Every built-in component animates: put an
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedStyle&lt;/span&gt;" href="../../api/style/#pythonnative.style.AnimatedStyle"><code>AnimatedStyle</code></a> from
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_style&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_animated_style"><code>use_animated_style</code></a> in its <code>style</code>
+  list, and pass <code>entering=</code>, <code>exiting=</code>, <code>layout=</code>, or <code>shared_tag=</code> to
+  animate it in, out, to a new position, or across a screen push. See
+  the <a href="../../guides/motion/">Motion guide</a>.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;BottomSheet&lt;/span&gt;" href="../../api/components/#pythonnative.components.bottom_sheet.BottomSheet"><code>BottomSheet(*children, snap_points, index, on_change, ...)</code></a>:
+  a sheet with detents that follows the finger.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Swipeable&lt;/span&gt;" href="../../api/components/#pythonnative.components.swipeable.Swipeable"><code>Swipeable(child, left_actions, right_actions, ...)</code></a>:
+  a row that slides aside to reveal actions.</li>
 </ul>
 <h3 id="flex-layout-model">Flex layout model<a class="headerlink" href="#flex-layout-model" title="Permanent link">&para;</a></h3>
 <p>PythonNative uses a <strong>flexbox-inspired layout model</strong>. <code>View</code> is the
@@ -5297,9 +5302,14 @@ Passing <code>key=</code> to a user component raises <code>TypeError</code> poin
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_back_handler&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_back_handler"><code>use_back_handler(handler)</code></a>:
   intercept the Android back action / browser Escape; return <code>True</code>
   to consume.</li>
-<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_value&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.use_animated_value"><code>use_animated_value(initial)</code></a>:
-  stable <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AnimatedValue&lt;/span&gt;" href="../../api/animated/#pythonnative.animated.AnimatedValue"><code>AnimatedValue</code></a> across renders;
-  the canonical way to drive <code>Animated.View</code>.</li>
+<li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_shared_value&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_shared_value"><code>use_shared_value(initial)</code></a>: a
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SharedValue&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.shared.SharedValue"><code>SharedValue</code></a>, stable across renders, that
+  the UI thread reads and writes; with
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_style&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_animated_style"><code>use_animated_style</code></a>,
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_derived_value&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_derived_value"><code>use_derived_value</code></a>,
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_animated_reaction&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_animated_reaction"><code>use_animated_reaction</code></a>, and
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_frame_callback&lt;/span&gt;" href="../../api/motion/#pythonnative.motion.hooks.use_frame_callback"><code>use_frame_callback</code></a>, the way to
+  animate without re-rendering (see <a href="../../guides/motion/">Motion</a>).</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_context&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_context"><code>use_context(context)</code></a>: read from a
   context provider.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_store&lt;/span&gt;" href="../../api/store/#pythonnative.store.use_store"><code>use_store(store, selector)</code></a>: read an app
