@@ -309,6 +309,39 @@ final class PNMotionTests: XCTestCase {
 
     // MARK: - Shared elements
 
+    func testIOS26BackSwipeTurnsOffBetweenScreensThatShareElements() throws {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *) else { throw XCTSkip("iOS 26 adds the full-width back swipe") }
+        core.roots = [7401]
+        core.commit([["c", 7401, "ScreenStack", ["flex": 1, "_pn_events": ["on_native_back"]]],
+                     ["c", 7402, "Screen", ["title": "List", "flex": 1]],
+                     ["c", 7403, "View", ["width": 40, "height": 40, "shared_tag": "hero"]],
+                     ["c", 7404, "Screen", ["title": "Detail", "flex": 1]],
+                     ["c", 7405, "View", ["width": 200, "height": 120, "shared_tag": "hero"]],
+                     ["i", 7402, 7403, 0], ["i", 7404, 7405, 0], ["i", 7401, 7402, 0], ["i", 7401, 7404, 1]])
+        let stack = try XCTUnwrap(view(7401))
+        show(stack)
+        settle()
+        let navigation = try XCTUnwrap(PNScreenStackManager.navigationController(of: stack))
+        waitUntil("both screens are up") { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        let contentPop = try XCTUnwrap(navigation.interactiveContentPopGestureRecognizer)
+        // The stack's own edge pan (not UIKit's private subclass) decides at each touch-down.
+        let edgePan = try XCTUnwrap(navigation.view.gestureRecognizers?.first { type(of: $0) == UIScreenEdgePanGestureRecognizer.self })
+        let touchDown = { _ = edgePan.delegate?.gestureRecognizer?(edgePan, shouldReceive: UITouch()) }
+
+        touchDown()
+        XCTAssertFalse(contentPop.isEnabled, "only the edge pan can drive the shared-element pop")
+
+        // Once the screens stop sharing an element, the full-width swipe comes back.
+        core.commit([["u", 7405, [:], ["shared_tag"]]])
+        XCTAssertTrue(PNSharedElements.pairs(from: 7404, to: 7402).isEmpty)
+        touchDown()
+        XCTAssertTrue(contentPop.isEnabled)
+        #else
+        throw XCTSkip("needs the iOS 26 SDK")
+        #endif
+    }
+
     func testSharedElementsFlyOnPushAndPop() throws {
         core.roots = [7201]
         core.commit([["c", 7201, "ScreenStack", ["flex": 1, "_pn_events": ["on_native_back"]]],
