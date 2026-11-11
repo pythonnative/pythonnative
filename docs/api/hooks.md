@@ -38,7 +38,8 @@ async-aware hooks layered on top of `use_state` / `use_effect`:
   [`use_deferred_value`][pythonnative.use_deferred_value]: mark
   expensive updates as low priority so urgent updates render first.
 - [`use_query`][pythonnative.use_query]: subscribes to an async
-  fetcher and re-renders on data / error / refetch.
+  fetcher and re-renders on data / error / refetch. Pass a
+  [`QueryClient`](query.md) to control its cache.
 - [`use_mutation`][pythonnative.use_mutation]: wraps an async
   mutator with loading / error state and a trigger.
 - [`use_persisted_state`][pythonnative.use_persisted_state]:

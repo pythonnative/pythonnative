@@ -150,6 +150,7 @@ nav:
     - Sensors: api/sensors.md
     - Video: api/video.md
     - Async runtime: api/runtime.md
+    - Query cache: api/query.md
     - Suspense: api/suspense.md
     - Appearance: api/appearance.md
     - Images: api/images.md
