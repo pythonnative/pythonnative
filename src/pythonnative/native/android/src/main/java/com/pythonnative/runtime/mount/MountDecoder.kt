@@ -32,13 +32,30 @@ sealed class MountOp {
 
     /** Run a view command; the result goes back to Python under `callId`. */
     data class Command(val tag: Long, val name: String, val args: JSONObject, val callId: Long) : MountOp()
+
+    /**
+     * A view leaves without being destroyed yet (RFC 0009). `owner` 0: the
+     * core animates it out and later sends a [MotionWrite.Remove]; 1: the
+     * platform animates it (a leaving screen or modal) and reports the end
+     * through `pn_core_exit_finished`.
+     */
+    data class Exit(val tag: Long, val owner: Int) : MountOp()
 }
 
 /** A decoded transaction. */
 class MountTransaction(val surface: Long, val revision: Long, val id: Long, val ops: List<MountOp>)
 
-/** An animated prop write produced by the core's animator. */
-data class AnimatedWrite(val tag: Long, val prop: String, val value: Any?)
+/** One record of the core's motion writes (`pn_core_take_writes`, RFC 0009). */
+sealed class MotionWrite {
+    /** Set a paint prop on a view; a null `value` resets it to its default. */
+    data class Prop(val tag: Long, val prop: String, val value: Any?) : MotionWrite()
+
+    /** Set a view's frame in its mounted parent's coordinates, in dp (a layout animation). */
+    data class Frame(val tag: Long, val x: Double, val y: Double, val width: Double, val height: Double) : MotionWrite()
+
+    /** Exits finished: destroy each view like a delete op, in order (children first). */
+    data class Remove(val tags: List<Long>) : MotionWrite()
+}
 
 /**
  * Decodes the core's little-endian binary formats into the `org.json`
@@ -86,6 +103,7 @@ object MountDecoder {
                         val args = value(buffer) as? JSONObject ?: JSONObject()
                         MountOp.Command(tag, name, args, buffer.long)
                     }
+                    8 -> MountOp.Exit(buffer.long, buffer.get().toInt() and 0xFF)
                     else -> throw IllegalArgumentException("Unknown mount op $code")
                 },
             )
@@ -93,13 +111,21 @@ object MountDecoder {
         return MountTransaction(surface, revision, id, ops)
     }
 
-    fun decodeWrites(source: ByteBuffer): List<AnimatedWrite> {
+    /** Decode a motion writes buffer: `u32 count`, then per record a kind byte and its payload. */
+    fun decodeWrites(source: ByteBuffer): List<MotionWrite> {
         val buffer = source.duplicate().order(ByteOrder.LITTLE_ENDIAN)
         buffer.position(0)
         return List(buffer.int) {
-            val tag = buffer.long
-            val prop = string(buffer)
-            AnimatedWrite(tag, prop, plain(value(buffer)))
+            when (val kind = buffer.get().toInt()) {
+                0 -> {
+                    val tag = buffer.long
+                    val prop = string(buffer)
+                    MotionWrite.Prop(tag, prop, plain(value(buffer)))
+                }
+                1 -> MotionWrite.Frame(buffer.long, buffer.double, buffer.double, buffer.double, buffer.double)
+                2 -> MotionWrite.Remove(List(buffer.int) { buffer.long })
+                else -> throw IllegalArgumentException("Unknown motion write $kind")
+            }
         }
     }
 

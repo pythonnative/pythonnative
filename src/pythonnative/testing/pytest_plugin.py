@@ -32,7 +32,7 @@ __all__ = ["pn_clock"]
 @pytest.fixture(autouse=True)
 def _pn_fresh_runtime() -> Iterator[None]:
     """Run each test in dev mode, then reset the framework so loops, listeners, caches, and warnings never leak."""
-    from .. import animated, diagnostics, query, runtime
+    from .. import diagnostics, query, runtime
     from ..bridge.fake import reset_fakes
     from ..events import get_event_registry
 
@@ -42,7 +42,6 @@ def _pn_fresh_runtime() -> Iterator[None]:
 
     runtime._shutdown_for_tests()
     reset_fakes()
-    animated._tag_backends.clear()
     get_event_registry().reset()
     query._reset_for_tests()
     diagnostics.clear_warnings()

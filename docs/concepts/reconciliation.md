@@ -38,7 +38,8 @@ The reconciler runs synchronous render functions to completion on the
 application thread. Async components capture their provider environment across
 awaits. Changes to their inputs cancel obsolete work before it can publish.
 Expensive Python work delays callbacks and commits.
-Native scrolling and supported animation drivers run independently; see
+Native scrolling and [Motion](../guides/motion.md) (animations and
+worklets on the UI thread) run independently; see
 [Runtime limits](architecture.md#runtime-limits).
 
 ## Commits are transactions
@@ -226,12 +227,11 @@ for usage patterns.
 For animation-driven values that change every frame (60+ Hz), going
 through `set_state` is wasteful. Two ways to bypass:
 
-- Use the [`Animated`][pythonnative.Animated] API: an
-  [`AnimatedValue`][pythonnative.AnimatedValue] bound into an
-  `Animated.View` style drives the native property directly, and
-  when the platform can run the animation natively, no Python code
-  runs per frame at all. See the
-  [Animations guide](../guides/animations.md).
+- Use [Motion](../guides/motion.md): a
+  [`SharedValue`][pythonnative.SharedValue] read by
+  [`use_animated_style`][pythonnative.use_animated_style] drives the
+  native property from the UI thread, and worklets handle scroll and
+  gesture events there, so no Python code runs per frame at all.
 - Use [`use_ref`][pythonnative.use_ref] to receive a typed
   [handle](../api/handles.md) for a mounted view and drive it
   imperatively (`scroll_to`, `focus`, a custom component's `command`)

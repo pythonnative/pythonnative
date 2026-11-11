@@ -291,8 +291,24 @@ class FakeBackend(BridgeBackend):
 
     @property
     def animated(self) -> List[Tuple[int, str, Any]]:
-        """Every ``(tag, prop, value)`` the core's animator wrote, in order."""
-        return self.native.writes
+        """Every ``(tag, prop, value)`` the core's motion runtime wrote, in order."""
+        return [(write.tag, write.prop, write.value) for write in self.native.writes if write.kind == "prop"]
+
+    def presented_style(self, tag: int) -> Dict[str, Any]:
+        """A view's props as the platform shows them: committed props with motion's writes on top.
+
+        A view that's animating out keeps its last presented style until its
+        exit finishes; afterward it's gone and this returns ``{}``.
+        """
+        native = self.native.views.get(tag)
+        if native is None:
+            return {}
+        return {**native.props, **native.animated}
+
+    def presented_frame(self, tag: int) -> Tuple[float, float, float, float]:
+        """The frame the platform shows, including layout animation frames."""
+        native = self.native.views.get(tag)
+        return native.frame if native is not None else (0.0, 0.0, 0.0, 0.0)
 
     # ------------------------------------------------------------------
     # Commit channel

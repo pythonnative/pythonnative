@@ -126,13 +126,18 @@ pn.Column(
   awaitable multi-button picker / action sheet (resolves to the
   selected label, or ``None``).
 
-**Animations:**
+**Motion:**
 
-- `Animated.View` / `Animated.Text` / `Animated.Image`: components
-  whose `style` accepts [`AnimatedValue`][pythonnative.AnimatedValue]
-  instances. Drive animations with `Animated.timing`,
-  `Animated.spring`, or `Animated.decay`. See the
-  [Animations guide](../guides/animations.md).
+- Every built-in component animates: put an
+  [`AnimatedStyle`][pythonnative.AnimatedStyle] from
+  [`use_animated_style`][pythonnative.use_animated_style] in its `style`
+  list, and pass `entering=`, `exiting=`, `layout=`, or `shared_tag=` to
+  animate it in, out, to a new position, or across a screen push. See
+  the [Motion guide](../guides/motion.md).
+- [`BottomSheet(*children, snap_points, index, on_change, ...)`][pythonnative.BottomSheet]:
+  a sheet with detents that follows the finger.
+- [`Swipeable(child, left_actions, right_actions, ...)`][pythonnative.Swipeable]:
+  a row that slides aside to reveal actions.
 
 ### Flex layout model
 
@@ -363,9 +368,14 @@ Passing `key=` to a user component raises `TypeError` pointing to
 - [`use_back_handler(handler)`][pythonnative.use_back_handler]:
   intercept the Android back action / browser Escape; return `True`
   to consume.
-- [`use_animated_value(initial)`][pythonnative.use_animated_value]:
-  stable [`AnimatedValue`][pythonnative.AnimatedValue] across renders;
-  the canonical way to drive `Animated.View`.
+- [`use_shared_value(initial)`][pythonnative.use_shared_value]: a
+  [`SharedValue`][pythonnative.SharedValue], stable across renders, that
+  the UI thread reads and writes; with
+  [`use_animated_style`][pythonnative.use_animated_style],
+  [`use_derived_value`][pythonnative.use_derived_value],
+  [`use_animated_reaction`][pythonnative.use_animated_reaction], and
+  [`use_frame_callback`][pythonnative.use_frame_callback], the way to
+  animate without re-rendering (see [Motion](../guides/motion.md)).
 - [`use_context(context)`][pythonnative.use_context]: read from a
   context provider.
 - [`use_store(store, selector)`][pythonnative.use_store]: read an app

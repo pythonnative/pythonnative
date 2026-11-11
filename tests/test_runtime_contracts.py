@@ -9,7 +9,6 @@ import pytest
 
 import pythonnative as pn
 from pythonnative import runtime
-from pythonnative.animation_graph import serialize
 from pythonnative.bridge import codec
 from pythonnative.bridge.fake import FakeTransport
 from pythonnative.mutations import CreateOp, DestroyOp, InsertOp, UpdateOp
@@ -210,55 +209,6 @@ def test_schema_rejects_wrong_types_and_records_layout_metadata() -> None:
         schema.validate({})
     with pytest.raises(TypeError, match="Unknown"):
         schema.validate({"value": 0, "typo": 1})
-
-
-def test_animation_graph_orders_dependencies_and_retains_keyed_bindings() -> None:
-    value = pn.Animated.Value(0)
-    derived = (value * 2 + 5).interpolate([0, 100], [0, 1], extrapolate="clamp")
-    detach = derived.attach(99, "opacity")
-    graph = serialize(value)
-    seen: set[int] = set()
-    for node in graph["nodes"]:
-        assert all(parent["node"] in seen for parent in node.get("inputs", []) if "node" in parent)
-        seen.add(node["id"])
-    assert graph["bindings"] == [[99, "opacity", id(derived)]]
-    assert [node["kind"] for node in graph["nodes"]] == ["value", "multiply", "add", "interpolate"]
-    detach()
-    assert serialize(value)["bindings"] == []
-
-
-def test_replacing_derived_bindings_keeps_a_running_graph_owned() -> None:
-    from typing import Any
-
-    from pythonnative.native_views import set_backend
-    from pythonnative.testing import FakeBackend, render
-
-    class GraphBackend(FakeBackend):
-        def __init__(self) -> None:
-            super().__init__()
-            self.bindings: list[list[Any]] = []
-
-        def install_animation_graph(self, tag: int, graph: dict[str, Any]) -> None:
-            self.bindings.append(graph["bindings"])
-
-    backend = GraphBackend()
-    set_backend(backend)
-    value = pn.Animated.Value(0)
-
-    @pn.component
-    def Box(factor: float) -> pn.Element:
-        return pn.Animated.View(style={"opacity": value * factor})
-
-    result = render(Box(0.5), backend=backend)
-    try:
-        backend.bindings.clear()
-        result.rerender(Box(0.75))
-        assert backend.bindings
-        assert all(backend.bindings), "Replacing bindings must never release the entire graph"
-    finally:
-        result.unmount()
-        set_backend(None)
-    assert backend.bindings[-1] == []
 
 
 def test_implicit_queries_do_not_share_unrelated_closures_or_remounts() -> None:

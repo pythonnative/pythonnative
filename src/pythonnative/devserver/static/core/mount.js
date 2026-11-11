@@ -3,7 +3,7 @@
 // `pn_core.js` and `pn_core.wasm` are the C++ core the iOS and Android apps
 // link, compiled to WebAssembly by `scripts/build-core-wasm.py`. This module
 // binds its C ABI (`native/core/include/pn_core.h`), decodes the binary mount
-// transactions and animated writes it produces, and makes the page the
+// transactions and motion writes it produces, and makes the page the
 // core's platform: `CoreHost` installs the `pn_platform` callbacks, drains
 // mount transactions into the DOM renderer, runs deferred work and the
 // animation frame clock, and polls gesture deadlines.
@@ -18,7 +18,7 @@
 
 import createCore from "./pn_core.js";
 
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 export const MEASURE_TEXT = 1;
 export const MEASURE_INTRINSIC = 2;
 export const MEASURE_NATIVE = 3;
@@ -81,7 +81,8 @@ export function decodeValue(bytes) {
  * Decode a mount transaction into `{surface, revision, id, ops}`. Each op is
  * `{kind, tag, ...}` with the fields Python's `MountOp` uses: `component` and
  * `props` (create); `props`, `removed`, and `recreate` (update); `parent` and
- * `index` (insert); `frame` (frame); `name`, `arguments`, and `call_id` (command).
+ * `index` (insert); `frame` (frame); `name`, `arguments`, and `call_id` (command);
+ * `owner` (exit: 0 when the core animates the view out, 1 when the page does).
  */
 export function decodeTransaction(bytes) {
   const r = new Reader(bytes);
@@ -108,16 +109,30 @@ export function decodeTransaction(bytes) {
         ops.push({kind: "command", tag, name, arguments: args, call_id: r.i64()});
         break;
       }
+      case 8: { const tag = r.i64(); ops.push({kind: "exit", tag, owner: r.u8()}); break; }
       default: throw new Error(`Unknown mount op ${code}`);
     }
   }
   return {surface, revision, id, ops};
 }
 
-/** Decode animated prop writes into `[tag, prop, value]` triples. */
+/**
+ * Decode the core's motion writes (RFC 0009) into records:
+ * `{kind: "prop", tag, prop, value}` (a paint prop; `null` restores the
+ * default), `{kind: "frame", tag, frame}` (a layout animation frame), and
+ * `{kind: "remove", tags}` (an exit finished: destroy each, children first).
+ */
 export function decodeWrites(bytes) {
   const r = new Reader(bytes), out = [];
-  for (let n = r.u32(); n > 0; n--) out.push([r.i64(), r.str(), r.value()]);
+  for (let n = r.u32(); n > 0; n--) {
+    const kind = r.u8();
+    switch (kind) {
+      case 0: { const tag = r.i64(), prop = r.str(); out.push({kind: "prop", tag, prop, value: r.value()}); break; }
+      case 1: { const tag = r.i64(); out.push({kind: "frame", tag, frame: [r.f64(), r.f64(), r.f64(), r.f64()]}); break; }
+      case 2: { const tags = []; for (let count = r.u32(); count > 0; count--) tags.push(r.i64()); out.push({kind: "remove", tags}); break; }
+      default: throw new Error(`Unknown motion write kind ${kind}`);
+    }
+  }
   return out;
 }
 
@@ -246,9 +261,14 @@ export class RendererCore {
   command(surface, tag, name, args, callId) {
     return this.strings([name, args || "{}"], (n, a) => this.take(this.module._pn_core_command(this.handle, big(surface), big(tag), n, a, big(callId)))) || "";
   }
-  animate(surface, tag, request) {
-    return this.strings([request], (text) => this.take(this.module._pn_core_animate(this.handle, big(surface), big(tag), text))) || "";
+  /** Queue a motion request (`program`, `shared`, `set`, `animate`, `cancel`, `bind`, `release`, `batch`) behind pending mounts. */
+  motion(surface, request) {
+    return this.strings([request], (text) => this.take(this.module._pn_core_motion(this.handle, big(surface), text))) || "";
   }
+  /** The latest published value of a shared value, as JSON text. */
+  sharedRead(id) { return this.take(this.module._pn_core_shared_read(this.handle, big(id))) ?? "null"; }
+  /** Run one worklet outside the runtime (tests and tooling). */
+  workletEval(request) { return this.strings([request], (text) => this.take(this.module._pn_core_worklet_eval(text))) || ""; }
   measure(surface, tag) { return this.take(this.module._pn_core_measure(this.handle, big(surface), big(tag))) || "null"; }
   inspect(surface, x, y) { return this.take(this.module._pn_core_inspect(this.handle, big(surface), x, y)) || "null"; }
   validateModule(module, method, args) {
@@ -291,6 +311,21 @@ export class RendererCore {
     return size ? decodeWrites(this.copy(view.getUint32(s, true), size)) : [];
   }
   setReduceMotion(enabled) { this.module._pn_core_set_reduce_motion(this.handle, enabled ? 1 : 0); }
+  /** A page-owned exit (`exit` op owner 1) finished; the core queues its `remove` write. */
+  exitFinished(surface, tag) { this.module._pn_core_exit_finished(this.handle, big(surface), big(tag)); }
+  /**
+   * The views sharing a `shared_tag` between two screens, as
+   * `[{name, source, target, transition, source_style, target_style}]`.
+   */
+  sharedElements(surface, fromScreen, toScreen) {
+    const text = this.take(this.module._pn_core_shared_elements(this.handle, big(surface), big(fromScreen), big(toScreen)));
+    try {
+      const pairs = text ? JSON.parse(text) : [];
+      return Array.isArray(pairs) ? pairs : [];
+    } catch (error) {
+      return [];
+    }
+  }
 
   /**
    * Feed `{phase, pointer, x, y, windowX, windowY, time}` events (points and
@@ -356,7 +391,7 @@ function finite(value) {
  * Connects one core to the DOM renderer: the UI thread of the preview.
  *
  * `send(kind, tag, name, payload)` delivers the core's messages (events,
- * layout, animation, host) and command results to Python.
+ * layout, motion, host) and command results to Python.
  */
 export class CoreHost {
   constructor(core, renderer, {send}) {
@@ -368,6 +403,10 @@ export class CoreHost {
     this.workTimer = 0;
     this.frameHandle = 0;
     this.gestureTimers = new Map();
+    // Page-owned exits that finished while their own transaction was still
+    // mounting; the core learns about an exit only in `mount_finished`.
+    this.mounting = false;
+    this.finishedExits = [];
     renderer.attach(this);
     core.setPlatform({
       scheduleMount: () => this.scheduleMount(),
@@ -419,13 +458,19 @@ export class CoreHost {
     try {
       for (let next = this.core.mountNext(); next; next = this.core.mountNext()) {
         let error = null;
+        this.mounting = true;
         try {
           this.renderer.applyTransaction(decodeTransaction(next.bytes));
         } catch (failure) {
           console.error("[pn] mount transaction failed", failure);
           error = String(failure?.message || failure);
+        } finally {
+          this.mounting = false;
         }
         this.core.mountFinished(next.id, error);
+        for (const [surface, tag] of this.finishedExits.splice(0)) this.core.exitFinished(surface, tag);
+        // Entering animations write their first values in `mount_finished`;
+        // apply them in the same turn, before the page paints.
         this.applyWrites();
       }
     } finally {
@@ -444,7 +489,26 @@ export class CoreHost {
   }
 
   applyWrites() {
-    for (const [tag, prop, value] of this.core.takeWrites()) this.renderer.applyAnimated(tag, prop, value);
+    const writes = this.core.takeWrites();
+    if (writes.length) this.renderer.applyWrites(writes);
+  }
+
+  /**
+   * A page-owned exit (a popped screen or a destroyed modal) finished its
+   * transition: the core answers with a `remove` write for the subtree.
+   */
+  exitFinished(surface, tag) {
+    if (this.mounting) {
+      this.finishedExits.push([surface, tag]);
+      return;
+    }
+    this.core.exitFinished(surface, tag);
+    this.applyWrites();
+  }
+
+  /** Shared-element pairs between two screens of a stack (RFC 0009). */
+  sharedElements(surface, fromScreen, toScreen) {
+    return this.core.sharedElements(surface, fromScreen, toScreen);
   }
 
   /** A view's command ran (or failed); Python resolves the awaiting future. */
@@ -506,7 +570,8 @@ export class CoreHost {
   commit(envelope) { return this.core.commit(envelope); }
   layout(request) { return this.core.layout(request); }
   command(surface, tag, name, args, callId) { return this.core.command(surface, tag, name, args, callId); }
-  animate(surface, tag, request) { return this.core.animate(surface, tag, request); }
+  motion(surface, request) { return this.core.motion(surface, request); }
+  sharedRead(id) { return this.core.sharedRead(id); }
   measure(surface, tag) { return this.core.measure(surface, tag); }
 
   /** The page went away from Python: forget the core's state and every view. */
@@ -517,6 +582,7 @@ export class CoreHost {
     this.frameHandle = 0;
     for (const {timer} of this.gestureTimers.values()) clearTimeout(timer);
     this.gestureTimers.clear();
+    this.finishedExits = [];
     this.core.reset();
     this.renderer.reset();
   }

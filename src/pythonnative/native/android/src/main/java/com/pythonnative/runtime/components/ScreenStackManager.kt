@@ -8,6 +8,9 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
+import android.view.animation.Animation
+import android.view.animation.AnimationUtils
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -24,7 +27,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.R
+import com.pythonnative.runtime.animation.MotionTiming
 import com.pythonnative.runtime.core.PNCore
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -82,10 +87,36 @@ class ScreenManager : ViewManager() {
 
 /** A native fragment displays an existing logical screen's view. */
 class LogicalScreenFragment : Fragment() {
+    /**
+     * Called once when the fragment's view is destroyed. A removed fragment
+     * destroys its view after its exit animation, which is when a leaving
+     * screen's exit finishes.
+     */
+    internal var onViewDestroyed: (() -> Unit)? = null
+
+    /** The duration and curve of this transaction's animations, when a shared-element flight sets them. */
+    internal var timing: MotionTiming? = null
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         val view = PNBridge.registry.get(requireArguments().getLong("tag"))?.view ?: View(requireContext())
         (view.parent as? ViewGroup)?.removeView(view)
         return view
+    }
+
+    override fun onCreateAnimation(transit: Int, enter: Boolean, nextAnim: Int): Animation? {
+        val timing = timing ?: return null
+        if (nextAnim == 0) return null
+        return AnimationUtils.loadAnimation(requireContext(), nextAnim).apply {
+            duration = timing.durationMs
+            interpolator = timing.interpolator
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        val done = onViewDestroyed
+        onViewDestroyed = null
+        done?.invoke()
     }
 }
 
@@ -105,6 +136,14 @@ class LogicalScreenFragment : Fragment() {
  * On Activity recreation the fragment manager restores the
  * `pn-screen-<tag>` fragments; [Stack.schedule] adopts them by tag
  * instead of adding duplicates and removes any whose screen is gone.
+ *
+ * A popped screen leaves as a platform-owned exit (RFC 0009): the stack
+ * removes its fragment with the pop animation while the screen's views
+ * stay mounted, and reports the exit finished once the fragment's view is
+ * destroyed after that animation. When the leaving and shown screens
+ * share views by `shared_tag`, the stack times both screens' animations
+ * like the flight and flies each target view in the container's overlay
+ * ([SharedElementFlight]). Flights aren't interactive.
  *
  * Predictive back: the app manifest enables
  * `enableOnBackInvokedCallback`, and `PNScreenFragment` registers a
@@ -139,6 +178,9 @@ class ScreenStackManager : ComponentManager() {
         /** Effective animation and transparency per screen tag, kept past the record's destruction for pops. */
         val animations = HashMap<Long, String>()
         val transparent = HashSet<Long>()
+        /** Leaving screens' exit-finished callbacks, until their fragments' views are destroyed. */
+        val exits = HashMap<Long, () -> Unit>()
+        val flights = ArrayList<SharedElementFlight>()
         var lastTop: Long? = null
         var scheduled = false
         var owner: FragmentManager? = null
@@ -170,7 +212,10 @@ class ScreenStackManager : ComponentManager() {
             scheduled = true
             post {
                 scheduled = false
-                if (!isAttachedToWindow) return@post
+                if (!isAttachedToWindow) {
+                    finishExits()
+                    return@post
+                }
                 val manager = owner ?: runCatching { FragmentManager.findFragment<Fragment>(this).childFragmentManager }.getOrNull()
                     ?: (context as? FragmentActivity)?.supportFragmentManager ?: return@post
                 owner = manager
@@ -191,18 +236,35 @@ class ScreenStackManager : ComponentManager() {
             else ScreenTransitions.push(animations[top] ?: "slide_from_right")
         }
 
+        /** Report every pending exit finished (the stack can't animate them). */
+        fun finishExits() {
+            val pending = exits.values.toList()
+            exits.clear()
+            for (done in pending) done()
+        }
+
         private fun commit(manager: FragmentManager) {
             val transaction = manager.beginTransaction().setReorderingAllowed(true)
             val transition = transition()
             if (!transition.isNone) transaction.setCustomAnimations(transition.enter, transition.exit)
+            val previous = lastTop
+            val top = screens.lastOrNull()
+            val pairs = if (!transition.isNone && previous != null && top != null && previous != top) PNCore.sharedElements(previous, top) else JSONArray()
+            val timing = if (pairs.length() > 0) flightTiming(pairs) else null
+            for (flight in flights.toList()) flight.end()
+            flights.clear()
+            for (fragment in fragments.values) fragment.timing = timing
             // Fragments for screens that left the stack, including ones a
             // recreated Activity restored for screens that no longer exist.
             for ((tag, fragment) in fragments.toMap()) if (tag !in screens) {
+                exits.remove(tag)?.let { done -> if (fragment.view != null) fragment.onViewDestroyed = done else done() }
                 transaction.remove(fragment)
                 fragments.remove(tag)
                 animations.remove(tag)
                 transparent.remove(tag)
             }
+            // Leaving screens that never had a fragment finish now.
+            for (tag in exits.keys.filter { it !in fragments }) exits.remove(tag)?.invoke()
             for (fragment in manager.fragments) {
                 val tag = fragment.tag?.removePrefix(FRAGMENT_TAG_PREFIX)?.toLongOrNull() ?: continue
                 if (fragment.tag?.startsWith(FRAGMENT_TAG_PREFIX) == true && tag !in screens && fragments[tag] !== fragment) transaction.remove(fragment)
@@ -218,6 +280,7 @@ class ScreenStackManager : ComponentManager() {
                     val restored = found?.takeIf { it.view == null || it.view === PNBridge.registry.get(tag)?.view }
                     if (found != null && restored == null) transaction.remove(found)
                     fragment = restored ?: LogicalScreenFragment().apply { arguments = Bundle().apply { putLong("tag", tag) } }
+                    fragment.timing = timing
                     fragments[tag] = fragment
                     if (restored == null) transaction.add(container.id, fragment, FRAGMENT_TAG_PREFIX + tag)
                 }
@@ -230,6 +293,30 @@ class ScreenStackManager : ComponentManager() {
             }
             transaction.commitNow()
             lastTop = screens.lastOrNull()
+            if (timing != null) fly(pairs, timing)
+        }
+
+        /** The flight's timing: the first pair's `transition`, else Android's push. */
+        private fun flightTiming(pairs: JSONArray): MotionTiming {
+            for (index in 0 until pairs.length()) {
+                pairs.optJSONObject(index)?.optJSONObject("transition")?.let { return MotionTiming.of(it) }
+            }
+            return MotionTiming.of(null)
+        }
+
+        /** Fly each pair once the shown screen is laid out, before its first frame draws. */
+        private fun fly(pairs: JSONArray, timing: MotionTiming) {
+            viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    if (viewTreeObserver.isAlive) viewTreeObserver.removeOnPreDrawListener(this)
+                    for (index in 0 until pairs.length()) {
+                        val pair = pairs.optJSONObject(index) ?: continue
+                        val flight = SharedElementFlight(container, pair, timing)
+                        if (flight.start()) flights.add(flight)
+                    }
+                    return true
+                }
+            })
         }
 
         private fun applyHeader() {
@@ -305,6 +392,18 @@ class ScreenStackManager : ComponentManager() {
         PNBridge.registry.recordFor(child)?.let { stack.screens.remove(it.tag) }
         stack.schedule()
     }
+    /** Pop a leaving screen with the stack's animation; `finished` runs once its fragment's view is gone. */
+    override fun exitChild(parent: View, child: View, finished: () -> Unit) {
+        val stack = parent as Stack
+        val tag = PNBridge.registry.recordFor(child)?.tag
+        if (tag == null) {
+            removeChild(parent, child)
+            finished()
+            return
+        }
+        stack.exits[tag] = finished
+        removeChild(parent, child)
+    }
     override fun command(view: View, name: String, args: JSONObject): Any? {
         if (name == "restore_stack") (view as Stack).schedule()
         return null
@@ -317,6 +416,9 @@ class ScreenStackManager : ComponentManager() {
             for (fragment in stack.fragments.values) transaction.remove(fragment)
             transaction.commitAllowingStateLoss()
         }
+        for (flight in stack.flights.toList()) flight.end()
+        stack.flights.clear()
+        stack.finishExits()
         stack.screens.clear()
         stack.fragments.clear()
         stack.animations.clear()

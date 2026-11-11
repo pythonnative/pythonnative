@@ -61,9 +61,13 @@ class AndroidTransport:
         """Queue a view command behind pending mounts."""
         return self.core.command(surface, tag, name, args_json, call_id)
 
-    def animate(self, surface: int, tag: int, request_json: str) -> str:
-        """Queue an animation request behind pending mounts."""
-        return self.core.animate(surface, tag, request_json)
+    def motion(self, surface: int, request_json: str) -> str:
+        """Queue a motion request behind pending mounts (RFC 0009)."""
+        return self.core.motion(surface, request_json)
+
+    def shared_read(self, ident: int) -> str:
+        """The latest value the UI thread published for a shared value, as JSON."""
+        return self.core.shared_read(ident)
 
     def measure(self, surface: int, tag: int) -> str:
         """The shadow and window frames of a view."""

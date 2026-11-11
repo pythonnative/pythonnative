@@ -363,16 +363,33 @@ def Editor() -> pn.Node:
 iOS has no system back button, so the handler never fires there;
 swipe-back is controlled by the navigation stack instead.
 
-### use_animated_value
+### use_shared_value
 
-Create an [`AnimatedValue`][pythonnative.AnimatedValue] that's stable
-across renders. Equivalent to wrapping `pn.Animated.Value(initial)` in
-`use_memo(..., [])` but more discoverable:
+Create a [`SharedValue`][pythonnative.SharedValue] that's stable across
+renders, like a ref, but that the UI thread owns. Worklets read and
+write it there, and
+[`use_animated_style`][pythonnative.use_animated_style] turns it into a
+style without re-rendering:
 
 ```python
-opacity = pn.use_animated_value(0.0)
-pn.Animated.timing(opacity, to=1.0, duration=300).start()
+opacity = pn.use_shared_value(0.0)
+faded = pn.use_animated_style(lambda: {"opacity": opacity.value})
+
+
+async def appear() -> None:
+    await opacity.animate(pn.with_timing(1.0, duration=300))
+
+
+pn.use_effect(appear, [])
+return pn.View(child, style=[styles.card, faded])
 ```
+
+Reading `opacity.value` during render doesn't subscribe to it; read it
+in a worklet instead. The other Motion hooks
+([`use_derived_value`][pythonnative.use_derived_value],
+[`use_animated_reaction`][pythonnative.use_animated_reaction], and
+[`use_frame_callback`][pythonnative.use_frame_callback]) take worklets
+and no dependency list; see the [Motion guide](../guides/motion.md#hooks).
 
 ### use_context
 

@@ -15,7 +15,7 @@ from ..style import (
 from ._base import _make_element
 from .events import ImageLoadEvent, WebNavigationEvent
 from .layout import View
-from .props import AccessibilityProps
+from .props import CommonProps
 
 ImageSource = Union[str, Asset]
 """What ``Image.source`` accepts: a URL, ``data:`` URI, file path, or bundled [`Asset`][pythonnative.Asset]."""
@@ -46,7 +46,7 @@ def Image(
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Display a bundled, local, or remote image.
 
@@ -130,7 +130,7 @@ def ImageBackground(
     scale_type: Optional[ScaleType] = None,
     style: StyleProp = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Render ``children`` layered on top of a background image.
 

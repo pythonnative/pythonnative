@@ -1,0 +1,32 @@
+# Tests interpolate and interpolate_color in an animated style, and that
+# the core's interpolate_color (through use_derived_value) agrees with
+# Python's at the end of the run.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/interpolate.py
+# Source under test: src/pythonnative/motion/animations.py :: interpolate, interpolate_color, clamp
+#                    src/pythonnative/motion/hooks.py :: use_derived_value
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: Interpolate
+- assertVisible: "Status: idle"
+- assertVisible: "Midpoint color: #FFF59E0B"
+- assertVisible: "Clamped past the end: 160"
+- assertVisible: "Extended past the end: 320"
+- tapOn: "Run interpolate"
+- extendedWaitUntil:
+    visible: "Status: done"
+    timeout: 5000
+- assertVisible: "End color: #FF22C55E"
+- assertVisible: "Colors match: yes"
+- tapOn: "Reset interpolate"
+- extendedWaitUntil:
+    visible: "Status: idle"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

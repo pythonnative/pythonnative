@@ -6,8 +6,10 @@ numbers are host timings for comparing changes on one machine, not device
 measurements: ``import pythonnative`` in a fresh interpreter, element
 construction, re-rendering a 300-component tree headlessly, and a first
 commit of 300 views to the renderer core (validation, layout, and the
-mount transaction, RFC 0007). ``tests/test_performance_budgets.py`` enforces
-the deterministic properties behind these timings.
+mount transaction, RFC 0007), and one display frame of the motion runtime
+driving 200 animated styles from a running spring (RFC 0009).
+``tests/test_performance_budgets.py`` enforces the deterministic properties
+behind these timings.
 """
 
 from __future__ import annotations
@@ -99,6 +101,58 @@ def core_committer(envelope: dict[str, Any]) -> Callable[[int], Any]:
     return commit
 
 
+_driver: list[Any] = []
+
+
+@pn.component
+def Moving(index: int) -> pn.Node:
+    """A view whose animated style reads the shared driver every frame."""
+    style = pn.use_animated_style(
+        lambda: {
+            "opacity": pn.interpolate(_driver[0].value, (0, 100), (0.2, 1), "clamp"),
+            "transform": [{"translate_x": _driver[0].value * 0.5}, {"rotate": _driver[0].value / 10}],
+        }
+    )
+    return pn.View(style=[{"width": 10, "height": 10}, style])
+
+
+@pn.component
+def Field() -> pn.Node:
+    """200 views, each with its own animated style worklet."""
+    driver = pn.use_shared_value(0.0)
+    _driver[:] = [driver]
+    return pn.Column(*(Moving(i).with_key(str(i)) for i in range(200)))
+
+
+def motion_frame_us(frames: int = 120) -> list[float]:
+    """Microseconds per display frame: one spring step, then 200 animated style worklets and their writes."""
+    tree = render(Field())
+    core = tree.backend.native.core
+    from pythonnative.motion.runtime import runtime as motion
+
+    _driver[0].value = pn.with_spring(100, stiffness=40, damping=4)
+    motion.flush_all()
+    tree.backend.native.drain()
+    runs = core.motion(tree.backend.surface, '{"op": "batch", "requests": []}')
+    assert '"ok":true' in runs.replace(" ", ""), runs
+    import ctypes
+
+    from pythonnative.bridge.core import _Bytes
+
+    samples = []
+    buffer = _Bytes()
+    for index in range(frames):
+        started = time.perf_counter()
+        running = core.animation_frame(1000 + index * 1000 / 60)
+        # The platform reads the writes natively; take them without decoding them in Python.
+        core._take_writes(core._handle, ctypes.byref(buffer))
+        if running:
+            samples.append((time.perf_counter() - started) * 1e6)
+    assert core.shared_read(_driver[0].id) != "0.0", "the spring never ran"
+    tree.unmount()
+    return samples
+
+
 def summary(samples: list[float]) -> dict[str, float]:
     """Median and best of a set of samples."""
     return {"median": round(statistics.median(samples), 3), "min": round(min(samples), 3)}
@@ -124,6 +178,7 @@ def main() -> None:
         "element_us": summary([ms * 1000 for ms in per_call_ms(lambda i: Cell(f"cell {i}", i), 2000)]),
         "rerender_300_ms": summary(per_call_ms(lambda i: tree.rerender(Grid(i)), 5)),
         "core_commit_300_ms": summary(per_call_ms(core_committer(envelope), 20)),
+        "motion_frame_200_styles_us": summary(motion_frame_us()),
     }
     text = json.dumps(report, indent=2)
     print(text)

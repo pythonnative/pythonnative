@@ -63,6 +63,53 @@ final class PNGestureTests: XCTestCase {
         XCTAssertEqual(PNGestureCoordinator.swipeDirection("any"), [.left, .right, .up, .down])
     }
 
+    func testOnlyPansThatSidewaysTravelCanBeginClaimItFromTheBackSwipe() {
+        // A Swipeable row and a bare pan claim a sideways swipe; a sheet's
+        // vertical-only pan leaves it to iOS 26's back swipe.
+        XCTAssertTrue(PNPanConfig(["active_offset_x": [-10, 10], "fail_offset_y": [-10, 10]]).claimsHorizontalTravel)
+        XCTAssertTrue(PNPanConfig([:]).claimsHorizontalTravel)
+        XCTAssertTrue(PNPanConfig(["active_offset_y": [-6, 6], "min_distance": 20]).claimsHorizontalTravel)
+        XCTAssertFalse(PNPanConfig(["active_offset_y": [-6, 6]]).claimsHorizontalTravel)
+        let pan = PNPanGestureRecognizer(config: PNPanConfig([:]))
+        XCTAssertFalse(PNGestureCoordinator.isContentPop(pan, above: UIView()))
+    }
+
+    func testIOS26BackSwipeWaitsForASidewaysPan() throws {
+        #if compiler(>=6.2)
+        guard #available(iOS 26.0, *) else { throw XCTSkip("iOS 26 adds the full-width back swipe") }
+        let manager = PNViewManager()
+        let row = manager.createView(tag: 1, props: [
+            "gestures": [["kind": "pan", "active_offset_x": [-10, 10], "fail_offset_y": [-10, 10], "simultaneous": [], "wait_for": []]],
+        ])
+        let handle = manager.createView(tag: 2, props: [
+            "gestures": [["kind": "pan", "active_offset_y": [-6, 6], "simultaneous": [], "wait_for": []]],
+        ])
+        let detail = UIViewController()
+        detail.view.addSubview(row)
+        detail.view.addSubview(handle)
+        let navigation = UINavigationController(rootViewController: UIViewController())
+        navigation.pushViewController(detail, animated: false)
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = navigation
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        navigation.view.layoutIfNeeded()
+
+        let contentPop = try XCTUnwrap(navigation.interactiveContentPopGestureRecognizer)
+        let edgePop = try XCTUnwrap(navigation.interactivePopGestureRecognizer)
+        let rowPan = try XCTUnwrap(PNViewState.existing(for: row)?.gestureRecognizers.first)
+        let handlePan = try XCTUnwrap(PNViewState.existing(for: handle)?.gestureRecognizers.first)
+        let coordinator = PNGestureCoordinator.shared
+        // A Swipeable-style row claims a sideways swipe; the back swipe waits for it.
+        XCTAssertTrue(coordinator.gestureRecognizer(rowPan, shouldBeRequiredToFailBy: contentPop))
+        // A sheet handle that only moves vertically leaves the swipe alone, as does the edge swipe.
+        XCTAssertFalse(coordinator.gestureRecognizer(handlePan, shouldBeRequiredToFailBy: contentPop))
+        XCTAssertFalse(coordinator.gestureRecognizer(rowPan, shouldBeRequiredToFailBy: edgePop))
+        #else
+        throw XCTSkip("needs the iOS 26 SDK")
+        #endif
+    }
+
     func testAnyDirectionSwipeInstallsOneRecognizerPerDirection() {
         let manager = PNViewManager()
         let view = manager.createView(tag: 3, props: [
@@ -79,19 +126,5 @@ final class PNGestureTests: XCTestCase {
         XCTAssertEqual(swipes.map { $0.direction }, [.left, .right, .up, .down])
         XCTAssertTrue(swipes.allSatisfy { coordinator.index(of: $0) == 1 }, "every recognizer reports the spec index")
         XCTAssertNil(coordinator.direction(of: recognizers[0]))
-    }
-
-    func testAnimatorSetAppliesImmediately() {
-        let core = PNCoreHarness()
-        core.roots = [50]
-        core.commit([["c", 50, "View", ["opacity": 1, "background_color": "#000000"]]])
-        core.animate(tag: 50, ["op": "set", "prop": "opacity", "value": 0.25])
-        XCTAssertEqual(PNViewRegistry.shared.view(for: 50)?.alpha ?? 0, 0.25, accuracy: 0.001)
-        core.animate(tag: 50, ["op": "set", "prop": "translate_x", "value": 12])
-        XCTAssertEqual(PNViewRegistry.shared.view(for: 50)?.transform.tx ?? 0, 12, accuracy: 0.001)
-        let request = PNJSON.encode(["op": "start", "id": 1, "prop": "opacity", "spec": ["kind": "mystery"]])
-        let reply = request.withCString { pn_core_animate(PNCore.handle, PNCore.surface, 50, $0) }
-        defer { pn_core_free(reply) }
-        XCTAssertEqual(PNJSON.decodeObject(reply.map { String(cString: $0) })["ok"] as? Bool, false)
     }
 }

@@ -1,7 +1,7 @@
 # The native bridge
 
 Python reaches the native side through two channels. Commits, layout
-reads, view commands, and animation requests go to the **renderer core**,
+reads, view commands, and motion requests go to the **renderer core**,
 a C++20 library with a C ABI (`native/core/include/pn_core.h`) that every
 target links: the iOS app binary, Android's `libpncore.so`, the
 `pythonnative._core` extension that tests and tooling load on the
@@ -12,26 +12,28 @@ module calls go to the platform runtime: Swift in
 
 Python owns component state, reconciliation, and logical relationships.
 The core owns validation, the shadow tree, layout, view flattening, list
-datasets, animation graphs, and (on Android, in the browser, and in tests)
-gesture recognition. The platform's mounting layer owns widgets, text
-drawing, input, scrolling, navigation containers, accessibility, and the
-frame clock. Python binds the core with `ctypes`
-([`pythonnative.bridge.core`](../api/bridge.md#renderer-core)); the
-protocol version is 7.
+datasets, the motion runtime (worklets, shared values, animations, and
+layout animations; see [Motion](../guides/motion.md)), and (on Android,
+in the browser, and in tests) gesture recognition. The platform's
+mounting layer owns widgets, text drawing, input, scrolling, navigation
+containers, accessibility, and the frame clock. Python binds the core
+with `ctypes` ([`pythonnative.bridge.core`](../api/bridge.md#renderer-core));
+the protocol version is 8.
 
 ## Threads and the deadlock rule
 
 | Thread | Calls into the core | May wait on |
 | --- | --- | --- |
-| Python application loop | `pn_core_measure`, `pn_core_command`, `pn_core_animate` (short, under the core lock) | the core lock |
+| Python application loop | `pn_core_measure`, `pn_core_command`, `pn_core_motion` (short, under the core lock), `pn_core_shared_read` (a published snapshot) | the core lock |
 | Commit worker (the loop's executor) | `pn_core_commit`, with the GIL released by `ctypes` | the core lock; the UI thread, only to measure an `intrinsic` leaf |
 | Core work (a non-UI thread the platform schedules) | `pn_core_work`, which relayouts after container and intrinsic size reports | the core lock; the UI thread, as above |
-| Platform UI thread | `pn_core_mount_next`, `pn_core_mount_finished`, `pn_core_animation_frame`, `pn_core_take_writes`, `pn_core_event`, `pn_core_pointer`, `pn_core_report_*`, list reads | nothing |
+| Platform UI thread | `pn_core_mount_next`, `pn_core_mount_finished`, `pn_core_animation_frame`, `pn_core_take_writes`, `pn_core_event`, `pn_core_pointer`, `pn_core_exit_finished`, `pn_core_shared_elements`, `pn_core_report_*`, list reads | nothing |
 
 The rule that keeps this deadlock-free: **the UI thread never waits on
 another thread and never takes the core's commit lock.** It takes mount
 transactions from a queue, owns the mount-side state (list data sources,
-animated values, gesture recognizers), and posts everything else
+the motion runtime's shared values and bindings, gesture recognizers),
+and runs worklets there. It posts everything else
 (container sizes, loaded image sizes, re-measure requests) to the core
 without blocking. The core asks the platform to run that deferred work
 through its `schedule_work` callback, on any thread but the UI thread.
@@ -53,12 +55,12 @@ A commit follows these steps:
    One transaction mounts at a time.
 
 Effects therefore run after the core accepts and lays out a commit, not
-after widgets exist. Commands and animation requests those effects issue
+after widgets exist. Commands and motion requests those effects issue
 queue behind the commit's mount, so they always reach the widgets it
 creates.
 
 Native never waits for Python, and Python never answers a callback:
-every message (`event`, `host`, `module`, `animation`, `layout`, and
+every message (`event`, `host`, `module`, `motion`, `layout`, and
 `command`) is queued and delivered in order to the application loop.
 Navigation back requests and recycled-row requests are asynchronous.
 Messages sent before Python has started, such as a screen's `create`
@@ -68,8 +70,9 @@ publishes it (`Host.set_state`) and hand it back in the next `create`
 payload as `restored_state`. Viewport metrics (size, insets, keyboard
 height, color scheme, scale, and font scale) travel on the `layout` and
 `resume` host events. Adjacent continuous scroll and gesture samples can
-be coalesced; discrete input preserves order. Animated event bindings
-evaluate in the core before the event is queued to Python.
+be coalesced; discrete input preserves order. An event or gesture whose
+handler is a worklet runs in the core and isn't queued to Python at
+all.
 
 ## Commits
 
@@ -77,7 +80,7 @@ A surface commit has this shape:
 
 ```json
 {
-  "version": 7,
+  "version": 8,
   "application": "3f2a9c41-6c1e-4b8a-9d55-0d1f7e2b8c10",
   "surface": 1,
   "revision": 42,
@@ -193,6 +196,7 @@ The core hands the UI thread a little-endian binary buffer:
 | `5` delete | `i64` tag (also detaches the view from its parent) |
 | `6` frame | `i64` tag, `f64` x, y, width, height |
 | `7` command | `i64` tag, `str` name, `value` arguments, `i64` call id |
+| `8` exit | `i64` tag, `u8` owner: `0` when the core animates the view out (an `exiting` animation) and later sends a `remove` write, or `1` when the platform does (a leaving stack screen or a closing modal) and calls `pn_core_exit_finished` |
 
 A `str` is a `u32` byte length followed by UTF-8. A `value` is a `u8`
 kind followed by its payload: `0` null, `1` false, `2` true, `3` an `i64`,
@@ -209,8 +213,15 @@ with a reset. Relayouts that native changes cause (a container resizes,
 an image loads) produce frame-only transactions, and Python receives
 the observed frames as a `layout` message.
 
-Animation requests don't occupy ops: the core attaches them to a
-transaction and runs them when the platform reports that transaction
+An `exit` replaces the `delete` of the outermost removed view that has
+an exit animation, and the deletes of its descendants are dropped. The
+platform keeps the view and its subtree where they are but stops
+routing touches to them, and it skips exiting siblings when it resolves
+the index of a later `insert`. Tags come from a counter that never
+reuses one, so a view that's still exiting can't collide with a new one.
+
+Motion requests don't occupy ops: the core attaches them to a
+transaction and applies them when the platform reports that transaction
 mounted.
 [`pythonnative.bridge.core.decode_transaction`][pythonnative.bridge.core.decode_transaction]
 is the reference decoder, and the Swift, Kotlin, and JavaScript mounting
@@ -220,23 +231,27 @@ layers each implement the same format.
 
 The platform passes each view event through `pn_core_event(surface, tag,
 name, arguments, edit_revision)`. The core stamps the mounted
-application, surface, revision, and a sequence number, feeds any
-animated event bindings, and queues an `event` message whose payload is
+application, surface, revision, and a sequence number, and queues an `event` message whose payload is
 `{"application", "surface", "revision", "sequence", "args",
-"edit_revision"}`. The backend rejects callbacks from earlier
+"edit_revision"}`. When the view's `_pn_motion` prop binds the event to a
+worklet, the core runs the worklet instead and queues nothing. The
+backend rejects callbacks from earlier
 applications, destroyed tags, future revisions, and replayed sequences.
 Event payloads for `on_layout`, `on_scroll`, `on_selection_change`,
 `on_key_press`, and `on_content_size_change` are reconstructed into the
 frozen dataclasses in `pythonnative.components.events` before the
 callback runs. Gesture callbacks arrive as `gesture:N` events, where `N`
-indexes the view's `gestures` list.
+indexes the view's `gestures` list. A gesture spec whose callbacks are
+worklets carries their handler bindings under `"worklets"`, keyed by
+gesture state, and the core runs them for both its own gesture engine
+and the events iOS's UIKit recognizers report.
 
 Text changes also carry an edit revision. Python echoes the latest revision it
 has processed with controlled `value` updates. A native input ignores older
 echoes, preserves the selection where possible, and avoids replacing an active
 IME composition. Typing therefore doesn't wait for Python rendering.
 
-## Commands, animations, and layout reads
+## Commands, motion, and layout reads
 
 `pn_core_command(surface, tag, name, arguments, call_id)` validates the
 arguments against the component's contract and queues the command behind
@@ -248,12 +263,19 @@ UI thread runs the command and answers with a `command` message,
 awaits. A ref's handle addresses a live tag; commands against a destroyed
 tag raise an error.
 
-`pn_core_animate(surface, tag, request)` validates an animation request
-(`graph`, `start`, `cancel`, or `set`) and queues it the same way. The
-core reports each driver's end as an `animation` message, `{"id",
-"finished", "value"}`, and a driver started with `report: true` (a value
-with Python listeners or no bound view) also sends `{"id", "value"}` every
-frame.
+`pn_core_motion(surface, request)` validates a motion request and queues
+it the same way. A request's `op` is `program` (install a compiled
+worklet), `shared` (define a shared value), `set`, `animate`, or
+`cancel` (write a shared value), `bind` (a derived value, reaction,
+frame callback, animated style, or event handler), `release` (forget
+shared values or bindings), or `batch` (several requests at once). Python
+sends the requests it has queued as one batch, just before the commit
+that references them or on the application loop's next turn.
+`pn_core_shared_read(id)` returns the latest value the UI thread
+published for a shared value, as JSON, without waiting for it. The core
+sends `motion` messages back: `finished` when an awaited animation
+settles, `call` for each `run_on_python`, and `error` when a worklet
+fails, with its file, line, and the exception it raised.
 
 `pn_core_measure(surface, tag)` reads the shadow tree, flattened views
 included, and returns `{"frame": [x, y, w, h], "window": [x, y, w, h]}`.
@@ -282,7 +304,7 @@ iOS also preserves it as measured row heights replace estimates. Global and
 section headers don't change public item indices. Row instances can unmount
 outside the window, so persistent item state belongs in app data.
 
-## Modules, contracts, and animations
+## Modules, contracts, and motion
 
 Module calls carry a call ID and arguments. A module can settle inline or return
 `pending` and settle later. Cancellation removes the Python waiter and notifies
@@ -317,22 +339,42 @@ version and the contract fingerprint compiled into the native library, and
 a mismatch fails with "Native component contracts changed. Rebuild the app
 with 'pn run'."
 
-Animation graphs describe values, arithmetic, interpolation, colors, and
-clamping. The core runs timing, spring, and decay drivers and evaluates
-connected bindings. The platform's frame clock calls
-`pn_core_animation_frame(timestamp_ms)`, which returns whether more frames
-are needed, and then `pn_core_take_writes`, which returns the frame's
-animated prop writes:
+Worklets reach the core as programs: stack-machine code that Python
+compiles from each worklet's syntax tree, with a constant table and the
+names it captures. The core verifies every program when it's installed
+(operand indices, jump targets, and stack depth) and runs it
+in a small VM with an instruction budget per run. The motion runtime
+holds shared values, the bindings that read them, and the animation
+drivers that write them. The platform's frame clock calls
+`pn_core_animation_frame(timestamp_ms)`, which advances drivers and runs
+derived values, reactions, frame callbacks, and animated styles in that
+order, and returns whether more frames are needed. The platform then
+calls `pn_core_take_writes`, also after each event and each mount, which
+returns what changed:
 
 | Part | Encoding |
 | --- | --- |
 | Header | `u32` write count |
-| Each write | `i64` tag, `str` prop, `value` |
+| `0` prop | `i64` tag, `str` prop, `value`: a paint property; `null` restores the static value |
+| `1` frame | `i64` tag, `f64` x, y, width, height: a layout animation's frame |
+| `2` remove | `u32` count, `i64` tags: exits that finished; destroy each view, children first |
 
-The platform applies each write to the view's animated property. The core
-asks for frames through the `request_frames` callback. Scroll and gesture
-mappings feed graph values directly, so visual updates continue while the
-Python application thread is busy.
+Each record starts with its `u8` kind. Layout properties an animated
+style writes don't appear here: the core posts them to its layout
+worker, which relayouts and sends the new frames through the normal
+mount queue. The core asks for frames through the `request_frames`
+callback, and `pn_core_set_reduce_motion` tells it the platform's
+reduce-motion setting.
+
+Two calls serve the platform's screen transitions.
+`pn_core_exit_finished(surface, tag)` reports that a leaving screen or
+modal (an `exit` op with owner `1`) finished its native transition, and
+the core answers with its `remove` write.
+`pn_core_shared_elements(surface, from_screen, to_screen)` returns the
+mounted views the two screens share by `shared_tag`, as
+`{"name", "source", "target", "transition", "source_style",
+"target_style"}` records, and the platform flies each pair in its own
+overlay while the screens move.
 
 ## The browser preview
 
@@ -340,8 +382,8 @@ Under `pn preview` the renderer core runs in the page, compiled to
 WebAssembly (`devserver/static/core/pn_core.wasm`), and
 [`WebTransport`][pythonnative.bridge.web.WebTransport] forwards each call
 Python makes into the core over the dev server's WebSocket.
-`load_contracts`, `commit`, `layout`, `command`, `animate`, and `measure`
-become requests that the page answers with the core's own JSON reply.
+`load_contracts`, `commit`, `layout`, `command`, `motion`, `shared_read`,
+and `measure` become requests that the page answers with the core's own JSON reply.
 Envelopes travel as the text Python serialized, so the core parses each one
 once. Everything the core emits, and every command result, comes back as a
 callback, as on device. Python waits for each reply on the calling thread

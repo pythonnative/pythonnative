@@ -1,0 +1,28 @@
+# Tests with_spring with physical parameters and with duration plus
+# damping_ratio, each awaited until the shared value comes to rest.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/with_spring.py
+# Source under test: src/pythonnative/motion/animations.py :: with_spring
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: with_spring
+- assertVisible: "Status: idle"
+- assertVisible: "Scale: 0.50"
+- tapOn: "Run spring"
+- extendedWaitUntil:
+    visible: "Scale: 1.00"
+    timeout: 8000
+- assertVisible: "Status: done"
+- tapOn: "Run timed spring"
+- extendedWaitUntil:
+    visible: "Scale: 0.50"
+    timeout: 8000
+- assertVisible: "Status: done"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

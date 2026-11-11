@@ -9,7 +9,7 @@
 #include <unordered_map>
 
 #include "../include/pn_core.h"
-#include "animation.h"
+#include "motion_runtime.h"
 #include "gestures.h"
 #include "lists.h"
 #include "shadow.h"
@@ -21,7 +21,7 @@ class Core;
 
 class MountState {
 public:
-    MountState(Core& core, Animator& animator, int64_t surface) : core_(core), animator_(animator), surface_(surface) {}
+    MountState(Core& core, motion::Runtime& motion, int64_t surface) : core_(core), motion_(motion), surface_(surface) {}
 
     /// Apply a transaction's mirror changes as the UI thread takes it.
     void begin(const Transaction& transaction);
@@ -29,6 +29,10 @@ public:
 
     bool is_mounted(int64_t tag) const { return views_.count(tag) != 0; }
     const Value* prop(int64_t tag, const std::string& name) const;
+    /// Forget views a finished exit removed.
+    void forget(const std::vector<int64_t>& tags);
+    /// Views with the same `shared_tag` on two screens, as JSON pairs (RFC 0009).
+    std::string shared_elements(int64_t from_screen, int64_t to_screen) const;
 
     /// Stamp a view event and send it to Python, feeding animated bindings.
     void event(int64_t tag, const std::string& name, const char* arguments, int64_t edit_revision);
@@ -57,7 +61,7 @@ private:
     void emit_event(int64_t tag, const std::string& name, const std::string& arguments_json, int64_t edit_revision);
 
     Core& core_;
-    Animator& animator_;
+    motion::Runtime& motion_;
     int64_t surface_;
     std::string application_;
     int64_t revision_ = 0;
@@ -67,6 +71,8 @@ private:
     int64_t sequence_ = 0;
     std::unordered_map<int64_t, View> views_;
     std::unordered_map<int64_t, List> lists_;
+    std::unordered_map<int64_t, Object> exiting_;  // props of views animating out
+    std::unordered_map<int64_t, int64_t> screens_;  // shared_tag view -> its Screen
 };
 
 }  // namespace pn

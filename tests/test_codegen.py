@@ -20,7 +20,7 @@ def test_checked_native_contracts_match_python_definitions(tmp_path: Path) -> No
         [
             sys.executable,
             "-c",
-            "import pythonnative; from pythonnative.sdk.codegen import generate; " "import sys; generate(sys.argv[1])",
+            "import pythonnative; from pythonnative.sdk.codegen import generate; import sys; generate(sys.argv[1])",
             str(tmp_path),
         ],
         check=True,
@@ -141,3 +141,24 @@ def test_codegen_escapes_kotlin_literals_once(tmp_path: Path, monkeypatch: pytes
         .read_text()
         .startswith('"""Generated Python interfaces. Regenerate from the declarations."""\n\n')
     )
+
+
+def test_every_checked_in_plugin_manifest_matches_the_core_protocol() -> None:
+    """Example and first-party plugin manifests load only at the current protocol and Yoga version."""
+    from pythonnative.bridge.core import PROTOCOL_VERSION
+    from pythonnative.sdk.schema import YOGA_VERSION
+
+    root = Path(__file__).parents[1]
+    manifests = [
+        *root.glob("src/pythonnative/*/native/schema.json"),
+        *root.glob("examples/*/native/*/schema.json"),
+        *root.glob("examples/*/src/*/native/schema.json"),
+    ]
+    assert len(manifests) >= 14
+    stale = [
+        str(path.relative_to(root))
+        for path in manifests
+        if (document := json.loads(path.read_text(encoding="utf-8"))).get("protocol") != PROTOCOL_VERSION
+        or document.get("yoga") != YOGA_VERSION
+    ]
+    assert stale == []

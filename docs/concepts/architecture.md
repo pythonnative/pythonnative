@@ -13,7 +13,7 @@ flowchart LR
     E -->|events, pointers, container sizes| C
     C -->|stamped events, frames, command results| A
     F[Frame clock] --> C
-    C -->|animated prop writes| E
+    C -->|motion writes| E
 ```
 
 ## The authoring model
@@ -78,7 +78,7 @@ WebAssembly. Python reaches it through a C ABI with `ctypes`.
 | Owner | Responsibilities |
 | --- | --- |
 | Python (application thread) | Components, hooks, reconciliation, commit operations, event handlers, effects, device module and capability facades |
-| Renderer core (C++) | Contract tables and validation, surfaces and revisions, the shadow tree, Yoga style mapping and layout, view flattening, mount diffing, list datasets, animation graphs and drivers, gesture recognition (Android, browser, and tests), event identity stamping |
+| Renderer core (C++) | Contract tables and validation, surfaces and revisions, the shadow tree, Yoga style mapping and layout, view flattening, mount diffing, list datasets, the motion runtime (the worklet VM, shared values, animation drivers, animated styles, layout animations, and exits), gesture recognition (Android, browser, and tests), event identity stamping |
 | Platform (UI thread) | Widget creation and prop application, text drawing, text input, scroll physics, navigation containers, modal windows, accessibility, image decoding, the frame clock, iOS gesture recognizers, device modules, plugins, app lifecycle |
 
 A commit worker hands each commit to the core while the application loop
@@ -136,11 +136,13 @@ calling it raises `plugin_not_enabled`.
 
 ## Contracts and tooling
 
-The bridge protocol (version 7) validates commits in the core before mutation
+The bridge protocol (version 8) validates commits in the core before mutation
 and acknowledges exact revisions. Events carry application and revision
 identities, which the core stamps. Controlled inputs additionally acknowledge
-native edit revisions to avoid overwriting newer typing. The core's animation
-graphs perform frame updates independently of Python callbacks.
+native edit revisions to avoid overwriting newer typing. Worklets, animation
+drivers, and layout animations run in the core on the UI thread, so frame
+updates and gesture responses never wait for Python callbacks (see
+[Motion](../guides/motion.md)).
 
 The SDK compiles dataclass props and protocol methods into portable contracts.
 The core compiles the merged contract document into indexed tables at startup
@@ -184,8 +186,8 @@ minute shows a fallback screen, so a broken tree can't loop forever.
 error with its phase, in development and release builds alike.
 Reconciliation reduces work at dirty component roots but doesn't time-slice
 arbitrary Python render functions. Long computations delay Python callbacks
-and commits even while native scrolling and the core's animation drivers
-continue.
+and commits even while native scrolling and the core's worklets and animation
+drivers continue.
 Use cooperative async work, move blocking I/O off the application thread,
 and keep expensive computation out of render functions.
 
@@ -208,7 +210,7 @@ validate device signing, store submission, or performance on physical devices.
 | Renderer core (C++) and its Python binding | `native/core/` (Yoga in `native/core/yoga/`), `bridge/core.py` |
 | Platform mounting layers | `native/ios/`, `native/android/` |
 | Navigation and lists | `navigation/`, `components/lists.py` |
-| Animation graphs | `animated.py`, `animation_graph.py` |
+| Motion (worklets, shared values, animations, layout animations) | `motion/`, `components/bottom_sheet.py`, `components/swipeable.py`; the core's `motion_vm`, `motion_runtime`, and `motion_anim` in `native/core/src/` |
 | Contracts and plugins | `sdk/`, `project/plugins.py`, `project/plugin_config.py` |
 | Device modules | `native_modules/` |
 | Capabilities | `audio/`, `background/`, `biometrics/`, `camera/`, `location/`, `maps/`, `notifications/`, `pickers/`, `purchases/`, `push/`, `sensors/`, `video/` |

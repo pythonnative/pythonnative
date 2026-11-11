@@ -129,7 +129,6 @@ GestureConfig decode_gesture(const Value& spec) {
         config.simultaneous = int_set(*together);
     }
     if (const Value* wait = spec.find("wait_for"); wait != nullptr && wait->is_array()) config.wait_for = int_set(*wait);
-    if (const Value* events = spec.find("animated_events")) config.animated_events = *events;
     return config;
 }
 

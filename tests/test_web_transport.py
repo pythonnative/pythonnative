@@ -31,7 +31,7 @@ from pythonnative.native_modules import registry as modules
 from pythonnative.native_views import set_backend
 from pythonnative.native_views.bridge_backend import BridgeBackend, CommitError
 
-CORE_REQUESTS = ("load_contracts", "commit", "layout", "command", "animate", "measure")
+CORE_REQUESTS = ("load_contracts", "commit", "layout", "command", "motion", "shared_read", "measure")
 
 
 class FakePage:
@@ -79,9 +79,11 @@ class FakePage:
         if kind == "command":
             _, _, surface, tag, name, args, call_id = message
             return self.core.command(surface, tag, name, args, call_id)
-        if kind == "animate":
-            _, _, surface, tag, request = message
-            return self.core.animate(surface, tag, request)
+        if kind == "motion":
+            _, _, surface, request = message
+            return self.core.motion(surface, request)
+        if kind == "shared_read":
+            return self.core.shared_read(message[2])
         if kind == "measure":
             _, _, surface, tag = message
             return self.core.measure(surface, tag)
@@ -195,7 +197,7 @@ def test_a_rejected_contract_document_raises(web: Any) -> None:
         web.transport.load_contracts("{not json")
 
 
-def test_layout_command_animate_and_measure_round_trip(web: Any) -> None:
+def test_layout_command_motion_and_measure_round_trip(web: Any) -> None:
     bridge.ensure_contracts(web.transport)
     web.transport.commit(
         _envelope(1, ["c", 1, "Column", {"_pn_layout": True}], ["c", 2, "TextInput", {"value": "a"}], ["i", 1, 2, 0])
@@ -205,8 +207,8 @@ def test_layout_command_animate_and_measure_round_trip(web: Any) -> None:
     web.page.core.command_results["get_value"] = "typed"
     assert json.loads(web.transport.command(1, 2, "get_value", "{}", 7)) == {"ok": True, "queued": True}
     assert web.page.core.commands[-1][:2] == (2, "get_value")
-    reply = json.loads(web.transport.animate(1, 2, codec.dumps({"op": "set", "prop": "opacity", "value": 0.5})))
-    assert reply["ok"] and (2, "opacity", 0.5) in web.page.core.writes
+    reply = json.loads(web.transport.motion(1, codec.dumps({"op": "shared", "id": 77, "value": 0.5})))
+    assert reply["ok"] and json.loads(web.transport.shared_read(77)) == 0.5
     frame = json.loads(web.transport.measure(1, 2))
     assert frame["frame"][2] == 300 and len(frame["window"]) == 4
     assert json.loads(web.transport.command(1, 2, "no_such_command", "{}", 8))["ok"] is False
@@ -218,7 +220,7 @@ def test_requests_without_a_page_answer_like_a_failed_core() -> None:
         transport.commit(_envelope(1)),
         transport.layout("{}"),
         transport.command(1, 1, "focus", "{}", 1),
-        transport.animate(1, 1, "{}"),
+        transport.motion(1, "{}"),
     ):
         body = json.loads(reply)
         assert body["ok"] is False and "no browser preview page" in body["error"]

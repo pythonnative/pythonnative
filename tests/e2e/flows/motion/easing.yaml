@@ -1,0 +1,25 @@
+# Tests every Easing curve (named, bezier, and a sampled custom curve)
+# with an awaited with_timing, and that an unknown curve name raises.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/easing.py
+# Source under test: src/pythonnative/motion/animations.py :: Easing, EasingSpec
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: Easing
+- assertVisible: "Status: idle"
+- assertVisible: "Rejects unknown easing: yes"
+- tapOn: "Run all curves"
+# Ten curves, each out and back (180 ms) plus a round trip through Python.
+- extendedWaitUntil:
+    visible: "Curves run: 10"
+    timeout: 20000
+- assertVisible: "Status: done"
+- assertVisible: "Last curve: custom"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

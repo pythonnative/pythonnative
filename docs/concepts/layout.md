@@ -72,7 +72,9 @@ A `View`, `Row`, `Column`, or `Spacer` that only affects layout isn't
 mounted. Each contract field says whether it allows flattening. Layout
 style keys do, apart from `display` and border widths; everything else
 blocks it, including paint props (background, border, shadow, opacity,
-transform, `overflow`), event handlers, gestures, animated bindings, and
+transform, `overflow`), event handlers, gestures, Motion props
+(an animated style, worklet event handlers, `entering`, `exiting`,
+`layout`, and `shared_tag`), and
 accessibility and test props, which screen readers and Maestro use to
 address views. An `on_layout` callback or a ref doesn't block flattening,
 because the core answers layout events and `measure_in_window` from its

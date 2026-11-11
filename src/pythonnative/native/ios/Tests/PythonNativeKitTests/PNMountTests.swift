@@ -33,6 +33,8 @@ final class PNMountTests: XCTestCase {
             return ["kind": "frame", "tag": tag, "frame": [x, y, width, height]]
         case let .command(tag, name, arguments, callId):
             return ["kind": "command", "tag": tag, "name": name, "arguments": arguments, "call_id": callId]
+        case let .exit(tag, owner):
+            return ["kind": "exit", "tag": tag, "owner": Int(owner)]
         }
     }
 

@@ -82,15 +82,12 @@ open class PNComponentManager {
 
     // MARK: - Lifecycle
 
-    /// Native controller containers can own final view detachment.
-    open var detachesOnDestroy: Bool { true }
-
     /// Release the view's resources and detach it from the hierarchy.
     open func destroy(view: UIView) {
         teardown(view: view)
         PNGestureCoordinator.shared.unwire(view: view)
         view.layer.removeAllAnimations()
-        if detachesOnDestroy && view.superview != nil {
+        if view.superview != nil {
             view.removeFromSuperview()
         }
     }
@@ -169,9 +166,26 @@ open class PNComponentManager {
         nil
     }
 
-    /// Apply one animated value the core's animator wrote.
+    /// Apply one paint prop the core's motion runtime wrote (`null` restores
+    /// the default). The default routes it like a static update of that key.
     open func setAnimatedProperty(view: UIView, prop: String, value: Any?) {
-        PNAnimator.shared.applyValue(view: view, prop: prop, value: value)
+        PNMotionApplier.apply(view: view, manager: self, prop: prop, value: value)
+    }
+
+    // MARK: - Exits (RFC 0009)
+
+    /// Start the platform's own exit of `child` (a stack popping a screen)
+    /// without destroying it, and call `finished` when the transition ends.
+    /// Return `false` when this container has no native exit for it.
+    open func exitChild(parent: UIView, child: UIView, finished: @escaping () -> Void) -> Bool {
+        false
+    }
+
+    /// Start the platform's own exit of `view` itself (a modal's dismissal)
+    /// without destroying it, and call `finished` when it ends. Return
+    /// `false` when the view has none.
+    open func exitView(_ view: UIView, finished: @escaping () -> Void) -> Bool {
+        false
     }
 
     // MARK: - Helpers

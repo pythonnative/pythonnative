@@ -77,8 +77,144 @@ private final class PNListCell: UICollectionViewCell {
     }
 }
 
+/// A list's `item_entering`, `item_exiting`, and `item_layout` presets
+/// (RFC 0009), applied to rows a dataset patch inserts, removes, or moves.
+struct PNListItemAnimations {
+    var entering: [String: Any]?
+    var exiting: [String: Any]?
+    var layout: [String: Any]?
+
+    init?(_ props: [String: Any]) {
+        entering = props["item_entering"] as? [String: Any]
+        exiting = props["item_exiting"] as? [String: Any]
+        layout = props["item_layout"] as? [String: Any]
+        if entering == nil && exiting == nil && layout == nil { return nil }
+    }
+
+    /// Whether the system's reduce-motion setting turns these off.
+    var reduced: Bool {
+        guard UIAccessibility.isReduceMotionEnabled else { return false }
+        return [entering, exiting, layout].compactMap { $0 }.contains { ($0["reduce_motion"] as? String ?? "system") != "never" }
+    }
+
+    /// One timing for the whole batch: the preset that runs longest.
+    var timing: PNMotionTiming {
+        let presets = [entering, layout, exiting].compactMap { $0 }
+        let longest = presets.max { a, b in
+            let ta = PNMotionTiming(a), tb = PNMotionTiming(b)
+            return ta.duration + ta.delay < tb.duration + tb.delay
+        }
+        return PNMotionTiming(longest, fallback: PNMotionTiming(duration: 0.3, delay: 0, curve: .bezier(CGPoint(x: 0.42, y: 0), CGPoint(x: 0.58, y: 1))))
+    }
+
+    /// Put `attributes` in the state a row starts from (`appearing`) or
+    /// ends at under `preset`, in a list of `extent`.
+    static func apply(_ preset: [String: Any], to attributes: UICollectionViewLayoutAttributes, appearing: Bool, extent: CGSize) {
+        let type = preset["type"] as? String ?? ""
+        switch type {
+        case "fade_in", "fade_out", "fading":
+            attributes.alpha = 0
+        case "zoom_in", "zoom_out":
+            attributes.transform = CGAffineTransform(scaleX: 0.01, y: 0.01)
+        case "slide_in", "slide_out":
+            switch preset["edge"] as? String ?? "right" {
+            case "left": attributes.transform = CGAffineTransform(translationX: -extent.width, y: 0)
+            case "top": attributes.transform = CGAffineTransform(translationX: 0, y: -extent.height)
+            case "bottom": attributes.transform = CGAffineTransform(translationX: 0, y: extent.height)
+            default: attributes.transform = CGAffineTransform(translationX: extent.width, y: 0)
+            }
+        default:
+            break
+        }
+    }
+}
+
+/// The moves that turn `old` into `new`, both duplicate-free key lists:
+/// `(deleted old indices, inserted new indices, moved (old, new) pairs)`.
+/// Rows whose order relative to the others is kept (the longest increasing
+/// run of old positions) aren't reported as moves.
+func PNListDiff(_ old: [String], _ new: [String]) -> (deleted: [Int], inserted: [Int], moved: [(Int, Int)]) {
+    let oldIndex = Dictionary(old.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { first, _ in first })
+    let newSet = Set(new)
+    let deleted = old.indices.filter { !newSet.contains(old[$0]) }
+    let inserted = new.indices.filter { oldIndex[new[$0]] == nil }
+    let common = new.enumerated().compactMap { item in oldIndex[item.element].map { (old: $0, new: item.offset) } }
+    // Longest increasing subsequence of old positions, in new order.
+    var tails: [Int] = [], previous = [Int](repeating: -1, count: common.count)
+    for (i, item) in common.enumerated() {
+        var low = 0, high = tails.count
+        while low < high {
+            let mid = (low + high) / 2
+            if common[tails[mid]].old < item.old { low = mid + 1 } else { high = mid }
+        }
+        if low > 0 { previous[i] = tails[low - 1] }
+        if low == tails.count { tails.append(i) } else { tails[low] = i }
+    }
+    var kept = Set<Int>()
+    var cursor = tails.last ?? -1
+    while cursor >= 0 {
+        kept.insert(cursor)
+        cursor = previous[cursor]
+    }
+    let moved = common.enumerated().filter { !kept.contains($0.offset) }.map { ($0.element.old, $0.element.new) }
+    return (deleted, inserted, moved)
+}
+
 private final class PNStickyListLayout: UICollectionViewFlowLayout {
     weak var owner: PNCollectionList?
+    /// The item animations of the batch update in flight, if any.
+    var animations: PNListItemAnimations?
+    private var inserted: Set<IndexPath> = []
+    private var deleted: Set<IndexPath> = []
+    override func prepare(forCollectionViewUpdates updateItems: [UICollectionViewUpdateItem]) {
+        super.prepare(forCollectionViewUpdates: updateItems)
+        guard animations != nil else { return }
+        for item in updateItems {
+            switch item.updateAction {
+            case .insert: if let path = item.indexPathAfterUpdate { inserted.insert(path) }
+            case .delete: if let path = item.indexPathBeforeUpdate { deleted.insert(path) }
+            default: break
+            }
+        }
+    }
+    override func finalizeCollectionViewUpdates() {
+        super.finalizeCollectionViewUpdates()
+        inserted.removeAll()
+        deleted.removeAll()
+    }
+    override func initialLayoutAttributesForAppearingItem(at itemIndexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+        guard let animations = animations else { return super.initialLayoutAttributesForAppearingItem(at: itemIndexPath) }
+        let settled = layoutAttributesForItem(at: itemIndexPath)?.copy() as? UICollectionViewLayoutAttributes
+        if inserted.contains(itemIndexPath) {
+            // Without `item_entering`, a new row is simply there.
+            if let preset = animations.entering, let attributes = settled {
+                PNListItemAnimations.apply(preset, to: attributes, appearing: true, extent: collectionView?.bounds.size ?? .zero)
+            }
+            return settled
+        }
+        switch animations.layout?["type"] as? String {
+        case nil:
+            return settled
+        case "fading":
+            settled?.alpha = 0
+            return settled
+        default:
+            return super.initialLayoutAttributesForAppearingItem(at: itemIndexPath)
+        }
+    }
+    override func finalLayoutAttributesForDisappearingItem(at itemIndexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+        guard let animations = animations else { return super.finalLayoutAttributesForDisappearingItem(at: itemIndexPath) }
+        let attributes = super.finalLayoutAttributesForDisappearingItem(at: itemIndexPath)?.copy() as? UICollectionViewLayoutAttributes
+        if deleted.contains(itemIndexPath) {
+            if let preset = animations.exiting, let attributes = attributes {
+                attributes.alpha = 1
+                PNListItemAnimations.apply(preset, to: attributes, appearing: false, extent: collectionView?.bounds.size ?? .zero)
+            }
+            return attributes
+        }
+        if animations.layout?["type"] as? String == "fading" { attributes?.alpha = 0 }
+        return attributes
+    }
     /// Whether a header is pinned, which moves with every scroll offset.
     private var pins: Bool {
         guard let owner = owner else { return false }
@@ -190,18 +326,28 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
         if changed.contains("dataset"), props["dataset"] is [String: Any] {
             let saved = anchor()
             let before = Set(keys)
+            let animations = PNListItemAnimations(props)
+            // Read the count UIKit holds before the store moves on, so a
+            // batch update starts from the rows on screen.
+            let shown = animations != nil && window != nil ? numberOfItems(inSection: 0) : -1
+            let previous = keys
             if let patch = store.apply() {
                 if patch.reset { heights.removeAll() }
                 else if patch.structural {
                     for key in before.subtracting(keys) { heights.removeValue(forKey: key) }
                 }
-                if patch.structural {
-                    // Multiple moves use sequential indices; a reload preserves the
-                    // logical keyed roots and avoids UIKit's pre/post-index ambiguity.
-                    reloadData()
+                if patch.structural, !patch.reset, let animations = animations, !animations.reduced, shown == previous.count,
+                   animate(from: previous, animations) {
+                    // The batch update keeps the scroll position itself.
+                } else {
+                    if patch.structural {
+                        // Multiple moves use sequential indices; a reload preserves the
+                        // logical keyed roots and avoids UIKit's pre/post-index ambiguity.
+                        reloadData()
+                    }
+                    collectionViewLayout.invalidateLayout()
+                    restore(saved)
                 }
-                collectionViewLayout.invalidateLayout()
-                restore(saved)
             }
             lastWindow = []
             DispatchQueue.main.async { [weak self] in self?.emitWindow() }
@@ -220,6 +366,31 @@ private final class PNCollectionList: UICollectionView, UICollectionViewDelegate
             else { refreshControl?.endRefreshing() }
         } else { refreshControl = nil }
     }
+    /// Animate a structural patch with `performBatchUpdates`, diffing keys
+    /// (the core's sequential edits are ambiguous to UIKit). Returns `false`
+    /// when the rows can't be diffed and the caller should reload.
+    private func animate(from previous: [String], _ animations: PNListItemAnimations) -> Bool {
+        let current = keys
+        guard Set(previous).count == previous.count, Set(current).count == current.count else { return false }
+        let diff = PNListDiff(previous, current)
+        flow.animations = animations
+        batch += 1
+        let generation = batch
+        animations.timing.run({
+            self.performBatchUpdates({
+                self.deleteItems(at: diff.deleted.map { IndexPath(item: $0, section: 0) })
+                self.insertItems(at: diff.inserted.map { IndexPath(item: $0, section: 0) })
+                for (from, to) in diff.moved {
+                    self.moveItem(at: IndexPath(item: from, section: 0), to: IndexPath(item: to, section: 0))
+                }
+            }, completion: nil)
+        }, completion: { [weak self] in
+            guard let self = self, self.batch == generation else { return }
+            self.flow.animations = nil
+        })
+        return true
+    }
+    private var batch = 0
     func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
         guard let index = indexPaths.map({ $0.item }).min(), index < keys.count else { return }
         request(index)

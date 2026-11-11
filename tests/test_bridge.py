@@ -211,7 +211,7 @@ def test_backend_applies_transaction_and_tracks_tags(backend: BridgeBackend, tra
     assert backend.live_view_count() == 1
 
 
-def test_backend_command_and_animation(backend: BridgeBackend, transport: FakeTransport) -> None:
+def test_backend_commands(backend: BridgeBackend, transport: FakeTransport) -> None:
     backend.apply_mutations([CreateOp(7, "Text", {"text": "x"})])
     backend.apply_mutations([CreateOp(8, "ScrollView", {}), CreateOp(9, "TextInput", {})])
     transport.command_results["get_scroll_offset"] = {"x": 0, "y": 42}
@@ -220,17 +220,6 @@ def test_backend_command_and_animation(backend: BridgeBackend, transport: FakeTr
     assert transport.commands[-1] == (9, "focus", {})
     with pytest.raises(TypeError, match="Unknown command"):
         backend.command(7, "focus")
-
-    backend.set_animated_property(7, "opacity", 0.5)
-    assert transport.writes[-1] == (7, "opacity", 0.5)
-    assert (
-        backend.start_animation(
-            7, 3, "opacity", {"kind": "timing", "from": 0.0, "to": 1.0, "duration_ms": 100, "easing": "linear"}
-        )
-        is True
-    )
-    backend.cancel_animation(7, 3)
-    assert backend.start_animation(404, 1, "opacity", {}) is False
 
 
 def test_backend_holds_callable_props_in_sidecar(backend: BridgeBackend, transport: FakeTransport) -> None:
@@ -307,22 +296,6 @@ def test_builtin_factory_defaults_cross_the_bridge(name: str, backend: BridgeBac
         assert transport.views[1].props["accessibility_role"] == ("checkbox" if name == "Checkbox" else "button")
 
 
-@pytest.mark.parametrize("name", ["View", "Text", "Image"])
-def test_animated_transform_shorthands_cross_the_bridge(name: str, transport: FakeTransport) -> None:
-    scale = pn.Animated.Value(0.5)
-    translate = pn.Animated.Value(10)
-    factory = getattr(pn.Animated, name)
-    children = [] if name == "View" else ["box" if name == "Text" else "https://example.com/image.png"]
-    rec = Reconciler(get_backend())
-    try:
-        rec.mount(factory(*children, style={"scale": scale, "translate_x": translate, "rotate": 45}))
-        props = transport.find(name)[0].props
-        assert props["transform"] == [{"scale": 0.5}, {"translate_x": 10.0}, {"rotate": 45}]
-        assert not {"scale", "translate_x", "rotate"} & props.keys()
-    finally:
-        rec.unmount()
-
-
 def test_events_reach_handlers_and_never_answer_native(transport: FakeTransport) -> None:
     from pythonnative.events import get_event_registry
 
@@ -357,13 +330,13 @@ def test_destroyed_view_drops_queued_event(transport: FakeTransport) -> None:
     assert seen == ["press"]
 
 
-def test_animation_messages_route_to_animated(transport: FakeTransport, monkeypatch: pytest.MonkeyPatch) -> None:
-    from pythonnative import animated
+def test_motion_messages_route_to_the_motion_runtime(transport: FakeTransport, monkeypatch: pytest.MonkeyPatch) -> None:
+    from pythonnative.motion import runtime
 
     seen: List[Any] = []
-    monkeypatch.setattr(animated, "native_animation_message", seen.append)
-    message = {"completed": [{"id": 9, "finished": False, "value": 0.25}]}
-    bridge.native_callback("animation", 0, "", codec.dumps(message))
+    monkeypatch.setattr(runtime.runtime, "message", seen.append)
+    message = {"type": "finished", "token": 9, "finished": False}
+    bridge.native_callback("motion", 0, "", codec.dumps(message))
     assert seen == [message]
 
 

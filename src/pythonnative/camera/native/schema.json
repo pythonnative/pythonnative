@@ -26,9 +26,6 @@
       ],
       "portal": false,
       "props": {
-        "_pn_animated_events": {
-          "type": "object"
-        },
         "_pn_edit_revision": {
           "type": "integer"
         },
@@ -54,6 +51,12 @@
         "_pn_list_key": {
           "type": "string"
         },
+        "_pn_motion": {
+          "native": {
+            "invalidates_layout": false
+          },
+          "type": "object"
+        },
         "accessibility_label": {
           "anyOf": [
             {
@@ -64,7 +67,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -88,7 +90,6 @@
             "space_evenly"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -118,7 +119,6 @@
             "fill"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -148,7 +148,6 @@
             "fill"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -163,7 +162,6 @@
         },
         "aspect_ratio": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -203,7 +201,6 @@
             }
           ],
           "native": {
-            "animated": true,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -245,7 +242,6 @@
         },
         "bold": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -285,7 +281,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -300,7 +295,6 @@
         },
         "border_bottom_left_radius": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -316,7 +310,6 @@
         },
         "border_bottom_right_radius": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -332,7 +325,6 @@
         },
         "border_bottom_width": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -372,7 +364,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -411,7 +402,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -426,7 +416,6 @@
         },
         "border_left_width": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -442,7 +431,6 @@
         },
         "border_radius": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -482,7 +470,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -497,7 +484,6 @@
         },
         "border_right_width": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -518,7 +504,6 @@
             "dotted"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -557,7 +542,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -572,7 +556,6 @@
         },
         "border_top_left_radius": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -588,7 +571,6 @@
         },
         "border_top_right_radius": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -604,7 +586,6 @@
         },
         "border_top_width": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -620,7 +601,6 @@
         },
         "border_width": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -647,7 +627,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -686,7 +665,6 @@
             }
           ],
           "native": {
-            "animated": true,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -701,7 +679,6 @@
         },
         "column_gap": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -721,7 +698,6 @@
             "rtl"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -740,7 +716,6 @@
             "none"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -755,7 +730,6 @@
         },
         "elevation": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -782,7 +756,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -793,6 +766,16 @@
             ],
             "python_only": false,
             "recreate": false
+          }
+        },
+        "entering": {
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "exiting": {
+          "native": {
+            "invalidates_layout": false
           }
         },
         "facing": {
@@ -811,7 +794,6 @@
         },
         "flex": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -838,7 +820,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -859,7 +840,6 @@
             "column_reverse"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -874,7 +854,6 @@
         },
         "flex_grow": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -890,7 +869,6 @@
         },
         "flex_shrink": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -911,7 +889,6 @@
             "wrap_reverse"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -926,7 +903,6 @@
         },
         "font_family": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -942,7 +918,6 @@
         },
         "font_size": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -971,7 +946,6 @@
             "900"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -986,7 +960,6 @@
         },
         "gap": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1016,7 +989,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1031,7 +1003,6 @@
         },
         "italic": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -1061,7 +1032,6 @@
             "bottom"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1072,6 +1042,11 @@
             ],
             "python_only": false,
             "recreate": false
+          }
+        },
+        "layout": {
+          "native": {
+            "invalidates_layout": false
           }
         },
         "left": {
@@ -1087,7 +1062,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1102,7 +1076,6 @@
         },
         "letter_spacing": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -1118,7 +1091,6 @@
         },
         "line_height": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -1251,7 +1223,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1282,7 +1253,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1313,7 +1283,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1344,7 +1313,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1375,7 +1343,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1406,7 +1373,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1437,7 +1403,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1468,7 +1433,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1499,7 +1463,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1525,7 +1488,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1540,7 +1502,6 @@
         },
         "max_lines": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -1567,7 +1528,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1593,7 +1553,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1619,7 +1578,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1721,7 +1679,6 @@
         },
         "opacity": {
           "native": {
-            "animated": true,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -1742,7 +1699,6 @@
             "scroll"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -1869,7 +1825,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1895,7 +1850,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1921,7 +1875,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1947,7 +1900,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1973,7 +1925,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -1999,7 +1950,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -2025,7 +1975,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -2051,7 +2000,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -2077,7 +2025,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -2116,7 +2063,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -2137,7 +2083,6 @@
             "box_only"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -2156,7 +2101,6 @@
             "absolute"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -2182,7 +2126,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -2197,7 +2140,6 @@
         },
         "row_gap": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -2237,7 +2179,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -2291,7 +2232,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -2306,7 +2246,6 @@
         },
         "shadow_opacity": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -2322,7 +2261,6 @@
         },
         "shadow_radius": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -2335,6 +2273,29 @@
             "recreate": false
           },
           "type": "number"
+        },
+        "shared_tag": {
+          "native": {
+            "invalidates_layout": false
+          },
+          "type": "string"
+        },
+        "shared_transition": {
+          "native": {
+            "invalidates_layout": false
+          }
+        },
+        "skip_entering": {
+          "native": {
+            "invalidates_layout": false
+          },
+          "type": "boolean"
+        },
+        "skip_exiting": {
+          "native": {
+            "invalidates_layout": false
+          },
+          "type": "boolean"
         },
         "start": {
           "anyOf": [
@@ -2349,7 +2310,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -5896,7 +5856,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -5919,7 +5878,6 @@
             "end"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -5939,7 +5897,6 @@
             "line_through"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -5978,7 +5935,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -6032,7 +5988,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -6047,7 +6002,6 @@
         },
         "text_shadow_radius": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -6069,7 +6023,6 @@
             "capitalize"
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": true,
@@ -6108,7 +6061,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -6134,7 +6086,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -6586,7 +6537,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -6612,7 +6562,6 @@
             }
           ],
           "native": {
-            "animated": false,
             "description": "",
             "flatten": true,
             "invalidates_layout": true,
@@ -6627,7 +6576,6 @@
         },
         "z_index": {
           "native": {
-            "animated": false,
             "description": "",
             "flatten": false,
             "invalidates_layout": false,
@@ -6773,6 +6721,6 @@
       "name": "Camera"
     }
   },
-  "protocol": 7,
+  "protocol": 8,
   "yoga": "3.2.1"
 }

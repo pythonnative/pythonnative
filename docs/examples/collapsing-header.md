@@ -1,45 +1,54 @@
 # Collapsing header and bottom sheet
 
-This example combines the interaction toolkit into the two patterns
-that define "native feel": a collapsing header driven by the scroll
-offset, and a draggable bottom sheet that snaps open or closed based
-on release velocity. It exercises `Animated.event`,
-`Animated.diff_clamp`, `interpolate`, animated operators, `z_index`,
-`pointer_events`, and the `Pan` gesture with a spring release.
+This example combines two patterns that define "native feel": a header
+that slides away as you scroll down and comes back as soon as you
+scroll up, and a bottom sheet that follows the finger and snaps to a
+detent. Both run on the UI thread as [Motion](../guides/motion.md)
+worklets, so they keep up with the finger even while Python is busy.
+It exercises an `on_scroll` worklet, shared values,
+`use_animated_style`, `interpolate`, `clamp`, `with_timing`, `z_index`,
+`pointer_events`, and [`BottomSheet`][pythonnative.BottomSheet].
 
 Paste it into `app/main.py` of a project scaffolded with `pn init`,
 then run `pn preview` (or `pn run ios` / `pn run android`).
 
 ```python
-from collections.abc import Callable
-
 import pythonnative as pn
-from pythonnative import gestures
 
 HEADER_HEIGHT = 64.0
-SHEET_HEIGHT = 280.0
 
 
 @pn.component
 def CollapsingHeaderPage() -> pn.Node:
-    scroll_y = pn.use_animated_value(0.0)
+    # Where the list was on the last scroll event, and how far the
+    # header is hidden: 0 is fully shown, HEADER_HEIGHT fully hidden.
+    last_y = pn.use_shared_value(0.0)
+    hidden = pn.use_shared_value(0.0)
 
-    # The header hides after 64 points of downward travel and comes
-    # back on any upward travel: diff_clamp tracks scroll deltas, and
-    # the interpolation maps the clamped total onto a negative shift.
-    clamped = pn.Animated.diff_clamp(scroll_y, 0.0, HEADER_HEIGHT)
-    header_shift = clamped.interpolate([0.0, HEADER_HEIGHT], [0.0, -HEADER_HEIGHT])
+    @pn.worklet
+    def track(event: pn.ScrollEvent) -> None:
+        delta = event.y - last_y.value
+        last_y.value = event.y
+        if event.y <= 0:
+            hidden.value = 0.0  # always show it at the top, including the bounce
+        else:
+            hidden.value = pn.clamp(hidden.value + delta, 0, HEADER_HEIGHT)
+
+    @pn.worklet
+    def settle(event: pn.ScrollEvent) -> None:
+        # Don't leave the header half hidden when the finger lifts.
+        target = HEADER_HEIGHT if hidden.value > HEADER_HEIGHT / 2 else 0.0
+        hidden.value = pn.with_timing(target, duration=150)
+
+    header = pn.use_animated_style(lambda: {"transform": [{"translate_y": -hidden.value}]})
     # Fade the title out during the first half of the travel; "clamp"
-    # pins the opacity at 0.0 for the rest.
-    title_opacity = clamped.interpolate(
-        [0.0, HEADER_HEIGHT / 2], [1.0, 0.0], extrapolate="clamp"
+    # holds the opacity at 0 for the rest.
+    title = pn.use_animated_style(
+        lambda: {"opacity": pn.interpolate(hidden.value, (0, HEADER_HEIGHT / 2), (1, 0), "clamp")}
     )
 
     rows = [
-        pn.Text(
-            f"Row {i}",
-            style={"padding": 14, "background_color": "#F8FAFC"},
-        )
+        pn.Text(f"Row {i}", style={"padding": 14, "background_color": "#F8FAFC"})
         for i in range(1, 41)
     ]
 
@@ -50,122 +59,55 @@ def CollapsingHeaderPage() -> pn.Node:
                 *rows,
                 style={"gap": 2},
             ),
-            on_scroll=pn.Animated.event(y=scroll_y),
+            on_scroll=track,
+            on_scroll_end_drag=settle,
             style={"flex": 1},
         ),
-        pn.Animated.View(
-            pn.Animated.Text(
+        pn.View(
+            pn.Text(
                 "Inbox",
-                style={
-                    "opacity": title_opacity,
-                    "color": "#FFFFFF",
-                    "font_size": 20,
-                    "font_weight": "700",
-                },
+                style=[{"color": "#FFFFFF", "font_size": 20, "font_weight": "700"}, title],
             ),
-            style={
-                "position": "absolute",
-                "top": 0, "left": 0, "right": 0,
-                "height": HEADER_HEIGHT,
-                "z_index": 2,
-                "transform": [{"translate_y": header_shift}],
-                "background_color": "#4F46E5",
-                "justify_content": "center",
-                "padding_left": 16,
-            },
+            style=[
+                {
+                    "position": "absolute",
+                    "top": 0, "left": 0, "right": 0,
+                    "height": HEADER_HEIGHT,
+                    "z_index": 2,
+                    "background_color": "#4F46E5",
+                    "justify_content": "center",
+                    "padding_left": 16,
+                },
+                header,
+            ],
         ),
         style={"flex": 1},
     )
 
 
 @pn.component
-def BottomSheet(*children: pn.Node, open: bool = False, on_close: Callable[[], None] | None = None) -> pn.Node:
-    # 0.0 = fully open, SHEET_HEIGHT = fully hidden.
-    slide = pn.use_animated_value(0.0 if open else SHEET_HEIGHT)
-    drag_origin = pn.use_ref(0.0)
-
-    def _sync_open() -> None:
-        target = 0.0 if open else SHEET_HEIGHT
-        pn.Animated.spring(slide, to=target, stiffness=260, damping=24).start()
-
-    pn.use_effect(_sync_open, [open])
-
-    def on_pan_begin(event: gestures.GestureEvent) -> None:
-        drag_origin.current = float(slide)
-
-    def on_pan_change(event: gestures.GestureEvent) -> None:
-        # Follow the finger, but never above the open position.
-        slide.set_value(
-            max(0.0, min(SHEET_HEIGHT, drag_origin.current + event.translation_y))
-        )
-
-    def on_pan_end(event: gestures.GestureEvent) -> None:
-        # Fast downward flick or past the midpoint: dismiss.
-        dismiss = event.velocity_y > 800 or float(slide) > SHEET_HEIGHT / 2
-        target = SHEET_HEIGHT if dismiss else 0.0
-        pn.Animated.spring(slide, to=target, stiffness=260, damping=24).start()
-        if dismiss and on_close is not None:
-            on_close()
-
-    # The scrim fades with the sheet position (derived, no listener),
-    # and stops intercepting touches entirely while hidden.
-    scrim_opacity = 1.0 - slide / SHEET_HEIGHT
-
-    return pn.View(
-        pn.Animated.View(
-            style=[pn.ABSOLUTE_FILL, {
-                "background_color": "#0F172A",
-                "opacity": scrim_opacity * 0.4,
-                "pointer_events": "none",
-            }],
-        ),
-        pn.Animated.View(
-            pn.View(  # grab handle
-                style={
-                    "width": 40, "height": 4,
-                    "border_radius": 2,
-                    "background_color": "#CBD5E1",
-                    "align_self": "center",
-                    "margin": {"top": 8, "bottom": 12},
-                },
-            ),
-            *children,
-            gestures=[gestures.Pan(
-                on_begin=on_pan_begin,
-                on_change=on_pan_change,
-                on_end=on_pan_end,
-            )],
-            style={
-                "position": "absolute",
-                "left": 0, "right": 0, "bottom": 0,
-                "height": SHEET_HEIGHT,
-                "z_index": 3,
-                "transform": [{"translate_y": slide}],
-                "background_color": "#FFFFFF",
-                "border_top_left_radius": 16,
-                "border_top_right_radius": 16,
-                "padding": 16,
-            },
-        ),
-        style=[pn.ABSOLUTE_FILL, {"pointer_events": "box_none"}],
-    )
-
-
-@pn.component
 def App() -> pn.Node:
-    sheet_open, set_sheet_open = pn.use_state(False)
+    sheet = pn.use_ref()
+    detent, set_detent = pn.use_state(-1)
 
     return pn.View(
         CollapsingHeaderPage(),
         pn.View(
-            pn.Button("Open sheet", on_press=lambda: set_sheet_open(True)),
+            pn.Button("Open sheet", on_press=lambda: sheet.current.snap_to(0)),
             style={"position": "absolute", "bottom": 24, "right": 16, "z_index": 2},
         ),
-        BottomSheet(
-            pn.Text("Sheet content", style={"font_size": 17, "font_weight": "600"}),
-            pn.Text("Drag down to dismiss, or flick it away."),
-            open=sheet_open,
-            on_close=lambda: set_sheet_open(False),
+        pn.BottomSheet(
+            pn.Column(
+                pn.Text("Sheet content", style={"font_size": 17, "font_weight": "600"}),
+                pn.Text(f"Detent {detent}" if detent >= 0 else "Closed"),
+                pn.Text("Drag the handle up to expand, or flick it down to dismiss."),
+                style={"gap": 8, "padding": 16},
+            ),
+            snap_points=("40%", "85%"),
+            index=-1,  # start closed
+            on_change=set_detent,
+            on_close=lambda: set_detent(-1),
+            ref=sheet,
         ),
         style={"flex": 1},
     )
@@ -173,32 +115,43 @@ def App() -> pn.Node:
 
 ## How it works
 
-**Collapsing header.** `Animated.event(y=scroll_y)` writes the scroll
-offset into `scroll_y` on every scroll event, with no Python listener
-required for the animation itself. `Animated.diff_clamp` turns the
-absolute offset into clamped travel, so the header reacts to scroll
-*direction* rather than position, matching the behavior of toolbar
-hiding in native mail and browser apps. The title opacity is derived
-with plain arithmetic on the animated node; both derived nodes update
-whenever the driver moves.
+**Collapsing header.** `track` is a worklet, so the core runs it on the
+UI thread every time the list scrolls, and the scroll events never
+reach Python. It turns the absolute scroll offset into the header's
+hidden distance: each event adds the change in offset, and
+`clamp` keeps the total between 0 and the header's height. The header
+therefore reacts to the scroll *direction* rather than the position,
+like the toolbars of native mail and browser apps. Both animated styles
+read `hidden`, so the core reruns them whenever `track` writes it, and
+the platform moves the header and fades the title before the frame is
+drawn. Animating `transform` and `opacity` keeps every frame free of
+layout work (see
+[Animatable properties](../guides/motion.md#animatable-properties)).
 
-**Bottom sheet.** The `Pan` gesture writes the drag position into
-`slide` directly, so the sheet tracks the finger with no
-reconciliation per frame. On release, the velocity decides between
-snapping open and dismissing, and `Animated.spring` handles the
-settle. The scrim's opacity is `1.0 - slide / SHEET_HEIGHT`, another
-derived node, and `pointer_events` keeps the scrim and the sheet's
-wrapper from swallowing touches meant for the page underneath.
+**Snapping.** `settle` runs when the finger lifts. It's a decision, not
+a mapping: it looks at where the header is and assigns a `with_timing`
+animation to the nearest end. Because it's a worklet too, the header
+settles in the same frame the finger lifts, however busy Python is.
+
+**Bottom sheet.** [`BottomSheet`][pythonnative.BottomSheet] is built
+from the same pieces: a `Pan` gesture whose callbacks are worklets, a
+shared value for its offset, and a spring that
+[`snap_point`][pythonnative.snap_point] aims at the detent the release
+velocity projects to. Python hears about the result through
+`on_change` and `on_close`, which the sheet calls with
+`run_on_python` once a drag settles. The button opens it through the
+[`BottomSheetHandle`][pythonnative.BottomSheetHandle] in `ref`.
 
 **Stacking.** The header, the floating button, and the sheet all use
 `position: "absolute"` with `z_index` to define the stacking order
-explicitly.
+explicitly. The sheet presents in a [`Portal`][pythonnative.Portal], so
+it covers everything else, and its backdrop ignores touches while it's
+closed.
 
 ## Related reading
 
-- The [Animations guide](../guides/animations.md) covers
-  interpolation, operators, `Animated.event`, and `diff_clamp` in
-  detail.
+- The [Motion guide](../guides/motion.md) covers worklets, shared
+  values, animations, and event worklets in detail.
 - The [Gestures guide](../guides/gestures.md) covers `Pan`, `Fling`,
   and gesture composition.
 - The [Styling guide](../guides/styling.md#interaction-surface)

@@ -168,6 +168,13 @@ raised by the predicate counts as "not yet", so both `get_by_*` and
 - `settle()` pumps the framework loop until async work is done.
 - `unmount()` tears down and runs effect cleanups; `RenderResult` is
   also a context manager.
+- `drag(target, dx=0, dy=0, duration=0.25, steps=10)` drags a finger
+  across a view's gestures through the core's gesture engine, running
+  gesture worklets in the core and Python callbacks here.
+- `presented_style(target)` and `presented_frame(target)` return a
+  view's style and frame as the platform shows them, with
+  [Motion](motion.md)'s animated styles and layout animations applied.
+  See [Testing](motion.md#testing) in the Motion guide.
 
 ### Virtual time
 
@@ -192,7 +199,9 @@ def test_toast_disappears():
 
 The clock patches the loop's `time()` rather than `asyncio.sleep`, so
 the framework's own timers (transitions, animations, debounced hooks)
-advance together with the app's. `advance()` steps timer by timer, so
+advance together with the app's. The test core's display frames run on
+the same clock, so Motion's animations, layout animations, and exits
+finish during `advance()` too. `advance()` steps timer by timer, so
 a re-arming timer fires the right number of times.
 
 ## Testing hooks in isolation
@@ -383,10 +392,10 @@ def test_layout_wrappers_are_flattened() -> None:
 
 | Attribute or method | What it holds |
 | --- | --- |
-| `native.views`, `find(type)`, `roots()` | Mounted [`FakeNativeView`][pythonnative.bridge.fake.FakeNativeView]s with merged props, mounted children, frames relative to the nearest mounted ancestor, and animated values |
+| `native.views`, `find(type)`, `roots()` | Mounted [`FakeNativeView`][pythonnative.bridge.fake.FakeNativeView]s with merged props, mounted children, frames relative to the nearest mounted ancestor, the paint props motion wrote (`animated`), and whether the view is exiting |
 | `native.transactions` | Every decoded [`MountTransaction`][pythonnative.bridge.core.MountTransaction] |
 | `native.commands` | `(tag, name, args)` view commands in the order the UI thread ran them |
-| `native.writes` (also `backend.animated`) | `(tag, prop, value)` animated prop writes from the core's animator |
+| `native.writes` | Every [`MotionWrite`][pythonnative.bridge.core.MotionWrite] the core produced (`prop`, `frame`, and `remove` records); `backend.animated` lists the `prop` writes as `(tag, prop, value)` |
 | `native.calls` | `(module, method, args)` native module calls |
 | `native.measured` | `(tag, component)` pairs the core asked the platform to measure |
 | `backend.list_store(tag)` | A `VirtualList`'s dataset as the UI thread's data source sees it: revision, keys, and rows |
@@ -398,8 +407,8 @@ The transport also plays the native side in the other direction:
 [Gestures](gestures.md#testing)), `report_container` and
 `report_intrinsic` report native sizes and relayout, and
 `emit_module_event`, `resolve_pending`, and `host_event` deliver module
-and host messages. Animations advance on the framework loop's clock, so a
-[`FakeClock`][pythonnative.testing.FakeClock] drives them. Every
+and host messages. Display frames advance on the framework loop's clock,
+so a [`FakeClock`][pythonnative.testing.FakeClock] drives animations. Every
 `FakeTransport` owns its own core surface, so several can live in one
 test. `tests/test_bridge.py` in the repository is the reference for this
 style.

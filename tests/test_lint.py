@@ -56,7 +56,34 @@ def test_finding_is_frozen() -> None:
 
 
 def test_codes_are_documented() -> None:
-    assert set(CODES) == {"PN000", "PN101", "PN102", "PN103", "PN104"}
+    assert set(CODES) == {"PN000", "PN101", "PN102", "PN103", "PN104", "PN201", "PN202", "PN203"}
+
+
+def test_worklet_rules() -> None:
+    source = """
+        import pythonnative as pn
+
+        @pn.component
+        def Box() -> pn.Node:
+            x = pn.use_shared_value(0.0)
+
+            @pn.worklet
+            def bad(event):
+                while True:
+                    pass
+
+            def plain():
+                return {"opacity": x.value}
+
+            style = pn.use_animated_style(plain)
+            print(x.value)
+            ok = pn.use_animated_style(lambda: {"opacity": x.value})
+            fine = pn.use_derived_value(pn.worklet(plain))
+            return pn.View(style=[style, ok])
+    """
+    findings = lint_source(textwrap.dedent(source), "box.py")
+    assert [(f.code, f.line) for f in findings] == [("PN201", 10), ("PN202", 16), ("PN203", 17)]
+    assert "for i in range(n)" in findings[0].message
 
 
 def test_clean_component_has_no_findings() -> None:
@@ -998,3 +1025,22 @@ def test_cli_lint_help_lists_json(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert "--json" in result.stdout
+
+
+def test_pn202_trusts_imported_and_assigned_worklets() -> None:
+    source = """
+        import pythonnative as pn
+        from .motions import fade
+
+        def spin():
+            return {}
+
+        spun = pn.worklet(spin)
+
+        @pn.component
+        def Box() -> pn.Node:
+            a = pn.use_animated_style(fade)
+            b = pn.use_animated_style(spun)
+            return pn.View(style=[a, b])
+    """
+    assert lint_source(textwrap.dedent(source), "box.py") == []

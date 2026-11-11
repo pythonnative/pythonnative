@@ -39,9 +39,6 @@ private final class PNLogicalScreenController: UIViewController {
 }
 
 public final class PNScreenManager: PNComponentManager {
-    // UINavigationController must detach its outgoing screen as part of the
-    // transition. Removing it early prevents UIKit from attaching the destination.
-    public override var detachesOnDestroy: Bool { false }
     public override func makeView(props: [String: Any]) -> UIView { PNLogicalScreen(frame: .zero) }
     public override func apply(view: UIView, props: [String: Any], initial: Bool) {
         var responder: UIResponder? = view.next
@@ -225,9 +222,15 @@ protocol PNBackButtonHandling: AnyObject {
 
 // MARK: - The logical stack
 
-private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAdaptivePresentationControllerDelegate, PNBackButtonHandling {
+private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAdaptivePresentationControllerDelegate, PNBackButtonHandling,
+    UIGestureRecognizerDelegate {
     let navigation = PNNavigationController()
     var controllers: [Int64: UIViewController] = [:]
+    /// Screens leaving through a pop or dismissal (`exit` op owner 1): the
+    /// core hears `finished` once UIKit no longer shows their controllers.
+    var pendingExits: [Int64: (controller: UIViewController, finished: () -> Void)] = [:]
+    /// The edge-pan-driven pop of a shared-element transition, while it runs.
+    var interactivePop: UIPercentDrivenInteractiveTransition?
     var order: [Int64] = []
     var applying: Set<ObjectIdentifier> = []
     var modalNavigations: [PNNavigationController] = []
@@ -242,6 +245,7 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
         navigation.delegate = self
         navigation.backHandler = self
         addSubview(navigation.view)
+        installSharedPop(navigation)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
     override func didMoveToWindow() {
@@ -274,9 +278,23 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
     func properties(_ tag: Int64) -> [String: Any] {
         PNViewRegistry.shared.view(for: tag).flatMap { PNViewState.existing(for: $0)?.props } ?? [:]
     }
+    /// The screen tag behind `controller`, including a screen that's exiting.
     func tag(for controller: UIViewController?) -> Int64? {
         guard let controller = controller else { return nil }
+        if let screen = (controller as? PNLogicalScreenController)?.screen, let state = PNViewState.existing(for: screen) {
+            return state.tag
+        }
         return controllers.first { $0.value === controller }?.key
+    }
+    /// Report every pending exit whose controller UIKit no longer shows.
+    func flushExits() {
+        guard !pendingExits.isEmpty else { return }
+        let shown = Set(([navigation] + modalNavigations).flatMap { $0.viewControllers }.map { ObjectIdentifier($0) })
+        let done = pendingExits.filter { !shown.contains(ObjectIdentifier($0.value.controller)) }
+        for (tag, exit) in done {
+            pendingExits.removeValue(forKey: tag)
+            exit.finished()
+        }
     }
     func routeGroups() -> [[Int64]] {
         var groups: [[Int64]] = [[]]
@@ -302,10 +320,12 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
             transitioning = true
             outgoing.dismiss(animated: window != nil && outgoing.dismissAnimated && !restoring) { [weak self] in
                 self?.transitioning = false
+                self?.flushExits()
                 self?.schedule()
             }
             return
         }
+        var animating = false
         for (index, tags) in groups.enumerated() {
             if index > modalNavigations.count { break }
             let nav = index == 0 ? navigation : modalNavigations[index - 1]
@@ -322,7 +342,7 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
                     && subject.map { PNScreenOptions.animates(properties($0)) } == true
                 applying.insert(ObjectIdentifier(nav))
                 nav.setViewControllers(target, animated: animated)
-                if !animated { applying.remove(ObjectIdentifier(nav)) }
+                if animated { animating = true } else { applying.remove(ObjectIdentifier(nav)) }
             }
             // Every controller carries its own item appearance so a pop
             // reveals the right header without waiting for Python.
@@ -342,6 +362,7 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
             let nav = PNNavigationController()
             nav.delegate = self
             nav.backHandler = self
+            installSharedPop(nav)
             let tags = groups[index]
             let root = properties(tags[0])
             nav.modalPresentationStyle = PNScreenOptions.modalStyle(PNScreenOptions.presentation(root))
@@ -362,6 +383,8 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
             nav.presentationController?.delegate = self
         }
         restoring = false
+        // An animated change reports its exits from `didShow`.
+        if !animating && !transitioning { flushExits() }
     }
 
     /// `gesture_enabled` drives the pop gesture on cards and
@@ -389,6 +412,7 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
     }
 
     func navigationController(_ navigationController: UINavigationController, didShow viewController: UIViewController, animated: Bool) {
+        flushExits()
         if applying.remove(ObjectIdentifier(navigationController)) != nil { return }
         let index = groupIndex(of: navigationController)
         let groups = routeGroups()
@@ -400,7 +424,94 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
     func navigationController(_ navigationController: UINavigationController, animationControllerFor operation: UINavigationController.Operation,
                               from fromVC: UIViewController, to toVC: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         guard let tag = tag(for: operation == .push ? toVC : fromVC) else { return nil }
-        return PNScreenOptions.transition(animation: PNScreenOptions.animation(properties(tag)), operation: operation)
+        let animation = PNScreenOptions.animation(properties(tag))
+        if animation != "none", operation != .none, let from = self.tag(for: fromVC), let to = self.tag(for: toVC) {
+            let pairs = PNSharedElements.pairs(from: from, to: to)
+            if !pairs.isEmpty {
+                return PNSharedElementTransition(operation: operation, animation: animation, pairs: pairs)
+            }
+        }
+        return PNScreenOptions.transition(animation: animation, operation: operation)
+    }
+
+    func navigationController(_ navigationController: UINavigationController,
+                              interactionControllerFor animationController: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
+        animationController is PNSharedElementTransition ? interactivePop : nil
+    }
+
+    // MARK: Interactive shared-element pop
+
+    /// UIKit's own back swipe only drives its default animation, so a pop
+    /// with shared elements gets an edge pan of its own. It begins only
+    /// when the two screens share elements; otherwise UIKit's swipe runs.
+    private func installSharedPop(_ nav: UINavigationController) {
+        let pan = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(sharedPop(_:)))
+        pan.edges = .left
+        pan.delegate = self
+        nav.view.addGestureRecognizer(pan)
+        nav.interactivePopGestureRecognizer?.require(toFail: pan)
+    }
+
+    private func navigation(for recognizer: UIGestureRecognizer) -> UINavigationController? {
+        ([navigation] + modalNavigations).first { $0.view === recognizer.view }
+    }
+
+    /// iOS 26's full-width back swipe pops with the shared-element
+    /// animation but can't drive it, so the screen jumps instead of
+    /// following the finger. Every touch re-decides it here (pairs come and
+    /// go as views mount): while the top screen shares elements with the
+    /// one below, only the edge pan pops it. Otherwise it follows UIKit's
+    /// edge swipe, so a guarded screen or `gesture_enabled=False` turns
+    /// both off.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), gestureRecognizer is UIScreenEdgePanGestureRecognizer, let nav = navigation(for: gestureRecognizer),
+           let contentPop = nav.interactiveContentPopGestureRecognizer {
+            let enabled = nav.interactivePopGestureRecognizer?.isEnabled == true && !sharesElements(nav)
+            if contentPop.isEnabled != enabled { contentPop.isEnabled = enabled }
+        }
+        #endif
+        return true
+    }
+
+    /// Whether the top screen of `nav` shares elements with the one below.
+    private func sharesElements(_ nav: UINavigationController) -> Bool {
+        let stack = nav.viewControllers
+        guard stack.count > 1, let from = tag(for: stack[stack.count - 1]), let to = tag(for: stack[stack.count - 2]),
+              PNScreenOptions.animates(properties(from)) else { return false }
+        return !PNSharedElements.pairs(from: from, to: to).isEmpty
+    }
+
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer is UIScreenEdgePanGestureRecognizer, let nav = navigation(for: gestureRecognizer) else {
+            return super.gestureRecognizerShouldBegin(gestureRecognizer)
+        }
+        guard nav.transitionCoordinator == nil, !transitioning, nav.interactivePopGestureRecognizer?.isEnabled == true else { return false }
+        return sharesElements(nav)
+    }
+
+    @objc private func sharedPop(_ pan: UIScreenEdgePanGestureRecognizer) {
+        guard let nav = navigation(for: pan) else { return }
+        let width = max(1, nav.view.bounds.width)
+        let progress = min(1, max(0, pan.translation(in: nav.view).x / width))
+        switch pan.state {
+        case .began:
+            interactivePop = UIPercentDrivenInteractiveTransition()
+            nav.popViewController(animated: true)
+        case .changed:
+            interactivePop?.update(progress)
+        case .ended:
+            let velocity = pan.velocity(in: nav.view).x
+            if velocity > 300 || (progress > 0.5 && velocity > -300) {
+                interactivePop?.finish()
+            } else {
+                interactivePop?.cancel()
+            }
+            interactivePop = nil
+        default:
+            interactivePop?.cancel()
+            interactivePop = nil
+        }
     }
 
     // MARK: PNBackButtonHandling
@@ -453,6 +564,19 @@ public final class PNScreenStackManager: PNComponentManager {
         stack.controllers.removeValue(forKey: state.tag)
         stack.schedule()
     }
+    /// A leaving screen pops (or its modal group dismisses) with its content
+    /// intact; the core destroys it once UIKit no longer shows it.
+    public override func exitChild(parent: UIView, child: UIView, finished: @escaping () -> Void) -> Bool {
+        guard let stack = parent as? PNLogicalStack, let state = PNViewState.existing(for: child) else { return false }
+        let controller = stack.controllers[state.tag]
+        removeChild(parent: parent, child: child)
+        if let controller = controller {
+            stack.pendingExits[state.tag] = (controller, finished)
+        } else {
+            finished()
+        }
+        return true
+    }
     public override func command(view: UIView, name: String, args: [String: Any]) -> Any? {
         if name == "restore_stack", let stack = view as? PNLogicalStack {
             // Python vetoed a native back: put UIKit back where Python is,
@@ -464,6 +588,9 @@ public final class PNScreenStackManager: PNComponentManager {
     }
     public override func teardown(view: UIView) {
         guard let stack = view as? PNLogicalStack else { return }
+        let exits = stack.pendingExits.values
+        stack.pendingExits.removeAll()
+        for exit in exits { exit.finished() }
         stack.navigation.dismiss(animated: false)
         for modal in stack.modalNavigations { modal.delegate = nil; modal.presentationController?.delegate = nil; modal.backHandler = nil }
         stack.modalNavigations.removeAll()

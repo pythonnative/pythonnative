@@ -59,8 +59,11 @@ class Transport(Protocol):
     def command(self, surface: int, tag: int, name: str, args_json: str, call_id: int) -> str:
         """Queue a view command; its result arrives as a ``command`` message."""
 
-    def animate(self, surface: int, tag: int, request_json: str) -> str:
-        """Queue an animation request behind pending mounts."""
+    def motion(self, surface: int, request_json: str) -> str:
+        """Queue a motion request behind pending mounts (RFC 0009)."""
+
+    def shared_read(self, ident: int) -> str:
+        """The latest value the UI thread published for a shared value, as JSON."""
 
     def measure(self, surface: int, tag: int) -> str:
         """The shadow and window frames of a view, as JSON."""
@@ -286,10 +289,10 @@ def dispatch(kind: str, tag: int, name: str, payload: str, backend: Any = None) 
                 from ..hosts.native import dispatch_host_event
 
                 dispatch_host_event(int(tag), name, codec.loads(payload))
-        elif kind == "animation":
-            from ..animated import native_animation_message
+        elif kind == "motion":
+            from ..motion.runtime import motion_message
 
-            native_animation_message(codec.loads(payload) or {})
+            motion_message(codec.loads(payload) or {})
         else:
             print(f"[pn.bridge] unknown callback kind {kind!r}")
     except Exception as exc:

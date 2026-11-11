@@ -30,6 +30,10 @@ when:
 - a capability in `[plugins].use` needs a `[permissions]` entry that's
   missing, because iOS crashes an app that reaches a protected API without
   its usage string.
+- a [worklet](motion.md#release-builds) uses Python the UI thread can't
+  run. Release builds ship without source, so staging compiles every
+  worklet into `pn_worklets.json` first and lists each one that fails;
+  `pn lint` reports the same errors as `PN201`.
 
 `--allow-unsigned` turns off the icon and signing checks for a smoke build
 that won't reach a store. On iOS it signs ad hoc and stops at the archive.

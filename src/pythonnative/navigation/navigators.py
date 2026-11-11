@@ -47,7 +47,7 @@ listeners fire as the active route changes.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Unpack
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Unpack, cast
 
 from ..component import Component, component
 from ..element import Element, Node
@@ -281,11 +281,13 @@ class TabNavigator(_KeepAliveNavigator):
 
 
 class DrawerNavigator(_KeepAliveNavigator):
-    """Sibling screens behind a slide-in menu.
+    """Sibling screens behind a menu that slides in from the left.
 
-    The drawer is drawn in Python on every platform and styled by the
-    theme. The handle returned by
-    [`use_navigation`][pythonnative.use_navigation] inside a drawer
+    The drawer is drawn by PythonNative on every platform and styled by the
+    theme. It follows the finger: swipe from the left edge to pull it open,
+    and drag it (or tap the dimmed screen) to close it. The drag and the
+    spring run as worklets on the UI thread (RFC 0009). The handle returned
+    by [`use_navigation`][pythonnative.use_navigation] inside a drawer
     screen is a [`DrawerNavigation`][pythonnative.navigation.DrawerNavigation]
     with ``open_drawer()``, ``close_drawer()``, and ``toggle_drawer()``.
 
@@ -295,10 +297,15 @@ class DrawerNavigator(_KeepAliveNavigator):
         initial: The screen shown first. Defaults to the first screen.
         screen_options: Options for every screen.
         drawer_width: Width of the menu panel, in points.
+        drawer_type: ``"front"`` slides the menu over the screen;
+            ``"slide"`` pushes the screen aside with it.
+        swipe_enabled: Whether swiping opens and closes the drawer.
+        swipe_edge_width: How far from the left edge a swipe can start
+            to open the drawer, in points.
     """
 
     kind: NavigatorKind = "drawer"
-    __slots__ = ("drawer_width",)
+    __slots__ = ("drawer_width", "drawer_type", "swipe_enabled", "swipe_edge_width")
 
     def __init__(
         self,
@@ -307,9 +314,17 @@ class DrawerNavigator(_KeepAliveNavigator):
         initial: Optional[ScreenTarget] = None,
         screen_options: Optional[ScreenOptions] = None,
         drawer_width: float = _DRAWER_WIDTH,
+        drawer_type: Literal["front", "slide"] = "front",
+        swipe_enabled: bool = True,
+        swipe_edge_width: float = 24,
     ) -> None:
         super().__init__(*screens, name=name, initial=initial, screen_options=screen_options)
+        if drawer_type not in ("front", "slide"):
+            raise ValueError("drawer_type must be 'front' or 'slide'")
         self.drawer_width = drawer_width
+        self.drawer_type = drawer_type
+        self.swipe_enabled = swipe_enabled
+        self.swipe_edge_width = swipe_edge_width
 
 
 def navigator_of(element: Element) -> Optional[Navigator]:
@@ -805,7 +820,9 @@ def _TabNavigatorImpl(*, navigator: TabNavigator) -> Element:
 
 @component
 def _DrawerNavigatorImpl(*, navigator: DrawerNavigator) -> Element:
+    from .. import gestures
     from ..components import Pressable, Text, View
+    from ..motion import interpolate, run_on_python, use_animated_style, use_shared_value, with_spring, worklet
 
     theme = use_theme()
     core, state, parent_focused = _use_navigator(navigator)
@@ -814,6 +831,15 @@ def _DrawerNavigatorImpl(*, navigator: DrawerNavigator) -> Element:
     drawer_open, set_drawer_open = use_state(False)
     core.drawer_open = drawer_open
     core._set_drawer_open = set_drawer_open
+    width = float(navigator.drawer_width)
+    # The panel's offset from fully open: 0 when open, -width when closed.
+    offset = use_shared_value(0.0 if drawer_open else -width)
+    start = use_shared_value(0.0)
+
+    def follow() -> None:
+        offset.value = with_spring(0.0 if drawer_open else -width, damping=30, stiffness=300, overshoot_clamping=True)
+
+    use_effect(follow, [drawer_open, width])
 
     def on_back() -> bool:
         if drawer_open:
@@ -823,9 +849,36 @@ def _DrawerNavigatorImpl(*, navigator: DrawerNavigator) -> Element:
 
     use_back_handler(on_back)
 
-    content = View(*_render_keep_alive(core, state, parent_focused, visited, frozen, theme), style={"flex": 1})
-    if not drawer_open:
-        return View(content, style={"flex": 1})
+    @worklet
+    def begin(event: Any) -> None:
+        start.value = offset.value
+
+    @worklet
+    def drag(event: Any) -> None:
+        offset.value = max(-width, min(0.0, start.value + event.translation_x))
+
+    @worklet
+    def release(event: Any) -> None:
+        opened = offset.value + 0.2 * event.velocity_x > -width / 2
+        offset.value = with_spring(
+            0.0 if opened else -width, velocity=event.velocity_x, damping=30, stiffness=300, overshoot_clamping=True
+        )
+        run_on_python(set_drawer_open, opened)
+
+    sliding = navigator.drawer_type == "slide"
+    panel_motion = use_animated_style(lambda: {"transform": [{"translate_x": offset.value}]})
+    content_motion = use_animated_style(
+        lambda: {"transform": [{"translate_x": offset.value + width if sliding else 0.0}]}
+    )
+    dim = use_animated_style(lambda: {"opacity": interpolate(offset.value, (-width, 0.0), (0.0, 1.0), "clamp")})
+    pan = gestures.Pan(
+        active_offset_x=(-10, 10),
+        fail_offset_y=(-15, 15),
+        on_begin=begin,
+        on_change=drag,
+        on_end=release,
+        enabled=navigator.swipe_enabled,
+    )
 
     def select(name: str) -> Callable[[], None]:
         def _select() -> None:
@@ -854,29 +907,54 @@ def _DrawerNavigatorImpl(*, navigator: DrawerNavigator) -> Element:
                 key=f"__drawer_{route.key}",
             )
         )
-    panel = View(
-        *rows,
-        style={
-            "width": navigator.drawer_width,
-            "background_color": colors.surface,
-            "padding_top": 24,
-            "border_right_width": 0.5,
-            "border_color": colors.border,
-        },
+    fill = {"position": "absolute", "top": 0, "left": 0, "right": 0, "bottom": 0}
+    content = View(
+        *_render_keep_alive(core, state, parent_focused, visited, frozen, theme),
+        style=[{"flex": 1}, content_motion],
     )
     scrim = Pressable(
         on_press=lambda: set_drawer_open(False),
-        style={"flex": 1, "background_color": "#00000080" if theme.dark else "#00000040"},
+        accessibility_label="Close menu",
+        style=[
+            cast(
+                Style,
+                {
+                    **fill,
+                    "background_color": "#00000080" if theme.dark else "#00000040",
+                    "pointer_events": "auto" if drawer_open else "none",
+                },
+            ),
+            dim,
+        ],
+        gestures=[pan],
     )
-    return View(
-        content,
+    edge = (
         View(
-            panel,
-            scrim,
-            style={"position": "absolute", "top": 0, "left": 0, "right": 0, "bottom": 0, "flex_direction": "row"},
-        ),
-        style={"flex": 1},
+            style={"position": "absolute", "top": 0, "bottom": 0, "left": 0, "width": navigator.swipe_edge_width},
+            gestures=[pan],
+        )
+        if navigator.swipe_enabled and not drawer_open
+        else None
     )
+    panel = View(
+        *rows,
+        style=[
+            {
+                "position": "absolute",
+                "top": 0,
+                "bottom": 0,
+                "left": 0,
+                "width": width,
+                "background_color": colors.surface,
+                "padding_top": 24,
+                "border_right_width": 0.5,
+                "border_color": colors.border,
+            },
+            panel_motion,
+        ],
+        gestures=[pan],
+    )
+    return View(content, scrim, edge, panel, style={"flex": 1})
 
 
 _IMPLEMENTATIONS: Dict[str, Component[...]] = {

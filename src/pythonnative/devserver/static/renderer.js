@@ -4,12 +4,12 @@
 // play on device. The renderer core runs in the page as WebAssembly
 // (`core/mount.js`): it validates each commit, lays it out with Yoga,
 // flattens layout-only views, and hands this renderer decoded mount
-// transactions (create, update, insert, delete, frame, and command ops),
-// which it applies through the component managers. The renderer measures
-// text and intrinsic leaves for the core, reports container and image
-// sizes back to it, forwards input to it (`pn_core_event` and
-// `pn_core_pointer`), and applies its animated writes. Frames use points,
-// represented by CSS pixels inside the phone frame.
+// transactions (create, update, insert, delete, frame, command, and exit
+// ops), which it applies through the component managers. The renderer
+// measures text and intrinsic leaves for the core, reports container and
+// image sizes back to it, forwards input to it (`pn_core_event` and
+// `pn_core_pointer`), and applies its motion writes (RFC 0009). Frames use
+// points, represented by CSS pixels inside the phone frame.
 //
 // Component managers mirror the Swift `PN*Manager` classes prop for
 // prop (see docs/concepts/bridge.md and the iOS sources).
@@ -264,10 +264,8 @@ export function applyStyle(view, props, changed, scheme, { leaf = false, backgro
     }
   }
 
-  if (has("transform")) {
-    view.staticTransform = transformToCSS(props.transform);
-    composeTransform(view);
-  }
+  // A motion write of `transform` replaces the whole list, like a static update.
+  if (has("transform")) s.transform = transformToCSS(props.transform);
 
   // Accessibility.
   if (has("accessibility_label")) {
@@ -402,25 +400,6 @@ function withAlpha(cssColor, alpha) {
   return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${Math.max(0, Math.min(1, alpha))})`;
 }
 
-/** Combine the static `transform` prop with animated transform values (animation wins). */
-export function composeTransform(view) {
-  const anim = view.animTransform;
-  let css = view.staticTransform || "";
-  if (anim && Object.keys(anim).length) {
-    const parts = [];
-    if (anim.translate_x != null) parts.push(`translateX(${anim.translate_x}px)`);
-    if (anim.translate_y != null) parts.push(`translateY(${anim.translate_y}px)`);
-    if (anim.scale != null) parts.push(`scale(${anim.scale})`);
-    if (anim.scale_x != null) parts.push(`scaleX(${anim.scale_x})`);
-    if (anim.scale_y != null) parts.push(`scaleY(${anim.scale_y})`);
-    if (anim.rotate != null) parts.push(`rotate(${anim.rotate}deg)`);
-    if (anim.rotate_x != null) parts.push(`rotateX(${anim.rotate_x}deg)`);
-    if (anim.rotate_y != null) parts.push(`rotateY(${anim.rotate_y}deg)`);
-    css = parts.join(" ");
-  }
-  view.el.style.transform = css;
-}
-
 function applyTextStyle(el, props, changed, scheme) {
   const s = el.style;
   const has = (k) => k in changed;
@@ -488,6 +467,136 @@ export function measureElement(el, maxW, maxH, { block = false } = {}) {
   if (isFiniteConstraint(maxW)) width = Math.min(width, maxW);
   if (isFiniteConstraint(maxH)) height = Math.min(height, maxH);
   return [width, height];
+}
+
+// ---------------------------------------------------------------------------
+// Motion timing (RFC 0009): presets and transitions as CSS timing
+// ---------------------------------------------------------------------------
+
+/** The named curves of `pythonnative.motion.Easing` as CSS easing functions. */
+const EASINGS = {
+  linear: "linear",
+  ease: "cubic-bezier(0.42, 0, 1, 1)",
+  ease_in: "cubic-bezier(0.42, 0, 1, 1)",
+  ease_out: "cubic-bezier(0, 0, 0.58, 1)",
+  ease_in_out: "cubic-bezier(0.42, 0, 0.58, 1)",
+  quad: "cubic-bezier(0.11, 0, 0.5, 0)",
+  cubic: "cubic-bezier(0.32, 0, 0.67, 0)",
+};
+
+const round4 = (v) => Math.round(v * 10000) / 10000;
+const linearEasing = (samples) => `linear(${samples.map(round4).join(", ")})`;
+const finiteOr = (value, fallback) => (Number.isFinite(Number(value)) && value !== null ? Number(value) : fallback);
+
+/** Robert Penner's bounce-out, as `Easing.bounce` computes it. */
+function bounce(t) {
+  if (t < 1 / 2.75) return 7.5625 * t * t;
+  if (t < 2 / 2.75) return 7.5625 * (t -= 1.5 / 2.75) * t + 0.75;
+  if (t < 2.5 / 2.75) return 7.5625 * (t -= 2.25 / 2.75) * t + 0.9375;
+  return 7.5625 * (t -= 2.625 / 2.75) * t + 0.984375;
+}
+
+/**
+ * A CSS easing function for the wire's easing: a curve name, four bezier
+ * control points, or `{samples: [...]}`. `null` uses `fallback`'s curve.
+ */
+export function cssEasing(easing, fallback = "ease_in_out") {
+  if (Array.isArray(easing) && easing.length === 4 && easing.every((v) => Number.isFinite(Number(v)))) {
+    return `cubic-bezier(${easing.map(Number).join(", ")})`;
+  }
+  if (easing && typeof easing === "object" && Array.isArray(easing.samples) && easing.samples.length >= 2) {
+    return linearEasing(easing.samples.map(Number));
+  }
+  if (easing === "bounce") return linearEasing(Array.from({ length: 41 }, (_, i) => bounce(i / 40)));
+  return EASINGS[easing] || EASINGS[fallback] || "ease";
+}
+
+/**
+ * A spring from 0 to 1, sampled every 16 ms into a CSS `linear()` curve,
+ * with the time it takes to settle. It uses the core's spring model:
+ * `duration` and `damping_ratio` (SwiftUI's response and damping
+ * fraction), or `stiffness`, `damping` (or `damping_ratio`), and `mass`.
+ */
+export function springTiming(spring) {
+  const mass = finiteOr(spring?.mass, 1) > 0 ? finiteOr(spring?.mass, 1) : 1;
+  let stiffness;
+  let damping;
+  if (finiteOr(spring?.duration, 0) > 0) {
+    const response = spring.duration / 1000;
+    const ratio = finiteOr(spring.damping_ratio, 1);
+    stiffness = (2 * Math.PI / response) ** 2 * mass;
+    damping = (4 * Math.PI * ratio * mass) / response;
+  } else {
+    stiffness = Math.max(1e-3, finiteOr(spring?.stiffness, 100));
+    const ratio = finiteOr(spring?.damping_ratio, -1);
+    damping = ratio >= 0 ? 2 * ratio * Math.sqrt(stiffness * mass) : finiteOr(spring?.damping, 10);
+  }
+  const clamp = !!spring?.overshoot_clamping;
+  // Semi-implicit Euler, stable while omega * step stays well under 2.
+  const step = Math.min(0.001, 0.2 / Math.sqrt(stiffness / mass));
+  const perSample = Math.max(1, Math.round(0.016 / step));
+  const samples = [0];
+  let x = 0;
+  let v = 0;
+  let t = 0;
+  while (t < 5) {
+    for (let i = 0; i < perSample; i++) {
+      v += ((-stiffness * (x - 1) - damping * v) / mass) * step;
+      x += v * step;
+      if (clamp && x > 1) {
+        x = 1;
+        v = 0;
+      }
+    }
+    t += perSample * step;
+    samples.push(x);
+    if (Math.abs(x - 1) < 0.001 && Math.abs(v) < 0.01) break;
+  }
+  samples[samples.length - 1] = 1;
+  return { duration: Math.round(t * 1000), easing: linearEasing(samples) };
+}
+
+/**
+ * `{duration, delay, easing}` (milliseconds and a CSS easing) for a preset
+ * or a transition: its `spring`, else its `duration` and `easing`, else
+ * `fallback` (`{duration, easing}` with a curve name).
+ */
+export function motionTiming(spec, fallback = { duration: 300, easing: "ease_in_out" }) {
+  const delay = Math.max(0, finiteOr(spec?.delay, 0));
+  if (spec?.spring && typeof spec.spring === "object") return { ...springTiming(spec.spring), delay };
+  const duration = finiteOr(spec?.duration, NaN);
+  return {
+    duration: duration >= 0 ? duration : fallback.duration,
+    easing: cssEasing(spec?.easing, fallback.easing),
+    delay,
+  };
+}
+
+/**
+ * Web Animations keyframes for a list row preset (`fade_in`, `slide_out`,
+ * `zoom_in`, ...), or `null` for a type rows don't play. `opacity` is the
+ * row's resting opacity; slides travel the row's own size from `edge`.
+ */
+export function presetKeyframes(type, edge, opacity = 1) {
+  const away = { left: "-100% 0", right: "100% 0", top: "0 -100%", bottom: "0 100%" }[edge] || "100% 0";
+  switch (type) {
+    case "fade_in": return [{ opacity: 0 }, { opacity }];
+    case "fade_out": return [{ opacity }, { opacity: 0 }];
+    case "slide_in": return [{ translate: away }, { translate: "0 0" }];
+    case "slide_out": return [{ translate: "0 0" }, { translate: away }];
+    case "zoom_in": return [{ scale: "0" }, { scale: "1" }];
+    case "zoom_out": return [{ scale: "1" }, { scale: "0" }];
+    default: return null;
+  }
+}
+
+/**
+ * The FLIP keyframes that carry a moved row from `delta` points away
+ * (along the list's axis) to its new place, or fade it (`fading`).
+ */
+export function moveKeyframes(type, delta, horizontal, opacity = 1) {
+  if (type === "fading") return [{ opacity }, { opacity: 0, offset: 0.5 }, { opacity }];
+  return [{ translate: horizontal ? `${delta}px 0` : `0 ${delta}px` }, { translate: "0 0" }];
 }
 
 // ---------------------------------------------------------------------------
@@ -2188,11 +2297,12 @@ class ModalManager extends ViewManager {
     void backdrop.offsetWidth; // commit the off-stage position before transitioning from it
     requestAnimationFrame(() => backdrop.classList.remove("pn-modal-out"));
   }
-  /** Play the dismissal on `backdrop`, then take it off the stage. */
-  dismiss(view, backdrop) {
+  /** Play the dismissal on `backdrop`, take it off the stage, then call `done`. */
+  dismiss(view, backdrop, done = null) {
     const kind = view.props.animation_type || "slide";
     if (kind === "none") {
       backdrop.remove();
+      done?.();
       return;
     }
     backdrop.dataset.animation = kind;
@@ -2201,15 +2311,26 @@ class ModalManager extends ViewManager {
     view.leaving = setTimeout(() => {
       backdrop.remove();
       backdrop.style.pointerEvents = "";
+      done?.();
     }, MODAL_TRANSITION_MS + 40);
+  }
+  /**
+   * A page-owned exit (RFC 0009): the modal and its content stay mounted
+   * while the sheet dismisses, then the core removes them.
+   */
+  exit(view, finish) {
+    document.removeEventListener("keydown", view.onKeyDown, true);
+    if (!view.shown) {
+      finish();
+      return;
+    }
+    view.shown = false;
+    this.dismiss(view, view.backdrop, finish);
   }
   destroy(view) {
     document.removeEventListener("keydown", view.onKeyDown, true);
-    if (!view.shown) return;
-    // Python destroys the content with the modal; animate a snapshot out.
-    const ghost = view.backdrop.cloneNode(true);
-    view.backdrop.replaceWith(ghost);
-    this.dismiss(view, ghost);
+    clearTimeout(view.leaving);
+    view.backdrop.remove();
   }
 }
 
@@ -2391,7 +2512,13 @@ class VirtualListManager extends ViewManager {
     const core = view.ctx.list?.();
     if (!core) return;
     const surface = view.ctx.surface(), tag = view.tag;
+    // Where every row was, for item animations (publishing replaces these, never mutates them).
+    const before = rows.revision > 0 && animatesItems(view) ? {indices: rows.indices, offsets: rows.offsets, scroll: offset} : null;
     const patch = core.listApply(surface, tag);
+    if (before && patch && !patch.reset) {
+      view.flip = before;
+      this.scheduleSettle(view);
+    }
     // A recreated list view starts from the dataset the core already holds.
     rows.revision = patch ? Number(patch.revision) : core.listRevision(surface, tag);
     if (patch?.reset) rows.measured.clear();
@@ -2461,6 +2588,71 @@ class VirtualListManager extends ViewManager {
       view.ctx.emit(view.tag, "on_window", [{...scrollPayload(view.el), first:view.first, last:view.last, extent, range, sticky, revision:rows.revision}]);
     }
   }
+  /**
+   * A row a dataset patch may remove keeps its elements while its delete
+   * ops run, so it can play `item_exiting` (the transaction's own dataset
+   * update decides; recycled rows just leave).
+   */
+  retainsDeleted(view, child) {
+    return !!view.props.item_exiting && child.props._pn_list_key != null && child.el.style.display !== "none" && view.el.isConnected;
+  }
+  childWillDetach(view, child) {
+    if (!child.retained) return;
+    (view.leavingRows || (view.leavingRows = [])).push({key: child.props._pn_list_key, el: child.el});
+    this.scheduleSettle(view);
+  }
+  scheduleSettle(view) {
+    if (view.settling) return;
+    view.settling = true;
+    view.ctx.afterMount(() => {
+      view.settling = false;
+      this.settle(view);
+    });
+  }
+  /**
+   * Play `item_entering`, `item_exiting`, and `item_layout` once a dataset
+   * patch's transaction has mounted and the rows sit at their new offsets:
+   * FLIP, with the Web Animations API on the rows' `translate`, `scale`, and
+   * `opacity` (so a row's own `transform` is untouched).
+   */
+  settle(view) {
+    const flip = view.flip, leaving = view.leavingRows || [];
+    view.flip = null;
+    view.leavingRows = [];
+    const rows = view.rows, props = view.props, horizontal = !!props.horizontal;
+    const scroll = horizontal ? view.el.scrollLeft : view.el.scrollTop;
+    const live = !!flip && view.el.isConnected && typeof view.el.animate === "function";
+    if (live) {
+      for (const child of view.children) {
+        const index = rows.indices.get(child.props._pn_list_key);
+        if (child.exiting || index == null || child.el.style.display === "none" || child.el.style.zIndex) continue;
+        const was = flip.indices.get(child.props._pn_list_key);
+        if (was == null) {
+          if (isPreset(props.item_entering)) playRow(child.el, presetKeyframes(props.item_entering.type, props.item_entering.edge, restingOpacity(child.el)), props.item_entering, "backwards");
+          continue;
+        }
+        const delta = (flip.offsets[was] - flip.scroll) - (rows.offsets[index] - scroll);
+        if (Math.abs(delta) >= 0.5 && isPreset(props.item_layout)) {
+          playRow(child.el, moveKeyframes(props.item_layout.type, delta, horizontal, restingOpacity(child.el)), props.item_layout, "backwards");
+        }
+      }
+    }
+    for (const {key, el} of leaving) {
+      if (!live || rows.indices.has(key) || !el.isConnected || !isPreset(props.item_exiting)) {
+        el.remove();
+        continue;
+      }
+      // Keep the row where it was on screen while the list scrolls to keep its anchor.
+      const axis = horizontal ? "left" : "top";
+      el.style[axis] = px((parseFloat(el.style[axis]) || 0) - flip.scroll + scroll);
+      el.style.pointerEvents = "none";
+      el.inert = true;
+      const exit = presetKeyframes(props.item_exiting.type, props.item_exiting.edge, restingOpacity(el)) || [{opacity: restingOpacity(el)}, {opacity: 0}];
+      const animation = playRow(el, exit, props.item_exiting, "both");
+      if (animation) animation.finished.then(() => el.remove(), () => el.remove());
+      else el.remove();
+    }
+  }
   command(view, name, args) {
     if (name === "get_scroll_offset") return {x:view.el.scrollLeft, y:view.el.scrollTop};
     if (name === "flash_scroll_indicators") return null;
@@ -2471,6 +2663,17 @@ class VirtualListManager extends ViewManager {
     view.el.scrollTo({[horizontal ? "left" : "top"]: offset, behavior: args.animated ? "smooth" : "instant"});
     return null;
   }
+}
+
+const isPreset = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+const animatesItems = (view) => isPreset(view.props.item_entering) || isPreset(view.props.item_exiting) || isPreset(view.props.item_layout);
+const restingOpacity = (el) => finiteOr(getComputedStyle(el).opacity, 1);
+
+/** Run `keyframes` on a row with a preset's timing; returns the `Animation`, or `null`. */
+function playRow(el, keyframes, preset, fill) {
+  if (!keyframes || typeof el.animate !== "function") return null;
+  const timing = motionTiming(preset);
+  return el.animate(keyframes, {duration: timing.duration, delay: timing.delay, easing: timing.easing, fill});
 }
 
 const SCREEN_TRANSITION_MS = 260;
@@ -2501,11 +2704,109 @@ export function screenTransition(props) {
   return MODAL_PRESENTATIONS.has(props?.presentation) ? "pn-screen-bottom" : "pn-screen-right";
 }
 
+/** The default timing of a push with shared elements (RFC 0009). */
+const SHARED_TRANSITION = { duration: SCREEN_TRANSITION_MS, easing: "ease_in_out" };
+const SHARED_PROPS = ["border_radius", "background_color", "opacity"];
+const SHARED_CSS = {
+  border_radius: "borderRadius",
+  border_top_left_radius: "borderTopLeftRadius",
+  border_top_right_radius: "borderTopRightRadius",
+  border_bottom_left_radius: "borderBottomLeftRadius",
+  border_bottom_right_radius: "borderBottomRightRadius",
+  background_color: "backgroundColor",
+  opacity: "opacity",
+};
+
+/** The rect of `el` in `layer`'s points (the phone frame may be scaled to fit the page). */
+export function rectIn(el, layer) {
+  const box = el.getBoundingClientRect();
+  const origin = layer.getBoundingClientRect();
+  const scale = layer.offsetWidth ? origin.width / layer.offsetWidth || 1 : 1;
+  return { x: (box.left - origin.left) / scale, y: (box.top - origin.top) / scale, w: box.width / scale, h: box.height / scale };
+}
+
+/**
+ * The CSS paint a shared element flies from and to: each of `props` that
+ * either end sets, from `source_style` to `target_style`.
+ */
+export function sharedPaint(pair, props, scheme) {
+  const from = {};
+  const to = {};
+  const css = (key, value) => {
+    if (key === "background_color") return parseColor(value, scheme) ?? "transparent";
+    if (key === "opacity") return String(value ?? 1);
+    return px(Number(value) || 0);
+  };
+  for (const key of props) {
+    const name = SHARED_CSS[key];
+    const start = pair.source_style?.[key];
+    const end = pair.target_style?.[key];
+    if (!name || (start == null && end == null)) continue;
+    from[name] = css(key, start);
+    to[name] = css(key, end);
+  }
+  return [from, to];
+}
+
+/** The overlay layer flights run in, created on demand and removed once empty. */
+function flightLayer(overlays) {
+  let layer = overlays.querySelector(":scope > .pn-flight-layer");
+  if (!layer) {
+    layer = document.createElement("div");
+    layer.className = "pn-flight-layer";
+    overlays.appendChild(layer);
+  }
+  return layer;
+}
+
+/**
+ * Fly one shared element: hide the source, lift the target view into
+ * `layer` at the source's rect, and animate it to its own rect while
+ * blending paint. Landing puts it back in its parent at its index and
+ * frame and shows the source again.
+ */
+export function startFlight(layer, source, target, pair, timing, scheme) {
+  const el = target.el;
+  const home = el.parentNode;
+  const next = el.nextSibling;
+  const from = rectIn(source.el, layer);
+  const to = rectIn(el, layer);
+  const props = Array.isArray(pair.transition?.props) ? pair.transition.props : SHARED_PROPS;
+  const [paintFrom, paintTo] = sharedPaint(pair, props, scheme);
+  const hidden = source.el.style.visibility;
+  const box = (r) => ({ left: px(r.x), top: px(r.y), width: px(r.w), height: px(r.h), margin: "0px" });
+  source.el.style.visibility = "hidden";
+  layer.appendChild(el);
+  const animation = el.animate([{ ...box(from), ...paintFrom }, { ...box(to), ...paintTo }], {
+    duration: timing.duration,
+    delay: timing.delay,
+    easing: timing.easing,
+    fill: "both",
+  });
+  const flight = { source, target, from, to, animation };
+  flight.land = () => {
+    if (target.flight !== flight) return;
+    target.flight = null;
+    animation.cancel();
+    if (home) home.insertBefore(el, next && next.parentNode === home ? next : null);
+    else el.remove();
+    if (target.frame) target.manager.frame(target, target.frame.x, target.frame.y, target.frame.w, target.frame.h);
+    source.el.style.visibility = hidden;
+    if (!layer.childElementCount) layer.remove();
+  };
+  target.flight = flight;
+  animation.finished.then(flight.land, flight.land);
+  return flight;
+}
+
 /**
  * The native stack container. Only the topmost `Screen` is shown, with the
  * screen beneath a `transparent_modal` kept visible under it. Pushes slide
- * or fade the new screen in; pops animate a snapshot of the removed screen
- * out, since Python destroys the real views in the same transaction.
+ * or fade the new screen in. A popped screen is a page-owned exit (RFC
+ * 0009): it stays mounted while it animates out over the revealed screen,
+ * then the core removes it. Views with the same `shared_tag` on both
+ * screens fly between them in the overlay layer, and the screens move with
+ * the flight's timing.
  *
  * Like `UINavigationController` and the Android toolbar, the stack draws a
  * navigation bar from the top screen's options (`title`, `header_shown`,
@@ -2546,14 +2847,14 @@ class ScreenStackManager extends ViewManager {
   /** Each screen lays out in the stack's bounds below the navigation bar its own options draw. */
   reportContainers(view, report) {
     for (const child of view.children) {
-      if (!child.props._pn_header_slot) report(child.tag, view.el, stackHeaderHeight(child.props));
+      if (!child.props._pn_header_slot && !child.exiting) report(child.tag, view.el, stackHeaderHeight(child.props));
     }
   }
   observed(view) {
     return [view.el];
   }
   goBack(view) {
-    if (view.children.length > 1 && view.hasEvent("on_native_back")) view.ctx.emit(view.tag, "on_native_back", [1]);
+    if (screensOf(view).length > 1 && view.hasEvent("on_native_back")) view.ctx.emit(view.tag, "on_native_back", [1]);
   }
   command(view, name) {
     // A vetoed back never left the DOM stack in the preview; just redraw.
@@ -2562,7 +2863,7 @@ class ScreenStackManager extends ViewManager {
   }
   /** Draw the navigation bar for the top screen and move its header slots into it. */
   refreshHeader(view) {
-    const children = view.children;
+    const children = screensOf(view);
     const top = children[children.length - 1] || null;
     const o = top?.props || {};
     const height = top ? stackHeaderHeight(o) : 0;
@@ -2591,7 +2892,7 @@ class ScreenStackManager extends ViewManager {
     view.titleEl.style.fontSize = titleStyle.font_size != null ? px(Number(titleStyle.font_size)) : "";
     view.titleEl.style.fontWeight = titleStyle.bold === false ? "400"
       : titleStyle.font_weight != null ? String(titleStyle.font_weight) : titleStyle.bold ? "700" : "";
-    for (const child of children) {
+    for (const child of view.children) {
       for (const slot of child.children) {
         const side = slot.props._pn_header_slot;
         if (!side) continue;
@@ -2624,20 +2925,21 @@ class ScreenStackManager extends ViewManager {
    * through); hide the rest, except a screen a push is still sliding over.
    */
   syncVisibility(view) {
-    const children = view.children;
+    const children = screensOf(view);
     const visible = new Set();
     for (let index = children.length - 1; index >= 0; index--) {
       visible.add(children[index]);
       if (children[index].props.presentation !== "transparent_modal") break;
     }
-    for (const child of children) {
+    for (const child of view.children) {
       child.el.classList.add("pn-stack-screen");
       child.el.classList.toggle("pn-screen-transparent", child.props.presentation === "transparent_modal");
-      if (child !== view.covered) child.el.style.display = visible.has(child) ? "" : "none";
+      // A leaving screen stays on stage until its exit finishes.
+      if (child !== view.covered && !child.exiting) child.el.style.display = visible.has(child) ? "" : "none";
     }
   }
   childrenChanged(view) {
-    const children = view.children;
+    const children = screensOf(view);
     const top = children[children.length - 1] || null;
     const previous = view.topTag;
     view.topTag = top ? top.tag : null;
@@ -2647,8 +2949,9 @@ class ScreenStackManager extends ViewManager {
     // Every screen in the stack now is "known": its reappearance after a pop
     // is a reveal, not a push. (A root stack never gets a `frame` call.)
     for (const child of children) known.add(child.tag);
-    // The screen a push covers stays on stage until the new one has slid over it.
-    const covered = pushed ? children.find((child) => child.tag === previous && child !== top) : null;
+    // The screen a push covers stays on stage until the new one has slid
+    // over it; a screen the push replaces leaves when it's covered.
+    const covered = pushed ? view.children.find((child) => child.tag === previous && child !== top) : null;
     if (covered) {
       view.covered?.el.classList.remove("pn-under");
       view.covered = covered;
@@ -2656,52 +2959,121 @@ class ScreenStackManager extends ViewManager {
     this.syncVisibility(view);
     this.refreshHeader(view);
     view.ctx.nativeStackChanged?.();
-    const reveal = view.revealFrom;
-    view.revealFrom = null;
-    if (pushed) this.enter(view, top, covered);
-    else if (changed && reveal === "pn-screen-right") this.reveal(top);
+    const popping = view.popping;
+    view.popping = null;
+    if (pushed) {
+      this.enter(view, top, covered, popping);
+    } else if (popping) {
+      this.leave(view, popping, changed ? top : null);
+    }
   }
   /** Play a push: the new screen slides (or fades) in and a card push nudges the covered one aside. */
-  enter(view, child, covered) {
+  enter(view, child, covered, popping = null) {
     const cls = screenTransition(child.props);
+    let timing = null;
     const settle = () => {
+      if (timing) {
+        untime(child.el);
+        if (covered) untime(covered.el);
+      }
+      if (popping?.child === covered) popping.finish();
       if (!covered || view.covered !== covered) return;
       view.covered = null;
       // Hide the covered screen, unless a quick pop already made it the top again.
       this.syncVisibility(view);
       covered.el.classList.remove("pn-under");
     };
+    if (popping && popping.child !== covered) popping.finish();
     if (!cls) {
       settle();
       return;
     }
     const el = child.el;
+    // Measure the shared elements before the screen moves off stage.
+    timing = covered ? this.fly(view, covered, child) : null;
     placeOffStage(el, cls);
+    if (timing) {
+      time(el, timing);
+      time(covered.el, timing);
+    }
     requestAnimationFrame(() => requestAnimationFrame(() => {
       el.classList.remove(cls);
       if (covered && cls === "pn-screen-right") covered.el.classList.add("pn-under");
     }));
-    setTimeout(settle, SCREEN_TRANSITION_MS + 40);
+    setTimeout(settle, (timing ? timing.duration + timing.delay : SCREEN_TRANSITION_MS) + 40);
+  }
+  /**
+   * Play a pop: the leaving screen animates out over the revealed one
+   * (which slides back from beneath after a card pop), then reports its
+   * exit finished on `transitionend`.
+   */
+  leave(view, popping, revealed) {
+    const { child, finish } = popping;
+    const cls = screenTransition(child.props);
+    if (!cls || !child.el.isConnected) {
+      finish();
+      return;
+    }
+    const el = child.el;
+    const timing = revealed ? this.fly(view, child, revealed) : null;
+    if (revealed && cls === "pn-screen-right") this.reveal(revealed, timing);
+    if (timing) time(el, timing);
+    let timer = 0;
+    const end = () => {
+      el.removeEventListener("transitionend", ended);
+      clearTimeout(timer);
+      finish();
+    };
+    const ended = (event) => {
+      if (event.target === el) end();
+    };
+    el.addEventListener("transitionend", ended);
+    requestAnimationFrame(() => el.classList.add(cls));
+    // `transitionend` never fires when nothing changed (or the page is hidden).
+    timer = setTimeout(end, (timing ? timing.duration + timing.delay : SCREEN_TRANSITION_MS) + 100);
   }
   /** Play the second half of a card pop: the revealed screen slides back from beneath. */
-  reveal(child) {
+  reveal(child, timing = null) {
     const el = child.el;
     placeOffStage(el, "pn-under");
+    if (timing) {
+      time(el, timing);
+      setTimeout(() => untime(el), timing.duration + timing.delay + 40);
+    }
     requestAnimationFrame(() => el.classList.remove("pn-under"));
   }
-  /** A child is leaving (pop): animate a snapshot of it out over the revealed screen. */
+  /**
+   * Start the shared-element flights between two screens (RFC 0009);
+   * returns the timing the screens should move with, or `null` without pairs.
+   */
+  fly(view, from, to) {
+    const pairs = view.ctx.sharedElements?.(from.tag, to.tag) || [];
+    if (!pairs.length) return null;
+    const scheme = view.ctx.scheme();
+    let layer = null;
+    let timing = null;
+    for (const pair of pairs) {
+      const source = view.ctx.viewFor(pair.source);
+      const target = view.ctx.viewFor(pair.target);
+      if (!source?.el.isConnected || !target?.el.isConnected || target.flight || typeof target.el.animate !== "function") continue;
+      layer = layer || flightLayer(view.ctx.overlays());
+      const own = motionTiming(pair.transition, SHARED_TRANSITION);
+      timing = timing || own;
+      startFlight(layer, source, target, pair, own, scheme);
+    }
+    return timing;
+  }
+  /** A screen is leaving (an `exit` op owned by the page): animate it out unless it's off stage. */
+  childWillExit(view, child, finish) {
+    view.seen?.delete(child.tag);
+    if (view.topTag !== child.tag || !child.el.isConnected || child.el.style.display === "none") {
+      finish();
+      return;
+    }
+    view.popping = { child, finish };
+  }
   childWillDetach(view, child) {
     view.seen?.delete(child.tag);
-    const cls = screenTransition(child.props);
-    if (!cls || child !== view.children[view.children.length - 1] || !child.el.isConnected) return;
-    const ghost = child.el.cloneNode(true);
-    ghost.classList.add("pn-screen-ghost");
-    ghost.style.pointerEvents = "none";
-    ghost.removeAttribute("data-pn-tag");
-    view.body.appendChild(ghost);
-    view.revealFrom = cls;
-    requestAnimationFrame(() => ghost.classList.add(cls));
-    setTimeout(() => ghost.remove(), SCREEN_TRANSITION_MS + 40);
   }
   frame(view, x, y, w, h) {
     super.frame(view, x, y, w, h);
@@ -2710,6 +3082,21 @@ class ScreenStackManager extends ViewManager {
   destroy(view) {
     view.ctx.nativeStackChanged?.();
   }
+}
+
+/** A stack's screens, without the ones leaving it. */
+const screensOf = (view) => view.children.filter((child) => !child.exiting);
+
+/** Give a screen's CSS transition a flight's timing, and take it back. */
+function time(el, timing) {
+  el.style.transitionDuration = `${timing.duration}ms`;
+  el.style.transitionTimingFunction = timing.easing;
+  el.style.transitionDelay = `${timing.delay}ms`;
+}
+function untime(el) {
+  el.style.transitionDuration = "";
+  el.style.transitionTimingFunction = "";
+  el.style.transitionDelay = "";
 }
 
 /** A native-stack screen; option changes redraw the stack's navigation bar. */
@@ -2781,13 +3168,19 @@ const MANAGERS = {
 // Animated writes (PNAnimator equivalent)
 // ---------------------------------------------------------------------------
 
-const ANIM_TRANSFORM = new Set(["translate_x", "translate_y", "scale", "scale_x", "scale_y", "rotate", "rotate_x", "rotate_y"]);
-
-/** An animated angle in degrees (`"45deg"`, `"0.5rad"`, or a bare number of degrees). */
-function degrees(value) {
-  const n = typeof value === "string" ? parseFloat(value) : Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return typeof value === "string" && value.endsWith("rad") ? (n * 180) / Math.PI : n;
+/**
+ * Where a child the core inserts at `index` goes among `children`: the
+ * core counts only the children that aren't exiting, so the child lands
+ * before the `index`-th of those, after any exiting siblings ahead of it.
+ */
+export function platformIndex(children, index) {
+  let seen = 0;
+  for (let i = 0; i < children.length; i++) {
+    if (children[i].exiting) continue;
+    if (seen === index) return i;
+    seen++;
+  }
+  return children.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -2858,6 +3251,11 @@ export class Renderer {
     this.ctx.list = () => this.host?.core;
     this.ctx.surface = () => this.surface;
     this.ctx.viewFor = (tag) => this.views.get(tag) || null;
+    this.ctx.sharedElements = (from, to) => this.host?.sharedElements?.(this.surface, from, to) || [];
+    // Run `fn` once the transaction being applied has mounted (right away outside one).
+    this.ctx.afterMount = (fn) => (this.applying ? this.mounted.push(fn) : fn());
+    this.applying = false;
+    this.mounted = [];
     this.views = new Map();
     this.managers = {};
     this.placeholder = new PlaceholderManager();
@@ -2881,6 +3279,7 @@ export class Renderer {
 
   /** Destroy every view (a `reset` op, or the page leaving Python). */
   reset() {
+    for (const view of this.views.values()) view.flight?.land();
     for (const view of this.views.values()) {
       try {
         view.manager.destroy(view);
@@ -2903,13 +3302,49 @@ export class Renderer {
   /** Apply one decoded transaction; the first failing op fails it (and the surface). */
   applyTransaction(transaction) {
     this.surface = transaction.surface;
+    this.applying = true;
     try {
+      this.retainLeaving(transaction.ops);
       for (const op of transaction.ops) this.applyOp(op);
+      this.flushContainers();
+    } finally {
+      this.dirtyContainers.clear();
+      this.applying = false;
+      for (const fn of this.mounted.splice(0)) {
+        try {
+          fn();
+        } catch (error) {
+          console.error("[pn] after-mount work failed", error);
+        }
+      }
+    }
+    this.reportContainers();
+  }
+
+  /** Tell each container whose children or frames changed. */
+  flushContainers() {
+    try {
       for (const view of this.dirtyContainers) if (this.views.has(view.tag)) view.manager.childrenChanged(view);
     } finally {
       this.dirtyContainers.clear();
     }
-    this.reportContainers();
+  }
+
+  /**
+   * Before a transaction's deletes run, let a parent keep the elements of a
+   * child it may animate out (a list row and its subtree, for `item_exiting`).
+   */
+  retainLeaving(ops) {
+    const retain = (view) => {
+      view.retained = true;
+      for (const child of view.children) retain(child);
+    };
+    for (const op of ops) {
+      if (op.kind !== "delete") continue;
+      const view = this.views.get(op.tag);
+      const parent = view?.parent;
+      if (parent?.manager.retainsDeleted?.(parent, view)) retain(view);
+    }
   }
 
   applyOp(op) {
@@ -2921,6 +3356,7 @@ export class Renderer {
       case "delete": this.destroyView(this.require(op.tag, "delete")); return;
       case "frame": this.frame(this.require(op.tag, "frame"), op.frame); return;
       case "command": this.command(op); return;
+      case "exit": this.exit(this.require(op.tag, "exit"), op.owner); return;
       default: throw new Error(`unknown mount op ${op.kind}`);
     }
   }
@@ -2993,7 +3429,8 @@ export class Renderer {
       const idx = parent.children.indexOf(child);
       if (idx >= 0) parent.children.splice(idx, 1);
     }
-    const at = Math.max(0, Math.min(index, parent.children.length));
+    // The core's index counts only the children that aren't exiting.
+    const at = platformIndex(parent.children, index);
     parent.children.splice(at, 0, child);
     child.parent = parent;
     const container = parent.manager.container(parent);
@@ -3004,12 +3441,18 @@ export class Renderer {
     this.dirtyContainers.add(parent);
   }
 
-  /** Delete one view; it also leaves its parent, and children still under it (moved later) leave it. */
+  /**
+   * Delete one view; it also leaves its parent, and children still under it
+   * (moved later) leave it. A retained view (a list row playing its exit)
+   * leaves its elements to its parent manager.
+   */
   destroyView(view) {
+    view.flight?.land();
+    const keep = !!view.retained;
     if (view.parent && view.parent.manager.childWillDetach) view.parent.manager.childWillDetach(view.parent, view);
     for (const child of view.children) {
       child.parent = null;
-      child.el.remove();
+      if (!keep) child.el.remove();
     }
     view.children = [];
     if (view.parent) {
@@ -3023,7 +3466,7 @@ export class Renderer {
     } catch (err) {
       /* ignore */
     }
-    view.el.remove();
+    if (!keep) view.el.remove();
     this.views.delete(view.tag);
     this.dirtyContainers.delete(view);
     this.forgetPrototype(view.tag);
@@ -3032,10 +3475,36 @@ export class Renderer {
     this.host?.forgetGestures(view.tag);
   }
 
+  /**
+   * An `exit` op (RFC 0009): the view keeps its place, frame, and subtree
+   * but gets no touches. Owner 0: the core animates it and later sends a
+   * `remove` write. Owner 1 (a stack's screen, a modal): the page plays its
+   * own transition, then reports the exit finished so the core removes it.
+   */
+  exit(view, owner) {
+    view.exiting = true;
+    view.el.style.pointerEvents = "none";
+    view.el.inert = true;
+    if (view.parent) this.dirtyContainers.add(view.parent);
+    if (owner !== 1) return;
+    const surface = this.surface;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      this.host?.exitFinished?.(surface, view.tag);
+    };
+    const parent = view.parent;
+    if (view.manager.exit) view.manager.exit(view, finish);
+    else if (parent?.manager.childWillExit) parent.manager.childWillExit(parent, view, finish);
+    else finish();
+  }
+
   /** A frame relative to the mounted parent (flattened ancestors already folded in). */
   frame(view, [x, y, w, h]) {
     view.frame = { x, y, w, h };
-    view.manager.frame(view, x, y, w, h);
+    // A flying shared element takes its frame when it lands.
+    if (!view.flight) view.manager.frame(view, x, y, w, h);
     if (view.parent) this.dirtyContainers.add(view.parent);
     if (view.children.length) this.dirtyContainers.add(view);
   }
@@ -3146,25 +3615,63 @@ export class Renderer {
     }
   }
 
-  // -- animated writes ------------------------------------------------------
+  // -- motion writes --------------------------------------------------------
 
-  /** Apply one animated prop write (`pn_core_take_writes`). */
-  applyAnimated(tag, prop, value) {
-    const view = this.views.get(tag);
-    if (!view || value == null) return;
-    if (ANIM_TRANSFORM.has(prop)) {
-      view.animTransform = view.animTransform || {};
-      view.animTransform[prop] = prop.startsWith("rotate") ? degrees(value) : Number(value) || 0;
-      composeTransform(view);
-    } else if (prop === "opacity") {
-      view.el.style.opacity = String(value);
-    } else if (prop === "background_color") {
-      view.el.style.backgroundColor = parseColor(value, this.ctx.scheme()) ?? "";
-    } else if (prop === "color") {
-      view.el.style.color = parseColor(value, this.ctx.scheme()) ?? "";
+  /**
+   * Apply the core's motion writes (`pn_core_take_writes`, decoded by
+   * `decodeWrites`): paint props, layout animation frames, and the removal
+   * of views whose exit finished. Unknown tags are skipped.
+   */
+  applyWrites(writes) {
+    let structural = false;
+    for (const write of writes) {
+      if (write.kind === "prop") {
+        const view = this.views.get(write.tag);
+        if (view) this.applyMotionProp(view, write.prop, write.value);
+      } else if (write.kind === "frame") {
+        const view = this.views.get(write.tag);
+        if (view) this.frame(view, write.frame);
+        structural = true;
+      } else if (write.kind === "remove") {
+        // Children come first; a tag can already be gone (a reset, a deleted parent).
+        for (const tag of write.tags) {
+          const view = this.views.get(tag);
+          if (view) this.destroyView(view);
+        }
+        structural = true;
+      }
     }
-    view.animValues = view.animValues || {};
-    view.animValues[prop] = value;
+    if (!structural) return;
+    this.flushContainers();
+    this.reportContainers();
+  }
+
+  /**
+   * Apply one motion `prop` write the way an update that changed only that
+   * key would (`null` as if the key were removed). The write wins until the
+   * core writes the key again; the core re-sends it after a commit changes
+   * the same static key. `transform` replaces the whole static list.
+   */
+  applyMotionProp(view, prop, value) {
+    const s = view.el.style;
+    if (prop === "opacity") {
+      view.baseOpacity = value == null ? 1 : Number(value);
+      if (!view.pressedOpacityActive) s.opacity = value == null ? "" : String(value);
+      return;
+    }
+    if (prop === "transform") {
+      s.transform = transformToCSS(value);
+      return;
+    }
+    const props = Object.create(view.props);
+    props[prop] = value == null ? undefined : value;
+    const saved = view.props;
+    view.props = props;
+    try {
+      view.manager.update(view, { [prop]: props[prop] });
+    } finally {
+      view.props = saved;
+    }
   }
 
   /** Re-apply every color-bearing prop after a light/dark switch. */

@@ -1,0 +1,33 @@
+# Tests with_decay settles at velocity / 1000 / (1 - deceleration), and
+# that clamp=(0, 100) rubber-bands an overshooting fling back to 100.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/with_decay.py
+# Source under test: src/pythonnative/motion/animations.py :: with_decay
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: with_decay
+- assertVisible: "Status: idle"
+- assertVisible: "Expected x: 150"
+- tapOn: "Fling"
+- extendedWaitUntil:
+    visible: "Finished: yes"
+    timeout: 10000
+- assertVisible: "Status: done"
+- assertVisible: "Settled x: 150"
+- tapOn: "Fling clamped"
+- extendedWaitUntil:
+    visible: "Settled x: 100"
+    timeout: 10000
+- assertVisible: "Status: done"
+- tapOn: "Reset decay"
+- extendedWaitUntil:
+    visible: "Status: idle"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

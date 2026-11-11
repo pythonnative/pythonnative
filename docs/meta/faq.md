@@ -193,12 +193,15 @@ Two strategies, depending on the cadence:
 - **State-driven** (e.g., a fade triggered by a button press): keep
   the value in [`use_state`][pythonnative.use_state] and let the
   reconciler push updates. Fine up to a few updates per second.
-- **Frame-driven** (e.g., a spring animation): bind an
-  [`AnimatedValue`][pythonnative.AnimatedValue] into an
-  `Animated.View` style and drive it with `Animated.spring` or
-  `Animated.timing`. Native animation graphs update supported bindings
-  without running Python on every frame. See the
-  [Animations guide](../guides/animations.md) for examples and fallback cases.
+- **Frame-driven** (e.g., a spring, or a view that follows a finger):
+  keep the value in a [`use_shared_value`][pythonnative.use_shared_value],
+  turn it into a style with
+  [`use_animated_style`][pythonnative.use_animated_style], and animate it
+  with `pn.with_spring` or `pn.with_timing`. Scroll and gesture handlers
+  marked [`@pn.worklet`][pythonnative.worklet] run on the UI thread, so
+  no Python runs on any frame. For views that appear, disappear, or
+  move, use the `entering=`, `exiting=`, and `layout=` props. See the
+  [Motion guide](../guides/motion.md).
 
 ## Is there async/await support?
 

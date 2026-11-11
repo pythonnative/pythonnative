@@ -143,17 +143,42 @@ object PNCore {
         if (loaded) nativeMountFinished(id, error?.toByteArray(Charsets.UTF_8))
     }
 
-    /** Apply the animated prop writes the core produced. */
+    /** Apply the motion writes (props, frames, and finished exits) the core produced. */
     fun applyWrites() {
         if (!loaded) return
         val buffer = nativeTakeWrites() ?: return
-        for (write in MountDecoder.decodeWrites(buffer)) {
-            val record = PNBridge.registry.get(write.tag) ?: continue
-            try {
-                record.manager.setAnimatedProperty(record.view, write.prop, write.value)
-            } catch (error: Exception) {
-                Log.d(PNBridge.TAG, "animated write ${write.prop} failed", error)
-            }
+        val writes = try {
+            MountDecoder.decodeWrites(buffer)
+        } catch (error: Exception) {
+            Log.e(PNBridge.TAG, "undecodable motion writes", error)
+            return
+        }
+        mounter.applyWrites(writes)
+    }
+
+    /**
+     * A platform-owned exit (a leaving screen or modal, mount op `exit`
+     * with owner 1) finished; the core answers with its `remove` write.
+     */
+    fun exitFinished(tag: Long) {
+        if (!loaded) return
+        nativeExitFinished(SURFACE, tag)
+        applyWrites()
+    }
+
+    /**
+     * Views sharing a `shared_tag` between two screens (RFC 0009): a JSON
+     * array of `{"name", "source", "target", "transition", "source_style",
+     * "target_style"}`, empty when there are none.
+     */
+    fun sharedElements(fromScreen: Long, toScreen: Long): JSONArray {
+        if (!loaded) return JSONArray()
+        val json = nativeSharedElements(SURFACE, fromScreen, toScreen) ?: return JSONArray()
+        return try {
+            JSONArray(String(json, Charsets.UTF_8))
+        } catch (error: Exception) {
+            Log.d(PNBridge.TAG, "shared elements unreadable", error)
+            JSONArray()
         }
     }
 
@@ -286,6 +311,8 @@ object PNCore {
     @JvmStatic private external fun nativeAnimationFrame(timestampMs: Double): Boolean
     @JvmStatic private external fun nativeTakeWrites(): ByteBuffer?
     @JvmStatic private external fun nativeSetReduceMotion(enabled: Boolean)
+    @JvmStatic private external fun nativeExitFinished(surface: Long, tag: Long)
+    @JvmStatic private external fun nativeSharedElements(surface: Long, fromScreen: Long, toScreen: Long): ByteArray?
     @JvmStatic private external fun nativePointer(surface: Long, tag: Long, events: DoubleArray, count: Int): Int
     @JvmStatic private external fun nativeGestureDeadline(surface: Long, tag: Long): Double
     @JvmStatic private external fun nativeGesturePoll(surface: Long, tag: Long, time: Double)

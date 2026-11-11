@@ -1,0 +1,41 @@
+# Tests Swipeable: swiping the row left reveals and opens the right
+# actions, swiping right opens the left ones, the revealed actions take
+# taps, and the handle's close slides the row back.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/swipeable.py
+# Source under test: src/pythonnative/components/swipeable.py :: Swipeable, SwipeableHandle
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: Swipeable
+- assertVisible: "Opened: none"
+- swipe:
+    from:
+      text: "Swipe this row"
+    direction: LEFT
+    duration: 400
+- extendedWaitUntil:
+    visible: "Opened: right"
+    timeout: 5000
+- tapOn: "Delete"
+- assertVisible: "Action: delete"
+- tapOn: "Close via ref"
+- assertVisible: "Last request: close"
+- swipe:
+    from:
+      text: "Swipe this row"
+    direction: RIGHT
+    duration: 400
+- extendedWaitUntil:
+    visible: "Opened: left"
+    timeout: 5000
+- tapOn: "Pin"
+- assertVisible: "Action: pin"
+- tapOn: "Close via ref"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

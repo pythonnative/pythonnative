@@ -428,12 +428,33 @@ class ListController:
         self._scroll_to_end(animated)
 
 
+ItemAnimation = Any
+"""A [`pythonnative.motion`][pythonnative.motion] preset: ``FadeIn``, ``SlideIn``, ``ZoomIn``,
+``FadeOut``, ``SlideOut``, ``ZoomOut``, ``LinearTransition``, or ``FadingTransition``."""
+
+
+def _item_animations(entering: Any, exiting: Any, layout: Any) -> Optional[Dict[str, Any]]:
+    """The ``VirtualList`` props for native row animations (RFC 0009)."""
+    from ..motion.layout import Keyframes
+
+    out = {}
+    for name, value in (("item_entering", entering), ("item_exiting", exiting), ("item_layout", layout)):
+        if value is None:
+            continue
+        if isinstance(value, Keyframes) or not hasattr(value, "__pn_wire__"):
+            raise TypeError(f"{name} takes a motion preset (FadeIn, SlideIn, LinearTransition, ...), not {value!r}")
+        out[name] = value
+    return out or None
+
+
 @memo(
-    equal=lambda old, new: old["revision"] == new["revision"]
-    and old["row"].key == new["row"].key
-    and old["row"].index == new["row"].index
-    and old["row"].is_last == new["row"].is_last
-    and old["inputs"] == new["inputs"]
+    equal=lambda old, new: (
+        old["revision"] == new["revision"]
+        and old["row"].key == new["row"].key
+        and old["row"].index == new["row"].index
+        and old["row"].is_last == new["row"].is_last
+        and old["inputs"] == new["inputs"]
+    )
 )
 @component
 def _ListRow(row: _RowSpec, revision: int, inputs: Any) -> Element:
@@ -460,6 +481,7 @@ def _NativeList(
     empty: Optional[Element] = None,
     refresh_control: Optional[Element] = None,
     content_container_style: Optional[Dict[str, Any]] = None,
+    item_animations: Optional[Dict[str, Any]] = None,
 ) -> Element:
     """Prepare a bounded set of logical rows for native recycled containers.
 
@@ -593,7 +615,14 @@ def _NativeList(
     if inverted:
         props["transform"] = [*(props.get("transform") or []), _inverted_transform(horizontal)]
     if on_scroll is not None:
-        props["on_scroll"] = lambda info: on_scroll(_scroll_event(info, horizontal))
+        from ..motion.worklets import is_worklet
+
+        # A worklet reads the native payload's fields in the core; a Python callback gets a ScrollEvent.
+        props["on_scroll"] = (
+            on_scroll if is_worklet(on_scroll) else lambda info: on_scroll(_scroll_event(info, horizontal))
+        )
+    if item_animations:
+        props.update(item_animations)
     if refresh_control is not None:
         props["refresh_control"] = dict(refresh_control.props)
     children = []
@@ -643,6 +672,9 @@ def FlatList(
     on_scroll: Optional[Callable[[ScrollEvent], Any]] = None,
     shows_scroll_indicator: bool = True,
     content_container_style: StyleProp = None,
+    item_entering: Optional["ItemAnimation"] = None,
+    item_exiting: Optional["ItemAnimation"] = None,
+    item_layout: Optional["ItemAnimation"] = None,
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
@@ -686,6 +718,12 @@ def FlatList(
             (React Native's ``ItemSeparatorComponent``).
         refresh_control: Optional [`RefreshControl`][pythonnative.RefreshControl]
             element for pull-to-refresh.
+        item_entering: How rows added to the data animate in, run by the
+            native list (a [`pythonnative.motion`][pythonnative.motion]
+            preset such as ``FadeIn``). Only data changes animate, never
+            scrolling or recycling.
+        item_exiting: How removed rows animate out (``FadeOut``, ``SlideOut``, ``ZoomOut``).
+        item_layout: How rows that move animate (``LinearTransition``, ``FadingTransition``).
         horizontal: Scroll horizontally (extents become widths).
         inverted: Render the list bottom-up (or right-to-left when
             ``horizontal``), so new rows appended to ``data`` appear at
@@ -862,6 +900,7 @@ def FlatList(
         empty=list_empty,
         refresh_control=refresh_control,
         content_container_style=resolve_style(content_container_style) or None,
+        item_animations=_item_animations(item_entering, item_exiting, item_layout),
     ).with_key(key)
 
 
@@ -896,6 +935,9 @@ def SectionList(
     on_end_reached_threshold: float = 0.5,
     on_viewable_items_changed: Optional[Callable[[List[ViewableItem[T]]], None]] = None,
     on_scroll: Optional[Callable[[ScrollEvent], Any]] = None,
+    item_entering: Optional["ItemAnimation"] = None,
+    item_exiting: Optional["ItemAnimation"] = None,
+    item_layout: Optional["ItemAnimation"] = None,
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
@@ -932,6 +974,12 @@ def SectionList(
         inverted: Render the list bottom-up (see
             [`FlatList`][pythonnative.FlatList]).
         refresh_control: Optional [`RefreshControl`][pythonnative.RefreshControl] element.
+        item_entering: How rows added to the data animate in, run by the
+            native list (a [`pythonnative.motion`][pythonnative.motion]
+            preset such as ``FadeIn``). Only data changes animate, never
+            scrolling or recycling.
+        item_exiting: How removed rows animate out (``FadeOut``, ``SlideOut``, ``ZoomOut``).
+        item_layout: How rows that move animate (``LinearTransition``, ``FadingTransition``).
         list_header: Element rendered once before everything.
         list_footer: Element rendered once after everything.
         list_empty: Element rendered when there are no sections.
@@ -1061,5 +1109,6 @@ def SectionList(
         footer=list_footer,
         empty=list_empty,
         refresh_control=refresh_control,
+        item_animations=_item_animations(item_entering, item_exiting, item_layout),
     )
     return native.with_key(key)

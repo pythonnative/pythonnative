@@ -142,9 +142,9 @@ def define_component(
             f"got {measurement!r}"
         )
     from dataclasses import replace
-    from typing import get_type_hints
+    from typing import Optional, Sequence, Union, get_type_hints
 
-    from ..style import Style, StyleProp
+    from ..style import Style
     from .schema import COMPONENTS, RUNTIME_PROPS, ComponentSchema, register_schema, type_schema
 
     schema = ComponentSchema.from_dataclass(name, props, platforms=platforms, measurement=measurement)
@@ -152,7 +152,9 @@ def define_component(
     style_keys = get_type_hints(Style)
     styles = {key: value for key, value in (common.props.items() if common else ()) if key in style_keys}
     wire = styles | schema.props | RUNTIME_PROPS
-    wire["style"] = {**type_schema(StyleProp), "native": {"python_only": True}}
+    # ``style`` never crosses the wire (it's flattened into the props), so
+    # its schema only documents the static shape; animated styles are Python-side.
+    wire["style"] = {**type_schema(Union[Style, Sequence[Optional[Style]], None]), "native": {"python_only": True}}
     register_schema(replace(schema, props=wire))
     _REGISTRY[name] = props
     return element_factory(name)

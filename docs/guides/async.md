@@ -410,11 +410,13 @@ def PostsScreen(user_id: int) -> pn.Node:
     state, create = pn.use_mutation(api.create_post)
     version, set_version = pn.use_state(0)
 
-    opacity = pn.use_animated_value(0.0)
-    pn.use_effect(
-        lambda: pn.Animated.timing(opacity, to=1.0, duration=300),
-        [],
-    )
+    opacity = pn.use_shared_value(0.0)
+
+    async def fade_in():
+        await opacity.animate(pn.with_timing(1.0, duration=300))
+
+    pn.use_effect(fade_in, [])
+    faded = pn.use_animated_style(lambda: {"opacity": opacity.value})
 
     async def submit():
         if not draft.strip():
@@ -423,7 +425,7 @@ def PostsScreen(user_id: int) -> pn.Node:
         set_draft("")
         set_version(version + 1)  # refetch the list resource
 
-    return pn.Animated.View(
+    return pn.View(
         pn.TextInput(value=draft, on_change=set_draft),
         pn.Button(
             "Post" if not state.loading else "Posting…",
@@ -433,7 +435,7 @@ def PostsScreen(user_id: int) -> pn.Node:
             PostList(user_id=user_id, version=version),
             fallback=pn.ActivityIndicator(),
         ),
-        style={"opacity": opacity, "padding": 16, "gap": 8},
+        style=[{"padding": 16, "gap": 8}, faded],
     )
 ```
 

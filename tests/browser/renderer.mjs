@@ -4,9 +4,10 @@
 // produces. The assertions read the DOM, the core's replies, and the
 // messages the core emits for Python.
 import {Renderer, transformToCSS, snapTarget, scrollPayload, keyPressName, screenTransition, stackHeaderHeight} from '../../src/pythonnative/devserver/static/renderer.js';
-import {RendererCore, CoreHost, PROTOCOL_VERSION, decodeTransaction, decodeWrites} from '../../src/pythonnative/devserver/static/core/mount.js';
+import {RendererCore, CoreHost, PROTOCOL_VERSION, decodeTransaction} from '../../src/pythonnative/devserver/static/core/mount.js';
 import {PreviewHost, Screen, localeRecord, scriptResult} from '../../src/pythonnative/devserver/static/host.js';
 import {runDevToolsTests} from './devtools.mjs';
+import {runMotionTests} from './motion.mjs';
 const assert = (condition, message) => { if (!condition) throw Error(message); };
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const until = async (condition, ms = 3000) => { for (const end = performance.now() + ms; !condition(); await sleep(10)) if (performance.now() > end) throw Error(`timed out waiting for ${condition}`); };
@@ -18,6 +19,9 @@ function canonical(value) {
   return value;
 }
 const FIXTURES = '../../src/pythonnative/native/ios/Tests/PythonNativeKitTests/Fixtures';
+
+// RFC 0009: the page's half of Motion, against a stand-in core.
+await runMotionTests();
 
 // ---------------------------------------------------------------------------
 // The WebAssembly core against the shared fixtures.
@@ -33,9 +37,6 @@ for (const item of recorded) {
   assert(decoded.surface === item.surface && decoded.revision === item.revision && decoded.id === item.id, `transaction header: ${item.name}`);
   assert(same(decoded.ops, item.ops), `decoded ops match Python's: ${item.name}: ${JSON.stringify(decoded.ops)}`);
 }
-const writes = new Uint8Array([2,0,0,0, 7,0,0,0,0,0,0,0, 7,0,0,0, ...new TextEncoder().encode('opacity'), 4, 0,0,0,0,0,0,224,63,
-  7,0,0,0,0,0,0,0, 16,0,0,0, ...new TextEncoder().encode('background_color'), 5, 4,0,0,0, ...new TextEncoder().encode('#fff')]);
-assert(same(decodeWrites(writes), [[7, 'opacity', 0.5], [7, 'background_color', '#fff']]), 'animated writes decode');
 const contracts = await (await fetch(`${FIXTURES}/contracts.json`)).text();
 assert(core.loadContracts(contracts) === null && core.fingerprint() !== '', 'the core compiles the contract document');
 
@@ -410,6 +411,8 @@ commit([['u',21,{dismiss_on_backdrop:false},[]]]);
 reopened.sheet.click();
 assert(emitted(21, 'on_request_close').length === 1, 'dismiss_on_backdrop=False ignores backdrop taps');
 commit([['d',22], ['d',21]]);
+// A visible modal dismisses before the core removes it (RFC 0009); later cases reuse its tags.
+await until(() => !renderer.views.has(21) && !renderer.views.has(22));
 overlay.style.cssText = '';
 
 // VirtualList: on_scroll only when wired.
@@ -478,12 +481,14 @@ await frames(3);
 assert(!third.el.classList.contains('pn-screen-fade') && !sheet.el.classList.contains('pn-under'), 'the enter class is released after a frame; a fade leaves the covered screen in place');
 await sleep(350);
 assert(sheet.el.style.display === 'none' && card.el.style.display === 'none', 'the covered screens leave the stage once the push lands');
-commit([['d',24]]);
-const ghost = renderer.views.get(21).el.querySelector('.pn-screen-ghost');
-assert(ghost && card.el.style.display === '' && sheet.el.style.display === '' && renderer.views.get(21).children.length === 2, 'a pop leaves a snapshot to animate out and reveals the stack beneath');
-await sleep(350);
-assert(!renderer.views.get(21).el.querySelector('.pn-screen-ghost'), 'the snapshot is removed after the transition');
+commit([['c',27,'Text',{text:'Leaving'}], ['i',24,27,0]]);
+commit([['d',27], ['d',24]]);
+assert(renderer.views.get(24) === third && third.exiting && third.el.isConnected && renderer.views.get(27)?.el.parentNode === third.el, 'a popped screen is a page-owned exit that keeps its content while it animates out');
+assert(card.el.style.display === '' && sheet.el.style.display === '' && renderer.views.get(21).children.length === 3, 'the pop reveals the stack beneath');
+await sleep(450);
+assert(!renderer.views.has(24) && !renderer.views.has(27) && !third.el.isConnected && renderer.views.get(21).children.length === 2, 'the core removes the screen once its transition ends');
 commit([['d',23], ['d',22], ['d',21]]);
+assert(!renderer.views.has(21) && !renderer.views.has(22), 'a stack removed with its screens is deleted at once');
 
 // ScreenStack: the navigation bar follows the top screen's options.
 commit([['c',60,'ScreenStack',{_pn_events:['on_native_back']}],
@@ -607,27 +612,44 @@ commit([['u',709,{animation_type:'none', visible:true},[]]]);
 commit([['u',709,{visible:false},[]]]);
 assert(!sliding.backdrop.isConnected, 'animation_type none dismisses at once');
 commit([['d',709]]);
+assert(!renderer.views.has(709), 'a hidden modal leaves at once');
+commit([['c',730,'Modal',{visible:true}], ['c',731,'Text',{text:'Sheet'}], ['i',730,731,0]]);
+const closing = renderer.views.get(730);
+commit([['d',731], ['d',730]]);
+assert(renderer.views.has(730) && closing.backdrop.isConnected && closing.backdrop.classList.contains('pn-modal-out') && closing.sheet.contains(renderer.views.get(731).el), 'a destroyed modal dismisses with its real content');
+await sleep(450);
+assert(!renderer.views.has(730) && !renderer.views.has(731) && !closing.backdrop.isConnected, 'the core removes the modal after its dismissal');
 
-// Animation: the core's drivers run on the page's frame clock and write to the views.
-const animation = (id) => messages.filter(([kind]) => kind === 'animation').map(([, , , payload]) => JSON.parse(payload)).filter(body => body.id === id);
-const declined = JSON.parse(core.animate(1, 10, JSON.stringify({op:'start', id:901, prop:'opacity', spec:{kind:'timing', to:0, duration_ms:100, easing:'nope'}})));
-assert(declined.ok === false && /easing/.test(declined.error), `a timing animation with an unknown easing is declined: ${JSON.stringify(declined)}`);
-assert(JSON.parse(core.animate(1, 10, JSON.stringify({op:'start', id:902, prop:'opacity', spec:{kind:'timing', from:1, to:0.25, duration_ms:80, easing:'linear'}}))).ok, 'the core queues an animation');
+// Motion (RFC 0009): requests queue behind mounts, shared values publish for Python, and
+// layout animations run on the page's frame clock through the core's writes.
+const declined = JSON.parse(core.motion(1, JSON.stringify({op:'nope'})));
+assert(declined.ok === false && /nope/.test(declined.error), `an unknown motion request is declined: ${JSON.stringify(declined)}`);
+assert(JSON.parse(core.motion(1, JSON.stringify({op:'shared', id:7001, value:0.25}))).ok, 'the core queues a shared value');
 mount.drain();
+assert(Number(core.sharedRead(7001)) === 0.25 && core.sharedRead(7999) === 'null', `a shared value publishes its value: ${core.sharedRead(7001)}`);
+core.motion(1, JSON.stringify({op:'animate', id:7001, animation:{__animation__:true, type:'timing', to:1, duration:80, easing:'linear', reduce_motion:'never', on_finish:null}})); mount.drain();
 await sleep(250); await frames(2);
-assert(renderer.views.get(10).el.style.opacity === '0.25' && animation(902).some(body => body.finished === true), `a timing animation finishes at its target: ${renderer.views.get(10).el.style.opacity} ${JSON.stringify(animation(902))}`);
-assert(JSON.parse(core.animate(1, 10, JSON.stringify({op:'start', id:903, prop:'translate_x', spec:{kind:'spring', to:40, stiffness:400, damping:30}}))).ok, 'a spring starts');
-mount.drain();
-await sleep(600); await frames(2);
-const springX = parseFloat(/translateX\(([-\d.]+)px\)/.exec(renderer.views.get(10).el.style.transform)?.[1]);
-assert(Math.abs(springX - 40) < 0.5, `a spring settles on its target: ${renderer.views.get(10).el.style.transform}`);
-JSON.parse(core.animate(1, 10, JSON.stringify({op:'set', prop:'background_color', value:'#00ff00'}))); mount.drain();
-assert(renderer.views.get(10).el.style.backgroundColor === 'rgb(0, 255, 0)', 'a set writes the value directly');
-JSON.parse(core.animate(1, 10, JSON.stringify({op:'start', id:904, prop:'opacity', spec:{kind:'timing', to:1, duration_ms:5000}}))); mount.drain();
-await frames(3);
-JSON.parse(core.animate(1, 10, JSON.stringify({op:'cancel', id:904}))); mount.drain();
-await frames(2);
-assert(animation(904).some(body => body.finished === false), 'a cancelled animation reports that it did not finish');
+assert(Number(core.sharedRead(7001)) === 1, `a timing animation runs on the frame clock: ${core.sharedRead(7001)}`);
+core.motion(1, JSON.stringify({op:'release', shared:[7001]})); mount.drain();
+assert(core.sharedRead(7001) === 'null', 'a released shared value stops publishing');
+const fade = (type) => ({type, duration:80, delay:0, easing:'linear', reduce_motion:'never'});
+const motionLayout = {roots:[740], width:200, height:200, selective:false};
+// The siblings paint, so the core doesn't flatten them away.
+commit([['c',740,'View',{width:200, height:200}], ['c',741,'View',{height:20, background_color:'#ff0000'}], ['i',740,741,0]], motionLayout);
+const motionRoot = renderer.views.get(740); stage.append(motionRoot.el);
+commit([['c',742,'View',{height:20, entering:fade('fade_in'), exiting:fade('fade_out')}], ['i',740,742,1]], motionLayout);
+const entering = renderer.views.get(742);
+assert(Number(entering.el.style.opacity) < 0.5, `an entering view paints its first frame from its initial style: ${entering.el.style.opacity}`);
+await sleep(250); await frames(2);
+assert(entering.el.style.opacity === '' || Number(entering.el.style.opacity) === 1, `the entering animation ends at the view's own opacity: ${entering.el.style.opacity}`);
+commit([['d',742]]);
+assert(renderer.views.get(742) === entering && entering.exiting && entering.el.parentNode === motionRoot.el && entering.el.style.pointerEvents === 'none', 'a removed view with exiting stays in place without touches');
+commit([['c',743,'View',{height:20, background_color:'#0000ff'}], ['i',740,743,1]], motionLayout);
+assert(motionRoot.children.map(child => child.tag).join() === '741,742,743', `inserts skip the exiting view: ${motionRoot.children.map(child => child.tag)}`);
+await sleep(250); await frames(2);
+assert(!renderer.views.has(742) && !entering.el.isConnected, 'the core removes the view when its exit animation finishes');
+commit([['d',743], ['d',741], ['d',740]]);
+motionRoot.el.remove();
 
 // TabBar: the contract's styling props.
 commit([['c',26,'TabBar',{items:[{name:'home', title:'Home'}, {name:'inbox', title:'Inbox', badge:'3'}], active_tab:'inbox', tint_color:'#ff0000', inactive_tint_color:'#00ff00', translucent:false, shows_labels:false}]]);

@@ -201,7 +201,14 @@ open class PNViewController: UIViewController {
         rootView = root
         root.translatesAutoresizingMaskIntoConstraints = true
         root.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(root)
+        // A portal mounted in the same commit attached itself to this view
+        // before the root did; the root goes below it so the portal floats
+        // over the screen (and takes touches first).
+        if let overlay = view.subviews.first(where: { $0 is PNPortalView }) {
+            view.insertSubview(root, belowSubview: overlay)
+        } else {
+            view.addSubview(root)
+        }
         syncRootFrame()
         PNLaunch.firstScreenAttached()
     }
@@ -230,10 +237,14 @@ open class PNViewController: UIViewController {
     }
 
     private func syncRootFrame() {
-        guard let root = rootView else { return }
         let frame = rootFrame
-        if root.frame != frame {
+        if let root = rootView, root.frame != frame {
             root.frame = frame
+        }
+        // Portals mirror the root's frame; one attached before the first
+        // layout pass computed its frame from stale insets.
+        for overlay in view.subviews where overlay is PNPortalView && overlay.frame != frame {
+            overlay.frame = frame
         }
     }
 

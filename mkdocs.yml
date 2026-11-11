@@ -86,7 +86,7 @@ nav:
     - Styling: guides/styling.md
     - Managing State: guides/state.md
     - Assets, Fonts, Icons & SVG: guides/assets.md
-    - Animations: guides/animations.md
+    - Motion: guides/motion.md
     - Gestures: guides/gestures.md
     - Lists: guides/lists.md
     - Async + Data: guides/async.md
@@ -134,7 +134,7 @@ nav:
     - Components: api/components.md
     - Hooks: api/hooks.md
     - Handles: api/handles.md
-    - Animated: api/animated.md
+    - Motion: api/motion.md
     - Gestures: api/gestures.md
     - Alerts: api/alerts.md
     - Audio: api/audio.md

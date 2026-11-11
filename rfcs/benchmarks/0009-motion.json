@@ -1,0 +1,32 @@
+{
+  "environment": {
+    "python": "3.13.15",
+    "system": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64",
+    "host": "Intel Mac (x86_64); load average about 4 to 20 during the runs",
+    "note": "Host timings only. Before and after ran alternately on the same machine, twice each; the second pair is shown. Device frame timings (UI-thread motion time per frame and dropped frames on the drag-under-load screen) weren't recorded."
+  },
+  "host_runtime": {
+    "command": "python scripts/benchmark-runtime.py --imports 3 (before: main at cb31e64 with its own core build, via PYTHONPATH)",
+    "before": {
+      "import_ms": 330.434,
+      "element_us": 3.5,
+      "rerender_300_ms": 69.817,
+      "core_commit_300_ms": 8.335
+    },
+    "after": {
+      "import_ms": 270.01,
+      "element_us": 3.195,
+      "rerender_300_ms": 70.265,
+      "core_commit_300_ms": 7.982,
+      "motion_frame_200_styles_us": 1583.973
+    },
+    "units": "medians",
+    "note": "import_ms is lower because Motion loads lazily and the eager Animated module is gone. motion_frame_200_styles_us is one display frame of the core's motion runtime driving 200 animated styles from a running spring: about 8 microseconds per style, including the worklet run, style diffing, and encoding the host writes."
+  },
+  "import_time_x_importtime": {
+    "command": "python -X importtime -c 'import pythonnative', nine runs each",
+    "before_median_us": 269308,
+    "after_median_us": 237061
+  }
+}

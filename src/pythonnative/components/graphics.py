@@ -10,7 +10,7 @@ from ..style import (
 )
 from ..svg import FillRule, LineCap, LineJoin, SvgShape, flatten
 from ._base import _make_element
-from .props import AccessibilityProps
+from .props import CommonProps
 
 PreserveAspectRatio = Literal["meet", "slice", "none"]
 """How an ``Svg`` view box scales into a frame of a different aspect ratio."""
@@ -43,7 +43,7 @@ def Svg(
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """Draw vector shapes in a single native view.
 
@@ -123,7 +123,7 @@ def LinearGradient(
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """A container filled with a linear color gradient.
 
@@ -194,7 +194,7 @@ def BlurView(
     style: StyleProp = None,
     ref: Optional[Ref] = None,
     key: Optional[str] = None,
-    **props: Unpack[AccessibilityProps],
+    **props: Unpack[CommonProps],
 ) -> Element:
     """A container that blurs whatever is drawn behind it.
 

@@ -9,6 +9,18 @@ public enum PNMountOp {
     case delete(tag: Int64)
     case frame(tag: Int64, x: Double, y: Double, width: Double, height: Double)
     case command(tag: Int64, name: String, arguments: [String: Any], callId: Int64)
+    /// The view leaves with an animation; `owner` 0 is the core's, 1 the platform's (RFC 0009).
+    case exit(tag: Int64, owner: UInt8)
+}
+
+/// One record of the core's motion writes (`pn_core_take_writes`, RFC 0009).
+public enum PNMotionWrite {
+    /// Set a paint prop; `NSNull` restores its default.
+    case prop(tag: Int64, name: String, value: Any)
+    /// Set a view's frame (a layout animation).
+    case frame(tag: Int64, x: Double, y: Double, width: Double, height: Double)
+    /// An exit finished: destroy these views, children first.
+    case remove(tags: [Int64])
 }
 
 /// A decoded mount transaction.
@@ -147,6 +159,9 @@ public enum PNMountDecoder {
                 let name = try reader.string()
                 let arguments = try reader.value() as? [String: Any] ?? [:]
                 ops.append(.command(tag: tag, name: name, arguments: arguments, callId: try reader.i64()))
+            case 8:
+                let tag = try reader.i64()
+                ops.append(.exit(tag: tag, owner: try reader.u8()))
             case let code:
                 throw PNMountDecodeError.malformed("op \(code)")
             }
@@ -154,16 +169,30 @@ public enum PNMountDecoder {
         return PNMountTransaction(surface: surface, revision: revision, id: id, ops: ops)
     }
 
-    /// Decode animated writes: `(tag, prop, value)` in order.
-    public static func writes(_ base: UnsafeRawPointer, count: Int) throws -> [(Int64, String, Any)] {
+    /// Decode motion writes in order.
+    public static func writes(_ base: UnsafeRawPointer, count: Int) throws -> [PNMotionWrite] {
         var reader = PNByteReader(base, count: count)
         let n = Int(try reader.u32())
-        var out: [(Int64, String, Any)] = []
+        var out: [PNMotionWrite] = []
         out.reserveCapacity(n)
         for _ in 0..<n {
-            let tag = try reader.i64()
-            let prop = try reader.string()
-            out.append((tag, prop, try reader.value()))
+            switch try reader.u8() {
+            case 0:
+                let tag = try reader.i64()
+                let name = try reader.string()
+                out.append(.prop(tag: tag, name: name, value: try reader.value()))
+            case 1:
+                let tag = try reader.i64()
+                out.append(.frame(tag: tag, x: try reader.f64(), y: try reader.f64(), width: try reader.f64(), height: try reader.f64()))
+            case 2:
+                let tags = Int(try reader.u32())
+                var removed: [Int64] = []
+                removed.reserveCapacity(tags)
+                for _ in 0..<tags { removed.append(try reader.i64()) }
+                out.append(.remove(tags: removed))
+            case let kind:
+                throw PNMountDecodeError.malformed("write kind \(kind)")
+            }
         }
         return out
     }

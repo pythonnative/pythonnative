@@ -1,0 +1,47 @@
+# Tests that a Pan whose callbacks are worklets keeps tracking, snapping
+# (snap_point), and springing while the Python thread is blocked.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/drag_under_load.py
+# Source under test: src/pythonnative/motion/worklets.py :: worklet
+#                    src/pythonnative/gestures.py :: Pan (worklet callbacks)
+#                    src/pythonnative/motion/animations.py :: snap_point, run_on_python
+#
+# "Block Python" sets a busy shared value, then spins the Python thread
+# for 4 s. The flow swipes the card during that window. The release
+# worklet reads the busy flag on the UI thread and queues a
+# run_on_python call, which Python only runs once the block ends, so
+# "Released while busy: yes" shows the release ran without Python.
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: Drag under load
+- assertVisible: "Python busy: no"
+- assertVisible: "Side: left"
+- tapOn: "Block Python"
+- extendedWaitUntil:
+    visible: "Python busy: yes"
+    timeout: 3000
+# Horizontal so the page ScrollView doesn't take the motion.
+- swipe:
+    from:
+      text: "Drag card"
+    direction: RIGHT
+    duration: 300
+- extendedWaitUntil:
+    visible: "Released while busy: yes"
+    timeout: 15000
+- assertVisible: "Side: right"
+- extendedWaitUntil:
+    visible: "Python busy: no"
+    timeout: 10000
+- assertVisible: "Blocks: 1"
+- assertVisible: "Releases: 1"
+- tapOn: "Recenter card"
+- assertVisible: "Side: left"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

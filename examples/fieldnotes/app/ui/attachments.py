@@ -313,7 +313,10 @@ def AttachmentTile(attachment: Attachment, entry_id: str) -> pn.Node:
             style=styles.tile,
         )
     elif attachment.kind == "photo":
-        content = pn.Image(journal.file_path(attachment), scale_type="cover", style=styles.photo)
+        # The journal row's thumbnail flies into this tile when the entry opens.
+        content = pn.Image(
+            journal.file_path(attachment), scale_type="cover", style=styles.photo, shared_tag=f"photo-{attachment.id}"
+        )
     else:
         content = pn.Column(
             pn.Icon("video", size=28, color=styles.colors.primary),

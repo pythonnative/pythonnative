@@ -86,7 +86,7 @@ def _capture(fields: tuple[str, ...]) -> Callable[[Any], tuple[Any, ...]]:
     """
     names = [f"v{index}" for index in range(len(fields))]
     copies = ", ".join(f"{name}.copy() if type({name}) in containers else {name}" for name in names)
-    source = "def capture(obj):\n" f"    {', '.join(names)}, = getter(obj)\n" f"    return ({copies},)\n"
+    source = f"def capture(obj):\n    {', '.join(names)}, = getter(obj)\n    return ({copies},)\n"
     namespace: dict[str, Any] = {
         "getter": (
             operator.attrgetter(*fields)

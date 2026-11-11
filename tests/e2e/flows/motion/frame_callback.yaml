@@ -1,0 +1,30 @@
+# Tests use_frame_callback: the worklet accumulates FrameInfo.delta_ms
+# into a shared value only while active, and Python reads the latest
+# published value without seeing the frames.
+#
+# Demo screen: examples/e2e-suite/app/screens/motion/frame_callback.py
+# Source under test: src/pythonnative/motion/hooks.py :: use_frame_callback, FrameInfo
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Motion
+      DEMO_TITLE: use_frame_callback
+- assertVisible: "Frames running: no"
+- tapOn: "Start frames"
+- assertVisible: "Frames running: yes"
+- tapOn: "Read elapsed"
+- extendedWaitUntil:
+    visible: "Elapsed advanced: yes"
+    timeout: 5000
+- tapOn: "Pause frames"
+- assertVisible: "Frames running: no"
+- tapOn: "Check paused"
+- extendedWaitUntil:
+    visible: "Paused stays still: yes"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Motion

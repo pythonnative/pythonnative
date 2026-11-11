@@ -35,10 +35,13 @@ Key building blocks:
   its navigators.
 - **State** lives in hooks for a component and in a typed
   [`Store`][pythonnative.Store] for the app.
-- **Animations** use the ``Animated`` namespace. Serialized graphs
-  connect values, arithmetic, interpolation, and style bindings.
-  Native timing, spring, decay, scroll, and gesture drivers update
-  supported bindings without Python work on every frame.
+- **Motion** (RFC 0009): [`worklet`][pythonnative.worklet] functions run
+  on the UI thread inside the renderer core. They read and write
+  [`SharedValue`][pythonnative.SharedValue]s, which
+  [`use_animated_style`][pythonnative.use_animated_style] turns into
+  styles and ``with_timing`` / ``with_spring`` / ``with_decay`` animate.
+  Event props and gesture callbacks take worklets, and views take
+  ``entering=``, ``exiting=``, ``layout=``, and ``shared_tag=``.
 - **Gestures** attach to any view via the ``gestures=`` prop using
   descriptors from ``pythonnative.gestures``
   ([`Tap`][pythonnative.gestures.Tap],
@@ -138,7 +141,7 @@ from .components import (
     WebView,
     set_error_fallback,
 )
-from .components.props import AccessibilityProps, ViewProps
+from .components.props import AccessibilityProps, CommonProps, MotionProps, ViewProps
 from .diagnostics import HookOrderError, set_error_handler
 from .element import Element, Node
 from .handles import ScrollOffset, ScrollViewHandle, TextInputHandle, ViewHandle, WebViewHandle
@@ -214,6 +217,7 @@ from .style import (
     AccessibilityAction,
     AccessibilityState,
     AccessibilityValue,
+    AnimatedStyle,
     Color,
     DynamicColor,
     EdgeInsets,
@@ -293,6 +297,8 @@ __all__ = [
     "WebView",
     # Shared props
     "AccessibilityProps",
+    "CommonProps",
+    "MotionProps",
     "ViewProps",
     # Typed events
     "ContentSizeEvent",
@@ -396,13 +402,34 @@ __all__ = [
     "use_theme",
     # Appearance
     "appearance",
-    # Animation
-    "Animated",
-    "AnimatedValue",
-    "AnimationResult",
+    # Motion
+    "motion",
+    "AnimatedStyle",
+    "BottomSheet",
+    "BottomSheetHandle",
     "Easing",
-    "EasingSpec",
-    "use_animated_value",
+    "FrameInfo",
+    "SharedValue",
+    "Spring",
+    "Swipeable",
+    "SwipeableHandle",
+    "clamp",
+    "interpolate",
+    "interpolate_color",
+    "run_on_python",
+    "snap_point",
+    "use_animated_reaction",
+    "use_animated_style",
+    "use_derived_value",
+    "use_frame_callback",
+    "use_shared_value",
+    "with_decay",
+    "with_delay",
+    "with_repeat",
+    "with_sequence",
+    "with_spring",
+    "with_timing",
+    "worklet",
     # Gestures
     "GestureSpec",
     "SwipeDirection",
@@ -466,14 +493,31 @@ from .list_data import ListData, Section, ViewableItem
 # ``import pythonnative`` stays fast on a phone. Names, ``__all__``, and
 # documentation are unchanged, and type checkers see ordinary imports.
 _LAZY_GROUPS: dict[str, tuple[str, ...]] = {
-    "animated": (
-        "Animated",
-        "AnimatedValue",
-        "AnimationResult",
+    "motion": (
         "Easing",
-        "EasingSpec",
-        "use_animated_value",
+        "FrameInfo",
+        "SharedValue",
+        "Spring",
+        "clamp",
+        "interpolate",
+        "interpolate_color",
+        "run_on_python",
+        "snap_point",
+        "use_animated_reaction",
+        "use_animated_style",
+        "use_derived_value",
+        "use_frame_callback",
+        "use_shared_value",
+        "with_decay",
+        "with_delay",
+        "with_repeat",
+        "with_sequence",
+        "with_spring",
+        "with_timing",
+        "worklet",
     ),
+    "components.bottom_sheet": ("BottomSheet", "BottomSheetHandle"),
+    "components.swipeable": ("Swipeable", "SwipeableHandle"),
     "gestures": ("GestureSpec", "SwipeDirection"),
     "icons": ("Icon", "IconName"),
     "navigation": (
@@ -500,20 +544,37 @@ _LAZY_GROUPS: dict[str, tuple[str, ...]] = {
     "websocket": ("WebSocket", "WebSocketClosed", "WebSocketError"),
 }
 _LAZY = {name: module for module, names in _LAZY_GROUPS.items() for name in names}
-_LAZY_MODULES = frozenset({"gestures", "icons"})
+_LAZY_MODULES = frozenset({"gestures", "icons", "motion"})
 
 if TYPE_CHECKING:
-    from . import gestures, icons
-    from .animated import (
-        Animated,
-        AnimatedValue,
-        AnimationResult,
-        Easing,
-        EasingSpec,
-        use_animated_value,
-    )
+    from . import gestures, icons, motion
+    from .components.bottom_sheet import BottomSheet, BottomSheetHandle
+    from .components.swipeable import Swipeable, SwipeableHandle
     from .gestures import GestureSpec, SwipeDirection
     from .icons import Icon, IconName
+    from .motion import (
+        Easing,
+        FrameInfo,
+        SharedValue,
+        Spring,
+        clamp,
+        interpolate,
+        interpolate_color,
+        run_on_python,
+        snap_point,
+        use_animated_reaction,
+        use_animated_style,
+        use_derived_value,
+        use_frame_callback,
+        use_shared_value,
+        with_decay,
+        with_delay,
+        with_repeat,
+        with_sequence,
+        with_spring,
+        with_timing,
+        worklet,
+    )
     from .navigation import (
         DrawerNavigator,
         Group,

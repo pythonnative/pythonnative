@@ -4,6 +4,7 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import com.pythonnative.runtime.bridge.MainThread
 import com.pythonnative.generated.PNValues
 import com.pythonnative.runtime.PNBridge
 import com.pythonnative.runtime.bridge.JsonUtil
@@ -14,6 +15,7 @@ import com.pythonnative.runtime.components.VirtualListManager
 import com.pythonnative.runtime.core.PNCore
 import com.pythonnative.runtime.gestures.TouchForwarder
 import com.pythonnative.runtime.layout.Measurement
+import com.pythonnative.runtime.views.PNFrameLayout
 import org.json.JSONObject
 import java.nio.ByteBuffer
 
@@ -21,8 +23,19 @@ import java.nio.ByteBuffer
  * Applies the core's mount transactions to platform views, on the main
  * thread. The core has already validated, diffed, flattened, and laid out
  * the tree; an op that still fails here fails the surface.
+ *
+ * Exits (RFC 0009): an `exit` op keeps the view mounted. With owner 0 the
+ * view stays in place without touches while the core animates it, its
+ * parent's later `insert` indices skip it, and a `remove` motion write
+ * destroys it. With owner 1 the platform closes it (a stack pops a screen,
+ * a modal dismisses) and `exitFinished` reports the end to the core, which
+ * then sends the `remove` write.
  */
-class Mounter(private val registry: ViewRegistry) {
+class Mounter(
+    private val registry: ViewRegistry,
+    /** Reports a platform-owned exit finished (`pn_core_exit_finished`); tests replace it. */
+    private val exitFinished: (Long) -> Unit = { tag -> PNCore.exitFinished(tag) },
+) {
     /** Apply one transaction from the core and acknowledge it. */
     fun mount(buffer: ByteBuffer) {
         val id = MountDecoder.idOf(buffer)
@@ -57,6 +70,7 @@ class Mounter(private val registry: ViewRegistry) {
             is MountOp.Delete -> registry.get(op.tag)?.let { delete(it) }
             is MountOp.Frame -> frame(op)
             is MountOp.Command -> command(op)
+            is MountOp.Exit -> exit(op)
         }
         PNValues.takeDecodeFailure()?.let { failure ->
             val tag = when (op) {
@@ -64,6 +78,7 @@ class Mounter(private val registry: ViewRegistry) {
                 is MountOp.Update -> op.tag
                 is MountOp.Insert -> op.parent
                 is MountOp.Command -> op.tag
+                is MountOp.Exit -> op.tag
                 else -> 0L
             }
             val type = (op as? MountOp.Create)?.typeName ?: registry.get(tag)?.typeName ?: "view"
@@ -158,9 +173,109 @@ class Mounter(private val registry: ViewRegistry) {
         } else if (previous === parent) {
             parent.children.remove(child.tag)
         }
-        parent.children.add(op.index.coerceIn(0, parent.children.size), child.tag)
+        val index = platformIndex(parent, op.index)
+        parent.children.add(index.coerceIn(0, parent.children.size), child.tag)
         child.parent = parent.tag
-        parent.manager.insertChild(parent.view, child.view, op.index)
+        parent.manager.insertChild(parent.view, child.view, index)
+    }
+
+    /**
+     * Map the core's child index, which counts only children that aren't
+     * exiting, to an index among every child the parent still holds.
+     */
+    private fun platformIndex(parent: ViewRecord, index: Int): Int {
+        if (parent.children.none { registry.get(it)?.state?.containsKey(EXITING) == true }) return index
+        var live = 0
+        for ((position, tag) in parent.children.withIndex()) {
+            if (registry.get(tag)?.state?.containsKey(EXITING) == true) continue
+            if (live == index) return position
+            live++
+        }
+        return parent.children.size
+    }
+
+    private fun exit(op: MountOp.Exit) {
+        val record = registry.get(op.tag)
+        if (record == null) {
+            if (op.owner == 1) finishLater(op.tag)
+            return
+        }
+        record.state[EXITING] = op.owner
+        stopTouches(record)
+        if (op.owner == 0) return
+        // The platform closes it: the parent forgets the child now, and the
+        // view and its subtree live until the core's `remove` write.
+        val parent = record.parent?.let { registry.get(it) }
+        parent?.children?.remove(record.tag)
+        var finished = false
+        val finish = {
+            if (!finished) {
+                finished = true
+                finishLater(record.tag)
+            }
+        }
+        try {
+            if (record.manager.beginExit(record.view, finish)) {
+                parent?.manager?.removeChild(parent.view, record.view)
+            } else if (parent != null) {
+                parent.manager.exitChild(parent.view, record.view, finish)
+            } else {
+                finish()
+            }
+        } catch (error: Exception) {
+            Log.e(PNBridge.TAG, "exit of ${record.typeName}#${record.tag} failed", error)
+            finish()
+        }
+    }
+
+    /** Report a platform-owned exit finished after the current transaction is acknowledged. */
+    private fun finishLater(tag: Long) {
+        MainThread.post(Runnable { exitFinished(tag) })
+    }
+
+    /** An exiting view and its subtree get no more touches; the view stays where it is. */
+    private fun stopTouches(record: ViewRecord) {
+        val pending = ArrayDeque<ViewRecord>()
+        pending.add(record)
+        while (pending.isNotEmpty()) {
+            val current = pending.removeFirst()
+            TouchForwarder.unbind(current)
+            for (tag in current.children) registry.get(tag)?.let { pending.add(it) }
+        }
+        val view = record.view
+        if (view is PNFrameLayout) {
+            // Touches pass through to whatever sits underneath, as with `pointer_events="none"`.
+            view.setPointerEventsMode("none")
+        } else {
+            view.setOnTouchListener(null)
+            view.isClickable = false
+            view.isLongClickable = false
+            view.isFocusable = false
+            if (view is ViewGroup) view.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        }
+        view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+    }
+
+    /** Apply motion writes from the core (`pn_core_take_writes`), in order. */
+    fun applyWrites(writes: List<MotionWrite>) {
+        for (write in writes) {
+            try {
+                when (write) {
+                    is MotionWrite.Prop -> registry.get(write.tag)?.let { it.manager.setMotionProperty(it.view, write.prop, write.value) }
+                    is MotionWrite.Frame -> if (registry.get(write.tag) != null) {
+                        frame(MountOp.Frame(write.tag, write.x, write.y, write.width, write.height))
+                    }
+                    is MotionWrite.Remove -> remove(write.tags)
+                }
+            } catch (error: Exception) {
+                Log.d(PNBridge.TAG, "motion write $write failed", error)
+            }
+        }
+    }
+
+    /** Destroy views whose exit finished, like delete ops in the given order; tags already gone are skipped. */
+    fun remove(tags: List<Long>) {
+        for (tag in tags) registry.get(tag)?.let { delete(it) }
     }
 
     private fun delete(record: ViewRecord) {
@@ -208,4 +323,12 @@ class Mounter(private val registry: ViewRegistry) {
 
     /** The props recorded for `tag`, mainly for diagnostics. */
     fun propsOf(tag: Long): JSONObject? = registry.get(tag)?.props
+
+    /** Whether `tag` is exiting (an `exit` op arrived and no `remove` yet). */
+    fun isExiting(tag: Long): Boolean = registry.get(tag)?.state?.containsKey(EXITING) == true
+
+    companion object {
+        /** Record state key of an exiting view; the value is the exit's owner. */
+        const val EXITING = "exiting"
+    }
 }

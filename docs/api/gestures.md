@@ -3,7 +3,9 @@
 Native-backed gesture recognition, attached to any view-like element
 via the `gestures=` prop. Descriptors are frozen dataclasses; their
 numeric configuration crosses the bridge while callbacks are routed
-through the tag-based event channel. Every descriptor accepts
+through the tag-based event channel, or, when they're marked
+[`@pn.worklet`][pythonnative.worklet], run on the UI thread inside the
+renderer core. Every descriptor accepts
 `enabled=False` to keep it in the list without recognizing;
 [`Pan`][pythonnative.gestures.Pan] adds React Native Gesture Handler's
 activation criteria (`active_offset_x`, `fail_offset_y`,
@@ -28,5 +30,5 @@ as [`SwipeDirection`][pythonnative.SwipeDirection]. See the
 
 - The [Gestures guide](../guides/gestures.md) walks through taps,
   drags, activation offsets, and gesture-driven animations.
-- [Animated](animated.md) pairs with `Pan` velocity for springs and
-  decays.
+- [Motion](motion.md) runs gesture callbacks as worklets and carries
+  `Pan` velocity into springs and decays.

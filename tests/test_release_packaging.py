@@ -192,7 +192,6 @@ DEV_ONLY_LAZY_IMPORTS = {
     # `_builtin_contracts.json` predates a protocol change reaches it.
     ("pythonnative.components", "_install_contracts", "pythonnative.sdk.builtins"),
     # Animations run on the host core only off device, where no backend exists.
-    ("pythonnative.animated", "_driver_backend", "pythonnative.bridge.fake"),
 }
 
 

@@ -95,8 +95,8 @@ def split_props(
     ``wire_props`` is JSON-ready; ``python_props`` holds callbacks and
     fields explicitly declared Python-only. Other unsupported values
     fail encoding. The backend keeps Python props in a per-tag sidecar.
-    (The reconciler has already published ``Animated.event`` bindings
-    under ``_pn_animated_events`` before props reach the codec.)
+    (The reconciler has already turned worklet handlers and animated
+    styles into ``_pn_motion`` bindings before props reach the codec.)
     """
     wire: Dict[str, Any] = {}
     python: Dict[str, Any] = {}

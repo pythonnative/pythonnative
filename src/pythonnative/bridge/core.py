@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple
 
 __all__ = [
+    "MotionWrite",
     "MountOp",
     "MountTransaction",
     "Platform",
@@ -30,7 +31,7 @@ __all__ = [
     "load_core",
 ]
 
-PROTOCOL_VERSION = 7
+PROTOCOL_VERSION = 8
 """The protocol ``include/pn_core.h`` defines as ``PN_CORE_PROTOCOL_VERSION``."""
 
 MEASURE_TEXT = 1
@@ -130,6 +131,25 @@ class MountOp:
     name: str = ""
     arguments: Any = None
     call_id: int = 0
+    owner: int = 0
+    """``exit`` ops: 0 when the core animates the view out, 1 when the platform does."""
+
+
+@dataclass(frozen=True)
+class MotionWrite:
+    """One record of the core's motion writes (RFC 0009).
+
+    ``kind`` is ``"prop"`` (``tag``, ``prop``, ``value``), ``"frame"``
+    (``tag``, ``frame``), or ``"remove"`` (``tags``: an exit finished,
+    destroy each, children first).
+    """
+
+    kind: str
+    tag: int = 0
+    prop: str = ""
+    value: Any = None
+    frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
+    tags: Tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -217,15 +237,34 @@ def decode_transaction(data: bytes) -> MountTransaction:
             name = reader.string()
             arguments = reader.value()
             ops.append(MountOp("command", tag, name=name, arguments=arguments, call_id=reader.take("q")))
+        elif code == 8:
+            tag = reader.take("q")
+            ops.append(MountOp("exit", tag, owner=reader.take("B")))
         else:
             raise ValueError(f"Unknown mount op {code}")
     return MountTransaction(surface, revision, ident, tuple(ops))
 
 
-def decode_writes(data: bytes) -> List[Tuple[int, str, Any]]:
-    """Decode animated prop writes into ``(tag, prop, value)`` tuples."""
+def decode_writes(data: bytes) -> List[MotionWrite]:
+    """Decode the core's motion writes into [`MotionWrite`][pythonnative.bridge.core.MotionWrite] records."""
     reader = _Reader(data)
-    return [(reader.take("q"), reader.string(), reader.value()) for _ in range(reader.take("I"))]
+    writes: List[MotionWrite] = []
+    for _ in range(reader.take("I")):
+        kind = reader.take("B")
+        if kind == 0:
+            tag = reader.take("q")
+            prop = reader.string()
+            writes.append(MotionWrite("prop", tag, prop=prop, value=reader.value()))
+        elif kind == 1:
+            tag = reader.take("q")
+            frame = (reader.take("d"), reader.take("d"), reader.take("d"), reader.take("d"))
+            writes.append(MotionWrite("frame", tag, frame=frame))
+        elif kind == 2:
+            count = reader.take("I")
+            writes.append(MotionWrite("remove", tags=tuple(reader.take("q") for _ in range(count))))
+        else:
+            raise ValueError(f"Unknown motion write kind {kind}")
+    return writes
 
 
 def decode_value(data: bytes) -> Any:
@@ -248,7 +287,14 @@ _SIGNATURES: dict[str, Tuple[Any, List[Any]]] = {
         ctypes.c_void_p,
         [ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int64],
     ),
-    "pn_core_animate": (ctypes.c_void_p, [ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64, ctypes.c_char_p]),
+    "pn_core_motion": (ctypes.c_void_p, [ctypes.c_void_p, ctypes.c_int64, ctypes.c_char_p]),
+    "pn_core_shared_read": (ctypes.c_void_p, [ctypes.c_void_p, ctypes.c_int64]),
+    "pn_core_worklet_eval": (ctypes.c_void_p, [ctypes.c_char_p]),
+    "pn_core_exit_finished": (None, [ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64]),
+    "pn_core_shared_elements": (
+        ctypes.c_void_p,
+        [ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64, ctypes.c_int64],
+    ),
     "pn_core_measure": (ctypes.c_void_p, [ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64]),
     "pn_core_inspect": (ctypes.c_void_p, [ctypes.c_void_p, ctypes.c_int64, ctypes.c_double, ctypes.c_double]),
     "pn_core_validate_module": (ctypes.c_int32, [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]),
@@ -429,9 +475,17 @@ class RendererCore:
             self._take(self._command(self._handle, surface, tag, name.encode(), self._bytes(arguments), call_id)) or ""
         )
 
-    def animate(self, surface: int, tag: int, request: str) -> str:
-        """Queue an animation request behind pending mounts."""
-        return self._take(self._animate(self._handle, surface, tag, self._bytes(request))) or ""
+    def motion(self, surface: int, request: str) -> str:
+        """Queue a motion request behind pending mounts (RFC 0009)."""
+        return self._take(self._motion(self._handle, surface, self._bytes(request))) or ""
+
+    def shared_read(self, ident: int) -> str:
+        """The latest published value of a shared value, as JSON."""
+        return self._take(self._shared_read(self._handle, ident)) or "null"
+
+    def worklet_eval(self, request: str) -> str:
+        """Run one worklet outside the runtime and return the result JSON."""
+        return self._take(self._worklet_eval(self._bytes(request))) or ""
 
     def measure(self, surface: int, tag: int) -> str:
         """The shadow frame and window frame of ``tag`` as JSON (``"null"`` when unknown)."""
@@ -495,12 +549,20 @@ class RendererCore:
         """Advance animations; returns whether more frames are needed."""
         return bool(self._animation_frame(self._handle, timestamp_ms))
 
-    def take_writes(self) -> List[Tuple[int, str, Any]]:
-        """Animated prop writes produced since the last call."""
+    def take_writes(self) -> List[MotionWrite]:
+        """Motion writes produced since the last call."""
         buffer = _Bytes()
         if not self._take_writes(self._handle, ctypes.byref(buffer)):
             return []
         return decode_writes(ctypes.string_at(buffer.data, buffer.size))
+
+    def exit_finished(self, surface: int, tag: int) -> None:
+        """Report a platform-owned exit (a leaving screen or modal) finished."""
+        self._exit_finished(self._handle, surface, tag)
+
+    def shared_elements(self, surface: int, from_screen: int, to_screen: int) -> str:
+        """The views sharing a ``shared_tag`` between two screens, as JSON."""
+        return self._take(self._shared_elements(self._handle, surface, from_screen, to_screen)) or "[]"
 
     def set_reduce_motion(self, enabled: bool) -> None:
         """Finish every animation at its target, as the platform's setting asks."""

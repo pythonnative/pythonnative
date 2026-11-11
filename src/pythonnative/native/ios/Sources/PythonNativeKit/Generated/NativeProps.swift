@@ -196,8 +196,6 @@ open class PNViewProps {
     public private(set) lazy var `important_for_accessibility`: PNViewImportantForAccessibility? = { guard let value = values["important_for_accessibility"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewImportantForAccessibility.self, value, field: "important_for_accessibility") }()
     public var has_test_id: Bool { values["test_id"] != nil }
     public private(set) lazy var `test_id`: String? = { guard let value = values["test_id"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "test_id") }()
-    public var has_gestures: Bool { values["gestures"] != nil }
-    public private(set) lazy var `gestures`: [PNJSONValue]? = { guard let value = values["gestures"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord([PNJSONValue].self, value, field: "gestures") }()
     public var has_hit_slop: Bool { values["hit_slop"] != nil }
     public private(set) lazy var `hit_slop`: PNViewHitSlop? = { guard let value = values["hit_slop"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewHitSlop.self, value, field: "hit_slop") }()
     public var has_on_layout: Bool { values["on_layout"] != nil }
@@ -206,14 +204,30 @@ open class PNViewProps {
     public private(set) lazy var `_pn_layout`: Bool? = { guard let value = values["_pn_layout"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "_pn_layout") }()
     public var has__pn_events: Bool { values["_pn_events"] != nil }
     public private(set) lazy var `_pn_events`: [String]? = { guard let value = values["_pn_events"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord([String].self, value, field: "_pn_events") }()
-    public var has__pn_animated_events: Bool { values["_pn_animated_events"] != nil }
-    public private(set) lazy var `_pn_animated_events`: [String: PNJSONValue]? = { guard let value = values["_pn_animated_events"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord([String: PNJSONValue].self, value, field: "_pn_animated_events") }()
+    public var has__pn_motion: Bool { values["_pn_motion"] != nil }
+    public private(set) lazy var `_pn_motion`: [String: PNJSONValue]? = { guard let value = values["_pn_motion"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord([String: PNJSONValue].self, value, field: "_pn_motion") }()
+    public var has_entering: Bool { values["entering"] != nil }
+    public private(set) lazy var `entering`: PNJSONValue? = { guard let value = values["entering"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNJSONValue.self, value, field: "entering") }()
+    public var has_exiting: Bool { values["exiting"] != nil }
+    public private(set) lazy var `exiting`: PNJSONValue? = { guard let value = values["exiting"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNJSONValue.self, value, field: "exiting") }()
+    public var has_layout: Bool { values["layout"] != nil }
+    public private(set) lazy var `layout`: PNJSONValue? = { guard let value = values["layout"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNJSONValue.self, value, field: "layout") }()
+    public var has_shared_tag: Bool { values["shared_tag"] != nil }
+    public private(set) lazy var `shared_tag`: String? = { guard let value = values["shared_tag"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "shared_tag") }()
+    public var has_shared_transition: Bool { values["shared_transition"] != nil }
+    public private(set) lazy var `shared_transition`: PNJSONValue? = { guard let value = values["shared_transition"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNJSONValue.self, value, field: "shared_transition") }()
+    public var has_skip_entering: Bool { values["skip_entering"] != nil }
+    public private(set) lazy var `skip_entering`: Bool? = { guard let value = values["skip_entering"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "skip_entering") }()
+    public var has_skip_exiting: Bool { values["skip_exiting"] != nil }
+    public private(set) lazy var `skip_exiting`: Bool? = { guard let value = values["skip_exiting"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "skip_exiting") }()
     public var has__pn_list_key: Bool { values["_pn_list_key"] != nil }
     public private(set) lazy var `_pn_list_key`: String? = { guard let value = values["_pn_list_key"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(String.self, value, field: "_pn_list_key") }()
     public var has__pn_header_slot: Bool { values["_pn_header_slot"] != nil }
     public private(set) lazy var `_pn_header_slot`: PNViewPnHeaderSlot? = { guard let value = values["_pn_header_slot"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNViewPnHeaderSlot.self, value, field: "_pn_header_slot") }()
     public var has__pn_edit_revision: Bool { values["_pn_edit_revision"] != nil }
     public private(set) lazy var `_pn_edit_revision`: Int64? = { guard let value = values["_pn_edit_revision"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Int64.self, value, field: "_pn_edit_revision") }()
+    public var has_gestures: Bool { values["gestures"] != nil }
+    public private(set) lazy var `gestures`: [PNJSONValue]? = { guard let value = values["gestures"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord([PNJSONValue].self, value, field: "gestures") }()
 }
 
 public final class ActivityIndicatorProps: PNViewProps, PNNativeProps {
@@ -1182,6 +1196,12 @@ public final class VirtualListProps: PNViewProps, PNNativeProps {
     public private(set) lazy var `shows_scroll_indicator`: Bool? = { guard let value = values["shows_scroll_indicator"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(Bool.self, value, field: "shows_scroll_indicator") }()
     public var has_refresh_control: Bool { values["refresh_control"] != nil }
     public private(set) lazy var `refresh_control`: PNScrollViewRefreshControl? = { guard let value = values["refresh_control"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNScrollViewRefreshControl.self, value, field: "refresh_control") }()
+    public var has_item_entering: Bool { values["item_entering"] != nil }
+    public private(set) lazy var `item_entering`: PNJSONValue? = { guard let value = values["item_entering"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNJSONValue.self, value, field: "item_entering") }()
+    public var has_item_exiting: Bool { values["item_exiting"] != nil }
+    public private(set) lazy var `item_exiting`: PNJSONValue? = { guard let value = values["item_exiting"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNJSONValue.self, value, field: "item_exiting") }()
+    public var has_item_layout: Bool { values["item_layout"] != nil }
+    public private(set) lazy var `item_layout`: PNJSONValue? = { guard let value = values["item_layout"], !(value is NSNull) else { return nil }; return PNValues.decodeOrRecord(PNJSONValue.self, value, field: "item_layout") }()
 }
 
 public final class WebViewProps: PNViewProps, PNNativeProps {

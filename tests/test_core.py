@@ -90,7 +90,7 @@ def test_shared_validation_corpus(case: Dict[str, Any]) -> None:
 
 def test_protocol_and_fingerprint() -> None:
     surface = Surface()
-    assert surface.core.protocol_version() == PROTOCOL_VERSION == 7
+    assert surface.core.protocol_version() == PROTOCOL_VERSION == 8
     from pythonnative.sdk.schema import fingerprint
 
     assert surface.core.fingerprint() == fingerprint()
@@ -472,29 +472,34 @@ def test_events_are_stamped_with_the_mounted_revision() -> None:
     assert events[0][3]["revision"] == 1 and events[0][3]["args"] == [True]
 
 
-def test_events_feed_animated_bindings_on_the_ui_thread() -> None:
-    surface = Surface()
-    graph = {"id": 9, "nodes": [{"id": 9, "kind": "value", "value": 0}], "bindings": [[3, "opacity", 9]]}
-    surface.commit(
-        ["c", 1, "View", {}],
-        ["c", 2, "ScrollView", {"_pn_animated_events": {"on_scroll": {"y": 9}}, "_pn_events": ["on_scroll"]}],
-        ["c", 3, "View", {"opacity": 1, "background_color": "#000"}],
-        ["i", 1, 2, 0],
-        ["i", 1, 3, 1],
-    )
-    surface.core.animate(surface.surface, 3, json.dumps({"op": "graph", "graph": graph}))
+# ----------------------------------------------------------------------
+# Motion (RFC 0009)
+# ----------------------------------------------------------------------
+
+
+def _motion(surface: Surface, *requests: Dict[str, Any], ok: bool = True) -> Dict[str, Any]:
+    payload = requests[0] if len(requests) == 1 else {"op": "batch", "requests": list(requests)}
+    reply = json.loads(surface.core.motion(surface.surface, json.dumps(payload)))
+    assert reply["ok"] is ok, reply
     surface.transport.drain()
-    surface.transport.fire(2, "on_scroll", {"x": 0, "y": 0.25})
-    assert (3, "opacity", 0.25) in surface.transport.writes
+    return reply
 
 
-# ----------------------------------------------------------------------
-# Animation
-# ----------------------------------------------------------------------
+def _closure(fn: Any) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Install requests for a worklet's programs, and its closure."""
+    from pythonnative.motion.worklets import Encoder, closure_wire
+
+    encoder = Encoder(lambda callback: 1)
+    wire = closure_wire(fn, encoder=encoder)
+    programs = [
+        {"op": "program", "id": ident, "program": program.document()} for ident, program in encoder.programs.items()
+    ]
+    shared = [{"op": "shared", "id": value.id, "value": value._value} for value in encoder.shared]
+    return programs + shared, wire
 
 
 def _run_frames(surface: Surface, start: float, frames: int, step: float = 1000 / 60) -> None:
-    """Advance the core's animator as the display link would, applying writes after each frame."""
+    """Advance the core's motion runtime as the display link would, applying writes after each frame."""
     from pythonnative.bridge import fake
 
     for index in range(frames):
@@ -502,88 +507,400 @@ def _run_frames(surface: Surface, start: float, frames: int, step: float = 1000 
         fake._take_writes()
 
 
-def test_timing_driver_on_a_direct_prop() -> None:
-    surface = Surface()
-    surface.commit(["c", 1, "View", {}], ["c", 2, "View", {"opacity": 1, "background_color": "#000"}], ["i", 1, 2, 0])
-    request = {
-        "op": "start",
-        "id": 1,
-        "prop": "opacity",
-        "spec": {"kind": "timing", "to": 0, "duration_ms": 100, "easing": "linear"},
+def _props(surface: Surface, tag: int) -> List[Tuple[str, Any]]:
+    return [(w.prop, w.value) for w in surface.transport.writes if w.kind == "prop" and w.tag == tag]
+
+
+def _finished(surface: Surface) -> Dict[int, bool]:
+    return {
+        m[3]["token"]: m[3]["finished"] for m in surface.messages if m[0] == "motion" and m[3]["type"] == "finished"
     }
-    assert json.loads(surface.core.animate(surface.surface, 2, json.dumps(request)))["ok"]
-    surface.transport.drain()
-    _run_frames(surface, 0, 12)
-    values = [value for tag, prop, value in surface.transport.writes if tag == 2 and prop == "opacity"]
-    assert values[0] < 1 and values[-1] == 0
-    done = [m[3] for m in surface.messages if m[0] == "animation"]
-    assert done == [{"id": 1, "finished": True, "value": 0.0}]
 
 
-def test_spring_and_decay_settle() -> None:
+def test_event_worklets_drive_animated_styles_on_the_ui_thread() -> None:
+    from pythonnative.motion import SharedValue, worklet
+
+    offset = SharedValue(0.0)
+
+    @worklet
+    def track(event: Any) -> None:
+        offset.value = event.y
+
+    @worklet
+    def style() -> Dict[str, Any]:
+        return {"opacity": 1 - offset.value, "transform": [{"translate_y": -offset.value * 100}]}
+
+    install, handler = _closure(track)
+    install_style, styled = _closure(style)
     surface = Surface()
-    for anim_id, spec in (
-        (2, {"kind": "spring", "from": 0, "to": 1}),
-        (3, {"kind": "decay", "from": 0, "velocity": 1, "deceleration": 0.99}),
-    ):
-        request = {"op": "start", "id": anim_id, "prop": f"_pn_value:{anim_id}", "spec": dict(spec, report=False)}
-        assert json.loads(surface.core.animate(surface.surface, 0, json.dumps(request)))["ok"]
-    surface.transport.drain()
+    _motion(
+        surface,
+        *install,
+        *install_style,
+        {"op": "bind", "id": 1, "kind": "handler", "closure": handler},
+        {"op": "bind", "id": 2, "kind": "style", "closure": styled},
+    )
+    surface.commit(
+        ["c", 1, "View", {}],
+        ["c", 2, "ScrollView", {"_pn_motion": {"events": {"on_scroll": 1}}, "_pn_events": ["on_scroll"]}],
+        ["c", 3, "View", {"opacity": 1, "_pn_motion": {"style": [2]}}],
+        ["i", 1, 2, 0],
+        ["i", 1, 3, 1],
+    )
+    assert ("opacity", 1.0) in _props(surface, 3)
+    surface.transport.fire(2, "on_scroll", {"x": 0, "y": 0.25})
+    assert _props(surface, 3)[-2:] == [("opacity", 0.75), ("transform", [{"translate_y": -25.0}])]
+    # The worklet ran instead of Python's handler, and Python reads the published value.
+    assert not [m for m in surface.messages if m[0] == "event"]
+    assert json.loads(surface.core.shared_read(offset.id)) == 0.25
+
+
+def test_animated_style_keys_restore_the_static_value() -> None:
+    from pythonnative.motion import SharedValue, worklet
+
+    lifted = SharedValue(True)
+
+    @worklet
+    def style() -> Dict[str, Any]:
+        return {"opacity": 0.5} if lifted.value else {}
+
+    install, styled = _closure(style)
+    surface = Surface()
+    _motion(surface, *install, {"op": "bind", "id": 7, "kind": "style", "closure": styled})
+    surface.commit(
+        ["c", 1, "View", {}], ["c", 2, "View", {"opacity": 0.9, "_pn_motion": {"style": [7]}}], ["i", 1, 2, 0]
+    )
+    assert surface.view(2).presented("opacity") == 0.5
+    _motion(surface, {"op": "set", "id": lifted.id, "value": False})
+    assert surface.view(2).presented("opacity") == 0.9
+    # A commit that changes a key motion controls doesn't win over the animated value.
+    _motion(surface, {"op": "set", "id": lifted.id, "value": True})
+    surface.commit(["u", 2, {"opacity": 0.8}, []])
+    assert surface.view(2).presented("opacity") == 0.5
+
+
+def test_timing_spring_and_decay_settle_and_report_tokens() -> None:
+    surface = Surface()
+    linear = {"__animation__": True, "type": "timing", "to": 10, "duration": 100, "easing": "linear"}
+    spring = {"__animation__": True, "type": "spring", "to": 1, "damping": 10, "stiffness": 100, "mass": 1}
+    decay = {"__animation__": True, "type": "decay", "velocity": 1000, "deceleration": 0.99}
+    _motion(
+        surface,
+        *({"op": "shared", "id": ident, "value": 0} for ident in (1, 2, 3)),
+        {"op": "animate", "id": 1, "animation": linear, "token": 11},
+        {"op": "animate", "id": 2, "animation": spring, "token": 12},
+        {"op": "animate", "id": 3, "animation": decay, "token": 13},
+    )
     _run_frames(surface, 0, 600)
-    done = {m[3]["id"]: m[3] for m in surface.messages if m[0] == "animation" and "finished" in m[3]}
-    assert done[2]["finished"] and done[2]["value"] == 1.0
-    assert done[3]["finished"] and done[3]["value"] == pytest.approx(100.0)
+    assert _finished(surface) == {11: True, 12: True, 13: True}
+    assert json.loads(surface.core.shared_read(1)) == 10
+    assert json.loads(surface.core.shared_read(2)) == 1
+    assert json.loads(surface.core.shared_read(3)) == pytest.approx(100.0, abs=0.2)
 
 
-def test_cancel_reports_the_current_value_and_reports_stream() -> None:
+def test_interrupting_and_canceling_report_unfinished() -> None:
     surface = Surface()
-    request = {
-        "op": "start",
-        "id": 4,
-        "prop": "_pn_value:4",
-        "spec": {"kind": "timing", "from": 0, "to": 10, "duration_ms": 1000, "easing": "linear", "report": True},
-    }
-    surface.core.animate(surface.surface, 0, json.dumps(request))
-    surface.transport.drain()
-    _run_frames(surface, 0, 5)
-    reports = [m[3]["value"] for m in surface.messages if m[0] == "animation" and "finished" not in m[3]]
-    assert len(reports) == 5 and reports == sorted(reports)
-    surface.core.animate(surface.surface, 0, json.dumps({"op": "cancel", "id": 4}))
-    surface.transport.drain()
-    final = [m[3] for m in surface.messages if m[0] == "animation" and "finished" in m[3]][-1]
-    assert final["finished"] is False and final["value"] == pytest.approx(reports[-1])
+    slow = {"__animation__": True, "type": "timing", "to": 10, "duration": 1000, "easing": "linear"}
+    _motion(surface, {"op": "shared", "id": 4, "value": 0}, {"op": "animate", "id": 4, "animation": slow, "token": 1})
+    _run_frames(surface, 0, 6)
+    partial = json.loads(surface.core.shared_read(4))
+    assert 0 < partial < 10
+    _motion(surface, {"op": "animate", "id": 4, "animation": slow, "token": 2})
+    _motion(surface, {"op": "cancel", "id": 4})
+    assert _finished(surface) == {1: False, 2: False}
+    assert json.loads(surface.core.shared_read(4)) == pytest.approx(partial)
 
 
-def test_sampled_easing_and_reduce_motion() -> None:
+def test_sequences_repeats_delays_and_colors() -> None:
     surface = Surface()
-    samples = [i / 4 for i in range(5)]
-    request = {
-        "op": "start",
-        "id": 5,
-        "prop": "_pn_value:5",
-        "spec": {"kind": "timing", "from": 0, "to": 1, "duration_ms": 1000, "easing": {"samples": samples}},
+    step = {"__animation__": True, "type": "timing", "duration": 50, "easing": "linear"}
+    sequence = {"__animation__": True, "type": "sequence", "animations": [dict(step, to=5), dict(step, to=1)]}
+    repeat = {
+        "__animation__": True,
+        "type": "repeat",
+        "times": 3,
+        "reverse": True,
+        "animation": {"__animation__": True, "type": "delay", "delay": 20, "animation": dict(step, to=2)},
     }
-    assert json.loads(surface.core.animate(surface.surface, 0, json.dumps(request)))["ok"]
+    color = dict(step, to="#FFFFFFFF", duration=200)
+    _motion(
+        surface,
+        {"op": "shared", "id": 5, "value": 0},
+        {"op": "shared", "id": 6, "value": 0},
+        {"op": "shared", "id": 7, "value": "#FF000000"},
+        {"op": "animate", "id": 5, "animation": sequence, "token": 1},
+        {"op": "animate", "id": 6, "animation": repeat, "token": 2},
+        {"op": "animate", "id": 7, "animation": color, "token": 3},
+    )
+    _run_frames(surface, 0, 4)
+    middle = json.loads(surface.core.shared_read(7))
+    assert middle.startswith("#FF") and middle not in ("#FF000000", "#FFFFFFFF")
+    _run_frames(surface, 100, 120)
+    assert _finished(surface) == {1: True, 2: True, 3: True}
+    assert json.loads(surface.core.shared_read(5)) == 1
+    assert json.loads(surface.core.shared_read(6)) == 2  # odd number of runs ends at the target
+    assert json.loads(surface.core.shared_read(7)) == "#FFFFFFFF"
+
+
+def test_reduce_motion_jumps_to_the_end() -> None:
+    surface = Surface()
     surface.core.set_reduce_motion(True)
     try:
-        surface.transport.drain()
+        slow = {"__animation__": True, "type": "timing", "to": 3, "duration": 5000}
+        _motion(
+            surface, {"op": "shared", "id": 8, "value": 0}, {"op": "animate", "id": 8, "animation": slow, "token": 5}
+        )
         _run_frames(surface, 0, 1)
-        final = [m[3] for m in surface.messages if m[0] == "animation" and "finished" in m[3]][-1]
-        assert final == {"id": 5, "finished": True, "value": 1.0}
+        assert _finished(surface) == {5: True}
+        assert json.loads(surface.core.shared_read(8)) == 3
     finally:
         surface.core.set_reduce_motion(False)
 
 
-def test_invalid_animation_requests_are_refused() -> None:
+def test_repeat_and_delay_can_opt_out_of_reduce_motion() -> None:
     surface = Surface()
-    bad = [
-        {"op": "start", "id": 1, "prop": "width", "spec": {"kind": "timing", "to": 1}},
-        {"op": "start", "id": 1, "prop": "opacity", "spec": {"kind": "timing", "to": 1, "easing": "wobble"}},
-        {"op": "start", "id": 1, "prop": "opacity", "spec": {"kind": "teleport", "to": 1}},
+    surface.core.set_reduce_motion(True)
+    try:
+        step = {"__animation__": True, "type": "timing", "to": 1, "duration": 100, "reduce_motion": "never"}
+        kept = {"__animation__": True, "type": "repeat", "animation": step, "times": 2, "reduce_motion": "never"}
+        reduced = {"__animation__": True, "type": "repeat", "animation": step, "times": 2}
+        delayed = {"__animation__": True, "type": "delay", "delay": 100, "animation": step, "reduce_motion": "never"}
+        _motion(
+            surface,
+            {"op": "shared", "id": 21, "value": 0},
+            {"op": "shared", "id": 22, "value": 0},
+            {"op": "shared", "id": 23, "value": 0},
+            {"op": "animate", "id": 21, "animation": kept, "token": 1},
+            {"op": "animate", "id": 22, "animation": reduced, "token": 2},
+            {"op": "animate", "id": 23, "animation": delayed, "token": 3},
+        )
+        _run_frames(surface, 0, 2)
+        # The system setting finishes a repeat that doesn't opt out at once.
+        assert _finished(surface) == {2: True}
+        # The opted-out repeat is still running, and the delay hasn't let its child start.
+        assert 0 < json.loads(surface.core.shared_read(21)) < 1
+        assert json.loads(surface.core.shared_read(23)) == 0
+        _run_frames(surface, 50, 30)
+        assert _finished(surface) == {1: True, 2: True, 3: True}
+    finally:
+        surface.core.set_reduce_motion(False)
+
+
+def test_an_endless_instant_repeat_yields_each_frame() -> None:
+    surface = Surface()
+    instant = {"__animation__": True, "type": "timing", "to": 1, "duration": 0}
+    endless = {"__animation__": True, "type": "repeat", "animation": instant, "times": None}
+    _motion(surface, {"op": "shared", "id": 24, "value": 0}, {"op": "animate", "id": 24, "animation": endless})
+    _run_frames(surface, 0, 3)  # returns instead of spinning inside one frame
+    _motion(surface, {"op": "cancel", "id": 24})
+
+
+def test_a_finished_animation_publishes_its_value_before_reporting() -> None:
+    """Python reads the value as soon as its await resolves, so it must already be published."""
+    surface = Surface()
+    seen: List[Any] = []
+
+    def record(kind: str, tag: int, name: str, payload: str) -> None:
+        body = json.loads(payload or "null")
+        if kind == "motion" and body.get("type") == "finished":
+            seen.append(json.loads(surface.core.shared_read(25)))
+
+    surface.transport.set_callback(record)
+    quick = {"__animation__": True, "type": "timing", "to": 2, "duration": 50}
+    _motion(
+        surface, {"op": "shared", "id": 25, "value": 0}, {"op": "animate", "id": 25, "animation": quick, "token": 9}
+    )
+    _run_frames(surface, 0, 10)
+    assert seen == [2]
+
+
+def test_invalid_motion_requests_are_refused() -> None:
+    surface = Surface()
+    for request in (
         {"op": "explode"},
-    ]
-    for request in bad:
-        assert json.loads(surface.core.animate(surface.surface, 0, json.dumps(request)))["ok"] is False
+        {"op": "bind", "id": 1, "kind": "teleport", "closure": {}},
+        {
+            "op": "program",
+            "id": 1,
+            "program": {"name": "x", "params": 0, "locals": 0, "captures": 0, "consts": [], "code": [15, 5]},
+        },
+        {
+            "op": "program",
+            "id": 2,
+            "program": {"name": "y", "params": 0, "locals": 0, "captures": 0, "consts": [], "code": [5, 0, 23, 0]},
+        },
+    ):
+        _motion(surface, request, ok=False)
+
+
+def test_worklet_errors_disable_the_binding_and_reach_python() -> None:
+    from pythonnative.motion import worklet
+
+    @worklet
+    def broken(event: Any) -> None:
+        return event.y / 0
+
+    install, handler = _closure(broken)
+    surface = Surface()
+    _motion(surface, *install, {"op": "bind", "id": 3, "kind": "handler", "closure": handler})
+    surface.commit(
+        ["c", 1, "View", {}],
+        ["c", 2, "ScrollView", {"_pn_motion": {"events": {"on_scroll": 3}}, "_pn_events": ["on_scroll"]}],
+        ["i", 1, 2, 0],
+    )
+    surface.transport.fire(2, "on_scroll", {"x": 0, "y": 1})
+    errors = [m[3] for m in surface.messages if m[0] == "motion" and m[3]["type"] == "error"]
+    assert errors and errors[0]["error_type"] == "ZeroDivisionError" and errors[0]["name"].endswith("broken")
+
+
+def test_exits_hold_the_subtree_until_the_animation_ends() -> None:
+    surface = Surface()
+    fade = {"type": "fade_out", "duration": 100, "easing": "linear"}
+    surface.commit(
+        ["c", 1, "View", {}],
+        ["c", 2, "View", {"exiting": fade, "opacity": 1, "width": 50, "height": 50}],
+        ["c", 3, "Text", {"text": "inside"}],
+        ["c", 4, "View", {"width": 10, "height": 10, "background_color": "#FF0000FF"}],
+        ["i", 2, 3, 0],
+        ["i", 1, 2, 0],
+        ["i", 1, 4, 1],
+    )
+    surface.commit(["d", 3], ["d", 2])
+    assert ("exit", 2) in surface.kinds() and ("delete", 3) not in surface.kinds()
+    assert surface.view(2).exiting == 0 and 3 in surface.transport.views
+    # A new sibling inserted at index 0 counts only the children that aren't leaving.
+    surface.commit(["c", 5, "View", {"width": 10, "height": 10, "background_color": "#FF00FF00"}], ["i", 1, 5, 0])
+    assert [child.tag for child in surface.view(1).children] == [2, 5, 4]
+    _run_frames(surface, 0, 3)
+    assert 0 < surface.view(2).presented("opacity") < 1
+    _run_frames(surface, 100, 20)
+    assert 2 not in surface.transport.views and 3 not in surface.transport.views
+    removed = [w.tags for w in surface.transport.writes if w.kind == "remove"]
+    assert removed == [(3, 2)]
+
+
+def test_stack_screens_exit_through_the_platform() -> None:
+    surface = Surface()
+    surface.transport.finish_exits = False
+    surface.commit(
+        ["c", 1, "ScreenStack", {}],
+        ["c", 2, "Screen", {"route_key": "a"}],
+        ["c", 3, "Screen", {"route_key": "b"}],
+        ["c", 4, "Text", {"text": "b"}],
+        ["i", 3, 4, 0],
+        ["i", 1, 2, 0],
+        ["i", 1, 3, 1],
+    )
+    surface.commit(["d", 4], ["d", 3])
+    assert ("exit", 3) in surface.kinds() and ("delete", 4) not in surface.kinds()
+    assert [op.owner for op in surface.last if op.kind == "exit"] == [1]
+    assert 4 in surface.transport.views  # the popped screen keeps its content while it animates out
+    surface.transport.exit_finished(3)
+    assert 3 not in surface.transport.views and 4 not in surface.transport.views
+
+
+def test_a_platform_exit_reported_before_its_record_still_removes() -> None:
+    surface = Surface()
+    surface.transport.finish_exits = False
+    surface.commit(
+        ["c", 1, "ScreenStack", {}],
+        ["c", 2, "Screen", {"route_key": "a"}],
+        ["c", 3, "Screen", {"route_key": "b"}],
+        ["i", 1, 2, 0],
+        ["i", 1, 3, 1],
+    )
+    # An unanimated pop finishes while the platform applies the transaction,
+    # before the core registers the exit at `mount_finished`.
+    surface.core.exit_finished(surface.surface, 3)
+    surface.commit(["d", 3])
+    assert 3 not in surface.transport.views
+
+
+def test_parents_removed_without_exiting_take_children_with_them() -> None:
+    surface = Surface()
+    surface.commit(
+        ["c", 1, "View", {}],
+        ["c", 2, "View", {"opacity": 0.5}],
+        ["c", 3, "View", {"exiting": {"type": "fade_out"}, "opacity": 0.5}],
+        ["i", 2, 3, 0],
+        ["i", 1, 2, 0],
+    )
+    surface.commit(["d", 3], ["d", 2])
+    assert ("delete", 3) in surface.kinds() and ("delete", 2) in surface.kinds()
+    assert not [op for op in surface.last if op.kind == "exit"]
+
+
+def test_entering_and_layout_animations_write_frames_and_props() -> None:
+    surface = Surface()
+    surface.commit(["c", 1, "View", {}])
+    surface.commit(
+        [
+            "c",
+            2,
+            "View",
+            {"entering": {"type": "fade_in", "duration": 100, "easing": "linear"}, "height": 20, "opacity": 0.8},
+        ],
+        [
+            "c",
+            3,
+            "View",
+            {"layout": {"type": "linear", "duration": 100, "easing": "linear"}, "height": 20, "opacity": 0.5},
+        ],
+        ["i", 1, 3, 0],
+        ["i", 1, 2, 0],
+    )
+    assert _props(surface, 2)[0] == ("opacity", 0.0)
+    _run_frames(surface, 0, 20)
+    assert surface.view(2).presented("opacity") == 0.8
+    start = surface.view(3).frame
+    surface.commit(["u", 2, {"height": 60}, []])
+    target = (start[0], start[1] + 40, start[2], start[3])
+    frames = [w.frame for w in surface.transport.writes if w.kind == "frame" and w.tag == 3]
+    assert frames[-1] == start  # the transition starts where the view was
+    _run_frames(surface, 200, 3)
+    middle = surface.view(3).frame
+    assert start[1] < middle[1] < target[1]
+    _run_frames(surface, 300, 20)
+    assert surface.view(3).frame == target
+
+
+def test_entering_skips_children_mounted_with_an_entering_parent() -> None:
+    surface = Surface()
+    surface.commit(["c", 1, "View", {}])
+    fade = {"type": "fade_in", "duration": 100}
+    surface.commit(
+        ["c", 2, "View", {"entering": fade, "opacity": 1}],
+        ["c", 3, "View", {"entering": fade, "opacity": 1}],
+        ["i", 2, 3, 0],
+        ["i", 1, 2, 0],
+    )
+    assert _props(surface, 2) and not _props(surface, 3)
+
+
+def test_shared_elements_pair_views_between_screens() -> None:
+    surface = Surface()
+    flight = {"duration": 450}
+    surface.commit(
+        ["c", 1, "ScreenStack", {}],
+        ["c", 2, "Screen", {"route_key": "a"}],
+        ["c", 3, "Screen", {"route_key": "b"}],
+        ["c", 4, "Image", {"source": "x.png", "shared_tag": "photo", "border_radius": 8, "width": 10, "height": 10}],
+        [
+            "c",
+            5,
+            "Image",
+            {"source": "x.png", "shared_tag": "photo", "shared_transition": flight, "width": 10, "height": 10},
+        ],
+        ["c", 6, "View", {"shared_tag": "only-here", "width": 1, "height": 1}],
+        ["i", 2, 4, 0],
+        ["i", 2, 6, 1],
+        ["i", 3, 5, 0],
+        ["i", 1, 2, 0],
+        ["i", 1, 3, 1],
+    )
+    pairs = surface.transport.shared_elements(2, 3)
+    assert [(p["name"], p["source"], p["target"]) for p in pairs] == [("photo", 4, 5)]
+    assert pairs[0]["transition"] == flight and pairs[0]["source_style"] == {"border_radius": 8}
 
 
 # ----------------------------------------------------------------------

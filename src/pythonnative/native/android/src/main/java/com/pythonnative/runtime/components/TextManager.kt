@@ -421,12 +421,4 @@ class TextManager : ComponentManager() {
         if (radiusPx <= 0f && (dx != 0.0 || dy != 0.0)) radiusPx = 0.01f
         tv.setShadowLayer(radiusPx, pxF(dx), pxF(dy), argb)
     }
-
-    override fun setAnimatedProperty(view: View, prop: String, value: Any?) {
-        if (prop == "color" && view is TextView) {
-            PNColor.parse(value)?.let { view.setTextColor(it) }
-            return
-        }
-        super.setAnimatedProperty(view, prop, value)
-    }
 }

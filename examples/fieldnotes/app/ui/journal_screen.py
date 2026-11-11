@@ -5,11 +5,13 @@ from __future__ import annotations
 from functools import partial
 
 import pythonnative as pn
+from pythonnative.motion import FadeIn, FadeOut, LinearTransition
+from pythonnative.runtime import run_application_task
 
 from ..journal import journal
 from ..models import Entry, SyncStatus, format_day
 from .editor_screen import EditorScreen
-from .entry_screen import EntryScreen
+from .entry_screen import EntryScreen, delete_with_reminder
 from .theme import Styles
 from .widgets import ActionButton, Chip, EmptyState, ScreenHeader
 
@@ -19,7 +21,26 @@ def entry_key(entry: Entry, index: int) -> str:
 
 
 def render_entry(entry: Entry, index: int) -> pn.Element:
-    return EntryRow(entry)
+    return SwipeableEntry(entry)
+
+
+@pn.component
+def SwipeableEntry(entry: Entry) -> pn.Node:
+    """An entry row that slides left to reveal Delete."""
+    styles = pn.use_styles(Styles)
+    delete = pn.Pressable(
+        pn.Icon("trash", size=22, color="#FFFFFFFF"),
+        on_press=lambda: run_application_task(delete_with_reminder(entry)),
+        accessibility_label=f"Delete {entry.display_title}",
+        accessibility_role="button",
+        style={
+            "flex_grow": 1,
+            "align_items": "center",
+            "justify_content": "center",
+            "background_color": styles.colors.error,
+        },
+    )
+    return pn.Swipeable(EntryRow(entry), right_actions=delete, right_width=88)
 
 
 # FlatList rebuilds its rows when these callables change, so they live at module
@@ -58,7 +79,16 @@ def EntryRow(entry: Entry) -> pn.Node:
         count = len(entry.attachments)
         details.append(f"{count} attachment" + ("" if count == 1 else "s"))
     return pn.Pressable(
-        pn.Image(journal.file_path(photos[0]), scale_type="cover", style=styles.thumbnail) if photos else None,
+        (
+            pn.Image(
+                journal.file_path(photos[0]),
+                scale_type="cover",
+                style=styles.thumbnail,
+                shared_tag=f"photo-{photos[0].id}",
+            )
+            if photos
+            else None
+        ),
         pn.Column(
             pn.Text(entry.display_title, style=[styles.label, {"max_lines": 1}]),
             pn.Text(entry.excerpt, style=[styles.caption, {"max_lines": 2}]) if entry.excerpt else None,
@@ -100,6 +130,8 @@ def JournalScreen() -> pn.Node:
 
     def new_entry() -> None:
         navigation.push(EditorScreen())
+
+    tag_sheet = pn.use_ref(None)
 
     if searching:
         empty = EmptyState("search", "No matches", "Try fewer words, or a tag like #birds.")
@@ -144,7 +176,20 @@ def JournalScreen() -> pn.Node:
                 if tags
                 else None
             ),
-            pn.Text(sync_summary(server_url, sync), style=styles.caption),
+            pn.Row(
+                pn.Text(sync_summary(server_url, sync), style=[styles.caption, styles.grow]),
+                (
+                    pn.Pressable(
+                        pn.Text(f"All {len(tags)} tags", style=styles.caption),
+                        on_press=lambda: tag_sheet.current and tag_sheet.current.snap_to(0),
+                        accessibility_role="button",
+                        test_id="journal-all-tags",
+                    )
+                    if len(tags) > 12
+                    else None
+                ),
+                style=pn.style(gap=8, align_items="center"),
+            ),
             style=pn.style(gap=8, padding_horizontal=16, padding_bottom=8),
         ),
         pn.FlatList(
@@ -153,7 +198,31 @@ def JournalScreen() -> pn.Node:
             render_item=render_entry,
             estimated_item_height=96,
             list_empty=empty,
+            item_entering=FadeIn(duration=200),
+            item_exiting=FadeOut(duration=150),
+            item_layout=LinearTransition(duration=220),
             style=styles.grow,
+        ),
+        (
+            pn.BottomSheet(
+                pn.ScrollView(
+                    pn.View(
+                        *(
+                            Chip(
+                                f"#{tag}", on_press=partial(toggle_tag, tag), active=f"#{tag}" in search.split()
+                            ).with_key(tag)
+                            for tag in tags
+                        ),
+                        style=styles.wrap,
+                    ),
+                    style=pn.style(padding=16),
+                ),
+                snap_points=("40%", "80%"),
+                index=-1,
+                ref=tag_sheet,
+            )
+            if len(tags) > 12
+            else None
         ),
         edges=("top",),
         style=styles.screen,

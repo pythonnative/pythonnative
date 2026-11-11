@@ -2,7 +2,7 @@
 
 The linter parses Python source with the standard library's `ast` module,
 so it has no dependencies and never imports or runs the code it checks.
-It reports four rules:
+It reports four rules for hooks:
 
 - ``PN101``: a hook is called conditionally: inside an ``if``, a loop, a
   ``try``, a ``match``, a comprehension, a lambda, a conditional
@@ -14,6 +14,18 @@ It reports four rules:
   literal dependency list leaves out.
 - ``PN104``: ``key=`` is passed to a module-level ``@component``; use
   ``.with_key(...)`` on the returned element instead.
+
+And three rules for worklets (RFC 0009):
+
+- ``PN201``: a worklet uses Python the UI thread can't run (the
+  compiler's message, at the construct's position).
+- ``PN202``: an API that only accepts worklets (``use_animated_style``,
+  ``use_derived_value``, ``use_animated_reaction``, ``use_frame_callback``)
+  receives a name that isn't a ``@worklet`` function. It would run in
+  development, where any source compiles, and fail in a release build,
+  which only precompiles marked worklets and inline lambdas.
+- ``PN203``: a shared value's ``.value`` is read while rendering; the
+  render doesn't rerun when it changes.
 
 A syntax error is reported as ``PN000``. A trailing ``# pn: ignore``
 comment silences every finding on its line, and
@@ -49,6 +61,9 @@ CODES: dict[str, str] = {
     "PN102": "hook called outside a component or custom hook",
     "PN103": "dependency list is missing a name the callback reads",
     "PN104": "key= passed to a user component",
+    "PN201": "a worklet uses Python the UI thread can't run",
+    "PN202": "a worklet-only API receives a function that isn't marked @worklet",
+    "PN203": "a shared value is read during render",
 }
 """Every code `pn lint` can report, with a one-line summary."""
 
@@ -58,7 +73,7 @@ _DEPS_HOOKS = frozenset({"use_effect", "use_layout_effect", "use_memo", "use_cal
 _CALLBACK_KEYWORDS = ("effect", "factory", "callback")
 _STABLE_PAIR_HOOKS = frozenset({"use_state", "use_reducer"})
 # Hooks whose result is created once and keeps its identity for the component's lifetime.
-_STABLE_HOOKS = frozenset({"use_ref", "use_animated_value"})
+_STABLE_HOOKS = frozenset({"use_ref", "use_shared_value"})
 _SKIP_DIRS = frozenset({".git", "build", "dist", "__pycache__", "node_modules", "site"})
 
 _FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
@@ -133,10 +148,102 @@ def lint_source(source: str, filename: str) -> list[Finding]:
 
     checker = _Checker(filename, _module_components(tree), _wrapped_functions(tree))
     checker.visit(tree)
+    findings = checker.findings + _motion_findings(tree, filename)
     ignores = _ignore_comments(source)
-    kept = [finding for finding in checker.findings if not _is_ignored(finding, ignores)]
+    kept = [finding for finding in findings if not _is_ignored(finding, ignores)]
     # Stable sort: findings on one position keep the order they were found in.
     return sorted(dict.fromkeys(kept), key=lambda f: (f.line, f.col))
+
+
+_WORKLET_ONLY = frozenset({"use_animated_style", "use_derived_value", "use_animated_reaction", "use_frame_callback"})
+_SHARED_HOOKS = frozenset({"use_shared_value", "use_derived_value"})
+
+
+def _motion_findings(tree: ast.Module, filename: str) -> list[Finding]:
+    """PN201, PN202, and PN203: the worklet rules (RFC 0009)."""
+    from .motion.compiler import WorkletError, compile_node
+    from .motion.precompile import find_worklets
+
+    findings: list[Finding] = []
+    seen: set[int] = set()
+    for node in find_worklets(tree):
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+        try:
+            compile_node(node, filename, getattr(node, "name", "<lambda>"), node.lineno)
+        except WorkletError as error:
+            findings.append(Finding(filename, error.lineno or node.lineno, error.col + 1, "PN201", error.message))
+    # Only functions this module defines without the marker are flagged:
+    # an imported name, or one assigned from ``pn.worklet(...)``, may well
+    # be a worklet, and the runtime checks it.
+    plain = {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and not any(_final_name(decorator) == "worklet" for decorator in node.decorator_list)
+    }
+    marked = {
+        target.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and _final_name(node.value.func) == "worklet"
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    } | {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and any(_final_name(decorator) == "worklet" for decorator in node.decorator_list)
+    }
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or _final_name(node.func) not in _WORKLET_ONLY:
+            continue
+        for argument in node.args:
+            if isinstance(argument, ast.Name) and argument.id in plain and argument.id not in marked:
+                findings.append(
+                    Finding(
+                        filename,
+                        argument.lineno,
+                        argument.col_offset + 1,
+                        "PN202",
+                        f"{_final_name(node.func)}() needs a @pn.worklet function or an inline lambda; "
+                        f"mark {argument.id!r} with @pn.worklet",
+                    )
+                )
+    for function in ast.walk(tree):
+        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)) or not _is_component(function):
+            continue
+        shared: set[str] = set()
+        for statement in ast.walk(function):
+            if (
+                isinstance(statement, ast.Assign)
+                and isinstance(statement.value, ast.Call)
+                and _final_name(statement.value.func) in _SHARED_HOOKS
+            ):
+                shared.update(target.id for target in statement.targets if isinstance(target, ast.Name))
+        if not shared:
+            continue
+        for read in _walk_scope(function.body):
+            if (
+                isinstance(read, ast.Attribute)
+                and read.attr == "value"
+                and isinstance(read.ctx, ast.Load)
+                and isinstance(read.value, ast.Name)
+                and read.value.id in shared
+            ):
+                findings.append(
+                    Finding(
+                        filename,
+                        read.lineno,
+                        read.col_offset + 1,
+                        "PN203",
+                        f"{read.value.id}.value is read during render, which won't rerun when it changes; "
+                        "read it in a worklet (use_animated_style, use_derived_value) instead",
+                    )
+                )
+    return findings
 
 
 def lint_paths(paths: Iterable[str | os.PathLike[str]]) -> list[Finding]:
@@ -368,7 +475,7 @@ def _stable_targets(roots: Iterable[ast.AST]) -> set[int]:
 
     Those are the setter in ``value, set_value = use_state(...)``, the
     dispatcher in ``state, dispatch = use_reducer(...)``, any name
-    assigned straight from ``use_ref(...)`` or ``use_animated_value(...)``, and any name assigned from
+    assigned straight from ``use_ref(...)`` or ``use_shared_value(...)``, and any name assigned from
     ``use_memo(...)`` or ``use_callback(...)`` with a literal empty
     dependency list (computed once, so it never changes).
     """
@@ -697,8 +804,7 @@ class _Checker(ast.NodeVisitor):
             self.report(
                 node,
                 "PN102",
-                f"hook '{hook}' is called {where}; call hooks only from a @component function "
-                "or a use_* custom hook",
+                f"hook '{hook}' is called {where}; call hooks only from a @component function or a use_* custom hook",
             )
         elif self.reason is not None:
             self.report(

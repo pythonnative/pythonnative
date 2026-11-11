@@ -120,5 +120,7 @@ defers renders started inside
   [`Context.Provider`][pythonnative.hooks.Context.Provider], or across
   the app with a [`Store`][pythonnative.Store]; see
   [Managing state](../guides/state.md).
-- Animate without re-rendering using [`use_ref`][pythonnative.use_ref]
-  + `Animated`; see the [Animations guide](../guides/animations.md).
+- Animate without re-rendering using
+  [`use_shared_value`][pythonnative.use_shared_value] and
+  [`use_animated_style`][pythonnative.use_animated_style]; see the
+  [Motion guide](../guides/motion.md) and the [Motion API](motion.md).

@@ -17,7 +17,19 @@ from .types import NativeField, decode_value, encode_value, type_schema, validat
 RUNTIME_PROPS: dict[str, dict[str, Any]] = {
     "_pn_layout": {"type": "boolean", "native": {"invalidates_layout": False, "flatten": True}},
     "_pn_events": {"type": "array", "items": {"type": "string"}},
-    "_pn_animated_events": {"type": "object"},
+    # Motion (RFC 0009): animated style and worklet handler bindings, and
+    # layout animations. None of them changes layout, and a view with one is
+    # never flattened.
+    "_pn_motion": {"type": "object", "native": {"invalidates_layout": False}},
+    # Factories take presets and worklets that the reconciler encodes, so
+    # the schema accepts any value; the core validates the encoded form.
+    "entering": {"native": {"invalidates_layout": False}},
+    "exiting": {"native": {"invalidates_layout": False}},
+    "layout": {"native": {"invalidates_layout": False}},
+    "shared_tag": {"type": "string", "native": {"invalidates_layout": False}},
+    "shared_transition": {"native": {"invalidates_layout": False}},
+    "skip_entering": {"type": "boolean", "native": {"invalidates_layout": False}},
+    "skip_exiting": {"type": "boolean", "native": {"invalidates_layout": False}},
     "_pn_list_key": {"type": "string"},
     "_pn_header_slot": {"enum": ["left", "right"]},
     "_pn_edit_revision": {"type": "integer"},

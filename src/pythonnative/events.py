@@ -149,7 +149,16 @@ def dispatch_event(tag: int, name: str, *args: Any) -> bool:
 # ======================================================================
 
 
-def extract_events(props: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Callable[..., Any]]]:
+MOTION_PROP = "_pn_motion"
+"""Prop key carrying a view's animated style and worklet handler bindings (RFC 0009)."""
+
+WorkletBinder = Callable[[Callable[..., Any]], Optional[int]]
+"""Turns an event or gesture worklet into the handler binding the core runs, or ``None`` without a core."""
+
+
+def extract_events(
+    props: Dict[str, Any], bind_worklet: Optional[WorkletBinder] = None
+) -> Tuple[Dict[str, Any], Dict[str, Callable[..., Any]]]:
     """Split ``props`` into native-safe props and Python event callbacks.
 
     Rules:
@@ -166,21 +175,41 @@ def extract_events(props: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Cal
       event names present), so handlers can wire listeners
       conditionally and the prop differ can detect listener
       addition/removal without comparing closures.
+    - With ``bind_worklet``, an ``on_*`` callback marked ``@worklet`` runs
+      in the renderer core instead (RFC 0009): it stays in ``_pn_events`` so
+      the platform reports the event, and its handler binding goes in
+      ``_pn_motion["events"]`` rather than in Python's registry. Gesture
+      worklets are bound the same way. Animated style bindings that
+      ``resolve_style`` collected become ``_pn_motion["style"]``.
 
     Args:
         props: Raw element props (already stripped of reconciler-owned
             keys).
+        bind_worklet: Installs a worklet handler and returns its binding,
+            or ``None`` when no core can run it (it then runs in Python).
 
     Returns:
         ``(clean_props, events)`` where ``clean_props`` contains no
         callables and ``events`` maps event names to callbacks.
     """
+    from .motion.worklets import is_worklet
+    from .style import MOTION_STYLE_KEY
+
     clean: Dict[str, Any] = {}
     events: Dict[str, Callable[..., Any]] = {}
+    native: Dict[str, int] = {}
+    styles: Tuple[int, ...] = ()
 
     for key, value in props.items():
+        if key == MOTION_STYLE_KEY:
+            styles = tuple(value)
+            continue
         if key.startswith("on_") and callable(value):
-            events[key] = value
+            binding = bind_worklet(value) if bind_worklet is not None and is_worklet(value) else None
+            if binding is not None:
+                native[key] = binding
+            else:
+                events[key] = value
             continue
         nested_spec = _NESTED_EVENT_PROPS.get(key)
         if nested_spec is not None and isinstance(value, dict):
@@ -196,14 +225,21 @@ def extract_events(props: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Cal
         if key == GESTURES_PROP and value:
             from .gestures import serialize_gestures
 
-            specs, gesture_events = serialize_gestures(value)
+            specs, gesture_events = serialize_gestures(value, bind_worklet)
             clean[key] = specs
             events.update(gesture_events)
             continue
         clean[key] = value
 
-    if events:
-        clean[EVENTS_PROP] = frozenset(events)
+    if events or native:
+        clean[EVENTS_PROP] = frozenset(events) | frozenset(native)
+    if styles or native:
+        motion: Dict[str, Any] = {}
+        if styles:
+            motion["style"] = list(styles)
+        if native:
+            motion["events"] = native
+        clean[MOTION_PROP] = motion
     return clean, events
 
 
@@ -220,6 +256,8 @@ def event_names(props: Dict[str, Any]) -> FrozenSet[str]:
 __all__ = [
     "EVENTS_PROP",
     "GESTURES_PROP",
+    "MOTION_PROP",
+    "WorkletBinder",
     "EventRegistry",
     "get_event_registry",
     "dispatch_event",

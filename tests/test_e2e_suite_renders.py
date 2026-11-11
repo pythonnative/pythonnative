@@ -23,8 +23,7 @@ import pytest
 
 import pythonnative as pn
 from pythonnative import appearance
-from pythonnative.animated import ANIMATABLE_PROPS
-from pythonnative.testing import RenderResult, render
+from pythonnative.testing import FakeClock, RenderResult, render
 
 _SUITE_DIR = Path(__file__).parents[1] / "examples" / "e2e-suite"
 
@@ -373,33 +372,284 @@ def test_device_demos_read_fallback_values(suite: RenderResult) -> None:
     assert suite.get_by_text("Keyboard visible: no")
 
 
-def test_easing_and_decay_demos_complete(suite: RenderResult) -> None:
-    _open(suite, "easing")
-    assert suite.get_by_text("Rejects unknown easing: yes")
-    assert suite.get_by_text(f"Animatable props: {len(ANIMATABLE_PROPS)}")
-    suite.press(suite.get_by_text("Run all curves"))
-    assert suite.find_by_text("Curves run: 9", timeout=10.0)
-    assert suite.get_by_text("Status: done")
-    assert suite.back()
-    _open(suite, "decay_animation")
-    suite.press(suite.get_by_text("Fling"))
-    assert suite.find_by_text("Finished: yes", timeout=10.0)
-    assert suite.get_by_text("Status: done")
-    assert suite.get_by_text("Settled x: 150")
-
-
 def test_scroll_listeners_receive_typed_scroll_events(suite: RenderResult) -> None:
-    """Every demo that scrolls reads ``ScrollEvent`` fields, never dict keys."""
+    """A Python ``on_scroll`` listener reads ``ScrollEvent`` fields, never dict keys."""
     from pythonnative.events import get_event_registry
 
-    for demo_id, readout in (
-        ("collapsing_header", "Header state: collapsed"),
-        ("scroll_view", "Offset y positive: yes"),
-    ):
-        _open(suite, demo_id)
-        registry = get_event_registry()
-        scrollers = [v for v in suite.get_all_by_type("ScrollView") if registry.has(v.tag, "on_scroll")]
-        assert scrollers, demo_id
-        payload = {"x": 0.0, "y": 240.0, "content_width": 300.0, "content_height": 2400.0}
-        suite.fire(scrollers[-1], "on_scroll", {**payload, "viewport_width": 300.0, "viewport_height": 400.0})
-        assert suite.get_by_text(readout), demo_id
+    _open(suite, "scroll_view")
+    registry = get_event_registry()
+    scrollers = [v for v in suite.get_all_by_type("ScrollView") if registry.has(v.tag, "on_scroll")]
+    assert scrollers
+    payload = {"x": 0.0, "y": 240.0, "content_width": 300.0, "content_height": 2400.0}
+    suite.fire(scrollers[-1], "on_scroll", {**payload, "viewport_width": 300.0, "viewport_height": 400.0})
+    assert suite.get_by_text("Offset y positive: yes")
+
+
+# ----------------------------------------------------------------------
+# Motion: the virtual clock drives the core's frame clock, so awaited
+# animations, worklets, and layout animations run here as on a device.
+# ----------------------------------------------------------------------
+
+
+def _advance(suite: RenderResult, clock: FakeClock, seconds: float = 2.0) -> None:
+    clock.advance(seconds)
+    suite.settle()
+
+
+def _box(suite: RenderResult, label: str) -> Any:
+    """The animated view around a demo's ``label`` text."""
+    return suite.get_by_text(label).parent
+
+
+def test_with_timing_demo_awaits_and_reports_interruption(pn_clock: FakeClock, suite: RenderResult) -> None:
+    _open(suite, "with_timing")
+    box = _box(suite, "timing-box label")
+    assert suite.presented_style(box)["opacity"] == 0.2
+    suite.press(suite.get_by_text("Run timing"))
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Status: done")
+    assert suite.get_by_text("Finished: yes")
+    assert suite.presented_style(box)["opacity"] == 1.0
+    suite.press(suite.get_by_text("Interrupt timing"))
+    _advance(suite, pn_clock, 3.0)
+    assert suite.get_by_text("Status: interrupted")
+    assert suite.get_by_text("Finished: no")
+    assert suite.presented_style(box)["opacity"] == 0.5
+    suite.press(suite.get_by_text("Reset"))
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Status: idle")
+
+
+def test_easing_demo_runs_every_curve(pn_clock: FakeClock, suite: RenderResult) -> None:
+    curves = importlib.import_module("app.screens.motion.easing")._CURVES
+    _open(suite, "easing")
+    assert suite.get_by_text("Rejects unknown easing: yes")
+    suite.press(suite.get_by_text("Run all curves"))
+    _advance(suite, pn_clock, 10.0)
+    assert suite.get_by_text(f"Curves run: {len(curves)}")
+    assert suite.get_by_text("Status: done")
+    assert suite.get_by_text("Last curve: custom")
+
+
+def test_spring_and_decay_demos_settle_where_expected(pn_clock: FakeClock, suite: RenderResult) -> None:
+    _open(suite, "with_spring")
+    suite.press(suite.get_by_text("Run spring"))
+    _advance(suite, pn_clock, 4.0)
+    assert suite.get_by_text("Status: done")
+    assert suite.get_by_text("Scale: 1.00")
+    suite.press(suite.get_by_text("Run timed spring"))
+    _advance(suite, pn_clock, 4.0)
+    assert suite.get_by_text("Scale: 0.50")
+    assert suite.back()
+
+    _open(suite, "with_decay")
+    assert suite.get_by_text("Expected x: 150")
+    suite.press(suite.get_by_text("Fling"))
+    _advance(suite, pn_clock, 6.0)
+    assert suite.get_by_text("Finished: yes")
+    assert suite.get_by_text("Settled x: 150")
+    assert suite.get_by_text("Status: done")
+    suite.press(suite.get_by_text("Fling clamped"))
+    _advance(suite, pn_clock, 6.0)
+    assert suite.get_by_text("Settled x: 100")
+    assert suite.get_by_text("Status: done")
+    suite.press(suite.get_by_text("Reset decay"))
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Status: idle")
+
+
+def test_composition_demo_sequences_repeats_and_loops(pn_clock: FakeClock, suite: RenderResult) -> None:
+    _open(suite, "composition")
+    suite.press(suite.get_by_text("Run sequence"))
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Sequence: done")
+    suite.press(suite.get_by_text("Run repeat"))
+    assert suite.get_by_text("Repeat: running")
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Repeat: finished")
+    assert suite.presented_style(_box(suite, "pulse-box"))["opacity"] == 1.0
+    suite.press(suite.get_by_text("Start loop"))
+    _advance(suite, pn_clock, 0.5)
+    suite.press(suite.get_by_text("Stop loop"))
+    assert suite.get_by_text("Loop: stopped")
+    assert suite.get_by_text("Loop moved: yes")
+
+
+def test_interpolate_demo_matches_python_helpers(pn_clock: FakeClock, suite: RenderResult) -> None:
+    demo = importlib.import_module("app.screens.motion.interpolate")
+    end = pn.interpolate_color(1.0, demo._STOPS, demo._COLORS)
+    _open(suite, "interpolate")
+    assert suite.get_by_text(f"Midpoint color: {pn.interpolate_color(0.5, demo._STOPS, demo._COLORS)}")
+    assert suite.get_by_text("Clamped past the end: 160")
+    assert suite.get_by_text("Extended past the end: 320")
+    suite.press(suite.get_by_text("Run interpolate"))
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Status: done")
+    assert suite.get_by_text(f"End color: {end}")
+    assert suite.get_by_text("Colors match: yes")
+    presented = suite.presented_style(_box(suite, "interp-box"))
+    assert presented["background_color"] == end
+    assert presented["transform"] == [{"translate_x": 160.0}]
+    assert presented["opacity"] == 1
+
+
+def test_collapsing_header_runs_its_scroll_worklet_in_the_core(pn_clock: FakeClock, suite: RenderResult) -> None:
+    from pythonnative.events import get_event_registry
+
+    _open(suite, "collapsing_header")
+    assert suite.get_by_text("Header state: expanded")
+    scroller = next(
+        view
+        for view in suite.get_all_by_type("ScrollView")
+        if "on_scroll" in ((view.props.get("_pn_motion") or {}).get("events") or {})
+    )
+    # The worklet replaces the Python listener: nothing is registered for Python.
+    assert not get_event_registry().has(scroller.tag, "on_scroll")
+    header = _box(suite, "Collapsing toolbar")
+    payload = {"x": 0.0, "content_width": 300.0, "content_height": 2400.0}
+    payload.update(viewport_width=300.0, viewport_height=400.0)
+    suite.fire(scroller, "on_scroll", {**payload, "y": 240.0})
+    assert suite.get_by_text("Header state: collapsed")
+    assert suite.presented_style(header)["opacity"] == 0
+    assert suite.presented_style(header)["transform"] == [{"translate_y": -56.0}]
+    suite.fire(scroller, "on_scroll", {**payload, "y": 0.0})
+    assert suite.get_by_text("Header state: expanded")
+
+
+def test_drag_under_load_releases_on_the_ui_thread(
+    pn_clock: FakeClock, suite: RenderResult, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    demo = importlib.import_module("app.screens.motion.drag_under_load")
+    monkeypatch.setattr(demo, "BLOCK_SECONDS", 0.0)
+    _open(suite, "drag_under_load")
+    card = suite.get_by_label("Drag card")
+    suite.press(suite.get_by_text("Block Python"))
+    assert suite.get_by_text("Python busy: yes")
+    # The handler is parked before its blocking loop; the drag runs entirely in the core.
+    suite.drag(card, dx=140, duration=0.2)
+    assert suite.get_by_text("Released while busy: yes")
+    assert suite.get_by_text("Side: right")
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Python busy: no")
+    assert suite.get_by_text("Blocks: 1")
+    transform = suite.presented_style(card)["transform"]
+    assert transform[0]["translate_x"] == pytest.approx(demo.TRACK, abs=0.5)
+    assert transform[1]["rotate"] == pytest.approx(6.0, abs=0.1)
+    suite.drag(card, dx=-140, duration=0.2)
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Side: left")
+    assert suite.get_by_text("Released while busy: no")
+    assert suite.get_by_text("Releases: 2")
+
+
+def test_layout_animations_demo_enters_exits_and_moves(pn_clock: FakeClock, suite: RenderResult) -> None:
+    _open(suite, "layout_animations")
+    assert suite.get_by_text("Chips: 3")
+    # The chips mounted with the screen skip their entering animation.
+    assert "transform" not in suite.presented_style(_box(suite, "Chip 1"))
+    suite.press(suite.get_by_text("Add chip"))
+    assert suite.get_by_text("Chips: 4")
+    chip4 = _box(suite, "Chip 4")
+    assert suite.presented_style(chip4)["transform"] != [{"scale": 1}]
+    _advance(suite, pn_clock)
+    assert "transform" not in suite.presented_style(chip4)
+    chip1 = _box(suite, "Chip 1")
+    chip2 = _box(suite, "Chip 2")
+    settled_x = suite.presented_frame(chip2)[0]
+    suite.press(suite.get_by_text("Remove first chip"))
+    assert suite.get_by_text("Last removed: Chip 1")
+    assert suite.query_by_text("Chip 1") is None  # the component unmounted at once
+    assert chip1.tag in suite.backend.native.views  # but its native view is fading out
+    _advance(suite, pn_clock)
+    assert chip1.tag not in suite.backend.native.views
+    assert suite.presented_frame(chip2)[0] < settled_x  # Chip 2 slid into Chip 1's place
+
+
+def test_list_item_animations_demo_sends_presets_to_the_native_list(pn_clock: FakeClock, suite: RenderResult) -> None:
+    _open(suite, "list_item_animations")
+    native = suite.backend.native.find("VirtualList")[-1]
+    assert native.props["item_entering"]["type"] == "slide_in"
+    assert native.props["item_entering"]["edge"] == "right"
+    assert native.props["item_exiting"]["type"] == "fade_out"
+    assert native.props["item_layout"]["type"] == "linear"
+    suite.press(suite.get_by_text("Add row"))
+    assert suite.get_by_text("Rows: 6")
+    assert suite.get_by_text("Top row: ItemRow 6")
+    suite.press(suite.get_by_text("Remove top row"))
+    assert suite.get_by_text("Rows: 5")
+    assert suite.get_by_text("Top row: ItemRow 5")
+
+
+def test_shared_element_demo_pairs_tags_across_a_push(suite: RenderResult) -> None:
+    demo = importlib.import_module("app.screens.motion.shared_element")
+    _open(suite, "shared_element")
+    assert suite.get_by_text("Showing: list")
+    suite.press(suite.get_by_text("Open detail"))
+    assert suite.get_by_text("Showing: detail")
+    assert _nav_ref().get_state().current.params == {"detail": True}
+    tagged = [v for v in suite.backend.native.views.values() if v.props.get("shared_tag") == demo.SHARED_TAG]
+    assert len(tagged) == 2  # the outgoing thumbnail and the incoming hero
+    hero = next(v for v in tagged if v.props.get("shared_transition"))
+    assert hero.props["shared_transition"]["spring"]["damping_ratio"] == 0.9
+    suite.press(suite.get_by_text("Back to list"))
+    assert suite.get_by_text("Showing: list")
+
+
+def test_bottom_sheet_demo_drags_between_detents(pn_clock: FakeClock, suite: RenderResult) -> None:
+    _open(suite, "bottom_sheet")
+    handle = suite.get_by_label("Sheet handle")
+    surface = handle.parent
+    assert surface is not None
+    assert suite.get_by_text("Sheet index: closed")
+    suite.press(suite.get_by_text("Open sheet"))
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Last request: open")
+    assert suite.presented_style(surface)["transform"] == [{"translate_y": 200.0}]
+    suite.drag(handle, dy=-150, duration=0.3)
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Sheet index: 1")
+    assert suite.get_by_text("Sheet changes: 2")  # the handle's open, then the drag
+    assert suite.presented_style(surface)["transform"] == [{"translate_y": 0}]
+    suite.press(suite.get_by_text("Sheet collapse"))
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Last request: collapse")
+    assert suite.presented_style(surface)["transform"] == [{"translate_y": 200}]
+    suite.drag(handle, dy=500, duration=0.1)
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Sheet index: closed")
+
+
+def test_swipeable_demo_opens_both_sides(pn_clock: FakeClock, suite: RenderResult) -> None:
+    _open(suite, "swipeable")
+    row = _box(suite, "Swipe this row").parent  # the Swipeable's sliding view
+    suite.drag(row, dx=-70, duration=0.2)
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Opened: right")
+    assert suite.presented_style(row)["transform"] == [{"translate_x": -80.0}]
+    suite.press(_box(suite, "Delete"))
+    assert suite.get_by_text("Action: delete")
+    suite.press(suite.get_by_text("Close via ref"))
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Last request: close")
+    assert suite.presented_style(row)["transform"] == [{"translate_x": 0}]
+    suite.drag(row, dx=70, duration=0.2)
+    _advance(suite, pn_clock)
+    assert suite.get_by_text("Opened: left")
+    suite.press(_box(suite, "Pin"))
+    assert suite.get_by_text("Action: pin")
+
+
+def test_frame_callback_demo_advances_only_while_active(pn_clock: FakeClock, suite: RenderResult) -> None:
+    _open(suite, "frame_callback")
+    suite.press(suite.get_by_text("Read elapsed"))
+    assert suite.get_by_text("Elapsed advanced: no")
+    suite.press(suite.get_by_text("Start frames"))
+    assert suite.get_by_text("Frames running: yes")
+    _advance(suite, pn_clock, 0.5)
+    suite.press(suite.get_by_text("Read elapsed"))
+    assert suite.get_by_text("Elapsed advanced: yes")
+    suite.press(suite.get_by_text("Pause frames"))
+    _advance(suite, pn_clock, 0.1)
+    suite.press(suite.get_by_text("Check paused"))
+    _advance(suite, pn_clock, 0.5)
+    assert suite.get_by_text("Paused stays still: yes")

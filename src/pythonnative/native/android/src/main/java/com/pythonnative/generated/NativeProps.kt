@@ -197,8 +197,6 @@ open class PNViewProps(val values: JSONObject) {
     val `important_for_accessibility`: PNViewImportantForAccessibility? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("important_for_accessibility"))) null else PNValues.decodeOrRecord("important_for_accessibility") { if (PNValues.isNull(values.get("important_for_accessibility"))) null else PNViewImportantForAccessibility.decode(values.get("important_for_accessibility")) } }
     val has_test_id: Boolean get() = values.has("test_id")
     val `test_id`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("test_id"))) null else PNValues.decodeOrRecord("test_id") { if (PNValues.isNull(values.get("test_id"))) null else PNValues.string(values.get("test_id")) } }
-    val has_gestures: Boolean get() = values.has("gestures")
-    val `gestures`: List<PNJSONValue>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("gestures"))) null else PNValues.decodeOrRecord("gestures") { PNValues.array(values.get("gestures")).map { item -> PNJSONValue(item ?: JSONObject.NULL) } } }
     val has_hit_slop: Boolean get() = values.has("hit_slop")
     val `hit_slop`: PNViewHitSlop? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("hit_slop"))) null else PNValues.decodeOrRecord("hit_slop") { if (PNValues.isNull(values.get("hit_slop"))) null else PNViewHitSlop.decode(values.get("hit_slop")) } }
     val has_on_layout: Boolean get() = values.has("on_layout")
@@ -207,14 +205,30 @@ open class PNViewProps(val values: JSONObject) {
     val `_pn_layout`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_layout"))) null else PNValues.decodeOrRecord("_pn_layout") { PNValues.boolean(values.get("_pn_layout")) } }
     val has__pn_events: Boolean get() = values.has("_pn_events")
     val `_pn_events`: List<String>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_events"))) null else PNValues.decodeOrRecord("_pn_events") { PNValues.array(values.get("_pn_events")).map { item -> PNValues.string(item) } } }
-    val has__pn_animated_events: Boolean get() = values.has("_pn_animated_events")
-    val `_pn_animated_events`: Map<String, PNJSONValue>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_animated_events"))) null else PNValues.decodeOrRecord("_pn_animated_events") { PNValues.objectValue(values.get("_pn_animated_events")).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNJSONValue(objectValue.get(key) ?: JSONObject.NULL) } } } }
+    val has__pn_motion: Boolean get() = values.has("_pn_motion")
+    val `_pn_motion`: Map<String, PNJSONValue>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_motion"))) null else PNValues.decodeOrRecord("_pn_motion") { PNValues.objectValue(values.get("_pn_motion")).let { objectValue -> objectValue.keys().asSequence().associateWith { key -> PNJSONValue(objectValue.get(key) ?: JSONObject.NULL) } } } }
+    val has_entering: Boolean get() = values.has("entering")
+    val `entering`: PNJSONValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("entering"))) null else PNValues.decodeOrRecord("entering") { PNJSONValue(values.get("entering") ?: JSONObject.NULL) } }
+    val has_exiting: Boolean get() = values.has("exiting")
+    val `exiting`: PNJSONValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("exiting"))) null else PNValues.decodeOrRecord("exiting") { PNJSONValue(values.get("exiting") ?: JSONObject.NULL) } }
+    val has_layout: Boolean get() = values.has("layout")
+    val `layout`: PNJSONValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("layout"))) null else PNValues.decodeOrRecord("layout") { PNJSONValue(values.get("layout") ?: JSONObject.NULL) } }
+    val has_shared_tag: Boolean get() = values.has("shared_tag")
+    val `shared_tag`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("shared_tag"))) null else PNValues.decodeOrRecord("shared_tag") { PNValues.string(values.get("shared_tag")) } }
+    val has_shared_transition: Boolean get() = values.has("shared_transition")
+    val `shared_transition`: PNJSONValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("shared_transition"))) null else PNValues.decodeOrRecord("shared_transition") { PNJSONValue(values.get("shared_transition") ?: JSONObject.NULL) } }
+    val has_skip_entering: Boolean get() = values.has("skip_entering")
+    val `skip_entering`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("skip_entering"))) null else PNValues.decodeOrRecord("skip_entering") { PNValues.boolean(values.get("skip_entering")) } }
+    val has_skip_exiting: Boolean get() = values.has("skip_exiting")
+    val `skip_exiting`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("skip_exiting"))) null else PNValues.decodeOrRecord("skip_exiting") { PNValues.boolean(values.get("skip_exiting")) } }
     val has__pn_list_key: Boolean get() = values.has("_pn_list_key")
     val `_pn_list_key`: String? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_list_key"))) null else PNValues.decodeOrRecord("_pn_list_key") { PNValues.string(values.get("_pn_list_key")) } }
     val has__pn_header_slot: Boolean get() = values.has("_pn_header_slot")
     val `_pn_header_slot`: PNViewPnHeaderSlot? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_header_slot"))) null else PNValues.decodeOrRecord("_pn_header_slot") { PNViewPnHeaderSlot.decode(values.get("_pn_header_slot")) } }
     val has__pn_edit_revision: Boolean get() = values.has("_pn_edit_revision")
     val `_pn_edit_revision`: Long? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("_pn_edit_revision"))) null else PNValues.decodeOrRecord("_pn_edit_revision") { PNValues.integer(values.get("_pn_edit_revision")) } }
+    val has_gestures: Boolean get() = values.has("gestures")
+    val `gestures`: List<PNJSONValue>? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("gestures"))) null else PNValues.decodeOrRecord("gestures") { PNValues.array(values.get("gestures")).map { item -> PNJSONValue(item ?: JSONObject.NULL) } } }
 }
 
 // The renderer core validated these values before they were mounted.
@@ -1087,6 +1101,12 @@ class VirtualListProps(values: JSONObject, partial: Boolean = true): PNViewProps
     val `shows_scroll_indicator`: Boolean? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("shows_scroll_indicator"))) null else PNValues.decodeOrRecord("shows_scroll_indicator") { PNValues.boolean(values.get("shows_scroll_indicator")) } }
     val has_refresh_control: Boolean get() = values.has("refresh_control")
     val `refresh_control`: PNScrollViewRefreshControl? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("refresh_control"))) null else PNValues.decodeOrRecord("refresh_control") { PNScrollViewRefreshControl.decode(values.get("refresh_control")) } }
+    val has_item_entering: Boolean get() = values.has("item_entering")
+    val `item_entering`: PNJSONValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("item_entering"))) null else PNValues.decodeOrRecord("item_entering") { PNJSONValue(values.get("item_entering") ?: JSONObject.NULL) } }
+    val has_item_exiting: Boolean get() = values.has("item_exiting")
+    val `item_exiting`: PNJSONValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("item_exiting"))) null else PNValues.decodeOrRecord("item_exiting") { PNJSONValue(values.get("item_exiting") ?: JSONObject.NULL) } }
+    val has_item_layout: Boolean get() = values.has("item_layout")
+    val `item_layout`: PNJSONValue? by lazy(LazyThreadSafetyMode.NONE) { if (PNValues.isNull(values.opt("item_layout"))) null else PNValues.decodeOrRecord("item_layout") { PNJSONValue(values.get("item_layout") ?: JSONObject.NULL) } }
 }
 
 // The renderer core validated these values before they were mounted.

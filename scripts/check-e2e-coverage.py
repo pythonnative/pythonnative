@@ -70,7 +70,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "ShadowOffset",
     "Style",
     "StyleProp",
-    "AnimatedValue",  # observed via use_animated_value usage in animations
     "QueryResult",  # observed via use_query demo
     "MutationCall",  # observed via use_mutation demo
     "MutationState",  # observed via use_mutation demo
@@ -93,7 +92,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "use_navigation",  # used by every screen for go_back
     "use_is_focused",  # underlies use_focus_effect; covered by the focus_effect demo
     "use_subscription",  # underlies use_color_scheme / use_window_dimensions demos
-    "use_animated_value",  # used in every animation demo
     "create_context",  # covered by use_context demo (Context.Provider)
     "style",  # the style helper itself is exercised by every styled demo
     # --------------------------------------------------------------
@@ -151,6 +149,7 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "start_resource",  # non-hook Resource constructor; driven by the lazy demo and unit tests
     "sdk",  # module re-export; custom_component demo covers it
     "icons",  # module re-export; the Icon demo drives icon_names / is_icon_name
+    "motion",  # module re-export; the Motion category demos drive its presets and hooks
     "svg",  # module re-export; the Svg demo drives svg.load and the shape classes
     "appearance",  # module re-export; use_color_scheme demo drives set_color_scheme
     "Props",  # tested in custom_component demo and SDK unit tests
@@ -173,7 +172,6 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "Deps",  # Sequence alias for use_effect deps; every use_effect demo passes one
     "ColorScheme",  # Literal alias returned by use_color_scheme; asserted in the use_color_scheme demo
     "DynamicColor",  # TypedDict color pair; the dynamic_color demo paints from one and flips the scheme
-    "EasingSpec",  # frozen descriptor built by Easing.*; the easing demo runs every curve
     "GestureSpec",  # wire dict alias produced by gesture descriptors; the gestures and pan_gesture demos
     "SwipeDirection",  # Literal alias on GestureEvent.direction; asserted in the gestures demo ("Swipe: left")
     "LayoutEvent",  # frozen record delivered to on_layout; the on_layout demo reads width/height from it
@@ -192,8 +190,28 @@ INTENTIONAL_EXEMPTIONS: Set[str] = {
     "WindowDimensions",  # NamedTuple from Dimensions.get / use_window_dimensions; both demos print it
     "DeviceInfo",  # frozen record from Device.info; every field printed by the device_info demo
     "Locale",  # frozen record from Localization.get_locales / use_locales; both demos print its fields
-    "AnimationResult",  # frozen record returned by awaited animations; easing and decay demos read .finished
     "ViewHandle",  # base handle on ref.current for plain views; the on_layout demo reads .frame
+    "CommonProps",  # TypedDict of accessibility and motion keys; every demo view passes some of them
+    # --------------------------------------------------------------
+    # Motion (RFC 0009). One demo maps to one feature, so these names
+    # are covered by the Motion demo named beside each one.
+    # --------------------------------------------------------------
+    "SharedValue",  # returned by use_shared_value; every Motion demo reads, writes, or animates one
+    "AnimatedStyle",  # returned by use_animated_style; every Motion demo puts one in a style list
+    "use_shared_value",  # every Motion demo; with_timing awaits SharedValue.animate on one
+    "use_animated_style",  # every Motion demo; the interpolate demo asserts its presented style
+    "use_derived_value",  # the interpolate demo compares its color with Python's; drag_under_load tilts with one
+    "use_animated_reaction",  # the collapsing_header demo reports the collapse through one
+    "run_on_python",  # drag_under_load, collapsing_header, and composition call back through it
+    "FrameInfo",  # frozen record a frame callback receives; the frame_callback demo sums its delta_ms
+    "Spring",  # spring parameters; layout_animations (LinearTransition) and shared_element pass one
+    "with_delay",  # the composition demo delays the second step of its sequence
+    "with_repeat",  # the composition demo repeats with reverse and on_finish, and loops forever
+    "interpolate_color",  # the interpolate demo blends its box color and checks the end color
+    "clamp",  # the interpolate demo clamps opacity; drag_under_load clamps the card's travel
+    "snap_point",  # the drag_under_load demo snaps the released card to a detent
+    "BottomSheetHandle",  # the bottom_sheet demo's ref; its buttons call snap_to, expand, collapse, close
+    "SwipeableHandle",  # the swipeable demo's ref; its buttons call open_left and close
 }
 
 

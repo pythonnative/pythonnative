@@ -101,9 +101,18 @@ def _unpacked_fields(annotation: Any) -> list[Any]:
     if typing.get_origin(annotation) is not typing.Unpack:
         return []
     (typed_dict,) = typing.get_args(annotation)
+    from ..motion.layout import LayoutAnimation
+    from ..motion.transitions import SharedTransition
+
+    # ``MotionProps`` names these only for type checkers; runtime props (the
+    # motion props among them) get their schemas from RUNTIME_PROPS.
+    hints = typing.get_type_hints(
+        typed_dict, localns={"LayoutAnimation": LayoutAnimation, "SharedTransition": SharedTransition}
+    )
     return [
         (name, field_type, dataclasses.field(default=None))
-        for name, field_type in typing.get_type_hints(typed_dict).items()
+        for name, field_type in hints.items()
+        if name not in RUNTIME_PROPS
     ]
 
 
@@ -184,20 +193,6 @@ def install(factories: dict[str, Any]) -> None:
                         "view_box",
                     },
                     recreate=key == "multiline" or (name == "ProgressBar" and key == "indeterminate"),
-                    animated=key
-                    in {
-                        "opacity",
-                        "background_color",
-                        "color",
-                        "rotate",
-                        "rotate_x",
-                        "rotate_y",
-                        "translate_x",
-                        "translate_y",
-                        "scale",
-                        "scale_x",
-                        "scale_y",
-                    },
                 )
             )
         if name == "Text":
@@ -268,6 +263,10 @@ def install(factories: dict[str, Any]) -> None:
             "horizontal": {"type": "boolean"},
             "shows_scroll_indicator": {"type": "boolean"},
             "refresh_control": {"type": "object"},
+            # Native row animations for dataset changes (RFC 0009).
+            "item_entering": {},
+            "item_exiting": {},
+            "item_layout": {},
         },
     }
     for name, extra in extras.items():

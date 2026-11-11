@@ -19,9 +19,6 @@ public final class PNViewState {
     public var retained: [AnyObject] = []
     /// Recognizers installed from the `gestures` prop.
     public var gestureRecognizers: [UIGestureRecognizer] = []
-    /// Animated transform channels (`translate_x`, `rotate`, ...) overlaid
-    /// on the static `transform` prop by `PNTransform.compose`.
-    public var animatedTransform: [String: Double] = [:]
 
     // Style bookkeeping used by `PNViewStyler` at frame time.
     var requestedCornerRadius: CGFloat?

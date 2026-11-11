@@ -35,6 +35,23 @@ public final class PNModalManager: PNComponentManager {
         }
     }
 
+    /// A removed modal dismisses with its content intact; the core destroys
+    /// the subtree once the dismissal ends (RFC 0009).
+    public override func exitView(_ view: UIView, finished: @escaping () -> Void) -> Bool {
+        guard let state = PNViewState.existing(for: view) else { return false }
+        // UIKit drops the completion of a dismissal it refuses (one asked
+        // for mid-presentation), so a late fallback finishes the exit.
+        var done = false
+        let once = {
+            guard !done else { return }
+            done = true
+            finished()
+        }
+        dismiss(view, state, emit: false, completion: once)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: once)
+        return true
+    }
+
     public override func childContainer(for view: UIView) -> UIView {
         guard let state = PNViewState.existing(for: view), let modal = state.extras["modal"] as? Presentation else {
             return view
@@ -132,11 +149,18 @@ public final class PNModalManager: PNComponentManager {
         }
     }
 
-    private func dismiss(_ placeholder: UIView, _ state: PNViewState, emit: Bool) {
-        guard let modal = state.extras.removeValue(forKey: "modal") as? Presentation else { return }
+    private func dismiss(_ placeholder: UIView, _ state: PNViewState, emit: Bool, completion: (() -> Void)? = nil) {
+        guard let modal = state.extras.removeValue(forKey: "modal") as? Presentation else {
+            completion?()
+            return
+        }
         (modal.controller as? PNModalViewController)?.onDismissed = nil
         let animated = PNProps.string(PNProps.value(state.props, "animation_type")) != "none"
-        modal.controller.dismiss(animated: animated)
+        if modal.controller.presentingViewController == nil {
+            completion?()
+        } else {
+            modal.controller.dismiss(animated: animated, completion: completion)
+        }
         if emit { PNEvents.emit(placeholder, "on_dismiss") }
     }
 }
@@ -216,6 +240,14 @@ final class PNPortalView: PNContainerReportingView {
             if sub.frame.contains(point) { return true }
         }
         return false
+    }
+
+    /// The overlay itself never takes a touch: one that no descendant
+    /// claims (a `box_none` wrapper, a closed sheet's `none` backdrop)
+    /// falls through to the screen below.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === self ? nil : hit
     }
 }
 

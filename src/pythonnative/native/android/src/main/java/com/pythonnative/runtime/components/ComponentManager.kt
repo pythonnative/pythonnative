@@ -6,7 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.pythonnative.runtime.PNBridge
-import com.pythonnative.runtime.animation.PNAnimator
+import com.pythonnative.runtime.animation.PNMotionApplier
 import com.pythonnative.runtime.bridge.JsonUtil
 import com.pythonnative.runtime.bridge.ViewRecord
 import com.pythonnative.runtime.bridge.present
@@ -23,7 +23,7 @@ import kotlin.math.roundToInt
  * Subclasses implement [createView] (construct the widget) and
  * [applyProps] (apply visual props); the base class owns frame
  * application, intrinsic measurement, child management, and the
- * animation hooks. All geometry crossing this API is in dp.
+ * motion and exit hooks. All geometry crossing this API is in dp.
  */
 abstract class ComponentManager {
     /** Construct the widget for `tag`; `props` may be consulted for creation-time choices. */
@@ -118,9 +118,32 @@ abstract class ComponentManager {
     /** Run an imperative command; unknown names return `null`. */
     open fun command(view: View, name: String, args: JSONObject): Any? = null
 
-    /** Apply one animated prop value from the core's animator. */
-    open fun setAnimatedProperty(view: View, prop: String, value: Any?) {
-        PNAnimator.setProperty(view, prop, value)
+    /**
+     * Apply one motion `prop` write from the core (RFC 0009): the same
+     * path as a static update of that key, and `null` resets it.
+     */
+    open fun setMotionProperty(view: View, prop: String, value: Any?) {
+        PNMotionApplier.apply(view, prop, value)
+    }
+
+    /**
+     * Start a platform-owned exit of `view` itself (mount op `exit` with
+     * owner 1, as for a `Modal`): close it with the platform's own
+     * transition without destroying it or its subtree, and call `finished`
+     * once the transition ends. Returns false when this manager has no
+     * exit of its own; the parent's [exitChild] runs instead.
+     */
+    open fun beginExit(view: View, finished: () -> Unit): Boolean = false
+
+    /**
+     * Start a platform-owned exit of `child` (a leaving screen): detach it
+     * with the platform's own transition without destroying it or its
+     * subtree, and call `finished` once the transition ends. The default
+     * detaches it at once.
+     */
+    open fun exitChild(parent: View, child: View, finished: () -> Unit) {
+        removeChild(parent, child)
+        finished()
     }
 
     /**

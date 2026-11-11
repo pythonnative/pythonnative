@@ -181,6 +181,31 @@ public final class PNGestureCoordinator: NSObject, UIGestureRecognizerDelegate {
         allowsSimultaneous(gestureRecognizer, other)
     }
 
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+        // iOS 26's back swipe starts anywhere on a pushed screen, so it
+        // waits for a pan that horizontal travel can begin (a Swipeable
+        // row, a carousel), the way it already waits for a scroll view.
+        guard let pan = gestureRecognizer as? PNPanGestureRecognizer, pan.config.claimsHorizontalTravel else { return false }
+        return PNGestureCoordinator.isContentPop(other, above: gestureRecognizer.view)
+    }
+
+    /// Whether `recognizer` is the full-width back swipe of a navigation
+    /// controller that contains `view`.
+    static func isContentPop(_ recognizer: UIGestureRecognizer, above view: UIView?) -> Bool {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            var responder: UIResponder? = view
+            while let next = responder {
+                if let nav = next as? UINavigationController, nav.interactiveContentPopGestureRecognizer === recognizer {
+                    return true
+                }
+                responder = next.next
+            }
+        }
+        #endif
+        return false
+    }
+
     // MARK: - Emission
 
     @objc private func handle(_ recognizer: UIGestureRecognizer) {
@@ -305,6 +330,12 @@ public struct PNPanConfig: Equatable {
     /// Whether travel `(dx, dy)` fails the interaction.
     public func fails(dx: Double, dy: Double) -> Bool {
         (failX?.crossed(by: dx) ?? false) || (failY?.crossed(by: dy) ?? false)
+    }
+
+    /// Whether horizontal travel alone can activate the pan (a pan that
+    /// waits only for vertical travel never claims a sideways swipe).
+    public var claimsHorizontalTravel: Bool {
+        activeX != nil || minDistance != nil || minVelocity != nil || activeY == nil
     }
 
     /// Whether travel `(dx, dy)` at `speed` points/second activates the pan.
