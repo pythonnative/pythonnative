@@ -1,13 +1,15 @@
 """Unit tests for StyleSheet namespaces, resolve_style, theme tokens, and typed Style."""
 
 import dataclasses
-from typing import Any, Dict, List, Set, get_args
+from typing import Any, Dict, List, Set, cast, get_args
 
 import pytest
 
 from pythonnative import diagnostics
 from pythonnative.style import (
     ABSOLUTE_FILL,
+    MOTION_STYLE_KEY,
+    AnimatedStyle,
     Style,
     StyleSheet,
     resolve_style,
@@ -45,6 +47,15 @@ def test_resolve_style_list() -> None:
     override: Style = {"color": "#FFF", "bold": True}
     result = resolve_style([base, override])
     assert result == {"font_size": 16, "color": "#FFF", "bold": True}
+
+
+def test_resolve_style_keeps_animated_styles_from_resolved_entries() -> None:
+    # A component layers its own animated style over the caller's,
+    # already-resolved style; both bindings must survive.
+    caller = cast(Style, resolve_style([{"padding": 1}, AnimatedStyle(1)]))
+    result = resolve_style([caller, AnimatedStyle(2)])
+    assert result == {"padding": 1, MOTION_STYLE_KEY: (1, 2)}
+    assert resolve_style([caller, {"margin": 2}]) == {"padding": 1, "margin": 2, MOTION_STYLE_KEY: (1,)}
 
 
 def test_resolve_style_list_with_none_entries() -> None:

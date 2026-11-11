@@ -518,7 +518,12 @@ def with_repeat(
     With ``reverse``, every other run heads back to where the first began.
     Under reduced motion, a finite repeat jumps to where it would end and an
     endless one stays put; ``reduce_motion="never"`` keeps it running.
+
+    Raises:
+        ValueError: If ``times`` is less than 1.
     """
+    if times is not None and times < 1:
+        raise ValueError(f"with_repeat() needs times of at least 1, or None to repeat forever, not {times!r}")
     return _Repeat(animation, times, reverse, on_finish, reduce_motion)  # type: ignore[arg-type,return-value]
 
 

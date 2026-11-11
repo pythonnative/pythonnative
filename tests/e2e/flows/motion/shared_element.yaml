@@ -10,10 +10,10 @@
 # source, a hero left in the overlay) would not.
 #
 # The flow doesn't cover the interactive back swipe on iOS. XCTest's
-# synthesized touches don't count as screen-edge touches on the iOS 18
+# synthesized touches don't count as screen-edge touches on the
 # simulator, so neither UIKit's back swipe nor the shared-element edge
-# pan starts. On iOS 26 the full-screen content swipe pops instead,
-# which doesn't run the percent-driven transition either.
+# pan starts. On iOS 26 the full-width content swipe is off while the
+# screens share elements, so a mid-screen swipe doesn't pop either.
 appId: ${APP_ID}
 ---
 - runFlow:

@@ -724,6 +724,23 @@ void Runtime::view_updated(int64_t surface, int64_t tag, const Object& props, co
             write_prop(tag, key, found->second);
         }
     }
+    // The same goes for a running entering or layout animation's keys. Its
+    // next frame might not restore them: a delayed one holds its first value,
+    // and `write_prop` skips a value it already sent.
+    for (auto* group : {&entering_, &layout_}) {
+        auto running = group->find(tag);
+        if (running == group->end()) continue;
+        auto& applied = applied_[tag];
+        for (const auto& [key, value] : changed) {
+            if (running->second.written.count(key) == 0) continue;
+            if (values != motion_values_.end() && values->second.count(key) != 0) continue;
+            auto last = applied.find(key);
+            if (last == applied.end()) continue;
+            Value shown = last->second;
+            applied.erase(last);
+            write_prop(tag, key, shown);
+        }
+    }
     if (motion_changed) {
         flush();
         publish();

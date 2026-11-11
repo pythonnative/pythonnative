@@ -88,8 +88,9 @@ def Swipeable(
             width by default.
         friction: Divides the finger's travel; above 1 the row lags behind.
         overshoot: Let the row travel past the actions' width while dragging.
-        on_open: Called with ``"left"`` or ``"right"`` when the row settles open.
-        on_close: Called when the row settles closed.
+        on_open: Called with ``"left"`` or ``"right"`` when the row settles
+            open on that side.
+        on_close: Called when an open row settles closed.
         style: Style for the outer container.
         ref: Receives a [`SwipeableHandle`][pythonnative.SwipeableHandle].
     """
@@ -105,23 +106,34 @@ def Swipeable(
     on_close_ref = use_ref(on_close)
     on_open_ref.current = on_open
     on_close_ref.current = on_close
+    resting = use_ref("")
 
     def settled(side: str) -> None:
+        # Only a change counts: a drag that springs back where it was
+        # (closed, or the same side open) reports nothing.
+        if side == resting.current:
+            return
+        resting.current = side
         if side and on_open_ref.current is not None:
             on_open_ref.current(side)  # type: ignore[arg-type]
         elif not side and on_close_ref.current is not None:
             on_close_ref.current()
 
-    def move(side: str) -> None:
-        target = left if side == "left" else -right if side == "right" else 0.0
+    def report(side: str) -> Any:
+        """A worklet that reports ``side`` once the row gets there."""
 
-        # Report the result once the row gets there, as a drag does.
         @worklet
         def landed(finished: bool) -> None:
             if finished:
                 run_on_python(settled, side)
 
-        x.value = with_spring(target, damping=_DAMPING, stiffness=_STIFFNESS, on_finish=landed)
+        return landed
+
+    landed_left, landed_right, landed_closed = report("left"), report("right"), report("")
+
+    def move(side: str) -> None:
+        target = left if side == "left" else -right if side == "right" else 0.0
+        x.value = with_spring(target, damping=_DAMPING, stiffness=_STIFFNESS, on_finish=report(side))
 
     use_imperative_handle(ref, lambda: SwipeableHandle(move), [left, right])
 
@@ -141,16 +153,17 @@ def Swipeable(
     @worklet
     def release(event: Any) -> None:
         projected = x.value + 0.2 * event.velocity_x
-        side = ""
         target = 0.0
+        landed = landed_closed
         if left > 0 and projected > open_left:
-            side = "left"
             target = left
+            landed = landed_left
         elif right > 0 and projected < -open_right:
-            side = "right"
             target = -right
-        x.value = with_spring(target, velocity=event.velocity_x, damping=_DAMPING, stiffness=_STIFFNESS)
-        run_on_python(settled, side)
+            landed = landed_right
+        x.value = with_spring(
+            target, velocity=event.velocity_x, damping=_DAMPING, stiffness=_STIFFNESS, on_finish=landed
+        )
 
     content = use_animated_style(lambda: {"transform": [{"translate_x": x.value}]})
 

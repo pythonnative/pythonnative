@@ -45,7 +45,10 @@ channel as `on_press` et al.
 Recognition itself runs on the platform's UI thread, never in Python:
 
 - **iOS** attaches real `UIGestureRecognizer` instances, which
-  coordinate with scroll views, the back swipe, and system gestures.
+  coordinate with scroll views, the back swipe, and system gestures. On
+  iOS 26, the back swipe that starts anywhere on a pushed screen waits
+  for a `Pan` that horizontal movement can begin, so a sideways drag
+  moves the content instead of popping the screen.
 - **Android**, **the browser preview**, and **headless tests** forward
   pointer events to the renderer core's gesture engine, the same C++
   recognizers, velocity tracking, activation and failure offsets, and

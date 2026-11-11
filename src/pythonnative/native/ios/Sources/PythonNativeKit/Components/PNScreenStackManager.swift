@@ -456,16 +456,38 @@ private final class PNLogicalStack: UIView, UINavigationControllerDelegate, UIAd
         ([navigation] + modalNavigations).first { $0.view === recognizer.view }
     }
 
+    /// iOS 26's full-width back swipe pops with the shared-element
+    /// animation but can't drive it, so the screen jumps instead of
+    /// following the finger. Every touch re-decides it here (pairs come and
+    /// go as views mount): while the top screen shares elements with the
+    /// one below, only the edge pan pops it. Otherwise it follows UIKit's
+    /// edge swipe, so a guarded screen or `gesture_enabled=False` turns
+    /// both off.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), gestureRecognizer is UIScreenEdgePanGestureRecognizer, let nav = navigation(for: gestureRecognizer),
+           let contentPop = nav.interactiveContentPopGestureRecognizer {
+            let enabled = nav.interactivePopGestureRecognizer?.isEnabled == true && !sharesElements(nav)
+            if contentPop.isEnabled != enabled { contentPop.isEnabled = enabled }
+        }
+        #endif
+        return true
+    }
+
+    /// Whether the top screen of `nav` shares elements with the one below.
+    private func sharesElements(_ nav: UINavigationController) -> Bool {
+        let stack = nav.viewControllers
+        guard stack.count > 1, let from = tag(for: stack[stack.count - 1]), let to = tag(for: stack[stack.count - 2]),
+              PNScreenOptions.animates(properties(from)) else { return false }
+        return !PNSharedElements.pairs(from: from, to: to).isEmpty
+    }
+
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard gestureRecognizer is UIScreenEdgePanGestureRecognizer, let nav = navigation(for: gestureRecognizer) else {
             return super.gestureRecognizerShouldBegin(gestureRecognizer)
         }
-        let stack = nav.viewControllers
-        guard stack.count > 1, nav.transitionCoordinator == nil, !transitioning,
-              nav.interactivePopGestureRecognizer?.isEnabled == true,
-              let from = tag(for: stack[stack.count - 1]), let to = tag(for: stack[stack.count - 2]),
-              PNScreenOptions.animates(properties(from)) else { return false }
-        return !PNSharedElements.pairs(from: from, to: to).isEmpty
+        guard nav.transitionCoordinator == nil, !transitioning, nav.interactivePopGestureRecognizer?.isEnabled == true else { return false }
+        return sharesElements(nav)
     }
 
     @objc private func sharedPop(_ pan: UIScreenEdgePanGestureRecognizer) {

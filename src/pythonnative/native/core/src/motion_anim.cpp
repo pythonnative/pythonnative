@@ -643,6 +643,11 @@ std::unique_ptr<Animation> make_animation(const MValue& descriptor, std::string&
             error = "with_repeat() needs an animation";
             return nullptr;
         }
+        const MValue* times = descriptor.find("times");
+        if (times != nullptr && times->is_number() && times->as_double() < 1) {
+            error = "with_repeat() needs times of at least 1, or None to repeat forever";
+            return nullptr;
+        }
         return std::make_unique<Repeat>(descriptor);
     }
     error = "unknown animation " + kind;

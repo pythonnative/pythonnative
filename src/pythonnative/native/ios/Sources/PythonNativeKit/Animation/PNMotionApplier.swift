@@ -105,9 +105,11 @@ struct PNMotionTiming {
         switch name {
         case "linear": points = (0, 0, 1, 1)
         case "ease", "ease_in": points = (0.42, 0, 1, 1)
+        // A bounce isn't a cubic bezier, so UIKit's animators get ease-out.
         case "ease_out", "bounce": points = (0, 0, 0.58, 1)
-        case "quad": points = (0.11, 0, 0.5, 0)
-        case "cubic": points = (0.32, 0, 0.67, 0)
+        // The core's exact beziers for t² and t³.
+        case "quad": points = (1.0 / 3.0, 0, 2.0 / 3.0, 1.0 / 3.0)
+        case "cubic": points = (1.0 / 3.0, 0, 2.0 / 3.0, 0)
         default: points = (0.42, 0, 0.58, 1)
         }
         return .bezier(CGPoint(x: points.0, y: points.1), CGPoint(x: points.2, y: points.3))

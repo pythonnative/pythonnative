@@ -63,6 +63,17 @@ final class PNGestureTests: XCTestCase {
         XCTAssertEqual(PNGestureCoordinator.swipeDirection("any"), [.left, .right, .up, .down])
     }
 
+    func testOnlyPansThatSidewaysTravelCanBeginClaimItFromTheBackSwipe() {
+        // A Swipeable row and a bare pan claim a sideways swipe; a sheet's
+        // vertical-only pan leaves it to iOS 26's back swipe.
+        XCTAssertTrue(PNPanConfig(["active_offset_x": [-10, 10], "fail_offset_y": [-10, 10]]).claimsHorizontalTravel)
+        XCTAssertTrue(PNPanConfig([:]).claimsHorizontalTravel)
+        XCTAssertTrue(PNPanConfig(["active_offset_y": [-6, 6], "min_distance": 20]).claimsHorizontalTravel)
+        XCTAssertFalse(PNPanConfig(["active_offset_y": [-6, 6]]).claimsHorizontalTravel)
+        let pan = PNPanGestureRecognizer(config: PNPanConfig([:]))
+        XCTAssertFalse(PNGestureCoordinator.isContentPop(pan, above: UIView()))
+    }
+
     func testAnyDirectionSwipeInstallsOneRecognizerPerDirection() {
         let manager = PNViewManager()
         let view = manager.createView(tag: 3, props: [

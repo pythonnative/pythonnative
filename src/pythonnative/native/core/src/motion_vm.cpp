@@ -1180,6 +1180,10 @@ bool VM::intrinsic(int32_t id, Seq& positional, Map& keywords, MValue& result, W
                   1, 1, positional, keywords, args, error)) {
             return false;
         }
+        if (args[1].is_number() && args[1].as_double() < 1) {
+            error = {"ValueError", "with_repeat() needs times of at least 1, or None to repeat forever"};
+            return false;
+        }
         result = animation("repeat", {{"animation", args[0]}, {"times", args[1]}, {"reverse", args[2]},
                                       {"on_finish", args[3]}, {"reduce_motion", args[4]}});
         return true;

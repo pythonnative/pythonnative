@@ -66,7 +66,8 @@ class MotionRuntime:
         self._futures: Dict[int, asyncio.Future[bool]] = {}
         self._callbacks: Dict[int, Callable[..., Any]] = {}
         self._callback_refs: Counter[int] = Counter()
-        self._callback_slots: Dict[Tuple[int, int, int], int] = {}
+        # Callback ids by (target, binding), in the order a binding registers them.
+        self._callback_slots: Dict[Tuple[int, int], List[int]] = {}
         self._callback_by_function: Dict[int, int] = {}
         self._callback_ids = itertools.count(1)
         self._binding_callbacks: Dict[Tuple[int, int], List[int]] = {}
@@ -163,11 +164,13 @@ class MotionRuntime:
             if slot is not None:
                 # Stable per binding and position, so a callback recreated on
                 # every render doesn't reinstall the worklet.
-                key = (slot[0], slot[1], next(counter))
-                ident = self._callback_slots.get(key)
-                if ident is None:
+                idents = self._callback_slots.setdefault(slot, [])
+                position = next(counter)
+                if position < len(idents):
+                    ident = idents[position]
+                else:
                     ident = next(self._callback_ids)
-                    self._callback_slots[key] = ident
+                    idents.append(ident)
             else:
                 ident = self._callback_by_function.get(id(fn), 0)
                 if self._callbacks.get(ident) is not fn:
@@ -342,6 +345,7 @@ class MotionRuntime:
         if target is None or binding not in target.bindings:
             return
         del target.bindings[binding]
+        self._callback_slots.pop((id(target), binding), None)
         self._settle_callbacks((id(target), binding), [])
         self.queue(target, {"op": "release", "bindings": [binding]})
 

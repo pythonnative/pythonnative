@@ -42,6 +42,7 @@ from typing import (
     TypedDict,
     Union,
     Unpack,
+    cast,
     get_args,
 )
 
@@ -708,7 +709,12 @@ def resolve_style(value: StyleProp) -> Dict[str, Any]:
             if isinstance(entry, AnimatedStyle):
                 animated += (entry.binding,)
             elif entry:
+                # An entry may already be resolved (a component layering
+                # its own animated style over the caller's), so carry its
+                # bindings along instead of letting the last one win.
+                animated += tuple(cast(Dict[str, Any], entry).get(MOTION_STYLE_KEY, ()))
                 result.update(entry)
+        result.pop(MOTION_STYLE_KEY, None)
         if animated:
             result[MOTION_STYLE_KEY] = animated
     if result.keys() & _INSET_SHORTHANDS.keys():

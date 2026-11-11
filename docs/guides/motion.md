@@ -343,7 +343,7 @@ pn.with_repeat(pn.with_timing(360, duration=1000, easing=pn.Easing.linear), time
 | [`with_decay(*, velocity, deceleration=0.998, clamp=None, rubber_band_factor=0.6)`][pythonnative.with_decay] | Coasts from the current value at `velocity` until it stops; with `clamp=(lower, upper)`, it rubber-bands back from a bound it crosses, or stops at it when `rubber_band_factor` is 0 |
 | [`with_delay(delay_ms, animation, *, reduce_motion="system")`][pythonnative.with_delay] | Starts `animation` after a delay |
 | [`with_sequence(*animations)`][pythonnative.with_sequence] | Runs animations one after another, each from where the last ended |
-| [`with_repeat(animation, *, times=None, reverse=False, reduce_motion="system")`][pythonnative.with_repeat] | Repeats `times` times, or forever when `times` is `None`; with `reverse`, every other run heads back |
+| [`with_repeat(animation, *, times=None, reverse=False, reduce_motion="system")`][pythonnative.with_repeat] | Repeats `times` times (at least 1), or forever when `times` is `None`; with `reverse`, every other run heads back |
 
 `with_timing` and `with_spring` animate numbers and colors; the other
 drivers animate numbers. Velocities are in units per second, so a
@@ -396,7 +396,10 @@ way there and in Python:
 | `Easing.custom(fn)` | Any `progress -> eased` Python function, sampled at 64 points that the core interpolates |
 
 A name such as `"ease_out"` works wherever a curve does, and a
-misspelled name raises `ValueError`.
+misspelled name raises `ValueError`. Where UIKit runs the animation
+itself (a list item's insert and remove transitions and a shared-element
+flight on iOS), `bounce` isn't a Bézier it can take, so it plays as
+`ease_out`.
 
 ### Reduce motion
 
@@ -821,8 +824,9 @@ the flight: `duration` and `easing` for a timed flight, or `spring`, and
 the source). Without one, the flight matches the platform's push.
 
 - **iOS** recreates the stack's slide in a custom transition, and the
-  back swipe drives the flight interactively; a canceled swipe flies
-  the element back.
+  back swipe from the screen's edge drives the flight interactively; a
+  canceled swipe flies the element back. On iOS 26, a back swipe that
+  starts mid-screen doesn't pop a screen with shared elements.
 - **Android** times the fragment transition to match and flies elements
   in the stack container's overlay. Transitions aren't interactive.
 - **The browser preview** aligns its screen transition with the same
@@ -904,7 +908,9 @@ release, the row opens when it's past `threshold` (half the actions'
 width by default), counting where the release velocity would carry it,
 and springs closed otherwise. `friction` above 1 makes the row lag
 behind the finger, and `overshoot` lets it travel past the actions while
-dragging. `on_open` receives `"left"` or `"right"`, and the
+dragging. Once the row settles somewhere new, `on_open` receives `"left"`
+or `"right"`, or `on_close` runs; a drag that springs back where it
+started reports nothing. The
 [`SwipeableHandle`][pythonnative.SwipeableHandle] in `ref` has
 `open_left()`, `open_right()`, and `close()`.
 

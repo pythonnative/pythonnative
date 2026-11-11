@@ -154,17 +154,23 @@ def BottomSheet(
         elif on_change_ref.current is not None:
             on_change_ref.current(position)
 
-    def snap_to(position: int) -> None:
-        set_current(position)
+    def report(position: int) -> Any:
+        """A worklet that reports ``position`` once the sheet gets there."""
 
-        # Report the detent once the sheet gets there, as a drag does.
         @worklet
         def landed(finished: bool) -> None:
             if finished:
                 run_on_python(settled, position)
 
+        return landed
+
+    landings = tuple(report(i) for i in range(len(offsets)))
+    landed_closed = report(-1)
+
+    def snap_to(position: int) -> None:
+        set_current(position)
         translate.value = with_spring(
-            offset_for(position), damping=_SPRING_DAMPING, stiffness=_SPRING_STIFFNESS, on_finish=landed
+            offset_for(position), damping=_SPRING_DAMPING, stiffness=_SPRING_STIFFNESS, on_finish=report(position)
         )
 
     def follow_index() -> None:
@@ -197,14 +203,18 @@ def BottomSheet(
         target = snap_point(translate.value, event.velocity_y, stops)
         if target >= tallest:
             target = closed
-        translate.value = with_spring(
-            target, velocity=event.velocity_y, damping=_SPRING_DAMPING, stiffness=_SPRING_STIFFNESS
-        )
         position = -1
+        landed = landed_closed
         for i in range(len(offsets)):
             if offsets[i] == target:
                 position = i
-        run_on_python(settled, position)
+                landed = landings[i]
+        translate.value = with_spring(
+            target, velocity=event.velocity_y, damping=_SPRING_DAMPING, stiffness=_SPRING_STIFFNESS, on_finish=landed
+        )
+        # Track the target now (the backdrop stops catching taps as soon as
+        # the sheet heads closed); the callbacks wait until it gets there.
+        run_on_python(set_current, position)
 
     sheet_motion = use_animated_style(lambda: {"transform": [{"translate_y": translate.value}]})
     dim = use_animated_style(

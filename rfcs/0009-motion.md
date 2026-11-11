@@ -386,7 +386,7 @@ pn.with_decay(*, velocity, deceleration=0.998, clamp=None, rubber_band_factor=0.
 pn.with_delay(delay_ms, animation, *, reduce_motion="system")
 pn.with_sequence(*animations)
 pn.with_repeat(animation, *, times=None, reverse=False, reduce_motion="system",
-               on_finish=None)  # None repeats forever
+               on_finish=None)  # None repeats forever; times < 1 raises
 ```
 
 These are frozen dataclasses. They're built in Python and sent with a
@@ -641,6 +641,10 @@ own transition the same way:
   elements in the transition context's container view. An edge pan that
   starts only when pairs exist drives a pop through a
   `UIPercentDrivenInteractiveTransition`; canceling flies elements back.
+  iOS 26's full-width back swipe can only drive UIKit's own animation, so
+  it's turned off while the top screen shares elements with the one below,
+  and the edge pan pops it alone. Elsewhere that swipe waits for any `Pan`
+  that horizontal travel can begin, as it does for a scroll view.
 - **Android** gives both fragments' animations the flight's duration and
   curve, and flies elements in the stack container's `ViewGroupOverlay`.
   Transitions aren't interactive (see "Non-goals").
@@ -675,12 +679,15 @@ pn.BottomSheet(
   `close`). With `handle=True` (the default) the sheet drags by its grab
   handle, so content inside scrolls normally; without a handle the whole
   sheet drags. Handing a drag over between a scrolled `ScrollView` and the
-  sheet isn't part of this RFC.
+  sheet isn't part of this RFC. `on_change` and `on_close` run once the
+  sheet's spring settles, after a drag as after a `snap_to`.
 - **`Swipeable`** reveals `left_actions` and `right_actions` behind a row,
   with `threshold`, `friction`, `overshoot`, `on_open(side)`, and
-  `on_close`. Its handle is `SwipeableHandle` (`open_left`, `open_right`,
-  `close`). It uses a `Pan` with horizontal activation and vertical
-  failure offsets, so it works inside a vertical list.
+  `on_close`. Both run once the row settles somewhere new, so a drag that
+  springs back where it started reports nothing. Its handle is
+  `SwipeableHandle` (`open_left`, `open_right`, `close`). It uses a `Pan`
+  with horizontal activation and vertical failure offsets, so it works
+  inside a vertical list.
 - **`DrawerNavigator`** keeps its menu mounted, slides it with a spring,
   fades a backdrop, and opens with a swipe from the edge
   (`swipe_edge_width`, `swipe_enabled`, `drawer_type="front"` or `"slide"`).

@@ -267,6 +267,14 @@ def test_repeat_and_delay_descriptors_carry_reduce_motion() -> None:
     assert default.__pn_wire__()["reduce_motion"] == "system"
 
 
+@pytest.mark.parametrize("times", [0, -1, 0.5])
+def test_repeat_needs_at_least_one_run(times: float) -> None:
+    import pythonnative as pn
+
+    # Python and the core both refuse a count below 1, rather than looping forever.
+    same(make("def f(x):\n    return pn.with_repeat(pn.with_timing(1), times=x)\n", {"pn": pn}), times)
+
+
 _VALID_PROGRAM: Dict[str, Any] = {
     "name": "f",
     "file": "f.py",

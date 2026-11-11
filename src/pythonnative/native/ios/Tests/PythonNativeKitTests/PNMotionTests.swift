@@ -379,6 +379,9 @@ final class PNMotionTests: XCTestCase {
         let fallback = PNMotionTiming(nil)
         XCTAssertEqual(fallback.duration, 0.35, accuracy: 1e-9)
         XCTAssertEqual(PNMotionTiming(["easing": "linear"]).curve, .bezier(.zero, CGPoint(x: 1, y: 1)))
+        // The core's exact beziers for t² and t³.
+        XCTAssertEqual(PNMotionTiming(["easing": "quad"]).curve, .bezier(CGPoint(x: 1.0 / 3.0, y: 0), CGPoint(x: 2.0 / 3.0, y: 1.0 / 3.0)))
+        XCTAssertEqual(PNMotionTiming(["easing": "cubic"]).curve, .bezier(CGPoint(x: 1.0 / 3.0, y: 0), CGPoint(x: 2.0 / 3.0, y: 0)))
         XCTAssertEqual(PNSharedElements.parse("not json").count, 0)
     }
 

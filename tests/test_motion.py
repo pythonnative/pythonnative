@@ -290,6 +290,36 @@ def test_entering_exiting_and_layout_presets(pn_clock: FakeClock) -> None:
     assert tree.presented_frame(a_tag)[1] == 0
 
 
+def test_a_commit_during_a_delayed_entering_keeps_its_first_frame(pn_clock: FakeClock) -> None:
+    """A re-render that sets a key the entering animation holds puts the held value back."""
+
+    @pn.component
+    def Items(names: List[str], opacity: float) -> pn.Node:
+        return pn.Column(
+            *(
+                pn.View(
+                    style={"height": 20, "opacity": opacity},
+                    entering=FadeIn(duration=200, delay=500),
+                    test_id=name,
+                ).with_key(name)
+                for name in names
+            )
+        )
+
+    tree = render(Items(["a"], 1.0))
+    tree.rerender(Items(["a", "b"], 1.0))
+    b = tree.get_by_test_id("b").tag
+    pn_clock.advance(0.1)
+    tree.settle()
+    before = len(tree.backend.animated)
+    # On a device the commit sets the view's opacity to 0.9 directly, so the
+    # core has to send the held 0 again rather than wait for the delay to end.
+    tree.rerender(Items(["a", "b"], 0.9))
+    assert (b, "opacity", 0.0) in tree.backend.animated[before:]
+    settle_animations(tree, pn_clock)
+    assert tree.presented_style(b)["opacity"] == 0.9
+
+
 def test_keyframes_and_slide_presets(pn_clock: FakeClock) -> None:
     pop = Keyframes(
         {0.0: {"opacity": 0, "transform": [{"scale": 0.5}]}, 1.0: {"opacity": 1, "transform": [{"scale": 1}]}}
@@ -383,9 +413,11 @@ def test_bottom_sheet_snaps_by_position_and_velocity(pn_clock: FakeClock) -> Non
     assert surface is not None
     assert tree.presented_style(surface)["transform"] == [{"translate_y": 200.0}]
     tree.drag(handle, dy=-150, duration=0.3)
+    assert changes == []  # reported once it settles, not at release
     settle_animations(tree, pn_clock)
     assert changes == [1] and tree.presented_style(surface)["transform"] == [{"translate_y": 0}]
     tree.drag(handle, dy=500, duration=0.1)
+    assert closed == []
     settle_animations(tree, pn_clock)
     assert closed == [True]
     tree.act(lambda: sheet.current.snap_to(0))
@@ -410,10 +442,15 @@ def test_swipeable_opens_past_its_threshold_and_closes(pn_clock: FakeClock) -> N
     assert row is not None
     tree.drag(row, dx=-20, duration=0.5)  # slow and short: springs back
     settle_animations(tree, pn_clock)
+    assert events == []  # it was closed and stayed closed
     tree.drag(row, dx=-70, duration=0.2)
+    assert events == []  # reported once it settles, not at release
     settle_animations(tree, pn_clock)
-    assert events == ["closed", "right"]
+    assert events == ["right"]
     assert tree.presented_style(row)["transform"] == [{"translate_x": -80.0}]
+    tree.drag(row, dx=70, duration=0.2)
+    settle_animations(tree, pn_clock)
+    assert events == ["right", "closed"]
 
 
 def test_drawer_opens_with_an_edge_swipe(pn_clock: FakeClock) -> None:
@@ -470,6 +507,33 @@ def test_run_on_python_calls_in_flight_survive_a_rerender(pn_clock: FakeClock) -
     tree.settle()
     assert seen == ["a:right"]
     assert runtime is not None
+
+
+def test_unmounted_bindings_release_their_callback_slots(pn_clock: FakeClock) -> None:
+    """Rows that mount and unmount don't leave callback ids behind."""
+    from pythonnative.motion.runtime import runtime
+
+    @pn.component
+    def Row() -> pn.Node:
+        level = pn.use_shared_value(0.0)
+
+        def crossed(high: bool) -> None:
+            pass
+
+        pn.use_animated_reaction(lambda: level.value > 1, lambda high, _before: pn.run_on_python(crossed, high))
+        return pn.View()
+
+    @pn.component
+    def Rows(count: int) -> pn.Node:
+        return pn.View(*[Row().with_key(str(i)) for i in range(count)])
+
+    before = len(runtime._callback_slots)
+    tree = render(Rows(5))
+    assert len(runtime._callback_slots) == before + 5
+    for count in (0, 5, 0, 5, 0):
+        tree.rerender(Rows(count))
+        tree.settle()
+    assert len(runtime._callback_slots) == before
 
 
 def test_handles_report_like_drags_do(pn_clock: FakeClock) -> None:
