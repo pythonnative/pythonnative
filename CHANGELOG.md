@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.54.0 (2026-11-11)
+
+### Features
+
+- **motion**: Add UI-thread worklets and layout animations
+  ([#120](https://github.com/pythonnative/pythonnative/pull/120),
+  [`d4caedf`](https://github.com/pythonnative/pythonnative/commit/d4caedf437b64a674b3de0896f3e110c4a569aa6))
+
+
 ## v0.53.1 (2026-11-04)
 
 ### Bug Fixes
