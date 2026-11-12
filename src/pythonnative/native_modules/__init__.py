@@ -91,20 +91,9 @@ Reactive state (with hooks):
   [`use_net_info`][pythonnative.use_net_info]: connectivity.
 """
 
-from .accessibility_info import AccessibilityEvent, AccessibilityInfo, use_reduce_motion, use_screen_reader_enabled
-from .app_state import AppState, use_app_state
-from .battery import Battery
-from .clipboard import Clipboard
-from .device import Device, DeviceInfo
-from .dimensions import Dimensions, DimensionsEvent, PixelRatio
-from .file_system import FileSystem
-from .haptics import Haptics
-from .images import Images, ImageSize
-from .keyboard import Keyboard, KeyboardEvent
-from .linking import Linking
-from .localization import Locale, Localization, use_locales
-from .net_info import NetInfo, use_net_info
-from .permissions import Permissions
+import importlib
+from typing import TYPE_CHECKING, Any
+
 from .registry import (
     BridgeModule,
     NativeModule,
@@ -113,8 +102,24 @@ from .registry import (
     native_module,
     register_python_module,
 )
-from .secure_store import SecureStore
-from .share import Share
+
+if TYPE_CHECKING:
+    from .accessibility_info import AccessibilityEvent, AccessibilityInfo, use_reduce_motion, use_screen_reader_enabled
+    from .app_state import AppState, use_app_state
+    from .battery import Battery
+    from .clipboard import Clipboard
+    from .device import Device, DeviceInfo
+    from .dimensions import Dimensions, DimensionsEvent, PixelRatio
+    from .file_system import FileSystem
+    from .haptics import Haptics
+    from .images import Images, ImageSize
+    from .keyboard import Keyboard, KeyboardEvent
+    from .linking import Linking
+    from .localization import Locale, Localization, use_locales
+    from .net_info import NetInfo, use_net_info
+    from .permissions import Permissions
+    from .secure_store import SecureStore
+    from .share import Share
 
 __all__ = [
     "AccessibilityEvent",
@@ -152,3 +157,41 @@ __all__ = [
     "use_reduce_motion",
     "use_screen_reader_enabled",
 ]
+
+# Facades load on first use (PEP 562), so ``import pythonnative`` doesn't pay
+# for the ones an app never touches. A native event for a facade that isn't
+# loaded yet imports it first (see ``registry.emit``), so state a facade
+# caches, such as ``AppState.current_state()``, is the same as if it had
+# loaded at startup.
+_FACADES: dict[str, tuple[str, ...]] = {
+    "accessibility_info": ("AccessibilityEvent", "AccessibilityInfo", "use_reduce_motion", "use_screen_reader_enabled"),
+    "app_state": ("AppState", "use_app_state"),
+    "battery": ("Battery",),
+    "clipboard": ("Clipboard",),
+    "device": ("Device", "DeviceInfo"),
+    "dimensions": ("Dimensions", "DimensionsEvent", "PixelRatio"),
+    "file_system": ("FileSystem",),
+    "haptics": ("Haptics",),
+    "images": ("Images", "ImageSize"),
+    "keyboard": ("Keyboard", "KeyboardEvent"),
+    "linking": ("Linking",),
+    "localization": ("Locale", "Localization", "use_locales"),
+    "net_info": ("NetInfo", "use_net_info"),
+    "permissions": ("Permissions",),
+    "secure_store": ("SecureStore",),
+    "share": ("Share",),
+}
+_LAZY = {name: module for module, names in _FACADES.items() for name in names}
+
+
+def __getattr__(name: str) -> Any:
+    module = _LAZY.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(importlib.import_module(f".{module}", __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | _LAZY.keys())

@@ -64,28 +64,38 @@ RenderFn = Callable[P, Union[Node, Awaitable[Node]]]
 """A component body: returns a [`Node`][pythonnative.element.Node], or awaits one when ``async def``."""
 
 
-def _hook_signature(fn: Callable[..., Any]) -> Optional[tuple[str, ...]]:
-    """Fast Refresh's hook fingerprint of ``fn``, or ``None`` without the refresh module.
+def _refresh_module() -> Any:
+    """``pythonnative.refresh``, or ``None`` when the bundle omits it.
 
     Release bundles omit ``pythonnative.refresh`` (and ship bytecode, which
     has no source to fingerprint), so the import is lazy, optional, and
     attempted once.
     """
-    global _refresh_signature
-    if getattr(fn, "__module__", "").startswith("pythonnative."):
-        # Framework components never change under Fast Refresh.
-        return None
-    if _refresh_signature is None:
+    global _refresh
+    if _refresh is None:
         try:
-            from .refresh import hook_signature
+            from . import refresh
         except ImportError:
-            _refresh_signature = False
+            _refresh = False
         else:
-            _refresh_signature = hook_signature
-    return _refresh_signature(fn) if callable(_refresh_signature) else None
+            _refresh = refresh
+    return _refresh or None
 
 
-_refresh_signature: Union[None, bool, Callable[[Callable[..., Any]], Optional[tuple[str, ...]]]] = None
+_refresh: Any = None
+
+
+def _refresh_source(fn: Callable[..., Any]) -> Any:
+    """Keep ``fn``'s module source for Fast Refresh, without parsing it.
+
+    Returns the record ``refresh.hook_signature`` reads later, or ``None``
+    for framework components (which never change under Fast Refresh) and
+    when the refresh module is absent.
+    """
+    if getattr(fn, "__module__", "").startswith("pythonnative."):
+        return None
+    refresh = _refresh_module()
+    return refresh.remember(fn) if refresh is not None else None
 
 
 class _Unplanned(Exception):
@@ -199,7 +209,8 @@ class Component(Generic[P]):
         "_plan",
         "_keyed_builtin",
         "_is_async",
-        "refresh_signature",
+        "_refresh_source",
+        "_refresh_signature",
         "__wrapped__",
         # ``functools.update_wrapper`` copies ``__module__`` and
         # ``__qualname__`` from the render function so Fast Refresh can
@@ -222,7 +233,8 @@ class Component(Generic[P]):
                     f"{getattr(fn, '__qualname__', fn)!r} declares a 'key' parameter, but 'key' names an element's "
                     "identity, not a prop. Rename the parameter; key a rendered element with .with_key(...)."
                 )
-        self.refresh_signature = _hook_signature(fn)
+        self._refresh_source = _refresh_source(fn)
+        self._refresh_signature: Optional[tuple[str, ...]] = None
         self.fn = fn
         self.display_name: str = display_name or str(getattr(fn, "__name__", "Component"))
         self.memoized = False
@@ -237,6 +249,22 @@ class Component(Generic[P]):
         self._is_async = inspect.iscoroutinefunction(fn)
         self.__wrapped__ = fn
         functools.update_wrapper(self, fn, updated=())
+
+    @property
+    def refresh_signature(self) -> Optional[tuple[str, ...]]:
+        """Fast Refresh's fingerprint of this component's hooks, or ``None``.
+
+        Two versions of a component whose signatures are equal (and not
+        ``None``) keep their hook state across a Fast Refresh. It's computed
+        on first use, from the module's source as it was when this version
+        was defined. Framework components, and every component in a release
+        bundle, have none.
+        """
+        source = self._refresh_source
+        if source is not None:
+            self._refresh_source = None
+            self._refresh_signature = _refresh_module().hook_signature(self.fn, source)
+        return self._refresh_signature
 
     # ------------------------------------------------------------------
     # Element construction

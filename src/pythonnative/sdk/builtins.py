@@ -318,7 +318,7 @@ def derive() -> dict[str, Any]:
 
     COMPONENTS.clear()
     MODULES.clear()
-    install(vars(components))
+    install(components._factories())
     return manifest()
 
 

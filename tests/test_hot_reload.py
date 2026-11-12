@@ -512,6 +512,110 @@ def test_changed_hook_bindings_remount_instead_of_reusing_slots(
         sys.modules.pop(module_name, None)
 
 
+@pytest.mark.parametrize("attribute_call", [False, True])
+def test_hooks_from_another_module_are_compared_as_they_were_loaded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, attribute_call: bool
+) -> None:
+    """Editing a hooks module keeps state unless its hooks change, though both files are rewritten first."""
+    from pythonnative.testing import render
+
+    hooks_name, screen_name = "pn_refresh_hooks", "pn_refresh_screen"
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    for name in (hooks_name, screen_name):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+
+    def write_hooks(extra: str) -> None:
+        _time_sleep()
+        (tmp_path / f"{hooks_name}.py").write_text(
+            "import pythonnative as pn\n\n"
+            f"def use_counter():\n{extra}    count, setter = pn.use_state(0)\n    return count, setter\n",
+            encoding="utf-8",
+        )
+
+    def write_screen(comment: str) -> None:
+        _time_sleep()
+        call, imports = (
+            ("hooks.use_counter()", f"import {hooks_name} as hooks\n")
+            if attribute_call
+            else ("use_counter()", f"from {hooks_name} import use_counter\n")
+        )
+        (tmp_path / f"{screen_name}.py").write_text(
+            f"import pythonnative as pn\n{imports}# {comment}\n\n"
+            "@pn.component\ndef Counter():\n"
+            f"    count, setter = {call}\n"
+            "    return pn.Button(str(count), on_press=lambda: setter(count + 1))\n",
+            encoding="utf-8",
+        )
+
+    def reload() -> None:
+        assert ModuleReloader.reload_modules([hooks_name, screen_name]) == [hooks_name, screen_name]
+        ModuleReloader.refresh_in_place(result.reconciler, [hooks_name, screen_name])
+        result.rerender(sys.modules[screen_name].Counter())
+
+    write_hooks("")
+    write_screen("first")
+    result = render(importlib.import_module(screen_name).Counter())
+    try:
+        result.press(result.get_by_text("0"))
+        # The hook's body changes, its hooks don't: state survives.
+        write_hooks("    label = 'edited'\n")
+        write_screen("second")
+        reload()
+        assert result.get_by_text("1")
+        # A hook is inserted in the hooks module: the component remounts.
+        write_hooks("    inserted, _ = pn.use_state('new slot')\n")
+        write_screen("third")
+        reload()
+        assert result.get_by_text("0")
+    finally:
+        result.unmount()
+        for name in (hooks_name, screen_name):
+            sys.modules.pop(name, None)
+
+
+def _time_sleep() -> None:
+    # File modification times must move for linecache to see a rewrite.
+    import time
+
+    time.sleep(0.01)
+
+
+def test_components_record_their_source_without_parsing_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import ast
+
+    from pythonnative import refresh
+
+    module_name = "pn_refresh_lazy"
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    monkeypatch.delitem(sys.modules, module_name, raising=False)
+    source = tmp_path / f"{module_name}.py"
+    source.write_text(
+        "import pythonnative as pn\n\n@pn.component\ndef Counter():\n"
+        "    count, setter = pn.use_state(0)\n    return pn.Text(str(count))\n",
+        encoding="utf-8",
+    )
+    expected = ("use_state:" + ast.dump(ast.parse("count, setter = x").body[0].targets[0]),)  # type: ignore[attr-defined]
+    parses: list[str] = []
+    original = ast.parse
+
+    def counted(*args: Any, **kwargs: Any) -> Any:
+        parses.append("parse")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(refresh.ast, "parse", counted)
+    try:
+        module = importlib.import_module(module_name)
+        assert parses == []
+        # The file changes on disk before Fast Refresh asks; the signature still reads the loaded source.
+        source.write_text("# replaced\n", encoding="utf-8")
+        assert module.Counter.refresh_signature == expected
+        assert parses == ["parse"]
+    finally:
+        sys.modules.pop(module_name, None)
+
+
 # ======================================================================
 # apply_reload: when a reload preserves state and when it remounts
 # ======================================================================

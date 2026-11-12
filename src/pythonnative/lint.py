@@ -2,7 +2,7 @@
 
 The linter parses Python source with the standard library's `ast` module,
 so it has no dependencies and never imports or runs the code it checks.
-It reports four rules for hooks:
+It reports five rules for components and hooks:
 
 - ``PN101``: a hook is called conditionally: inside an ``if``, a loop, a
   ``try``, a ``match``, a comprehension, a lambda, a conditional
@@ -14,6 +14,11 @@ It reports four rules for hooks:
   literal dependency list leaves out.
 - ``PN104``: ``key=`` is passed to a module-level ``@component``; use
   ``.with_key(...)`` on the returned element instead.
+- ``PN105``: a component body assigns a module-level name (``global``) or
+  mutates a module-level container (``CACHE.append(x)``,
+  ``CACHE[k] = v``, ``del CACHE[k]``). A render can run more than once,
+  so the change would repeat. Nested functions, such as event handlers
+  and effects, are exempt.
 
 And three rules for worklets (RFC 0009):
 
@@ -61,6 +66,7 @@ CODES: dict[str, str] = {
     "PN102": "hook called outside a component or custom hook",
     "PN103": "dependency list is missing a name the callback reads",
     "PN104": "key= passed to a user component",
+    "PN105": "a component body assigns or mutates module-level state",
     "PN201": "a worklet uses Python the UI thread can't run",
     "PN202": "a worklet-only API receives a function that isn't marked @worklet",
     "PN203": "a shared value is read during render",
@@ -148,11 +154,117 @@ def lint_source(source: str, filename: str) -> list[Finding]:
 
     checker = _Checker(filename, _module_components(tree), _wrapped_functions(tree))
     checker.visit(tree)
-    findings = checker.findings + _motion_findings(tree, filename)
+    findings = checker.findings + _module_state_findings(tree, filename) + _motion_findings(tree, filename)
     ignores = _ignore_comments(source)
     kept = [finding for finding in findings if not _is_ignored(finding, ignores)]
     # Stable sort: findings on one position keep the order they were found in.
     return sorted(dict.fromkeys(kept), key=lambda f: (f.line, f.col))
+
+
+_MUTATING_METHODS = frozenset(
+    {
+        "add",
+        "append",
+        "appendleft",
+        "clear",
+        "difference_update",
+        "discard",
+        "extend",
+        "extendleft",
+        "insert",
+        "intersection_update",
+        "pop",
+        "popitem",
+        "popleft",
+        "remove",
+        "reverse",
+        "setdefault",
+        "sort",
+        "symmetric_difference_update",
+        "update",
+    }
+)
+"""Methods that change a ``list``, ``dict``, ``set``, or ``deque`` in place."""
+
+
+def _module_state_findings(tree: ast.Module, filename: str) -> list[Finding]:
+    """PN105: a component body assigns or mutates module-level state."""
+    module_names = {
+        node.id for node in _walk_scope(tree.body) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    }
+    wrapped = _wrapped_functions(tree)
+    findings: list[Finding] = []
+
+    def visit(node: ast.AST, enclosing: frozenset[str]) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if _is_component(child) or child.name in wrapped:
+                    findings.extend(_component_state_writes(child, module_names - enclosing, filename))
+                # Names a function binds shadow module-level ones in the functions nested in it.
+                visit(child, enclosing | _bindings(child).names)
+            else:
+                visit(child, enclosing)
+
+    visit(tree, frozenset())
+    return findings
+
+
+def _render_nodes(stmts: Iterable[ast.AST]) -> Iterator[ast.AST]:
+    """Nodes that run while a component renders: its body and comprehensions, not nested functions."""
+    stack = list(stmts)[::-1]
+    while stack:
+        node = stack.pop()
+        yield node
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+            continue
+        stack.extend(list(ast.iter_child_nodes(node))[::-1])
+
+
+def _subscript_root(node: ast.Subscript) -> str | None:
+    """``CACHE`` for ``CACHE[k]`` and ``CACHE[a][b]``."""
+    value: ast.expr = node.value
+    while isinstance(value, ast.Subscript):
+        value = value.value
+    return value.id if isinstance(value, ast.Name) else None
+
+
+def _component_state_writes(node: _FunctionNode, module_names: set[str], filename: str) -> list[Finding]:
+    declared_global: set[str] = set()
+    declared_nonlocal: set[str] = set()
+    for child in _walk_scope(node.body):
+        if isinstance(child, ast.Global):
+            declared_global.update(child.names)
+        elif isinstance(child, ast.Nonlocal):
+            declared_nonlocal.update(child.names)
+    shared = ((module_names - _bindings(node).names) | declared_global) - declared_nonlocal
+    if not shared:
+        return []
+    advice = "a render can run more than once, so keep it in state or a ref, or change it in an effect or event handler"
+    findings: list[Finding] = []
+
+    def report(at: ast.AST, message: str) -> None:
+        findings.append(Finding(filename, getattr(at, "lineno", 1), getattr(at, "col_offset", 0) + 1, "PN105", message))
+
+    for child in _render_nodes(node.body):
+        if isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Store, ast.Del)) and child.id in declared_global:
+            report(child, f"'{node.name}' assigns the module-level name '{child.id}' while rendering; {advice}")
+        elif isinstance(child, ast.Subscript) and isinstance(child.ctx, (ast.Store, ast.Del)):
+            root = _subscript_root(child)
+            if root in shared:
+                report(child, f"'{node.name}' changes an item of the module-level '{root}' while rendering; {advice}")
+        elif (
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Attribute)
+            and child.func.attr in _MUTATING_METHODS
+            and isinstance(child.func.value, ast.Name)
+            and child.func.value.id in shared
+        ):
+            name = child.func.value.id
+            report(
+                child,
+                f"'{node.name}' mutates the module-level '{name}' while rendering ({name}.{child.func.attr}); {advice}",
+            )
+    return findings
 
 
 _WORKLET_ONLY = frozenset({"use_animated_style", "use_derived_value", "use_animated_reaction", "use_frame_callback"})
