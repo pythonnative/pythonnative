@@ -1,9 +1,9 @@
 # RFC 0010: Runtime
 
-- Status: Draft
+- Status: Implemented
 - Author(s): Owen Carey, with Claude (Claude Code)
 - Created: 2026-11-11
-- Implemented in: (the `feat/runtime` branch, once shipped)
+- Implemented in: the `feat/runtime` pull request
 - Supersedes / Superseded by: replaces the child matching rule and the
   one-turn transition deferral from RFC 0002, and the per-attribute render
   journal from RFC 0005. Everything else in those RFCs remains implemented.
@@ -483,8 +483,11 @@ a 300-component transition is rendering), and results are recorded in
 
 ### Rollout order
 
-The work lands in one pull request, in this order, with the full suite
-passing after each step:
+The work lands in one pull request, in this order. Steps 2 and 3 landed
+as one commit, because restructuring the child lists twice would have
+meant writing the slot matching against code that was about to be
+replaced; the import, startup, and lint work (step 6) was developed in
+parallel and merged after them.
 
 1. Call-count gates and the new benchmarks, recorded against today's
    code.
@@ -526,6 +529,60 @@ passing after each step:
 - **Eager imports** of `svg`, the list components, `sdk.plugin`, and the
   native module facades from `pythonnative/__init__.py`. The names stay
   importable from `pythonnative`.
+
+## Implementation notes
+
+What changed while building it, beyond the design above:
+
+- **The commit path got the same treatment.** A re-render's calls were
+  about half reconciler and half commit. `CreateOp`, `UpdateOp`,
+  `InsertOp`, and `DestroyOp` became slotted classes;
+  `codec.build_transaction`, `to_jsonable`, `split_props`, the bridge
+  backend's acknowledgement, and `affects_layout` dispatch on exact
+  classes and skip work for plain values; and the headless mount
+  decoder (and its records) uses precompiled `struct` layouts. These are
+  Python-side only; the wire format is unchanged.
+- **Hook cursors.** `use_state`, `use_effect`, `use_memo`,
+  `use_callback`, and `use_ref` read their cursor inline, and hooks call
+  `record_hook` only in development.
+- **Element contracts.** `Element` has a `__native_schema__`, since the
+  contract derivation used to treat it as a dataclass for
+  `ScrollView(refresh_control=...)`.
+- **The call-count gates run in a fresh interpreter**, because state that
+  earlier tests leave behind (registered plugins and contracts) moved
+  the mount count by a third.
+- **Startup timeline.** The log line also reports `bridge` and `total`.
+- **Lint.** The rule is `PN105`. Its only hits in the repository were the
+  E2E memo demo, which counts renders on purpose.
+
+## Results
+
+Host measurements are from the same Intel Core i9-9980HK Mac, alternating
+`main` (`851b0080`) and this branch with the same
+`scripts/benchmark-runtime.py`, and are recorded in
+`rfcs/benchmarks/0010-runtime.json`.
+
+| Measure | Target | Before | After |
+| --- | --- | --- | --- |
+| Re-render of 300 components (`rerender_300_ms`) | 35 ms or less | 75.9 ms | 23.5 ms |
+| Mount of 300 components (`mount_300_ms`) | 75 ms or less | 98.9 ms | 52.2 ms |
+| Press queued during a 300-component transition, to its commit (`transition_preempt_ms`) | (new) | 125.4 ms | 13.3 ms |
+| Function calls per re-rendered component | 200 or fewer | 556 | 186 |
+| Function calls to mount the 300 components | (none) | 249,063 | 111,510 |
+| `import pythonnative` | 250 ms or less | 308 ms | 226 ms |
+| `pythonnative` modules / dataclasses at import | (none) | 67 / 53 | 46 / 24 |
+| Field Notes, interpreter ready to first screen, iOS 26.2 simulator, release | 1.0 s or less | 1.26 to 1.38 s | 0.76 to 0.91 s |
+
+The load average was about 7 to 11 for the host runs, lower than when
+the RFC's "Today" column was measured, which is why the before numbers
+are lower than that column. The simulator runs after the change were at
+a load of about 27 to 35, against about 6 before, so the startup
+improvement is understated. The startup timeline for those launches read
+`framework 380 to 449 ms, contracts 36 to 44, bridge 43 to 55, app 188
+to 228, render 96 to 110, commit 6 to 7`: importing the framework is
+still half of it. Element construction (`element_us`) went from 3.3 to
+2.2 microseconds, and the core's commit and motion frame are unchanged,
+as expected.
 
 ## Alternatives considered
 
@@ -618,14 +675,16 @@ passing after each step:
 
 ## Open questions
 
-- **Which events are discrete.** The list above follows the bridge's
-  existing split between coalesced and uncoalesced events. Text
-  selection changes are coalesced today but arguably urgent.
-- **The starvation limits.** Three preemptions and 250 ms are starting
-  values. The preemption benchmark may move them.
-- **Strict mode in the template.** Wrapping the `pn init` root in
-  `StrictMode` matches React's project templates, but doubles
-  development render cost for new users.
-- **How much import time is left to remove.** The 250 ms target assumes
-  the dataclass and lazy-loading changes land as estimated; `asyncio`
-  alone is a third of it.
+All four were settled while implementing it:
+
+- **Which events are discrete.** Every `event` and `host` message the
+  bridge doesn't coalesce. Selection changes stay continuous: they're
+  coalesced today, and a selection change while a transition renders is
+  rarely what the user is waiting on.
+- **The starvation limits.** Three preemptions and 250 ms. The
+  preemption benchmark lands its press in about 13 ms either way.
+- **Strict mode in the template.** `pn init` wraps the root in
+  `StrictMode`, as React's templates do.
+- **How much import time is left.** About 80 ms is `asyncio`, which
+  `hooks.py` imports, and about 30 ms is `sdk.schema` loading the
+  bundled contracts. Both are candidates for a later change.
