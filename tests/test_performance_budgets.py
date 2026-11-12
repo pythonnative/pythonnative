@@ -38,7 +38,9 @@ for owner, name in ((inspect, "getsource"), (typing, "get_type_hints"), (ast, "p
 dataclass_definitions = []
 process_class = dataclasses._process_class
 def counted(cls, *args, **kwargs):
-    dataclass_definitions.append(f"{cls.__module__}.{cls.__qualname__}")
+    # Only the framework's own: the standard library's count varies by version.
+    if cls.__module__.split(".")[0] == "pythonnative":
+        dataclass_definitions.append(f"{cls.__module__}.{cls.__qualname__}")
     return process_class(cls, *args, **kwargs)
 dataclasses._process_class = counted
 
