@@ -106,19 +106,22 @@ class _Record:
 
     __slots__ = ()
 
+    def _fields(self) -> Tuple[str, ...]:
+        return type(self).__slots__
+
     def _values(self) -> Tuple[Any, ...]:
-        return tuple(getattr(self, name) for name in self.__slots__)
+        return tuple(getattr(self, name) for name in self._fields())
 
     def __eq__(self, other: object) -> bool:
-        if other.__class__ is not self.__class__:
+        if not isinstance(other, _Record) or other.__class__ is not self.__class__:
             return NotImplemented
-        return self._values() == other._values()  # type: ignore[attr-defined]
+        return self._values() == other._values()
 
     def __hash__(self) -> int:
         return hash(self._values())
 
     def __repr__(self) -> str:
-        fields = ", ".join(f"{name}={getattr(self, name)!r}" for name in self.__slots__)
+        fields = ", ".join(f"{name}={getattr(self, name)!r}" for name in self._fields())
         return f"{type(self).__name__}({fields})"
 
 

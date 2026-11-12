@@ -25,7 +25,7 @@ from pythonnative.testing import render
 
 # ``import pythonnative`` in a fresh interpreter, reporting what it did.
 _PROBE = """
-import ast, inspect, json, sys, typing
+import ast, dataclasses, inspect, json, sys, typing
 
 calls = []
 for owner, name in ((inspect, "getsource"), (typing, "get_type_hints"), (ast, "parse")):
@@ -35,22 +35,48 @@ for owner, name in ((inspect, "getsource"), (typing, "get_type_hints"), (ast, "p
         return _original(*args, **kwargs)
     setattr(owner, name, spy)
 
+dataclass_definitions = []
+process_class = dataclasses._process_class
+def counted(cls, *args, **kwargs):
+    dataclass_definitions.append(f"{cls.__module__}.{cls.__qualname__}")
+    return process_class(cls, *args, **kwargs)
+dataclasses._process_class = counted
+
 import pythonnative
 
 modules = sorted(name for name in sys.modules if name.split(".")[0] == "pythonnative")
-print(json.dumps({"calls": calls, "modules": modules}))
+print(json.dumps({"calls": calls, "modules": modules, "dataclasses": dataclass_definitions}))
 """
 
 LAZY_SUBSYSTEMS = (
     "pythonnative.animated",
+    "pythonnative.components.lists",
+    "pythonnative.components.vector",
     "pythonnative.gestures",
     "pythonnative.icons",
+    "pythonnative.list_data",
+    "pythonnative.native_modules.app_state",
+    "pythonnative.native_modules.device",
+    "pythonnative.native_modules.file_system",
+    "pythonnative.native_modules.images",
+    "pythonnative.native_modules.keyboard",
     "pythonnative.navigation",
     "pythonnative.net",
+    "pythonnative.sdk.plugin",
+    "pythonnative.svg",
 )
 
-MODULE_BUDGET = 90
-"""Upper bound on ``pythonnative`` modules loaded by ``import pythonnative``."""
+MODULE_BUDGET = 48
+"""Upper bound on ``pythonnative`` modules loaded by ``import pythonnative`` (46 at RFC 0010)."""
+
+DATACLASS_BUDGET = 30
+"""Upper bound on dataclass definitions ``import pythonnative`` executes (29 at RFC 0010).
+
+Each costs an ``exec`` of generated methods, about a millisecond on a laptop.
+Framework classes that are dataclasses only for convenience are slotted
+classes instead; public records with dataclass behavior (``Theme``, the
+event records, ``Props``) stay dataclasses.
+"""
 
 
 @pytest.fixture(scope="module")
@@ -73,12 +99,39 @@ def test_import_defers_optional_subsystems(probe: Any) -> None:
     assert len(probe["modules"]) <= MODULE_BUDGET, len(probe["modules"])
 
 
+def test_import_defines_few_dataclasses(probe: Any) -> None:
+    assert len(probe["dataclasses"]) <= DATACLASS_BUDGET, probe["dataclasses"]
+
+
 def test_lazy_names_resolve_to_the_same_objects() -> None:
-    from pythonnative import navigation, net
+    from pythonnative import list_data, navigation, net, sdk, svg
+    from pythonnative.components import lists, vector
+    from pythonnative.native_modules import app_state
+    from pythonnative.sdk import plugin
 
     assert pn.StackNavigator is navigation.StackNavigator
     assert pn.fetch is net.fetch
+    assert pn.FlatList is lists.FlatList and pn.components.SectionList is lists.SectionList
+    assert pn.Svg is vector.Svg is pn.components.Svg and pn.svg is svg
+    assert pn.ListData is list_data.ListData
+    assert pn.AppState is app_state.AppState is pn.native_modules.AppState
+    assert sdk.plugin_module is plugin.plugin_module
     assert set(pn.__all__) <= set(dir(pn))
+    for module in (pn.components, pn.native_modules, sdk):
+        assert set(module.__all__) <= set(dir(module)), module.__name__
+        for name in module.__all__:
+            getattr(module, name)
+
+
+def test_native_events_load_the_facade_that_keeps_their_state() -> None:
+    script = (
+        "import sys, pythonnative as pn\n"
+        "from pythonnative.native_modules.registry import emit\n"
+        "assert 'pythonnative.native_modules.app_state' not in sys.modules\n"
+        "emit('AppState', 'change', 'background')\n"
+        "assert pn.AppState.current_state() == 'background', pn.AppState.current_state()\n"
+    )
+    subprocess.run([sys.executable, "-c", script], check=True)
 
 
 def test_generated_contracts_match_the_factories() -> None:

@@ -86,6 +86,14 @@ Example:
 
 __version__ = "0.54.0"
 
+# ruff: noqa: E402 (the clock below starts before the imports it measures)
+
+import time as _time
+
+# The startup timeline's ``framework`` phase runs from here to the end of this
+# file: ``import pythonnative`` itself, not the interpreter's startup before it.
+_import_started = _time.perf_counter()
+
 import importlib
 from typing import TYPE_CHECKING, Any
 
@@ -641,3 +649,10 @@ def __getattr__(name: str) -> Any:
 
 def __dir__() -> list[str]:
     return sorted(set(globals()) | _LAZY.keys() | _LAZY_MODULES)
+
+
+from . import diagnostics as _diagnostics
+
+_diagnostics.begin_startup(_import_started)
+_diagnostics.mark_startup("framework")
+del _diagnostics, _import_started, _time
