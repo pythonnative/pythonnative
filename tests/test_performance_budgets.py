@@ -157,3 +157,77 @@ def test_release_renders_never_validate_props_in_python(monkeypatch: pytest.Monk
     finally:
         diagnostics.set_dev_mode(True)
     assert validated == []
+
+
+# ----------------------------------------------------------------------
+# Call-count gates (RFC 0010)
+# ----------------------------------------------------------------------
+#
+# The benchmark tree from ``scripts/benchmark-runtime.py``: 300 keyed
+# components whose props all change. Python and built-in function calls
+# are counted with ``sys.setprofile``, which is deterministic where a
+# clock isn't. Each budget is the shipped count plus 15%.
+
+RERENDER_CALL_BUDGET = 191_779
+"""Function calls to re-render the 300-component grid in release mode."""
+
+MOUNT_CALL_BUDGET = 286_422
+"""Function calls to mount the 300-component grid in release mode."""
+
+
+@pn.component
+def _BenchCell(label: str, n: int) -> pn.Node:
+    value, _set_value = pn.use_state(0)
+    pn.use_effect(lambda: None, [n])
+    return pn.Row(pn.Text(label), pn.Text(str(n + value)), style=pn.style(padding=4))
+
+
+@pn.component
+def _BenchGrid(n: int) -> pn.Node:
+    return pn.Column(*(_BenchCell(f"cell {i}", n).with_key(str(i)) for i in range(300)))
+
+
+def _count_calls(action: Any) -> int:
+    """Count the Python and built-in calls ``action`` makes on this thread."""
+    import gc
+
+    calls = 0
+
+    def profile(frame: Any, event: str, arg: Any) -> None:
+        nonlocal calls
+        if event == "call" or event == "c_call":
+            calls += 1
+
+    gc.disable()
+    sys.setprofile(profile)
+    try:
+        action()
+    finally:
+        sys.setprofile(None)
+        gc.enable()
+    return calls
+
+
+@pytest.fixture
+def release_mode() -> Any:
+    diagnostics.set_dev_mode(False)
+    try:
+        yield
+    finally:
+        diagnostics.set_dev_mode(True)
+
+
+def test_rerender_call_budget(release_mode: None) -> None:
+    tree = render(_BenchGrid(0), viewport=None)
+    tree.rerender(_BenchGrid(1))
+    calls = _count_calls(lambda: tree.rerender(_BenchGrid(2)))
+    tree.unmount()
+    assert calls <= RERENDER_CALL_BUDGET, calls
+
+
+def test_mount_call_budget(release_mode: None) -> None:
+    trees: List[Any] = []
+    render(_BenchGrid(0), viewport=None).unmount()
+    calls = _count_calls(lambda: trees.append(render(_BenchGrid(0), viewport=None)))
+    trees[0].unmount()
+    assert calls <= MOUNT_CALL_BUDGET, calls
