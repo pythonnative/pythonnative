@@ -24,14 +24,14 @@ for a fallback subtree when something goes wrong beneath them:
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .. import diagnostics
 from ..element import Element
 from ..hooks import HookState
 from ..mutations import UNSET, Mutation, UpdateOp
 from ..suspense import Suspend
-from .vnode import VNode, normalize_children
+from .vnode import BOUNDARY, SUSPENSE_KIND, VNode, child_slots, touch
 
 if TYPE_CHECKING:
     from ..scheduler import TransitionQueue
@@ -52,10 +52,18 @@ class BoundaryMixin:
     transitions: "TransitionQueue"
 
     # Methods provided by the concrete reconciler.
-    def _create_child_list(self, elements: List[Element]) -> List[VNode]:
+    def _create_child_list(self, slots: Sequence[Optional[Element]]) -> List[VNode]:
         raise NotImplementedError  # pragma: no cover
 
-    def _reconcile_child_list(self, old: List[VNode], new: List[Element]) -> List[VNode]:
+    def _reconcile_child_list(
+        self, parent: VNode, old_children: List[VNode], slots: Sequence[Optional[Element]]
+    ) -> List[VNode]:
+        raise NotImplementedError  # pragma: no cover
+
+    def _reconcile_children(self, parent: VNode, slots: Sequence[Optional[Element]]) -> bool:
+        raise NotImplementedError  # pragma: no cover
+
+    def _set_children(self, parent: VNode, children: List[VNode]) -> None:
         raise NotImplementedError  # pragma: no cover
 
     def _destroy_tree(self, node: VNode, salvage: Optional[HydrationMap] = None) -> None:
@@ -67,7 +75,7 @@ class BoundaryMixin:
     def _native_roots(self, node: VNode) -> List[VNode]:
         raise NotImplementedError  # pragma: no cover
 
-    def _create_wrapper(self, element: Element, owner: str) -> VNode:
+    def _create_wrapper(self, element: Element) -> VNode:
         raise NotImplementedError  # pragma: no cover
 
     def request_render(self) -> None:  # pragma: no cover
@@ -79,9 +87,9 @@ class BoundaryMixin:
     # ------------------------------------------------------------------
 
     def _create_error_boundary(self, element: Element) -> VNode:
-        node = VNode(element, [])
+        node = VNode(element, [], None, BOUNDARY)
         try:
-            children = self._create_child_list(normalize_children(element.children, owner="ErrorBoundary"))
+            children = self._create_child_list(child_slots(element.children, "ErrorBoundary"))
         except Exception as exc:
             self._activate_boundary(node, exc)
             return node
@@ -92,24 +100,15 @@ class BoundaryMixin:
         return node
 
     def _reconcile_error_boundary(self, old: VNode, new_el: Element) -> VNode:
+        touch(old)
         old.element = new_el
         if old.error is not None:
             # Fallback is showing; keep showing it (rebuilt against the
             # latest fallback prop) until reset() clears the error.
-            fallback_els = self._error_fallback_elements(old, old.error)
-            old.children = self._reconcile_child_list(old.children, fallback_els)
-            for child in old.children:
-                child.parent = old
-            self._refresh_identity(old)
+            self._reconcile_children(old, self._error_fallback_elements(old, old.error))
             return old
         try:
-            children = self._reconcile_child_list(
-                old.children, normalize_children(new_el.children, owner="ErrorBoundary")
-            )
-            old.children = children
-            for child in children:
-                child.parent = old
-            self._refresh_identity(old)
+            self._reconcile_children(old, child_slots(new_el.children, "ErrorBoundary"))
         except Exception as exc:
             self._activate_boundary(old, exc)
         return old
@@ -131,23 +130,20 @@ class BoundaryMixin:
                 diagnostics.warn(f"ErrorBoundary on_error callback raised {cb_exc!r}")
         if props.get("fallback") is None:
             raise exc
+        touch(node)
         for child in node.children:
             self._destroy_tree(child)
         node.children = []
         node.error = exc
-        children = self._create_child_list(self._error_fallback_elements(node, exc))
-        for child in children:
-            child.parent = node
-        node.children = children
-        self._refresh_identity(node)
+        self._set_children(node, self._create_child_list(self._error_fallback_elements(node, exc)))
 
-    def _error_fallback_elements(self, node: VNode, exc: BaseException) -> List[Element]:
+    def _error_fallback_elements(self, node: VNode, exc: BaseException) -> Sequence[Optional[Element]]:
         """Render a boundary's fallback prop into a normalized child list."""
         fallback = node.element.props.get("fallback")
         if fallback is None:
             return []
         result = call_fallback(fallback, exc, lambda: self._make_boundary_reset(node))
-        return normalize_children(result, owner="ErrorBoundary.fallback")
+        return child_slots(result, "ErrorBoundary.fallback", returned=True)
 
     def _make_boundary_reset(self, node: VNode) -> Callable[[], None]:
         """Return the ``reset`` callable handed to a boundary's fallback."""
@@ -155,6 +151,7 @@ class BoundaryMixin:
         def reset() -> None:
             if not node.mounted or node.error is None:
                 return
+            touch(node)
             node.error = None
             self._dirty_boundaries[id(node)] = node
             from ..scheduler import schedule_trigger
@@ -168,14 +165,20 @@ class BoundaryMixin:
     # ------------------------------------------------------------------
 
     def _create_suspense(self, element: Element) -> VNode:
+        node = VNode(element, [], None, SUSPENSE_KIND)
         if element.props.get("fallback") is None:
-            return self._create_wrapper(element, "Suspense")
-        node = VNode(element, [])
+            children = self._create_child_list(child_slots(element.children, "Suspense"))
+            for child in children:
+                child.parent = node
+            node.children = children
+            self._refresh_identity(node)
+            return node
         self._attempt_suspense_content(node)
         return node
 
     def _reconcile_suspense(self, old: VNode, new_el: Element) -> VNode:
         previous = old.element
+        touch(old)
         old.element = new_el
         if old.suspense_showing_fallback:
             if previous.children != new_el.children:
@@ -192,11 +195,7 @@ class BoundaryMixin:
             self._refresh_suspense_fallback(old)
             return old
         try:
-            children = self._reconcile_child_list(old.children, normalize_children(new_el.children, owner="Suspense"))
-            old.children = children
-            for child in children:
-                child.parent = old
-            self._refresh_identity(old)
+            self._reconcile_children(old, child_slots(new_el.children, "Suspense"))
         except Suspend as signal:
             self._hide_suspense_content(old, signal)
         return old
@@ -215,6 +214,7 @@ class BoundaryMixin:
         if node.suspense_hidden is not None:
             self._retry_hidden_suspense_content(node)
             return
+        touch(node)
         # Claim states from a candidate map. A later render failure must leave
         # the committed boundary's buckets available for its original retry.
         hydration: HydrationMap = {key: list(states) for key, states in (node.suspense_hydration or {}).items()}
@@ -224,7 +224,7 @@ class BoundaryMixin:
         self._hydration = hydration
         self._suspense_salvage = None
         try:
-            children = self._create_child_list(normalize_children(node.element.children, owner="Suspense"))
+            children = self._create_child_list(child_slots(node.element.children, "Suspense"))
         except Suspend as signal:
             # Unclaimed hook states from the previous attempt stay
             # preserved for the next retry; salvaged sibling states are
@@ -240,15 +240,13 @@ class BoundaryMixin:
         self._dispose_hydration(hydration)
         for child in node.children:
             self._destroy_tree(child)
-        for child in children:
-            child.parent = node
-        node.children = children
         node.suspense_showing_fallback = False
         node.suspense_waits = None
-        self._refresh_identity(node)
+        self._set_children(node, children)
 
     def _retry_hidden_suspense_content(self, node: VNode) -> None:
         """Reconcile a boundary's hidden content in place and reveal it if it settles."""
+        touch(node)
         hidden = node.suspense_hidden or []
         fallback = node.children[len(hidden) :]
         hydration: HydrationMap = {key: list(states) for key, states in (node.suspense_hydration or {}).items()}
@@ -258,7 +256,7 @@ class BoundaryMixin:
         self._hydration = hydration
         self._suspense_salvage = None
         try:
-            children = self._reconcile_child_list(hidden, normalize_children(node.element.children, owner="Suspense"))
+            children = self._reconcile_child_list(node, hidden, child_slots(node.element.children, "Suspense"))
         except Suspend as signal:
             merged = {key: states for key, states in hydration.items() if states}
             node.suspense_hydration = merged or None
@@ -266,9 +264,8 @@ class BoundaryMixin:
             # Slots whose node was replaced mid-list are rebuilt on the next retry.
             still = [child for child in hidden if child.mounted]
             node.suspense_hidden = still
-            node.children = [*still, *fallback]
+            self._set_children(node, [*still, *fallback])
             self._apply_suspense_hide(node)
-            self._refresh_identity(node)
             self._watch_waitable(node, signal.waitable)
             return
         finally:
@@ -278,14 +275,11 @@ class BoundaryMixin:
         self._dispose_hydration(hydration)
         for child in fallback:
             self._destroy_tree(child)
-        for child in children:
-            child.parent = node
-        node.children = children
         node.suspense_hidden = None
         node.suspense_showing_fallback = False
         node.suspense_waits = None
+        self._set_children(node, children)
         self._reveal_suspense_content(node)
-        self._refresh_identity(node)
 
     def _hide_suspense_content(self, node: VNode, signal: Suspend) -> None:
         """Keep a boundary's committed content mounted but hidden, and show the fallback beside it.
@@ -297,16 +291,14 @@ class BoundaryMixin:
         """
         if node.element.props.get("fallback") is None:
             raise signal
+        touch(node)
         self._fold_suspended_state(node, signal)
         if not node.suspense_showing_fallback:
             node.suspense_hidden = list(node.children)
             self._apply_suspense_hide(node)
             fallback = self._create_child_list(self._suspense_fallback_elements(node))
-            for child in fallback:
-                child.parent = node
-            node.children = [*node.children, *fallback]
             node.suspense_showing_fallback = True
-            self._refresh_identity(node)
+            self._set_children(node, [*node.children, *fallback])
         elif node.suspense_hidden is not None:
             self._apply_suspense_hide(node)
         self._watch_waitable(node, signal.waitable)
@@ -317,6 +309,7 @@ class BoundaryMixin:
             for root in self._native_roots(child):
                 if root.hidden_by_suspense:
                     continue
+                touch(root)
                 root.hidden_by_suspense = True
                 if root.tag is not None:
                     self._ops.append(UpdateOp(root.tag, {"display": "none"}))
@@ -327,18 +320,19 @@ class BoundaryMixin:
             for root in self._native_roots(child):
                 if not root.hidden_by_suspense:
                     continue
+                touch(root)
                 root.hidden_by_suspense = False
                 if root.tag is not None:
                     self._ops.append(UpdateOp(root.tag, {"display": root.clean_props.get("display", UNSET)}))
 
     def _refresh_suspense_fallback(self, node: VNode) -> None:
         """Reconcile a showing fallback against the latest ``fallback`` prop."""
+        touch(node)
         hidden = node.suspense_hidden or []
-        fallback = self._reconcile_child_list(node.children[len(hidden) :], self._suspense_fallback_elements(node))
-        for child in fallback:
-            child.parent = node
-        node.children = [*hidden, *fallback]
-        self._refresh_identity(node)
+        current = node.children[len(hidden) :]
+        fallback = self._reconcile_child_list(node, current, self._suspense_fallback_elements(node))
+        if fallback is not current:
+            self._set_children(node, [*hidden, *fallback])
 
     def _fold_suspended_state(self, node: VNode, signal: Suspend) -> None:
         """Move salvaged hook states and the suspender's own state into the boundary's hydration map.
@@ -347,6 +341,7 @@ class BoundaryMixin:
         in place under hidden content) keeps its state on the node; only
         states that lost their node are preserved through hydration.
         """
+        touch(node)
         salvage = self._suspense_salvage
         self._suspense_salvage = None
         suspender = signal.hook_state
@@ -375,41 +370,39 @@ class BoundaryMixin:
         """
         if node.element.props.get("fallback") is None:
             raise signal
+        touch(node)
         self._fold_suspended_state(node, signal)
         if not node.suspense_showing_fallback:
             children = self._create_child_list(self._suspense_fallback_elements(node))
-            for child in children:
-                child.parent = node
-            node.children = children
             node.suspense_showing_fallback = True
-            self._refresh_identity(node)
+            self._set_children(node, children)
         self._watch_waitable(node, signal.waitable)
 
     @staticmethod
-    def _suspense_fallback_elements(node: VNode) -> List[Element]:
+    def _suspense_fallback_elements(node: VNode) -> Sequence[Optional[Element]]:
         fallback = node.element.props.get("fallback")
         if fallback is None:
             return []
         result: Any = fallback
         if callable(fallback) and not isinstance(fallback, Element):
             result = fallback()
-        return normalize_children(result, owner="Suspense.fallback")
+        return child_slots(result, "Suspense.fallback", returned=True)
 
     def _watch_waitable(self, node: VNode, waitable: Any) -> None:
         """Queue a content retry for ``node`` when ``waitable`` completes."""
         waits = node.suspense_waits
-        if waits is None:
-            waits = node.suspense_waits = set()
         marker = id(waitable)
-        if marker in waits:
+        if waits is not None and marker in waits:
             return
-        waits.add(marker)
+        touch(node)
+        node.suspense_waits = {*(waits or ()), marker}
 
         def _on_done(_w: Any = None) -> None:
             live_waits = node.suspense_waits
             if live_waits is None or marker not in live_waits:
                 return
-            live_waits.discard(marker)
+            touch(node)
+            node.suspense_waits = live_waits - {marker}
             if not node.mounted or not node.suspense_showing_fallback:
                 return
             self._dirty_suspense[id(node)] = node

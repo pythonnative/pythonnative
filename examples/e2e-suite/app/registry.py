@@ -77,6 +77,7 @@ from app.screens.components.segmented_control import SegmentedControlDemo
 from app.screens.components.slider import SliderDemo
 from app.screens.components.spacer import SpacerDemo
 from app.screens.components.status_bar import StatusBarDemo
+from app.screens.components.strict_mode import StrictModeDemo
 from app.screens.components.suspense import SuspenseDemo
 from app.screens.components.svg import SvgDemo
 from app.screens.components.switch import SwitchDemo
@@ -153,6 +154,8 @@ from app.screens.navigation.tab_navigator import TabNavigatorDemo
 from app.screens.navigation.tab_options import TabOptionsDemo
 from app.screens.packages.pypi_packages import PyPIPackagesDemo
 from app.screens.platform.platform_info import PlatformInfoDemo
+from app.screens.runtime.child_identity_demo import ChildIdentityDemo
+from app.screens.runtime.preemption_demo import PreemptionDemo
 from app.screens.runtime.run_async_demo import RunAsyncDemo
 from app.screens.sdk.custom_component import CustomComponentDemo
 from app.screens.sdk.define_component_demo import DefineComponentDemo
@@ -239,6 +242,7 @@ DEMOS: List[DemoEntry] = [
         RefreshControlDemo,
     ),
     DemoEntry("fragment", "Components", "Fragment", "Fragment", FragmentDemo),
+    DemoEntry("strict_mode", "Components", "StrictMode", "StrictMode", StrictModeDemo),
     DemoEntry("portal", "Components", "Portal", "Portal", PortalDemo),
     DemoEntry(
         "error_boundary",
@@ -507,6 +511,8 @@ DEMOS: List[DemoEntry] = [
         AsyncStorageDemo,
     ),
     DemoEntry("run_async", "Runtime", "run_async", "run_async", RunAsyncDemo),
+    DemoEntry("child_identity", "Runtime", "Child identity", "runtime::child_identity", ChildIdentityDemo),
+    DemoEntry("preemption", "Runtime", "Preemption", "start_transition", PreemptionDemo),
     DemoEntry("platform_info", "Platform", "Platform info", "Platform", PlatformInfoDemo),
     # ------------------------------------------------------------------
     # Device environment modules

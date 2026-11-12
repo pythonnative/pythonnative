@@ -15,6 +15,7 @@ import asyncio
 import inspect
 import math
 import types
+from types import SimpleNamespace
 from typing import Any, Dict, Generator, List
 
 import pytest
@@ -308,7 +309,7 @@ def test_events_reach_handlers_and_never_answer_native(transport: FakeTransport)
         seen.append(payload)
         return {"ignored": True}
 
-    get_event_registry().set_events(11, {"on_bind_row": bind_row})
+    get_event_registry().register(11, SimpleNamespace(events={"on_bind_row": bind_row}))
     try:
         bridge.native_callback("event", 11, "on_missing", "[]")
         transport.fire(11, "on_bind_row", {"index": 21})
@@ -323,7 +324,7 @@ def test_destroyed_view_drops_queued_event(transport: FakeTransport) -> None:
     backend = get_backend()
     backend.apply_mutations([CreateOp(50, "Button", {"title": "Press"})])
     seen: list[str] = []
-    get_event_registry().set_events(50, {"on_press": lambda: seen.append("press")})
+    get_event_registry().register(50, SimpleNamespace(events={"on_press": lambda: seen.append("press")}))
     transport.fire(50, "on_press")
     backend.apply_mutations([DestroyOp(50)])
     transport.fire(50, "on_press")

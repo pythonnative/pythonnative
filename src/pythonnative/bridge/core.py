@@ -162,15 +162,19 @@ class MountTransaction:
     ops: Tuple[MountOp, ...]
 
 
+_LAYOUTS = {fmt: struct.Struct("<" + fmt) for fmt in ("B", "H", "I", "q", "d")}
+
+
 class _Reader:
     def __init__(self, data: bytes) -> None:
         self.data = data
         self.offset = 0
 
     def take(self, fmt: str) -> Any:
-        value = struct.unpack_from("<" + fmt, self.data, self.offset)
-        self.offset += struct.calcsize("<" + fmt)
-        return value[0]
+        layout = _LAYOUTS[fmt]
+        offset = self.offset
+        self.offset = offset + layout.size
+        return layout.unpack_from(self.data, offset)[0]
 
     def string(self) -> str:
         length = self.take("I")

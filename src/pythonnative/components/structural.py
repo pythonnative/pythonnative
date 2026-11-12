@@ -1,14 +1,14 @@
-"""Structural factories: ``Fragment``, ``ErrorBoundary``, and ``Suspense``.
+"""Structural factories: ``Fragment``, ``StrictMode``, ``ErrorBoundary``, and ``Suspense``.
 
 These produce elements whose ``type`` is one of the reconciler-owned
 singletons from [`pythonnative.element`][pythonnative.element]
-(``FRAGMENT``, ``ERROR_BOUNDARY``, ``SUSPENSE``) rather than a native
+(``FRAGMENT``, ``STRICT_MODE``, ``ERROR_BOUNDARY``, ``SUSPENSE``) rather than a native
 view name, so they never create a platform view of their own.
 """
 
 from typing import Any, Callable, Dict, Optional, Union
 
-from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element, Node
+from ..element import ERROR_BOUNDARY, FRAGMENT, STRICT_MODE, SUSPENSE, Element, Node
 
 _error_fallback: Union[Element, Callable[..., Node], None] = None
 
@@ -49,15 +49,16 @@ def root_error_fallback(error: BaseException, reset: Callable[[], None]) -> Node
     )
 
 
-def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element:
+def Fragment(*children: Node, key: Optional[str] = None) -> Element:
     """Group children without adding a wrapping native view.
 
     Like React's ``<></>``: groups elements without introducing an
-    extra container. Each child mounts as a direct sibling of the
-    Fragment's position in the parent's child list. Components may
-    also simply return a plain ``list`` of elements; ``Fragment``
-    exists for when the group needs a ``key`` (e.g. rendering a list
-    of pairs) or when a single expression reads better.
+    extra container. The fragment occupies one slot of its parent's
+    child list, and its children mount as native siblings at that
+    position, matched among themselves. Passing a plain ``list`` as a
+    child does the same; ``Fragment`` exists for when the group needs a
+    ``key`` (e.g. rendering a list of pairs) or when a single
+    expression reads better.
 
     ```python
     pn.Column(
@@ -72,9 +73,9 @@ def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element
 
     Args:
         *children: Child elements to expose at the parent level.
-            ``None`` and ``False`` children are dropped, which makes
-            conditional rendering with ``cond and pn.Text(...)``
-            ergonomic.
+            ``None`` and ``False`` children leave their slot empty, so
+            ``cond and pn.Text(...)`` never shifts the children after
+            it.
         key: Stable identity for keyed reconciliation. A keyed
             Fragment moves all of its children as one unit and
             preserves their state across reorders.
@@ -83,8 +84,41 @@ def Fragment(*children: Optional[Element], key: Optional[str] = None) -> Element
         An [`Element`][pythonnative.Element] whose type is
         [`FRAGMENT`][pythonnative.element.FRAGMENT].
     """
-    kept = [c for c in children if c is not None and c is not False]
-    return Element(FRAGMENT, {}, kept, key=key)
+    return Element(FRAGMENT, None, children, key=key)
+
+
+def StrictMode(*children: Node, key: Optional[str] = None) -> Element:
+    """Check the wrapped subtree for impure renders and effects in development.
+
+    Like React's ``<StrictMode>``. In development mode, for every
+    component mounted beneath it:
+
+    - the component body runs twice per render, and the first result is
+      discarded (hooks see the same state both times);
+    - ``use_state`` initializers, state updater functions, reducers, and
+      ``use_memo`` factories run twice;
+    - on mount, each ``use_effect`` and ``use_layout_effect`` runs, its
+      cleanup runs, and it runs again.
+
+    A body that mutates something outside itself, or an effect whose
+    cleanup doesn't undo it, then misbehaves visibly during development
+    instead of rarely in production. Transitions can abandon a render
+    and run it again, so renders must be pure. In a release build
+    ``StrictMode`` does nothing, and it never adds a native view.
+
+    ```python
+    pn.StrictMode(App())
+    ```
+
+    Args:
+        *children: The subtree to check.
+        key: Stable identity for keyed reconciliation.
+
+    Returns:
+        An [`Element`][pythonnative.Element] whose type is
+        [`STRICT_MODE`][pythonnative.element.STRICT_MODE].
+    """
+    return Element(STRICT_MODE, None, children, key=key)
 
 
 def ErrorBoundary(

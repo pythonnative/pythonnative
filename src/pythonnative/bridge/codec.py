@@ -54,6 +54,13 @@ def to_jsonable(value: Any) -> Any:
         TypeError: When ``value`` (or something nested in it) has no
             JSON representation.
     """
+    cls = value.__class__
+    if cls is str or cls is int or cls is bool or value is None:
+        return value
+    if cls is float:
+        if math.isfinite(value):
+            return value
+        return None if math.isnan(value) else (INF if value > 0 else NEG_INF)
     if isinstance(value, enum.Enum):
         return to_jsonable(value.value)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
@@ -101,6 +108,10 @@ def split_props(
     wire: Dict[str, Any] = {}
     python: Dict[str, Any] = {}
     for key, value in props.items():
+        cls = value.__class__
+        if (cls is str or cls is int or cls is bool or value is None) and key not in python_only:
+            wire[key] = value
+            continue
         if value is UNSET:
             continue
         if key in python_only or (callable(value) and not isinstance(value, type)):
@@ -148,22 +159,32 @@ def build_transaction(
     encoded: List[Any] = []
     sidecar: List[Tuple[int, Dict[str, Any]]] = []
     for op in ops:
-        if isinstance(op, CreateOp):
-            names[op.tag] = op.type_name
-            wire, python = split_props(op.props, python_fields(op.type_name))
-            encoded.append(["c", op.tag, op.type_name, wire])
+        # Exact class checks: one attribute load instead of isinstance calls.
+        cls = op.__class__
+        if cls is CreateOp:
+            create: CreateOp = op  # type: ignore[assignment]
+            names[create.tag] = create.type_name
+            fields = fields_cache.get(create.type_name)
+            wire, python = split_props(create.props, python_fields(create.type_name) if fields is None else fields)
+            encoded.append(["c", create.tag, create.type_name, wire])
             if python:
-                sidecar.append((op.tag, python))
-        elif isinstance(op, UpdateOp):
-            removed = [key for key, value in op.changed_props.items() if value is UNSET]
-            wire, python = split_props(op.changed_props, python_fields(names.get(op.tag) or base_names.get(op.tag, "")))
-            encoded.append(["u", op.tag, wire, removed])
+                sidecar.append((create.tag, python))
+        elif cls is UpdateOp:
+            update: UpdateOp = op  # type: ignore[assignment]
+            changed = update.changed_props
+            removed = [key for key, value in changed.items() if value is UNSET] if UNSET in changed.values() else []
+            name = names.get(update.tag) or base_names.get(update.tag, "")
+            fields = fields_cache.get(name)
+            wire, python = split_props(changed, python_fields(name) if fields is None else fields)
+            encoded.append(["u", update.tag, wire, removed])
             if python:
-                sidecar.append((op.tag, python))
-        elif isinstance(op, InsertOp):
-            encoded.append(["i", op.parent_tag, op.child_tag, op.index])
-        elif isinstance(op, DestroyOp):
-            encoded.append(["d", op.tag])
+                sidecar.append((update.tag, python))
+        elif cls is InsertOp:
+            insert: InsertOp = op  # type: ignore[assignment]
+            encoded.append(["i", insert.parent_tag, insert.child_tag, insert.index])
+        elif cls is DestroyOp:
+            destroy: DestroyOp = op  # type: ignore[assignment]
+            encoded.append(["d", destroy.tag])
         else:  # pragma: no cover - the reconciler only emits the four op kinds
             raise TypeError(f"Unknown mutation op: {op!r}")
     return encoded, sidecar

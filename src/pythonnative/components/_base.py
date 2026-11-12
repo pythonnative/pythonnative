@@ -106,14 +106,15 @@ def _make_element(
     Returns:
         A fresh [`Element`][pythonnative.Element].
     """
-    if props.get("on_layout") is not None:
-        props["on_layout"] = _layout_callback(props["on_layout"])
-    if "accessibility_value" in props:
-        props["accessibility_value"] = _accessibility_value(props["accessibility_value"])
-    if "accessibility_actions" in props:
-        props["accessibility_actions"] = _accessibility_actions(props["accessibility_actions"])
-    out: Dict[str, Any] = dict(resolve_style(style))
-    if diagnostics.is_dev():
+    if not _NORMALIZED_PROPS.isdisjoint(props):
+        if props.get("on_layout") is not None:
+            props["on_layout"] = _layout_callback(props["on_layout"])
+        if "accessibility_value" in props:
+            props["accessibility_value"] = _accessibility_value(props["accessibility_value"])
+        if "accessibility_actions" in props:
+            props["accessibility_actions"] = _accessibility_actions(props["accessibility_actions"])
+    out: Dict[str, Any] = {} if style is None else resolve_style(style)
+    if diagnostics._dev_mode:
         from ..sdk.schema import validate_props
 
         validate_props(name, props)
@@ -129,7 +130,10 @@ def _make_element(
         out["ref"] = ref
     if _forced:
         out.update(_forced)
-    return Element(name, out, list(children), key=key)
+    return Element(name, out, children, key)
+
+
+_NORMALIZED_PROPS = frozenset({"on_layout", "accessibility_value", "accessibility_actions"})
 
 
 # ======================================================================

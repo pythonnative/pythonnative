@@ -8,7 +8,7 @@ from pythonnative.runtime import run_application_task
 from ..journal import FREE_ATTACHMENTS, journal
 from ..pro import pro
 from .theme import Styles
-from .widgets import ActionButton, Banner, PrimaryButton, Section, slots
+from .widgets import ActionButton, Banner, PrimaryButton, Section
 
 
 @pn.component
@@ -41,29 +41,27 @@ def ProScreen() -> pn.Node:
 
     return pn.ScrollView(
         pn.Column(
-            *slots(
-                heading=pn.Text("One purchase, no subscription.", style=styles.heading),
-                pitch=pn.Text(
-                    f"Free entries hold {FREE_ATTACHMENTS} attachments each, which covers most days in the field. "
-                    "Pro removes the limit for every entry, on every device with your store account.",
-                    style=styles.body,
-                ),
-                offer=offer,
-                message=Banner(state.message, "info") if state.message and state.phase == "ready" else None,
-                restore=(
-                    Section(
-                        "Already bought it?",
-                        pn.Text("Restoring asks the store what your account owns.", style=styles.caption),
-                        ActionButton(
-                            "Restore purchase",
-                            "refresh-cw",
-                            lambda: run_application_task(pro.restore()),
-                            disabled=state.busy or state.phase == "unavailable",
-                        ),
-                    )
-                    if not owned
-                    else None
-                ),
+            pn.Text("One purchase, no subscription.", style=styles.heading),
+            pn.Text(
+                f"Free entries hold {FREE_ATTACHMENTS} attachments each, which covers most days in the field. "
+                "Pro removes the limit for every entry, on every device with your store account.",
+                style=styles.body,
+            ),
+            offer,
+            Banner(state.message, "info") if state.message and state.phase == "ready" else None,
+            (
+                Section(
+                    "Already bought it?",
+                    pn.Text("Restoring asks the store what your account owns.", style=styles.caption),
+                    ActionButton(
+                        "Restore purchase",
+                        "refresh-cw",
+                        lambda: run_application_task(pro.restore()),
+                        disabled=state.busy or state.phase == "unavailable",
+                    ),
+                )
+                if not owned
+                else None
             ),
             style=styles.content,
         ),

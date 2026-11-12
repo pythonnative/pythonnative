@@ -16,14 +16,15 @@ implementation detail:
 """
 
 from .children import plan_child_moves
-from .core import MAX_RENDER_PASSES, Reconciler
-from .vnode import VNode, next_tag, normalize_children
+from .core import MAX_RENDER_PASSES, Preempted, Reconciler
+from .vnode import VNode, child_slots, next_tag
 
 __all__ = [
     "MAX_RENDER_PASSES",
+    "Preempted",
     "Reconciler",
     "VNode",
+    "child_slots",
     "next_tag",
-    "normalize_children",
     "plan_child_moves",
 ]

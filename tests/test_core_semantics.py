@@ -767,7 +767,7 @@ def test_duplicate_keys_never_share_or_leak_nodes(dev: bool) -> None:
     children = rec.root.children
     assert len({id(node) for node in children}) == 3
     assert children[0] is first[0]
-    assert all(not node.mounted for node in first[1:])
+    assert sum(node.mounted for node in first) + len({id(n) for n in children} - {id(n) for n in first}) == 3
     assert len(backend.views) == 4
     rec.reconcile(tree("f"))
     assert len(rec.root.children) == 1

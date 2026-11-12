@@ -17,7 +17,7 @@ from ..reminders import PRESETS, Preset, cancel_reminder, entry_url, schedule_re
 from . import editor_screen
 from .attachments import AddAttachments, AttachmentTile, VoiceNotePlayer
 from .theme import Styles
-from .widgets import ActionButton, Banner, Chip, EmptyState, Section, slots
+from .widgets import ActionButton, Banner, Chip, EmptyState, Section
 
 
 async def delete_with_reminder(entry: Entry) -> None:
@@ -137,57 +137,42 @@ def EntryContent(entry: Entry) -> pn.Node:
     edited = entry.updated_at > entry.created_at + 1
     return pn.ScrollView(
         pn.Column(
-            *slots(
-                title=pn.Text(entry.display_title, style=styles.title, accessibility_role="header"),
-                meta=pn.Text(
-                    f"{format_time(entry.created_at)}  ·  {entry.conditions}" + ("  ·  Edited" if edited else ""),
-                    style=styles.caption,
-                ),
-                tags=(
-                    pn.View(*(Chip(f"#{tag}").with_key(tag) for tag in entry.tags), style=styles.wrap)
-                    if entry.tags
+            pn.Text(entry.display_title, style=styles.title, accessibility_role="header"),
+            pn.Text(
+                f"{format_time(entry.created_at)}  ·  {entry.conditions}" + ("  ·  Edited" if edited else ""),
+                style=styles.caption,
+            ),
+            pn.View(*(Chip(f"#{tag}").with_key(tag) for tag in entry.tags), style=styles.wrap) if entry.tags else None,
+            pn.Text(entry.body, style=styles.body, selectable=True) if entry.body else None,
+            Section(
+                "Attachments",
+                (
+                    pn.View(
+                        *(AttachmentTile(attachment=item, entry_id=entry.id).with_key(item.id) for item in visuals),
+                        style=styles.wrap,
+                    )
+                    if visuals
                     else None
                 ),
-                body=pn.Text(entry.body, style=styles.body, selectable=True) if entry.body else None,
-                attachments=Section(
-                    "Attachments",
-                    *slots(
-                        visuals=(
-                            pn.View(
-                                *(
-                                    AttachmentTile(attachment=item, entry_id=entry.id).with_key(item.id)
-                                    for item in visuals
-                                ),
-                                style=styles.wrap,
-                            )
-                            if visuals
-                            else None
-                        ),
-                        voices=(
-                            pn.Column(
-                                *(
-                                    VoiceNotePlayer(attachment=item).with_key(item.id)
-                                    for item in voices
-                                    if item.is_local
-                                ),
-                                style=pn.style(gap=8),
-                            )
-                            if voices
-                            else None
-                        ),
-                        transfer=Banner(transfer_error, "warning") if transfer_error else None,
-                        add=AddAttachments(entry=entry),
-                    ),
+                (
+                    pn.Column(
+                        *(VoiceNotePlayer(attachment=item).with_key(item.id) for item in voices if item.is_local),
+                        style=pn.style(gap=8),
+                    )
+                    if voices
+                    else None
                 ),
-                place=PlaceSection(entry=entry),
-                reminder=ReminderSection(entry=entry),
-                actions=pn.View(
-                    ActionButton("Share", "share-2", share),
-                    ActionButton("Delete", "trash", delete),
-                    style=styles.wrap,
-                ),
-                link=pn.Text(entry_url(entry.id), style=styles.caption, selectable=True),
+                Banner(transfer_error, "warning") if transfer_error else None,
+                AddAttachments(entry=entry),
             ),
+            PlaceSection(entry=entry),
+            ReminderSection(entry=entry),
+            pn.View(
+                ActionButton("Share", "share-2", share),
+                ActionButton("Delete", "trash", delete),
+                style=styles.wrap,
+            ),
+            pn.Text(entry_url(entry.id), style=styles.caption, selectable=True),
             style=styles.content,
         ),
         style=styles.screen,

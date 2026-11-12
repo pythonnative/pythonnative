@@ -72,7 +72,7 @@ from .lists import (  # noqa: F401
 from .media import Image, ImageBackground, ImageSource, WebView
 from .overlays import Modal, Portal
 from .pressable import Pressable, PressState, Ripple, _StatefulPressable  # noqa: F401
-from .structural import ErrorBoundary, Fragment, Suspense, set_error_fallback
+from .structural import ErrorBoundary, Fragment, StrictMode, Suspense, set_error_fallback
 from .text import Button, EllipsizeMode, KeyboardAppearance, Text, TextInput
 
 __all__ = [
@@ -89,6 +89,7 @@ __all__ = [
     "ErrorBoundary",
     "FlatList",
     "Fragment",
+    "StrictMode",
     "Image",
     "ImageBackground",
     "ImageLoadEvent",

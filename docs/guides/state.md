@@ -311,6 +311,36 @@ component unmounts first.
 For secrets such as tokens, use
 [`SecureStore`][pythonnative.SecureStore] instead of `AsyncStorage`.
 
+## Expensive updates and pure renders
+
+When one input drives an expensive subtree, such as a search field
+filtering a long list, make the expensive part a transition so typing
+stays responsive:
+
+```python
+@pn.component
+def Search() -> pn.Node:
+    query, set_query = pn.use_state("")
+    shown = pn.use_deferred_value(query)
+    return pn.Column(
+        pn.TextInput(value=query, on_change=set_query),
+        Results(shown),
+    )
+```
+
+`set_query` is urgent, so the field updates on the next frame.
+`shown` catches up in a transition render, which PythonNative abandons
+and starts over if the user types again before it finishes. From code
+outside a component, such as a store action, wrap the update in
+[`pn.start_transition`][pythonnative.start_transition].
+
+A render that's abandoned runs again, so component bodies must be pure:
+compute from props, state, and context, and leave everything else to
+event handlers and effects. Wrap your root in
+[`pn.StrictMode`][pythonnative.StrictMode] (the `pn init` template does)
+to run bodies, initializers, updaters, and mount effects twice in
+development, which makes impure code misbehave where you can see it.
+
 ## Choosing a tool
 
 - **Only one component uses it:** `use_state`, or `use_reducer` when

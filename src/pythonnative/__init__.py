@@ -131,6 +131,7 @@ from .components import (
     Slider,
     Spacer,
     StatusBar,
+    StrictMode,
     Suspense,
     Svg,
     Switch,
@@ -208,7 +209,7 @@ from .native_modules import (
 from .platform import Platform
 from .platform_metrics import WindowDimensions
 from .runtime import run_async, run_blocking
-from .scheduler import batch_updates
+from .scheduler import batch_updates, start_transition
 from .sdk import Props, define_component
 from .storage import AsyncStorage, use_persisted_state
 from .store import Store, use_store
@@ -262,6 +263,7 @@ __all__ = [
     "Section",
     "ViewableItem",
     "Fragment",
+    "StrictMode",
     "Icon",
     "IconName",
     "Image",
@@ -332,6 +334,7 @@ __all__ = [
     "QueryResult",
     "Ref",
     "batch_updates",
+    "start_transition",
     "create_context",
     "use_back_handler",
     "use_callback",

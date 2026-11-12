@@ -102,7 +102,7 @@ class _CallPlan:
     messages are Python's own.
     """
 
-    __slots__ = ("positional", "keyword_only", "names", "accepted", "defaults", "children")
+    __slots__ = ("positional", "keyword_only", "names", "accepted", "defaults", "children", "count", "size")
 
     def __init__(self, signature: inspect.Signature) -> None:
         self.positional: tuple[str, ...] = ()
@@ -126,20 +126,26 @@ class _CallPlan:
             names.append(name)
         self.names: tuple[str, ...] = tuple(names)
         self.accepted = frozenset(names)
+        self.count = len(self.positional)
+        self.size = len(names)
 
     def bind(self, args: tuple[Any, ...], kwargs: Dict[str, Any]) -> tuple[Dict[str, Any], tuple[Any, ...]]:
         """Return ``(props, children)`` in parameter order, with defaults applied."""
-        positional = self.positional
-        count = len(positional)
-        if len(args) > count and self.children is None:
-            raise _Unplanned
-        given = dict(zip(positional, args))
-        accepted = self.accepted
-        for name, value in kwargs.items():
-            if name in given or name not in accepted:
+        count = self.count
+        if args:
+            if len(args) > count and self.children is None:
                 raise _Unplanned
-            given[name] = value
-        if len(given) == len(self.names):
+            given = dict(zip(self.positional, args))
+            accepted = self.accepted
+            for name, value in kwargs.items():
+                if name in given or name not in accepted:
+                    raise _Unplanned
+                given[name] = value
+        else:
+            if not self.accepted.issuperset(kwargs):
+                raise _Unplanned
+            given = kwargs
+        if len(given) == self.size:
             props = given
         else:
             defaults = self.defaults
@@ -256,7 +262,7 @@ class Component(Generic[P]):
         except _Unplanned:
             props, children = self._bind(args, kwargs)
         props.pop("key", None)
-        if diagnostics.is_dev() and not self._keyed_builtin:
+        if diagnostics._dev_mode and not self._keyed_builtin:
             from .prop_checks import check_props
 
             check_props(self, props)

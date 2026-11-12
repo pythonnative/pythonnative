@@ -10,7 +10,7 @@ from pythonnative.video import Video, VideoInfo
 from ..journal import journal
 from ..models import Attachment, format_duration, format_size
 from .theme import Styles
-from .widgets import ActionButton, Banner, EmptyState, slots
+from .widgets import ActionButton, Banner, EmptyState
 
 
 @pn.component
@@ -43,21 +43,19 @@ def VideoPlayer(attachment: Attachment) -> pn.Node:
     else:
         line = "Loading the video..."
     return pn.Column(
-        *slots(
-            video=Video(
-                source=journal.file_path(attachment),
-                controls=True,
-                ref=player,
-                on_ready=ready,
-                on_progress=progress,
-                on_end=lambda: set_ended(True),
-                on_error=set_problem,
-                style=pn.style(aspect_ratio=16 / 9, background_color="#000000"),
-            ),
-            problem=Banner(f"This video can't play: {problem}", "error") if problem else None,
-            line=pn.Text(line, style=styles.caption),
-            restart=ActionButton("Play from the start", "rotate-ccw", restart, disabled=info is None),
+        Video(
+            source=journal.file_path(attachment),
+            controls=True,
+            ref=player,
+            on_ready=ready,
+            on_progress=progress,
+            on_end=lambda: set_ended(True),
+            on_error=set_problem,
+            style=pn.style(aspect_ratio=16 / 9, background_color="#000000"),
         ),
+        Banner(f"This video can't play: {problem}", "error") if problem else None,
+        pn.Text(line, style=styles.caption),
+        ActionButton("Play from the start", "rotate-ccw", restart, disabled=info is None),
         style=pn.style(gap=8),
     )
 

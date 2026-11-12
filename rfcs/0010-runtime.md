@@ -213,14 +213,16 @@ def Inbox() -> pn.Node:
     query, set_query = pn.use_state("")
     shown = pn.use_deferred_value(query)
     return pn.Column(
-        query and ClearButton(on_press=lambda: set_query("")),
+        ClearButton(on_press=lambda: set_query("")) if query else None,
         SearchField(value=query, on_change=set_query),  # keeps its state
         [MessageRow(m).with_key(m.id) for m in search(shown)],
         Footer(),                                       # never shifts
     )
 ```
 
-`SearchField` keeps its identity when `ClearButton` appears. `Footer`
+`SearchField` keeps its identity when `ClearButton` appears. (`query and
+ClearButton(...)` would render the same way, but an empty string isn't a
+`pn.Node`, so the conditional expression is the typed spelling.) `Footer`
 keeps its identity as the list grows. Rendering the rows for a new
 `shown` is a transition: if the user types again while it renders, the
 render is dropped, the keystroke commits, and the rows render for the
@@ -276,9 +278,11 @@ is unchanged.
   component, provider, error boundary, suspense, wrapper). The `is_*`
   properties remain for tools and read it.
 - **Explicit journaling.** `VNode.__setattr__` is removed. The reconciler
-  calls `journal.touch(node)` once, where it first changes a node in a
-  pass, which records the fields that pass can change. Nodes created in
-  the pass are never recorded. `Ref` keeps its journaled writes, since
+  calls `touch(node)` (`reconciler/vnode.py`) once, where it first
+  changes a node in a pass, which records the fields that pass can change
+  through `Journal.record`. Nodes created in the pass are never recorded.
+  Hook states are recorded the same way, copying only the lists a render
+  replaces entries of. `Ref` keeps its journaled writes, since
   application code assigns `ref.current` directly.
 - **One pass over props.** A native update walks the new props once.
   A value identical to the old one is skipped. An `on_*` callable updates
@@ -289,16 +293,20 @@ is unchanged.
   `refresh_control`, the motion props, and animated styles.
 - **Handlers on the node.** Event callbacks live in `VNode.events`, which
   the journal covers, and the event registry resolves a tag to its node's
-  table at dispatch. The per-node, per-pass `set_events` publication is
-  removed. Handlers from an uncommitted or rolled-back pass are never
-  visible, as now.
+  table at dispatch: `EventRegistry.register(tag, node, scope)` runs once,
+  when the view is committed. The per-node, per-pass `set_events`
+  publication is removed. Handlers from an uncommitted or rolled-back
+  pass are never visible, as now.
 - **Child lists.** If the new list has the same length and each slot has
   the same key and type, children update in place with no dicts built.
   Otherwise the keyed path runs, as now, with the slot rule above.
 - **Native order only when it changed.** Creating, destroying, moving, or
   replacing a child marks the nearest native ancestor's order as stale.
   Only stale containers recompute their flattened child tags and emit
-  inserts.
+  inserts, right before the ops are flushed.
+- **Untouched when unchanged.** A native view, fragment, group, or
+  provider whose props and child list didn't change isn't recorded or
+  written at all; it keeps its previous element, which compares equal.
 - **Refs and layout.** Ref publications are queued only when a ref
   changed or its view was created.
 - **Bailouts.** An identical element, a memoized component with equal
@@ -331,13 +339,23 @@ Every render pass is **urgent** or a **transition**.
   makes the pass urgent. Mounts and `reconcile` calls from hosts are
   urgent.
 - An urgent pass runs to completion, as now.
-- A transition pass checks a flag before each component body. The bridge
-  sets the flag, from the thread native events arrive on, when a
-  **discrete** event is queued: a press, a text change, a key, a submit,
-  a back press, a gesture's end, or a navigation event. Continuous
-  events (`on_scroll`, gesture updates, layout, window metrics, selection
-  changes), which the bridge already coalesces, don't set it. A state
-  setter called from another thread sets it too.
+- A transition update doesn't change the state that urgent renders read.
+  It waits in its hook state's queue (the queue `use_transition` already
+  had), and its component is recorded in the reconciler's
+  `TransitionQueue`. The transition pass applies every queue in order,
+  inside its journal, so a rollback restores the queues too. Clearing
+  `is_pending` is itself a transition update, so it commits with the
+  transition.
+- A transition pass checks for urgent input before each component body.
+  Input reaches the application loop through `scheduler.queue_urgent`,
+  which counts what's queued and not yet run; the bridge queues
+  **discrete** native messages this way (every `event` and `host`
+  message the bridge doesn't coalesce: presses, text changes, keys,
+  submits, back presses, gesture ends, navigation events). Continuous
+  events (`on_scroll`, `on_window`, `on_selection_change`, and
+  `on_gesture_update`), which the bridge already coalesces, aren't
+  urgent. Work queued from another thread with
+  `call_on_application_thread`, such as a state setter, is urgent too.
 - When the flag is set, the pass raises an internal `Preempted` signal.
   The journal rolls back every node and hook state the pass touched, the
   staged ops and publications are dropped, and the transition's updates
@@ -357,7 +375,11 @@ Every render pass is **urgent** or a **transition**.
 as a store action. It marks the updates in `fn` as a transition and has
 no pending flag.
 
-`TransitionQueue` keeps its role and gains the retry count and deadline.
+`TransitionQueue` now records the hook states with queued transition
+updates, the preemption count, and when the transition was queued; its
+one-turn `defer`, `on_complete`, and `flush` are gone. Flushes and urgent
+input are scheduled in a fresh `contextvars.Context`, so a handler never
+inherits the transition flag of the code that scheduled it.
 `docs/concepts/reconciliation.md` and the `use_transition` and
 `use_deferred_value` docstrings are rewritten to describe preemption.
 
@@ -374,7 +396,8 @@ mode, for components beneath it:
   discarded, and hooks see the same state both times.
 - On mount, each effect runs, its cleanup runs, and it runs again, for
   both `use_effect` and `use_layout_effect`.
-- `use_memo` factories, `use_state` initializers, and reducers run twice.
+- `use_memo` factories, `use_state` initializers, and updater functions
+  (which includes reducers) run twice.
 
 In a release build, and without the wrapper, nothing changes. The
 `pn init` template wraps its root in `StrictMode`. `pythonnative.testing`
@@ -466,21 +489,31 @@ passing after each step:
 
 ## Removals
 
-- **Dropping falsy children and flattening lists** in
-  `normalize_children`, along with the nested-list development warning.
-  The old matching rule isn't kept behind a flag: it's a bug relative to
-  React, and code that depended on siblings remounting was depending on
-  state loss.
-- **Inline expansion of unkeyed fragments.**
-- **`VNode.__setattr__` and `STRUCTURAL_FIELDS`-driven snapshots.**
-  Replaced by `journal.touch`.
+- **Dropping falsy children and flattening lists.** `normalize_children`
+  is gone, replaced by `child_slots`, along with the nested-list
+  development warning. The old matching rule isn't kept behind a flag:
+  it's a bug relative to React, and code that depended on siblings
+  remounting was depending on state loss.
+- **Inline expansion of unkeyed fragments.** `Fragment` no longer drops
+  `None` and `False` children either.
+- **`VNode.__setattr__`, `STRUCTURAL_FIELDS`, and the field-by-field
+  snapshots.** Replaced by `touch` and `Journal.record`. The
+  `_local_update` wrapper that compared native roots before and after a
+  local update is gone; stale containers replace it.
 - **Per-node `set_events` publications**, and `EventRegistry.set_events`
-  with them.
-- **`Element` as a frozen dataclass**, including `dataclasses.replace`
-  and `dataclasses.fields` working on it. `with_key` is the supported way
-  to copy one.
-- **The statement that rendering can't be preempted**, and the one-turn
-  deferral as the whole of what a transition means.
+  and `EventRegistry.set_scope` with them (replaced by `register`).
+- **`Element` as a frozen dataclass**, including `dataclasses.replace`,
+  `dataclasses.fields`, `FrozenInstanceError`, and the copied,
+  `MappingProxyType`-wrapped props. `with_key` is the supported way to
+  copy one.
+- **`CreateOp`, `UpdateOp`, `InsertOp`, and `DestroyOp` as frozen
+  dataclasses.** They're slotted classes with the same fields and value
+  equality.
+- **`TransitionQueue.defer`, `on_complete`, and `flush`**, and the
+  one-turn deferral as the whole of what a transition means, along with
+  the statement that rendering can't be preempted.
+- **Field Notes's `widgets.slots` helper**, which keyed children only to
+  stop siblings from remounting.
 - **Source parsing in `@pn.component`.**
 - **Eager imports** of `svg`, the list components, `sdk.plugin`, and the
   native module facades from `pythonnative/__init__.py`. The names stay

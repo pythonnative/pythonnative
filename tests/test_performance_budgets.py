@@ -120,18 +120,18 @@ def _Grid(n: int) -> pn.Node:
 def test_a_render_pass_captures_each_object_once(monkeypatch: pytest.MonkeyPatch) -> None:
     result = render(_Grid(0), viewport=None)
     captured: List[int] = []
-    original = journal.Journal.snapshot
+    original = journal.Journal.record
 
-    def snapshot(self: journal.Journal, obj: Any, fields: tuple[str, ...]) -> None:
+    def record(self: journal.Journal, obj: Any) -> None:
         captured.append(id(obj))
-        original(self, obj, fields)
+        original(self, obj)
 
-    monkeypatch.setattr(journal.Journal, "snapshot", snapshot)
+    monkeypatch.setattr(journal.Journal, "record", record)
     result.rerender(_Grid(1))
     assert captured
     assert len(captured) == len(set(captured))
     # One hook state and at most a handful of nodes per rendered cell.
-    assert len(captured) <= 20 * 6 + 4
+    assert len(captured) <= 20 * 4 + 4
 
 
 def test_element_construction_and_render_skip_signature_binding(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -231,3 +231,54 @@ def test_mount_call_budget(release_mode: None) -> None:
     calls = _count_calls(lambda: trees.append(render(_BenchGrid(0), viewport=None)))
     trees[0].unmount()
     assert calls <= MOUNT_CALL_BUDGET, calls
+
+
+def test_a_pass_where_nothing_changed_records_only_the_rendered_component(monkeypatch: pytest.MonkeyPatch) -> None:
+    setters: List[Any] = []
+
+    @pn.component
+    def Quiet() -> pn.Node:
+        tick, set_tick = pn.use_state(0)
+        setters[:] = [set_tick]
+        return pn.Column(pn.Text("a"), [pn.Text(f"row {i}", key=str(i)) for i in range(3)], pn.Text("b"))
+
+    tree = render(pn.Column(pn.Text("header"), Quiet()), viewport=None)
+    recorded: List[Any] = []
+    original = journal.Journal.record
+
+    def record(self: journal.Journal, obj: Any) -> None:
+        recorded.append(obj)
+        original(self, obj)
+
+    monkeypatch.setattr(journal.Journal, "record", record)
+    published: List[int] = []
+    publish = type(tree.reconciler)._publish
+
+    def spy(self: Any) -> None:
+        published.append(len(self._publications))
+        publish(self)
+
+    monkeypatch.setattr(type(tree.reconciler), "_publish", spy)
+    ops_before = len(tree.backend.ops)
+    setters[0](1)
+    tree.settle()
+    quiet = tree.reconciler.root.children[1]
+    assert recorded == [quiet.hook_state, quiet]
+    assert published == [0]
+    assert len(tree.backend.ops) == ops_before
+
+
+def test_a_child_list_that_keeps_its_shape_is_updated_in_place(monkeypatch: pytest.MonkeyPatch) -> None:
+    tree = render(_Grid(0), viewport=None)
+    reconciler = type(tree.reconciler)
+    original = reconciler._reconcile_child_list
+    reused: List[bool] = []
+
+    def spy(self: Any, parent: Any, old_children: Any, slots: Any) -> Any:
+        result = original(self, parent, old_children, slots)
+        reused.append(result is old_children)
+        return result
+
+    monkeypatch.setattr(reconciler, "_reconcile_child_list", spy)
+    tree.rerender(_Grid(1))
+    assert reused and all(reused), "a same-shape list built lookup tables or a new list"

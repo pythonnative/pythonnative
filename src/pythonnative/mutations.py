@@ -25,9 +25,8 @@ Op ordering rules (the reconciler guarantees these):
    from its parent as part of destruction.
 """
 
-from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 __all__ = [
     "UNSET",
@@ -53,25 +52,48 @@ UNSET = UnsetType.VALUE
 """Remove a property and restore its native default on the next commit."""
 
 
-@dataclass(frozen=True)
-class CreateOp:
+class _Op:
+    """Shared value semantics for the op records: compared by type and fields. Treat them as immutable."""
+
+    __slots__ = ()
+    _fields: tuple[str, ...] = ()
+
+    def __eq__(self, other: object) -> bool:
+        if other.__class__ is not self.__class__:
+            return NotImplemented
+        return all(getattr(self, name) == getattr(other, name) for name in self._fields)
+
+    __hash__ = None  # type: ignore[assignment]
+
+    def __repr__(self) -> str:
+        fields = ", ".join(f"{name}={getattr(self, name)!r}" for name in self._fields)
+        return f"{type(self).__name__}({fields})"
+
+
+class CreateOp(_Op):
     """Create a native view for ``tag`` of element type ``type_name``.
 
     Attributes:
         tag: Unique integer identity assigned by the reconciler.
         type_name: Element type name (e.g. ``"Text"``).
         props: Initial *clean* props; callables have already been
-            routed to the [`EventRegistry`][pythonnative.events.EventRegistry]
-            and replaced by the ``_pn_events`` name set.
+            moved to the view's event handlers and replaced by the
+            ``_pn_events`` name set.
     """
 
+    __slots__ = ("tag", "type_name", "props")
+    _fields = __slots__
     tag: int
     type_name: str
-    props: Dict[str, Any] = field(default_factory=dict)
+    props: Dict[str, Any]
+
+    def __init__(self, tag: int, type_name: str, props: Optional[Dict[str, Any]] = None) -> None:
+        self.tag = tag
+        self.type_name = type_name
+        self.props = {} if props is None else props
 
 
-@dataclass(frozen=True)
-class UpdateOp:
+class UpdateOp(_Op):
     """Apply ``changed_props`` to the view registered under ``tag``.
 
     Removed props are signaled with ``UNSET``. ``None`` sets a nullable
@@ -83,12 +105,17 @@ class UpdateOp:
             Removed props appear with the ``UNSET`` sentinel.
     """
 
+    __slots__ = ("tag", "changed_props")
+    _fields = __slots__
     tag: int
-    changed_props: Dict[str, Any] = field(default_factory=dict)
+    changed_props: Dict[str, Any]
+
+    def __init__(self, tag: int, changed_props: Optional[Dict[str, Any]] = None) -> None:
+        self.tag = tag
+        self.changed_props = {} if changed_props is None else changed_props
 
 
-@dataclass(frozen=True)
-class InsertOp:
+class InsertOp(_Op):
     """Ensure the child view sits at ``index`` inside the parent view.
 
     Handlers must treat this as *move-aware*: if the child is already
@@ -103,13 +130,19 @@ class InsertOp:
             current child count.
     """
 
+    __slots__ = ("parent_tag", "child_tag", "index")
+    _fields = __slots__
     parent_tag: int
     child_tag: int
     index: int
 
+    def __init__(self, parent_tag: int, child_tag: int, index: int) -> None:
+        self.parent_tag = parent_tag
+        self.child_tag = child_tag
+        self.index = index
 
-@dataclass(frozen=True)
-class DestroyOp:
+
+class DestroyOp(_Op):
     """Release the native view registered under ``tag``.
 
     The backend drops its tag record and the native component manager
@@ -120,7 +153,12 @@ class DestroyOp:
         tag: Unique integer identity of the view to destroy.
     """
 
+    __slots__ = ("tag",)
+    _fields = __slots__
     tag: int
+
+    def __init__(self, tag: int) -> None:
+        self.tag = tag
 
 
 Mutation = Union[CreateOp, UpdateOp, InsertOp, DestroyOp]

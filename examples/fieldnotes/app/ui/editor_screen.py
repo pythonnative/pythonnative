@@ -13,7 +13,7 @@ from ..journal import journal
 from ..models import CONDITIONS, Entry, EntryDraft, Place, format_coordinate, parse_tags
 from . import entry_screen
 from .theme import Styles
-from .widgets import ActionButton, Banner, Field, PrimaryButton, Section, slots
+from .widgets import ActionButton, Banner, Field, PrimaryButton, Section
 
 LocationStatus = Literal["idle", "locating", "unavailable"]
 
@@ -164,54 +164,46 @@ def EditorScreen(entry_id: Optional[str] = None) -> pn.Node:
     return pn.KeyboardAvoidingView(
         pn.ScrollView(
             pn.Column(
-                *slots(
-                    conflict=(
-                        Banner(
-                            "This entry changed on another device.",
-                            "warning",
-                            action=pn.Button("Use latest", on_press=use_latest),
-                        )
-                        if conflicting
-                        else None
-                    ),
-                    problem=Banner(problem, "error") if problem else None,
-                    title=Field("Title", title, set_title, placeholder="Heron at the old mill"),
-                    notes=Field("Notes", body, set_body, placeholder="What did you notice?", multiline=True),
-                    tags=Field("Tags", tags, set_tags, placeholder="birds river", auto_capitalize="none"),
-                    conditions=pn.Column(
-                        pn.Text("Conditions", style=styles.caption),
-                        pn.SegmentedControl(
-                            segments=list(CONDITIONS),
-                            selected_index=CONDITIONS.index(conditions) if conditions in CONDITIONS else 0,
-                            on_change=lambda index: set_conditions(CONDITIONS[index]),
-                            tint_color=styles.colors.primary,
-                            accessibility_label="Conditions",
-                        ),
-                        style=pn.style(gap=4),
-                    ),
-                    where=Section(
-                        "Where",
-                        *slots(
-                            line=pn.Text(location_line, style=styles.body),
-                            name=(
-                                Field("Place name", place_name, set_place_name, placeholder="North ridge")
-                                if place
-                                else None
-                            ),
-                            actions=pn.View(
-                                ActionButton(
-                                    "Locate me",
-                                    "locate",
-                                    lambda: set_locating_attempt(locating_attempt + 1),
-                                    disabled=location == "locating",
-                                ),
-                                ActionButton("Remove", "x", lambda: set_place(None)) if place else None,
-                                style=pn.style(flex_direction="row", gap=8),
-                            ),
-                        ),
-                    ),
-                    save=PrimaryButton("Save entry", save, disabled=draft.is_empty),
+                (
+                    Banner(
+                        "This entry changed on another device.",
+                        "warning",
+                        action=pn.Button("Use latest", on_press=use_latest),
+                    )
+                    if conflicting
+                    else None
                 ),
+                Banner(problem, "error") if problem else None,
+                Field("Title", title, set_title, placeholder="Heron at the old mill"),
+                Field("Notes", body, set_body, placeholder="What did you notice?", multiline=True),
+                Field("Tags", tags, set_tags, placeholder="birds river", auto_capitalize="none"),
+                pn.Column(
+                    pn.Text("Conditions", style=styles.caption),
+                    pn.SegmentedControl(
+                        segments=list(CONDITIONS),
+                        selected_index=CONDITIONS.index(conditions) if conditions in CONDITIONS else 0,
+                        on_change=lambda index: set_conditions(CONDITIONS[index]),
+                        tint_color=styles.colors.primary,
+                        accessibility_label="Conditions",
+                    ),
+                    style=pn.style(gap=4),
+                ),
+                Section(
+                    "Where",
+                    pn.Text(location_line, style=styles.body),
+                    Field("Place name", place_name, set_place_name, placeholder="North ridge") if place else None,
+                    pn.View(
+                        ActionButton(
+                            "Locate me",
+                            "locate",
+                            lambda: set_locating_attempt(locating_attempt + 1),
+                            disabled=location == "locating",
+                        ),
+                        ActionButton("Remove", "x", lambda: set_place(None)) if place else None,
+                        style=pn.style(flex_direction="row", gap=8),
+                    ),
+                ),
+                PrimaryButton("Save entry", save, disabled=draft.is_empty),
                 style=styles.content,
             ),
             style=styles.screen,

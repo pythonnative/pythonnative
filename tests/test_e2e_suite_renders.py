@@ -653,3 +653,37 @@ def test_frame_callback_demo_advances_only_while_active(pn_clock: FakeClock, sui
     suite.press(suite.get_by_text("Check paused"))
     _advance(suite, pn_clock, 0.5)
     assert suite.get_by_text("Paused stays still: yes")
+
+
+def test_child_identity_demo_keeps_sibling_state(suite: RenderResult) -> None:
+    _open(suite, "child_identity")
+    suite.press(suite.get_by_text("Bump counter"))
+    suite.press(suite.get_by_text("Bump footer"))
+    suite.press(suite.get_by_text("Toggle banner"))
+    assert suite.get_by_text("Banner shown")
+    suite.press(suite.get_by_text("Add row"))
+    suite.press(suite.get_by_text("Add row"))
+    assert suite.get_by_text("Row 1")
+    assert suite.get_by_text("Counter: 1")
+    assert suite.get_by_text("Footer: 1")
+    assert suite.back()
+    suite.settle()
+
+
+def test_preemption_demo_commits_the_urgent_update_first(suite: RenderResult) -> None:
+    _open(suite, "preemption")
+    suite.press(suite.get_by_text("Render 120 rows"))
+    suite.settle()
+    assert suite.get_by_text("Rows version: 1")
+    assert suite.get_by_text("Taps: 1")
+    assert suite.get_by_text("Order: urgent first")
+    assert suite.back()
+    suite.settle()
+
+
+def test_strict_mode_demo_matches_the_build_mode(suite: RenderResult) -> None:
+    _open(suite, "strict_mode")
+    assert suite.get_by_text("Matches: yes")
+    assert suite.get_by_text("Effect runs: 2")
+    assert suite.back()
+    suite.settle()

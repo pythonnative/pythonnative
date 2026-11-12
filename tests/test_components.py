@@ -485,11 +485,11 @@ def test_fragment_with_key() -> None:
     assert "key" not in el.props
 
 
-def test_fragment_drops_none_children() -> None:
+def test_fragment_keeps_empty_slots() -> None:
     a = Text("a")
     c = Text("c")
-    el = Fragment(a, None, c, None)
-    assert el.children == (a, c)
+    el = Fragment(a, None, c, False)
+    assert el.children == (a, None, c, False)
 
 
 # ======================================================================

@@ -197,17 +197,14 @@ PrimaryButton(label, lambda: run_application_task(pro.buy()), disabled=state.bus
 
 Deleting an entry works the same way, since its screen goes away as it does.
 
-There's a subtler version of the same trap. `None` children are dropped before diffing,
-not kept as holes, so a banner appearing above a row of buttons shifts those buttons
-into new slots and remounts them. That loses their state and cancels whatever they're
-running. `widgets.slots` gives each child a fixed key:
+A conditional child is safe next to these buttons. `None` keeps its slot in the child
+list, so a banner appearing above a row of buttons doesn't shift them into new slots,
+and they keep their state and whatever they're running:
 
 ```python
 pn.Column(
-    *slots(
-        problem=Banner(problem, "warning") if problem else None,
-        shutter=PrimaryButton(shutter, take_picture),
-    ),
+    Banner(problem, "warning") if problem else None,
+    PrimaryButton(shutter, take_picture),
 )
 ```
 

@@ -231,12 +231,18 @@ def call_threadsafe(callback: Callable[..., Any], *args: Any) -> None:
 
 
 def call_on_application_thread(fn: Callable[[], None]) -> None:
-    """Execute Python work on its owner thread, inline when already there."""
+    """Execute Python work on its owner thread, inline when already there.
+
+    From another thread the work is queued as urgent input, so a
+    transition rendering on the loop yields to it.
+    """
     loop = get_loop()
     if _on_loop_thread(loop):
         fn()
     else:
-        loop.call_soon_threadsafe(fn)
+        from .scheduler import queue_urgent
+
+        queue_urgent(fn)
 
 
 def resolve_future(future: asyncio.Future[T], value: T) -> None:
@@ -288,6 +294,9 @@ def _shutdown_for_tests() -> None:
                 loop.close()
         _loop = _thread = _owner = None
         _application_scope = TaskScope()
+    from .scheduler import _reset_urgent_input
+
+    _reset_urgent_input()
 
 
 __all__ = [

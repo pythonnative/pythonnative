@@ -3,8 +3,9 @@
 Reconciliation is the process that turns a freshly produced
 [`Element`][pythonnative.Element] tree into the smallest set of native
 view mutations that bring the on-screen tree into agreement with it.
-This page covers the rules that govern keyed
-diffing, function components, providers, and error boundaries.
+This page covers the rules that govern child identity, keyed diffing,
+function components, transitions, strict mode, providers, and error
+boundaries.
 
 ## Why we need a reconciler
 
@@ -21,23 +22,31 @@ native side) and the props last applied.
 
 ## The diff algorithm in one paragraph
 
-For each pair of (previous, next) elements at the same position in the
-tree:
+For each pair of (previous, next) elements matched in a child list
+(see [Child identity](#child-identity)):
 
 - If their `type` matches, **update**: emit an
   [`UpdateOp`][pythonnative.mutations.UpdateOp] carrying only the
   props that changed (removed props arrive as `UNSET`; `None` is explicit null).
 - If their `type` differs, **replace**: emit destroy ops for the old
   subtree, create ops for the new one, and recurse into its children.
-- For container elements, match children by `key` first and by
-  position only if no key was provided. Reorder, mount, and unmount
-  as needed using [`InsertOp`][pythonnative.mutations.InsertOp] /
-  [`DestroyOp`][pythonnative.mutations.DestroyOp].
+- Mount new children, unmount children that no longer match, and move
+  native views with [`InsertOp`][pythonnative.mutations.InsertOp] /
+  [`DestroyOp`][pythonnative.mutations.DestroyOp] only when a native
+  container's children were created, destroyed, moved, or replaced.
 
-The reconciler runs synchronous render functions to completion on the
-application thread. Async components capture their provider environment across
-awaits. Changes to their inputs cancel obsolete work before it can publish.
-Expensive Python work delays callbacks and commits.
+The committed tree is updated in place. Each node is recorded in an undo
+journal before its first change in a pass, so a pass that fails, or a
+transition that's preempted, rolls back to the committed tree. A child
+list that keeps its shape (the same types and keys in the same slots)
+is updated child by child without building any lookup tables, and a
+native view whose props didn't change isn't touched at all.
+
+The reconciler runs synchronous render functions on the application
+thread. Async components capture their provider environment across
+awaits. Changes to their inputs cancel obsolete work before it can
+publish. Expensive Python work delays callbacks and commits, except
+that a [transition](#transitions-and-preemption) yields to urgent input.
 Native scrolling and [Motion](../guides/motion.md) (animations and
 worklets on the UI thread) run independently; see
 [Runtime limits](architecture.md#runtime-limits).
@@ -61,29 +70,77 @@ re-schedules itself more than fifty times raises
 `RuntimeError("Too many re-renders")` through the same path. See
 [Commits](bridge.md#commits) for validation and failure handling.
 
-Callable props never enter the transaction at all. They're registered
-in the [`EventRegistry`][pythonnative.events.EventRegistry] keyed by
-`(tag, event name)`, so a render that only changes callback identities
-emits **zero** ops.
+Callable props never enter the transaction at all. They stay on the
+view's node, and the [`EventRegistry`][pythonnative.events.EventRegistry]
+reads them from the node when native reports an event, so a render that
+only changes callback identities emits **zero** ops.
+
+## Child identity
+
+A child list is the positional children of a native element, a
+`Fragment`, a provider, or a boundary, or the value a component
+returns. Each entry occupies one **slot**, numbered from zero, as in
+React:
+
+| Entry | Slot holds |
+| --- | --- |
+| An element | That element |
+| `None`, `False`, `True` | Nothing, but the slot is kept |
+| A list, tuple, or generator | A group: an implicit fragment whose items form their own child list |
+| `pn.Fragment(...)`, keyed or not | A fragment node with its own child list |
+
+Within one child list:
+
+1. An element with a key matches the old child with the same key,
+   wherever it was.
+2. An element without a key matches the old unkeyed child in the same
+   slot.
+3. A match with a different type is replaced. A slot that was empty and
+   now holds an element is a mount; the reverse is an unmount.
+
+So conditional children never shift their siblings:
+
+```python
+@pn.component
+def Inbox() -> pn.Node:
+    query, set_query = pn.use_state("")
+    messages = use_messages()
+    return pn.Column(
+        pn.Button("Clear", on_press=lambda: set_query("")) if query else None,
+        SearchField(value=query, on_change=set_query),  # keeps its state
+        [MessageRow(m).with_key(m.id) for m in messages],
+        Footer(),                                       # never shifts
+    )
+```
+
+When the `Clear` button appears, `SearchField` stays in slot 1 and
+keeps its state. The list is one slot, a group, so `Footer` keeps its
+identity however many messages there are.
+
+`*items` unpacks into separate slots, so `pn.Column(*rows, Footer())`
+still shifts `Footer` when `rows` grows, exactly as spreading an array
+does in React. Pass the list itself instead. In development, a group of
+two or more elements without keys is reported once per component.
 
 ## Keyed children
 
-Without keys, children are matched by **index**. That's fine for static
-lists but breaks down when items are inserted or reordered:
+Within a group, children without keys are matched by **index**. That's
+fine for static lists but breaks down when items are inserted or
+reordered:
 
 ```python
 @pn.component
 def Inbox() -> pn.Node:
     msgs, set_msgs = pn.use_state([("a", "Hi"), ("b", "Hello")])
     return pn.Column(
-        *[pn.Text(text, key=mid) for mid, text in msgs],
+        [pn.Text(text, key=mid) for mid, text in msgs],
     )
 ```
 
 Without `key=mid`, inserting a new message at index `0` would update
 each existing `Text` in place rather than push them down, briefly
 showing the wrong text in each row. With keys, the reconciler matches
-"a" and "b" by identity, mounts the new row at index `0`, and shifts
+"a" and "b" by identity, mounts the new row at index `0`, and moves
 the others without re-rendering them.
 
 !!! tip "Choose keys from the data, not the position"
@@ -106,9 +163,10 @@ A `@pn.component` function is treated as an element type just like
    context.
 3. It recursively reconciles whatever the function returned, a
    [`Node`][pythonnative.element.Node]: a single
-   [`Element`][pythonnative.Element], a `list` or other iterable of
-   nodes (which mount as siblings at the component's position), or
-   `None` (which mounts nothing).
+   [`Element`][pythonnative.Element], a `list` or tuple of nodes (a
+   child list whose entries mount as siblings at the component's
+   position, with the slot rules above), or `None` (which mounts
+   nothing).
 
 Hook slots are matched by their position in the function body, which is
 why hooks must be called at the top level (not inside `if`/`for`). In
@@ -157,11 +215,65 @@ change) doesn't re-render the screens.
 ## Fragments and multi-child rendering
 
 [`Fragment`][pythonnative.Fragment] groups siblings without a wrapping
-native view: its children splice directly into the parent's native
-child list. `None` and `False` children are dropped everywhere, so
-conditional rendering with `cond and pn.Text(...)` needs no special
-casing. A keyed Fragment participates in keyed diffing as one unit,
-moving all of its children together.
+native view: its children mount as native siblings at its position in
+the parent's native child list. A fragment is a node of its own that
+occupies one slot, keyed or not, and its children are matched among
+themselves, like a list's. A keyed Fragment moves all of its children
+together.
+
+## Transitions and preemption
+
+Every render pass is **urgent** or a **transition**. State updates made
+inside [`start_transition`][pythonnative.start_transition], the
+`start_transition` that [`use_transition`][pythonnative.use_transition]
+returns, or a [`use_deferred_value`][pythonnative.use_deferred_value]
+catch-up are transition updates. They wait in their component's state
+queue, so urgent renders keep reading the old value, and they render in
+a pass of their own after urgent work.
+
+A transition pass checks for queued urgent input before each component
+body. The bridge queues presses, text changes, keys, submits, back
+presses, gesture ends, and navigation events as urgent input; scroll,
+gesture updates, layout, window metrics, and selection changes are
+coalesced and don't count. When input is waiting, and the pass hasn't
+sent anything to native yet, PythonNative:
+
+1. rolls the pass back, restoring every node and hook state it touched
+   and dropping its staged mutations and effects;
+2. runs the input's handler, renders its urgent updates, and commits
+   them;
+3. renders the transition again, replaying every queued update in its
+   original order.
+
+`is_pending` from `use_transition` stays `True` until the transition
+commits, across any number of restarts. A transition that's been
+preempted three times, or has been pending for 250 ms, renders without
+checking, so a stream of taps can't starve it.
+
+PythonNative doesn't slice renders the way React does on the web. Native
+views scroll, animate, and paint on the UI thread while Python renders,
+so a transition never needs to pause for the screen; it only needs to
+get out of the way of input.
+
+## Strict mode
+
+A preempted transition renders again, so a component body must be
+pure: a body that changes something outside itself would apply the
+change twice. [`StrictMode`][pythonnative.StrictMode] finds those
+bodies in development:
+
+```python
+pn.StrictMode(App())
+```
+
+For every component mounted beneath it, in development mode, the body
+runs twice per render (the first result is discarded), `use_state`
+initializers, updater functions, reducers, and `use_memo` factories
+run twice, and on mount each `use_effect` and `use_layout_effect` runs,
+cleans up, and runs again. Release builds ignore it. The `pn init`
+template wraps its root in `StrictMode`, and `pn lint` flags the most
+common impurity it exposes: assigning to a module-level name or
+mutating a module-level container in a component body.
 
 ## Portals
 
@@ -248,17 +360,19 @@ bottleneck.
 
 ## Elements and update priority
 
-Elements hold read-only property snapshots and tuple children. Values inside
-application props aren't deep-copied; replace mutable application data when its
-meaning changes. Component construction follows the decorated function's Python
-signature, including positional-only parameters, keyword-only parameters,
-variadic children, and normal argument errors.
+Elements are immutable: assigning an attribute raises, and
+[`with_key`][pythonnative.element.Element.with_key] copies one. An element
+keeps the props mapping its factory built rather than copying it, and its
+children are a tuple. Values inside application props aren't copied;
+replace mutable application data when its meaning changes. Component
+construction follows the decorated function's Python signature, including
+positional-only parameters, keyword-only parameters, variadic children,
+and normal argument errors.
 
-State setters and reducer dispatch functions retain their identity across renders.
-Deferred updates stay out of urgent renders. When deferred work runs, the state
-queue replays urgent updates in their original order so an urgent edit isn't lost.
-Python rendering remains cooperative: a long synchronous function cannot be
-preempted by a later urgent update.
+State setters and reducer dispatch functions retain their identity across
+renders. Transition updates stay out of urgent renders. When the
+transition renders, the state queue replays urgent updates in their
+original order so an urgent edit isn't lost.
 
 A native mount failure retires the surface and cancels its work. Validation
 failure before native mutation preserves the previous revision and can be retried.

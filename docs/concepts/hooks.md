@@ -451,7 +451,9 @@ the [Async + data guide](../guides/async.md):
   fetcher / wrap an async mutator with loading and error state.
 - [`use_transition`][pythonnative.use_transition] /
   [`use_deferred_value`][pythonnative.use_deferred_value]: mark
-  expensive updates as low priority so urgent updates paint first.
+  expensive updates as transitions, so urgent updates commit first and
+  a transition that's rendering when the user taps or types starts
+  over; see [Transitions and preemption](reconciliation.md#transitions-and-preemption).
 - [`use_persisted_state`][pythonnative.use_persisted_state]:
   `use_state` backed by [`AsyncStorage`][pythonnative.AsyncStorage].
 

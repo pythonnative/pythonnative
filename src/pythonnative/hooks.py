@@ -128,6 +128,9 @@ class RenderOwner(Protocol):
     def request_render(self) -> None:
         """Ask the host to flush dirty components (may be deferred)."""
 
+    def request_transition(self) -> None:
+        """Ask for a transition render after urgent work."""
+
     def register_back_handler(self, handler: Callable[[], bool]) -> Callable[[], None]:
         """Register a system back-press handler; returns an unregister callable."""
 
@@ -230,11 +233,13 @@ class HookState:
         "_async_task",
         "_async_inputs",
         "task_scope",
+        "strict",
+        "_strict_effects",
         "_journal_stamp",
         "__weakref__",
     )
 
-    _JOURNALED = (
+    _JOURNALED = (  # Kept for reference: the fields ``_capture`` records.
         "states",
         "_setters",
         "_state_queues",
@@ -311,6 +316,72 @@ class HookState:
         # render can be rolled back without double-queueing effects.
         self._pending_effects_mark: int = 0
         self._pending_layout_effects_mark: int = 0
+        # Strict mode (development only): bodies, initializers, updaters,
+        # and memo factories run twice, and mount effects run, clean up,
+        # and run again. ``_strict_effects`` holds the effect phases whose
+        # mount double-run is still due.
+        self.strict: bool = False
+        self._strict_effects: int = 0
+
+    def _capture(self) -> Tuple[Any, ...]:
+        """What a render pass can change, for the render journal.
+
+        A render replaces ``states`` entries, ``memos`` entries, and
+        ``resources`` entries, so those are copied. The effect queues only
+        grow during a render, so their lengths suffice. The effect and ref
+        slots grow only when a render calls a hook the previous one
+        didn't, and a slot left over by a rolled-back render reads as
+        a fresh one.
+        """
+        resources = self.resources
+        return (
+            self.states.copy(),
+            self.memos.copy(),
+            resources.copy() if resources else resources,
+            self._pending_effects,
+            len(self._pending_effects),
+            self._pending_layout_effects,
+            len(self._pending_layout_effects),
+            self._setters,
+            self._state_queues,
+            self._reducers,
+            self._dispatchers,
+            self.context_deps,
+            self.owner,
+            self.vnode,
+            self._dirty,
+            self._hook_signature,
+            self._component_name,
+            self._async_task,
+            self._async_inputs,
+            self.task_scope,
+        )
+
+    def _restore(self, values: Tuple[Any, ...]) -> None:
+        (
+            self.states,
+            self.memos,
+            self.resources,
+            self._pending_effects,
+            pending_effects,
+            self._pending_layout_effects,
+            pending_layout_effects,
+            self._setters,
+            self._state_queues,
+            self._reducers,
+            self._dispatchers,
+            self.context_deps,
+            self.owner,
+            self.vnode,
+            self._dirty,
+            self._hook_signature,
+            self._component_name,
+            self._async_task,
+            self._async_inputs,
+            self.task_scope,
+        ) = values
+        del self._pending_effects[pending_effects:]
+        del self._pending_layout_effects[pending_layout_effects:]
 
     # ------------------------------------------------------------------
     # Render lifecycle
@@ -327,7 +398,7 @@ class HookState:
         self.context_deps = {}
         if component_name:
             self._component_name = component_name
-        self._hook_log = [] if diagnostics.is_dev() else None
+        self._hook_log = [] if diagnostics._dev_mode else None
         self._pending_effects_mark = len(self._pending_effects)
         self._pending_layout_effects_mark = len(self._pending_layout_effects)
 
@@ -400,10 +471,14 @@ class HookState:
     # ------------------------------------------------------------------
 
     def flush_layout_effects(self) -> None:
-        """Run layout effects queued during render (commit phase, pre-paint)."""
+        """Run layout effects queued during render (commit phase, after native mounted it)."""
         pending = self._pending_layout_effects
         self._pending_layout_effects = []
         self._pending_layout_effects_mark = 0
+        if self._strict_effects & _LAYOUT_PHASE:
+            self._strict_effects &= ~_LAYOUT_PHASE
+            _run_effects(self.layout_effects, pending, self.task_scope)
+            _remount_effects(self.layout_effects, pending)
         _run_effects(self.layout_effects, pending, self.task_scope)
 
     def flush_pending_effects(self) -> None:
@@ -423,7 +498,36 @@ class HookState:
         pending = self._pending_effects
         self._pending_effects = []
         self._pending_effects_mark = 0
+        if self._strict_effects & _PASSIVE_PHASE:
+            self._strict_effects &= ~_PASSIVE_PHASE
+            _run_effects(self.effects, pending, self.task_scope)
+            _remount_effects(self.effects, pending)
         _run_effects(self.effects, pending, self.task_scope)
+
+    def apply_transition_updates(self) -> bool:
+        """Apply the state updates queued by transitions, in order; return whether state changed.
+
+        Urgent updates made after a transition update are queued too
+        (and were applied eagerly), so replaying the queue from its base
+        value keeps every update's order.
+        """
+        queues = self._state_queues
+        if not queues:
+            return False
+        self._state_queues = {}
+        if self.task_scope.closed:
+            return False
+        changed = False
+        states = self.states
+        for idx, (value, updates) in queues.items():
+            for update in updates:
+                value = update(value) if callable(update) else update
+            if not equal(states[idx], value):
+                states[idx] = value
+                changed = True
+        if changed:
+            self._dirty = True
+        return changed
 
     def cleanup_all_effects(self) -> None:
         """Run every outstanding cleanup function, then clear state.
@@ -514,7 +618,10 @@ def _deps_changed(prev: Any, current: Deps, ctx: Optional[HookState] = None, hoo
                 key=f"deps-length:{ctx._component_name}:{hook}",
             )
         return True
-    return any(not equal(p, c) for p, c in zip(prev, current))
+    for p, c in zip(prev, current):
+        if p is not c and not equal(p, c):
+            return True
+    return False
 
 
 def _copy_deps(deps: Deps) -> Optional[List[object]]:
@@ -531,13 +638,15 @@ def _run_effects(slots: List[Any], pending: List[Any], task_scope: Any) -> None:
     """
     error: BaseException | None = None
     for idx, effect_fn, deps in pending:
-        _, prev_cleanup = slots[idx]
-        slots[idx] = (_copy_deps(deps), None)
+        prev_cleanup = slots[idx][1]
+        copied = None if deps is None else list(deps)
+        slots[idx] = (copied, None)
         try:
-            _run_cleanup(prev_cleanup)
+            if prev_cleanup is not None:
+                _run_cleanup(prev_cleanup)
             token = _scope.set(task_scope)
             try:
-                slots[idx] = (_copy_deps(deps), _activate_effect(effect_fn))
+                slots[idx] = (copied, _activate_effect(effect_fn))
             finally:
                 _scope.reset(token)
         except Exception as exc:
@@ -558,6 +667,18 @@ def _run_cleanup(cleanup: Any) -> None:
                 diagnostics.warn(f"Effect cleanup raised {exc!r}")
 
 
+_LAYOUT_PHASE = 1
+_PASSIVE_PHASE = 2
+
+
+def _remount_effects(slots: List[Any], pending: List[Any]) -> None:
+    """Strict mode: run the cleanups of effects that just mounted, so they can mount again."""
+    for idx, _effect_fn, _deps in pending:
+        _deps_value, cleanup = slots[idx]
+        slots[idx] = (_SENTINEL, None)
+        _run_cleanup(cleanup)
+
+
 def _activate_effect(effect_fn: Callable) -> Any:
     """Invoke an effect callback, running coroutine effects as tasks.
 
@@ -568,7 +689,7 @@ def _activate_effect(effect_fn: Callable) -> Any:
     callable runs as the cleanup instead.
     """
     result = effect_fn()
-    if not inspect.isawaitable(result):
+    if result is None or not inspect.isawaitable(result):
         return result
 
     from .runtime import run_async
@@ -615,9 +736,9 @@ def _notify_state_changed(ctx: HookState) -> None:
     makes the subsequent render *local*: the host's trigger flushes
     only the components marked here rather than the whole app. The
     dirty mark is eager (so several setters coalesce), while the render
-    request respects [`batch_updates`][pythonnative.scheduler.batch_updates] and
-    defers to a later loop turn inside a transition (see
-    [`use_transition`][pythonnative.use_transition]).
+    request respects [`batch_updates`][pythonnative.scheduler.batch_updates].
+    Transition updates don't come through here: they wait in the hook
+    state's queues for the reconciler's transition pass.
     """
     ctx._dirty = True
     owner = ctx.owner
@@ -625,10 +746,7 @@ def _notify_state_changed(ctx: HookState) -> None:
         return
     if ctx.vnode is not None:
         owner.mark_dirty(ctx.vnode)
-    if in_transition():
-        owner.transitions.defer(owner.request_render)
-    else:
-        schedule_trigger(owner.request_render)
+    schedule_trigger(owner.request_render)
 
 
 # ======================================================================
@@ -679,17 +797,25 @@ def use_state(initial: Any = None) -> Tuple[Any, StateSetter[Any]]:
             )
         ```
     """
-    ctx = _require_hook_state("use_state")
-    ctx.record_hook("use_state")
-
+    ctx = _hook_context.get()
+    if ctx is None:
+        raise RuntimeError("use_state must be called inside a @component function")
+    if ctx._hook_log is not None:
+        ctx.record_hook("use_state")
     idx = ctx.state_index
-    ctx.state_index += 1
-
-    if idx >= len(ctx.states):
-        val = initial() if callable(initial) else initial
-        ctx.states.append(val)
-
-    return ctx.states[idx], _state_setter(ctx, idx)
+    ctx.state_index = idx + 1
+    states = ctx.states
+    if idx >= len(states):
+        if callable(initial):
+            if ctx.strict:
+                initial()
+            states.append(initial())
+        else:
+            states.append(initial)
+    setter = ctx._setters.get(idx)
+    if setter is None:
+        setter = _state_setter(ctx, idx)
+    return states[idx], setter
 
 
 def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
@@ -697,7 +823,7 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
         return ctx._setters[idx]
 
     def setter(update: Any) -> None:
-        deferred = in_transition() and ctx.owner is not None
+        deferred = ctx.owner is not None and in_transition()
 
         def apply() -> None:
             defer = getattr(ctx.owner, "defer_input", None)
@@ -718,18 +844,28 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
                     "Derive the value inline or move the update into use_effect.",
                     key=f"set-during-render:{ctx._component_name}",
                 )
-            if deferred:
-                if idx not in ctx._state_queues:
-                    ctx._state_queues[idx] = (ctx.states[idx], [])
-                    assert ctx.owner is not None
-                    ctx.owner.transitions.defer(flush)
-                ctx._state_queues[idx][1].append(update)
+            owner = ctx.owner
+            if deferred and owner is not None:
+                # The render reads the old value until the transition pass
+                # applies the queue (see HookState.apply_transition_updates).
+                queue = ctx._state_queues.get(idx)
+                if queue is None:
+                    ctx._state_queues[idx] = (ctx.states[idx], [update])
+                else:
+                    queue[1].append(update)
+                owner.transitions.add(ctx)
+                owner.request_transition()
                 return
             # An urgent update after skipped work is replayed when that work
             # commits, so functional and replacement updates retain their order.
             if idx in ctx._state_queues:
                 ctx._state_queues[idx][1].append(update)
-            value = update(ctx.states[idx]) if callable(update) else update
+            if callable(update):
+                if ctx.strict:
+                    update(ctx.states[idx])
+                value = update(ctx.states[idx])
+            else:
+                value = update
             if value is ctx.states[idx] and isinstance(value, (list, dict, set)) and diagnostics.is_dev():
                 diagnostics.warn_once(
                     f"{ctx._component_name or 'A component'} set state to the same {type(value).__name__} "
@@ -742,20 +878,6 @@ def _state_setter(ctx: HookState, idx: int) -> Callable[[Any], None]:
                 _notify_state_changed(ctx)
 
         call_on_application_thread(apply)
-
-    def flush() -> None:
-        defer = getattr(ctx.owner, "defer_input", None)
-        if defer is not None and defer(flush):
-            return
-        queued = ctx._state_queues.pop(idx, None)
-        if queued is None or ctx.task_scope.closed:
-            return
-        value, updates = queued
-        for update in updates:
-            value = update(value) if callable(update) else update
-        if not equal(ctx.states[idx], value):
-            ctx.states[idx] = value
-            _notify_state_changed(ctx)
 
     ctx._setters[idx] = setter
     return setter
@@ -787,14 +909,19 @@ def use_reducer(reducer: Callable[[S, A], S], initial: Union[S, Callable[[], S]]
         RuntimeError: If called outside a ``@component`` function.
     """
     ctx = _require_hook_state("use_reducer")
-    ctx.record_hook("use_reducer")
+    if ctx._hook_log is not None:
+        ctx.record_hook("use_reducer")
 
     idx = ctx.state_index
     ctx.state_index += 1
 
     if idx >= len(ctx.states):
-        val = initial() if callable(initial) else initial
-        ctx.states.append(val)
+        if callable(initial):
+            if ctx.strict:
+                initial()
+            ctx.states.append(initial())
+        else:
+            ctx.states.append(initial)
 
     ctx._reducers[idx] = reducer
     if idx not in ctx._dispatchers:
@@ -867,19 +994,20 @@ def use_effect(effect: Callable[[], Any], deps: Deps = None) -> None:
             return pn.Text(now)
         ```
     """
-    ctx = _require_hook_state("use_effect")
-    ctx.record_hook("use_effect")
-
+    ctx = _hook_context.get()
+    if ctx is None:
+        raise RuntimeError("use_effect must be called inside a @component function")
+    if ctx._hook_log is not None:
+        ctx.record_hook("use_effect")
     idx = ctx.effect_index
-    ctx.effect_index += 1
-
-    if idx >= len(ctx.effects):
-        ctx.effects.append((_SENTINEL, None))
+    ctx.effect_index = idx + 1
+    effects = ctx.effects
+    if idx >= len(effects):
+        effects.append((_SENTINEL, None))
         ctx._pending_effects.append((idx, effect, deps))
         return
-
-    prev_deps, _prev_cleanup = ctx.effects[idx]
-    if _deps_changed(prev_deps, deps, ctx, "use_effect"):
+    prev_deps = effects[idx][0]
+    if prev_deps is _SENTINEL or prev_deps is None or deps is None or _deps_changed(prev_deps, deps, ctx, "use_effect"):
         ctx._pending_effects.append((idx, effect, deps))
 
 
@@ -909,7 +1037,8 @@ def use_layout_effect(effect: Callable[[], Any], deps: Deps = None) -> None:
         RuntimeError: If called outside a ``@component`` function.
     """
     ctx = _require_hook_state("use_layout_effect")
-    ctx.record_hook("use_layout_effect")
+    if ctx._hook_log is not None:
+        ctx.record_hook("use_layout_effect")
 
     idx = ctx.layout_effect_index
     ctx.layout_effect_index += 1
@@ -948,23 +1077,31 @@ def use_memo(factory: Callable[[], T], deps: Deps = None) -> T:
     Raises:
         RuntimeError: If called outside a ``@component`` function.
     """
-    ctx = _require_hook_state("use_memo")
-    ctx.record_hook("use_memo")
+    ctx = _hook_context.get()
+    if ctx is None:
+        raise RuntimeError("use_memo must be called inside a @component function")
+    return _memo(ctx, "use_memo", factory, deps)
 
+
+def _memo(ctx: HookState, hook: str, factory: Callable[[], T], deps: Deps) -> T:
+    if ctx._hook_log is not None:
+        ctx.record_hook(hook)
     idx = ctx.memo_index
-    ctx.memo_index += 1
-
-    if idx >= len(ctx.memos):
+    ctx.memo_index = idx + 1
+    memos = ctx.memos
+    if idx < len(memos):
+        prev_deps, prev_value = memos[idx]
+        if not _deps_changed(prev_deps, deps, ctx, hook):
+            return prev_value  # type: ignore[no-any-return,unused-ignore]
+        if ctx.strict:
+            factory()
         value = factory()
-        ctx.memos.append((_copy_deps(deps), value))
+        memos[idx] = (None if deps is None else list(deps), value)
         return value
-
-    prev_deps, prev_value = ctx.memos[idx]
-    if not _deps_changed(prev_deps, deps, ctx, "use_memo"):
-        return prev_value
-
+    if ctx.strict:
+        factory()
     value = factory()
-    ctx.memos[idx] = (_copy_deps(deps), value)
+    memos.append((None if deps is None else list(deps), value))
     return value
 
 
@@ -985,7 +1122,22 @@ def use_callback(callback: F, deps: Deps = None) -> F:
     Returns:
         A callable with stable identity across renders (until ``deps`` change).
     """
-    return use_memo(lambda: callback, deps)
+    ctx = _hook_context.get()
+    if ctx is None:
+        raise RuntimeError("use_callback must be called inside a @component function")
+    if ctx._hook_log is not None:
+        ctx.record_hook("use_memo")
+    idx = ctx.memo_index
+    ctx.memo_index = idx + 1
+    memos = ctx.memos
+    if idx < len(memos):
+        prev_deps, prev_value = memos[idx]
+        if not _deps_changed(prev_deps, deps, ctx, "use_memo"):
+            return prev_value  # type: ignore[no-any-return,unused-ignore]
+        memos[idx] = (None if deps is None else list(deps), callback)
+        return callback
+    memos.append((None if deps is None else list(deps), callback))
+    return callback
 
 
 @overload
@@ -1022,11 +1174,14 @@ def use_ref(initial: Any = None) -> Ref[Any]:
     Raises:
         RuntimeError: If called outside a ``@component`` function.
     """
-    ctx = _require_hook_state("use_ref")
-    ctx.record_hook("use_ref")
+    ctx = _hook_context.get()
+    if ctx is None:
+        raise RuntimeError("use_ref must be called inside a @component function")
+    if ctx._hook_log is not None:
+        ctx.record_hook("use_ref")
 
     idx = ctx.ref_index
-    ctx.ref_index += 1
+    ctx.ref_index = idx + 1
 
     if idx >= len(ctx.refs):
         ref: Ref[Any] = Ref(initial)
@@ -1128,7 +1283,8 @@ def use_resource(fetcher: Callable[[], Any], deps: Deps = None) -> Resource[Any]
     from .suspense import start_resource
 
     ctx = _require_hook_state("use_resource")
-    ctx.record_hook("use_resource")
+    if ctx._hook_log is not None:
+        ctx.record_hook("use_resource")
 
     idx = ctx.resource_index
     ctx.resource_index += 1
@@ -1153,12 +1309,20 @@ def use_transition() -> Tuple[bool, Callable[[Callable[[], None]], None]]:
     """Return ``(is_pending, start_transition)`` for low-priority updates.
 
     State updates made inside ``start_transition(fn)`` are marked as
-    *transitions*: instead of re-rendering synchronously, their render
-    is deferred to a later turn of the framework loop, so urgent
-    updates (typing, presses) queued in the meantime render first.
+    *transitions*. Their render runs after urgent work, and it can be
+    preempted: if the user taps, types, or presses back while a
+    transition is rendering, PythonNative abandons that render before
+    anything reaches the screen, handles the input, commits its urgent
+    update, and then renders the transition again. Until the transition
+    commits, components keep rendering the old values.
+
     ``is_pending`` is ``True`` from the moment ``start_transition`` is
-    called until the deferred render has committed, which is exactly
-    when to show a lightweight busy indicator.
+    called until the transition has committed, across any number of
+    restarts, which is exactly when to show a lightweight busy
+    indicator.
+
+    A transition abandoned three times, or pending for 250 ms, renders
+    without yielding, so a stream of input can't starve it.
 
     Returns:
         A 2-tuple ``(is_pending, start_transition)``.
@@ -1180,7 +1344,8 @@ def use_transition() -> Tuple[bool, Callable[[Callable[[], None]], None]]:
 
             return pn.Column(
                 pn.TextInput(value=query, on_change=on_change),
-                pn.ActivityIndicator() if is_pending else Results(results_for),
+                pn.ActivityIndicator() if is_pending else None,
+                Results(results_for),
             )
         ```
     """
@@ -1189,13 +1354,13 @@ def use_transition() -> Tuple[bool, Callable[[Callable[[], None]], None]]:
     is_pending, set_pending = use_state(False)
 
     def start_transition(fn: Callable[[], None]) -> None:
-        owner = ctx.owner
-        if owner is None:
+        if ctx.owner is None:
             fn()
             return
         set_pending(True)
         run_in_transition(fn)
-        owner.transitions.on_complete(lambda: set_pending(False))
+        # Clearing the flag is part of the transition, so it commits with it.
+        run_in_transition(lambda: set_pending(False))
 
     start = use_callback(start_transition, [])  # pn: ignore[PN103] ctx is this component's own hook state
     return is_pending, start
@@ -1204,11 +1369,12 @@ def use_transition() -> Tuple[bool, Callable[[Callable[[], None]], None]]:
 def use_deferred_value(value: T) -> T:
     """Return a copy of ``value`` that lags behind during fast updates.
 
-    The returned value updates in a deferred (transition-priority)
-    render after the urgent render that changed ``value`` has
-    committed. Pass the deferred value to expensive subtrees (a
-    filtered list, a chart) so the urgent part of the UI stays
-    responsive while the expensive part catches up a beat later.
+    The returned value updates in a transition render after the urgent
+    render that changed ``value`` has committed. Pass the deferred value
+    to expensive subtrees (a filtered list, a chart) so the urgent part
+    of the UI stays responsive while the expensive part catches up. If
+    ``value`` changes again while that render is in progress, the render
+    is abandoned and starts over for the newer value.
 
     Args:
         value: The latest value.
@@ -1706,7 +1872,8 @@ def use_context(context: Context[T]) -> T:
         RuntimeError: If called outside a ``@component`` function.
     """
     ctx = _require_hook_state("use_context")
-    ctx.record_hook("use_context")
+    if ctx._hook_log is not None:
+        ctx.record_hook("use_context")
     value = context.current()
     ctx.context_deps[id(context)] = value
     consumers = context._consumers()
