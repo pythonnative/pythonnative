@@ -411,8 +411,12 @@ bridge connected, app imported, first render finished, first commit
 acknowledged. One line is logged per launch, in release builds too:
 
 ```text
-[PN] startup: framework 182 ms, contracts 9 ms, app 310 ms, render 41 ms, commit 28 ms
+[PN] startup: framework 182 ms, contracts 9 ms, bridge 30 ms, app 310 ms, render 41 ms, commit 28 ms, total 640 ms
 ```
+
+`framework` runs from the first line of `pythonnative/__init__.py` to its
+last, so interpreter startup isn't included. `total` includes the gaps
+between phases.
 
 `pn.diagnostics.startup_timeline()` returns the same marks as a mapping,
 and they're reported through the existing profiling counters.
@@ -426,9 +430,13 @@ and they're reported through the existing profiling counters.
 - `svg`, the list components, `sdk.plugin`, and the native module facades
   join the lazy groups in `pythonnative/__init__.py`. Their names resolve
   on first use, as navigation and networking do today.
-- `@pn.component` no longer parses source at definition. It records the
-  function, and `refresh.hook_signature` reads the module's source, kept
-  from the last load, when Fast Refresh first compares two versions.
+- `@pn.component` no longer parses source at definition. In development
+  it keeps the defining module's source lines (and those of hooks it calls
+  from other modules), read once per module load, and
+  `refresh_signature` parses them when Fast Refresh first compares two
+  versions. Hot reload keeps the source of unchanged modules before it
+  reloads them. Keeping source only at reload would miss the first edit,
+  because `pn preview` edits files in place.
 - `MODULE_BUDGET` in `tests/test_performance_budgets.py` is lowered to
   the new count, and a new budget bounds the dataclass definitions
   executed by `import pythonnative`.
@@ -461,7 +469,7 @@ a 300-component transition is rendering), and results are recorded in
 
 ### Tooling, docs, and examples
 
-- `pn lint` gains a rule for the most common impurity strict mode
+- `pn lint` gains `PN105` for the most common impurity strict mode
   exposes: assigning to a module-level name or mutating a module-level
   container inside a component body.
 - `docs/concepts/reconciliation.md`, `docs/concepts/hooks.md`,

@@ -34,6 +34,7 @@ env:
 - runFlow: flows/components/picker.yaml
 - runFlow: flows/components/refresh_control.yaml
 - runFlow: flows/components/fragment.yaml
+- runFlow: flows/components/strict_mode.yaml
 - runFlow: flows/components/portal.yaml
 - runFlow: flows/components/error_boundary.yaml
 - runFlow: flows/components/spacer.yaml
@@ -122,6 +123,8 @@ env:
 - runFlow: flows/alerts/confirm_alert.yaml
 - runFlow: flows/storage/async_storage.yaml
 - runFlow: flows/runtime/run_async.yaml
+- runFlow: flows/runtime/child_identity.yaml
+- runFlow: flows/runtime/preemption.yaml
 - runFlow: flows/platform/platform_info.yaml
 - runFlow: flows/device/keyboard.yaml
 - runFlow: flows/device/dimensions.yaml

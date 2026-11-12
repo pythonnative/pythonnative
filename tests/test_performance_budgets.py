@@ -69,8 +69,8 @@ LAZY_SUBSYSTEMS = (
 MODULE_BUDGET = 48
 """Upper bound on ``pythonnative`` modules loaded by ``import pythonnative`` (46 at RFC 0010)."""
 
-DATACLASS_BUDGET = 30
-"""Upper bound on dataclass definitions ``import pythonnative`` executes (29 at RFC 0010).
+DATACLASS_BUDGET = 25
+"""Upper bound on dataclass definitions ``import pythonnative`` executes (24 at RFC 0010).
 
 Each costs an ``exec`` of generated methods, about a millisecond on a laptop.
 Framework classes that are dataclasses only for convenience are slotted
@@ -219,34 +219,39 @@ def test_release_renders_never_validate_props_in_python(monkeypatch: pytest.Monk
 # The benchmark tree from ``scripts/benchmark-runtime.py``: 300 keyed
 # components whose props all change. Python and built-in function calls
 # are counted with ``sys.setprofile``, which is deterministic where a
-# clock isn't. Each budget is the shipped count plus 15%.
+# clock isn't, in a fresh interpreter so other tests' leftover state
+# (registered contracts, plugins, caches) can't move the count. Each
+# budget is the shipped count plus 15%.
 
-RERENDER_CALL_BUDGET = 191_779
+RERENDER_CALL_BUDGET = 64_325
 """Function calls to re-render the 300-component grid in release mode."""
 
-MOUNT_CALL_BUDGET = 286_422
+MOUNT_CALL_BUDGET = 128_236
 """Function calls to mount the 300-component grid in release mode."""
+
+_CALLS = """
+import gc, json, sys
+import pythonnative as pn
+from pythonnative import diagnostics
+from pythonnative.testing import render
 
 
 @pn.component
-def _BenchCell(label: str, n: int) -> pn.Node:
+def Cell(label: str, n: int) -> pn.Node:
     value, _set_value = pn.use_state(0)
     pn.use_effect(lambda: None, [n])
     return pn.Row(pn.Text(label), pn.Text(str(n + value)), style=pn.style(padding=4))
 
 
 @pn.component
-def _BenchGrid(n: int) -> pn.Node:
-    return pn.Column(*(_BenchCell(f"cell {i}", n).with_key(str(i)) for i in range(300)))
+def Grid(n: int) -> pn.Node:
+    return pn.Column(*(Cell(f"cell {i}", n).with_key(str(i)) for i in range(300)))
 
 
-def _count_calls(action: Any) -> int:
-    """Count the Python and built-in calls ``action`` makes on this thread."""
-    import gc
-
+def count(action):
     calls = 0
 
-    def profile(frame: Any, event: str, arg: Any) -> None:
+    def profile(frame, event, arg):
         nonlocal calls
         if event == "call" or event == "c_call":
             calls += 1
@@ -261,29 +266,28 @@ def _count_calls(action: Any) -> int:
     return calls
 
 
-@pytest.fixture
-def release_mode() -> Any:
-    diagnostics.set_dev_mode(False)
-    try:
-        yield
-    finally:
-        diagnostics.set_dev_mode(True)
+diagnostics.set_dev_mode(False)
+tree = render(Grid(0), viewport=None)
+tree.rerender(Grid(1))
+rerender = count(lambda: tree.rerender(Grid(2)))
+trees = []
+mount = count(lambda: trees.append(render(Grid(0), viewport=None)))
+print(json.dumps({"rerender": rerender, "mount": mount}))
+"""
 
 
-def test_rerender_call_budget(release_mode: None) -> None:
-    tree = render(_BenchGrid(0), viewport=None)
-    tree.rerender(_BenchGrid(1))
-    calls = _count_calls(lambda: tree.rerender(_BenchGrid(2)))
-    tree.unmount()
-    assert calls <= RERENDER_CALL_BUDGET, calls
+@pytest.fixture(scope="module")
+def call_counts() -> Any:
+    result = subprocess.run([sys.executable, "-c", _CALLS], capture_output=True, text=True, check=True)
+    return json.loads(result.stdout.strip().splitlines()[-1])
 
 
-def test_mount_call_budget(release_mode: None) -> None:
-    trees: List[Any] = []
-    render(_BenchGrid(0), viewport=None).unmount()
-    calls = _count_calls(lambda: trees.append(render(_BenchGrid(0), viewport=None)))
-    trees[0].unmount()
-    assert calls <= MOUNT_CALL_BUDGET, calls
+def test_rerender_call_budget(call_counts: Any) -> None:
+    assert call_counts["rerender"] <= RERENDER_CALL_BUDGET, call_counts
+
+
+def test_mount_call_budget(call_counts: Any) -> None:
+    assert call_counts["mount"] <= MOUNT_CALL_BUDGET, call_counts
 
 
 def test_a_pass_where_nothing_changed_records_only_the_rendered_component(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -271,9 +271,9 @@ runs twice per render (the first result is discarded), `use_state`
 initializers, updater functions, reducers, and `use_memo` factories
 run twice, and on mount each `use_effect` and `use_layout_effect` runs,
 cleans up, and runs again. Release builds ignore it. The `pn init`
-template wraps its root in `StrictMode`, and `pn lint` flags the most
-common impurity it exposes: assigning to a module-level name or
-mutating a module-level container in a component body.
+template wraps its root in `StrictMode`, and `pn lint` rule `PN105`
+flags the most common impurity it exposes: assigning to a module-level
+name or mutating a module-level container in a component body.
 
 ## Portals
 
