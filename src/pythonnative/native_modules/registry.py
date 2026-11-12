@@ -590,6 +590,18 @@ def dispatch_module_message(module: str, message: Dict[str, Any]) -> None:
 
 _hooks: Dict[tuple, List[Listener]] = {}
 
+# Built-in facades that keep state from native pushes, by module name. They
+# load on first use, so the first event for one imports it before delivery.
+_EVENT_FACADES: Dict[str, str] = {
+    "AccessibilityInfo": "accessibility_info",
+    "AppState": "app_state",
+    "Battery": "battery",
+    "Keyboard": "keyboard",
+    "Linking": "linking",
+    "Localization": "localization",
+    "NetInfo": "net_info",
+}
+
 
 def on_event(module: str, event: str, callback: Listener) -> Callable[[], None]:
     """Subscribe to ``module``/``event`` without resolving the module.
@@ -622,6 +634,11 @@ def emit(module: str, event: str, payload: Any = None) -> None:
     """
     from ..sdk.schema import MODULES
 
+    facade = _EVENT_FACADES.get(module)
+    if facade is not None:
+        import importlib
+
+        importlib.import_module(f"{__package__}.{facade}")
     contract = MODULES.get(module)
     if contract is not None and contract.events:
         payload = contract.decode_event(event, payload)

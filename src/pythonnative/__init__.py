@@ -89,7 +89,7 @@ __version__ = "0.54.0"
 import importlib
 from typing import TYPE_CHECKING, Any
 
-from . import appearance, sdk, svg
+from . import appearance, sdk
 from .alerts import Alert
 from .assets import Asset, asset
 from .component import Component, component, memo
@@ -102,7 +102,6 @@ from .components import (
     ContentSizeEvent,
     DatePicker,
     ErrorBoundary,
-    FlatList,
     Fragment,
     Image,
     ImageBackground,
@@ -112,7 +111,6 @@ from .components import (
     KeyPressEvent,
     LayoutEvent,
     LinearGradient,
-    ListController,
     Modal,
     Picker,
     Portal,
@@ -125,14 +123,12 @@ from .components import (
     SafeAreaView,
     ScrollEvent,
     ScrollView,
-    SectionList,
     SegmentedControl,
     SelectionEvent,
     Slider,
     Spacer,
     StatusBar,
     Suspense,
-    Svg,
     Switch,
     Text,
     TextInput,
@@ -174,36 +170,6 @@ from .hooks import (
     use_subscription,
     use_transition,
     use_window_dimensions,
-)
-from .native_modules import (
-    AccessibilityEvent,
-    AccessibilityInfo,
-    AppState,
-    Battery,
-    Clipboard,
-    Device,
-    DeviceInfo,
-    Dimensions,
-    DimensionsEvent,
-    FileSystem,
-    Haptics,
-    Images,
-    ImageSize,
-    Keyboard,
-    KeyboardEvent,
-    Linking,
-    Locale,
-    Localization,
-    NetInfo,
-    Permissions,
-    PixelRatio,
-    SecureStore,
-    Share,
-    use_app_state,
-    use_locales,
-    use_net_info,
-    use_reduce_motion,
-    use_screen_reader_enabled,
 )
 from .platform import Platform
 from .platform_metrics import WindowDimensions
@@ -487,8 +453,6 @@ __all__ = [
     "sdk",
 ]
 
-from .list_data import ListData, Section, ViewableItem
-
 # Subsystems an app may never touch load on first use (PEP 562), so
 # ``import pythonnative`` stays fast on a phone. Names, ``__all__``, and
 # documentation are unchanged, and type checkers see ordinary imports.
@@ -517,9 +481,42 @@ _LAZY_GROUPS: dict[str, tuple[str, ...]] = {
         "worklet",
     ),
     "components.bottom_sheet": ("BottomSheet", "BottomSheetHandle"),
+    "components.lists": ("FlatList", "ListController", "SectionList"),
     "components.swipeable": ("Swipeable", "SwipeableHandle"),
+    "components.vector": ("Svg",),
     "gestures": ("GestureSpec", "SwipeDirection"),
     "icons": ("Icon", "IconName"),
+    "list_data": ("ListData", "Section", "ViewableItem"),
+    "native_modules": (
+        "AccessibilityEvent",
+        "AccessibilityInfo",
+        "AppState",
+        "Battery",
+        "Clipboard",
+        "Device",
+        "DeviceInfo",
+        "Dimensions",
+        "DimensionsEvent",
+        "FileSystem",
+        "Haptics",
+        "ImageSize",
+        "Images",
+        "Keyboard",
+        "KeyboardEvent",
+        "Linking",
+        "Locale",
+        "Localization",
+        "NetInfo",
+        "Permissions",
+        "PixelRatio",
+        "SecureStore",
+        "Share",
+        "use_app_state",
+        "use_locales",
+        "use_net_info",
+        "use_reduce_motion",
+        "use_screen_reader_enabled",
+    ),
     "navigation": (
         "DrawerNavigator",
         "Group",
@@ -544,14 +541,17 @@ _LAZY_GROUPS: dict[str, tuple[str, ...]] = {
     "websocket": ("WebSocket", "WebSocketClosed", "WebSocketError"),
 }
 _LAZY = {name: module for module, names in _LAZY_GROUPS.items() for name in names}
-_LAZY_MODULES = frozenset({"gestures", "icons", "motion"})
+_LAZY_MODULES = frozenset({"gestures", "icons", "motion", "svg"})
 
 if TYPE_CHECKING:
-    from . import gestures, icons, motion
+    from . import gestures, icons, motion, svg
     from .components.bottom_sheet import BottomSheet, BottomSheetHandle
+    from .components.lists import FlatList, ListController, SectionList
     from .components.swipeable import Swipeable, SwipeableHandle
+    from .components.vector import Svg
     from .gestures import GestureSpec, SwipeDirection
     from .icons import Icon, IconName
+    from .list_data import ListData, Section, ViewableItem
     from .motion import (
         Easing,
         FrameInfo,
@@ -574,6 +574,36 @@ if TYPE_CHECKING:
         with_spring,
         with_timing,
         worklet,
+    )
+    from .native_modules import (
+        AccessibilityEvent,
+        AccessibilityInfo,
+        AppState,
+        Battery,
+        Clipboard,
+        Device,
+        DeviceInfo,
+        Dimensions,
+        DimensionsEvent,
+        FileSystem,
+        Haptics,
+        Images,
+        ImageSize,
+        Keyboard,
+        KeyboardEvent,
+        Linking,
+        Locale,
+        Localization,
+        NetInfo,
+        Permissions,
+        PixelRatio,
+        SecureStore,
+        Share,
+        use_app_state,
+        use_locales,
+        use_net_info,
+        use_reduce_motion,
+        use_screen_reader_enabled,
     )
     from .navigation import (
         DrawerNavigator,
