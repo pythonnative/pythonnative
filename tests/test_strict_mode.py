@@ -73,6 +73,19 @@ def test_strict_mode_runs_updaters_and_reducers_twice_but_not_update_effects() -
     assert result.text() == ["a 1 2 5"]
 
 
+def test_strict_mode_runs_transition_updaters_and_reducers_twice() -> None:
+    diagnostics.set_dev_mode(True)
+    result = render(pn.StrictMode(pn.Column(Probe("a"))))
+    log.clear()
+    pn.start_transition(handles["increment"])
+    pn.start_transition(lambda: handles["dispatch"](5))
+    assert "updater" not in log and "reduce" not in log, "transition updates wait for their pass"
+    result.settle()
+    assert log.count("updater") == 2
+    assert log.count("reduce") == 2
+    assert result.text() == ["a 1 2 5"]
+
+
 def test_strict_mode_does_nothing_in_release_builds() -> None:
     diagnostics.set_dev_mode(False)
     render(pn.StrictMode(Probe("a")))

@@ -231,11 +231,20 @@ catch-up are transition updates. They wait in their component's state
 queue, so urgent renders keep reading the old value, and they render in
 a pass of their own after urgent work.
 
+Only component state waits. A [`Store`][pythonnative.Store], or any
+source read through [`use_subscription`][pythonnative.use_subscription],
+holds its new value as soon as it's written, so its subscribers
+re-render urgently even when the write happens inside a transition.
+Otherwise one subscriber could show the new value while another still
+showed the old one.
+
 A transition pass checks for queued urgent input before each component
 body. The bridge queues presses, text changes, keys, submits, back
 presses, gesture ends, and navigation events as urgent input; scroll,
 gesture updates, layout, window metrics, and selection changes are
-coalesced and don't count. When input is waiting, and the pass hasn't
+coalesced and don't count. Neither does work from another thread, such
+as a state setter a worker calls: it isn't input, and it runs once the
+pass finishes. When input is waiting, and the pass hasn't
 sent anything to native yet, PythonNative:
 
 1. rolls the pass back, restoring every node and hook state it touched
@@ -248,7 +257,8 @@ sent anything to native yet, PythonNative:
 `is_pending` from `use_transition` stays `True` until the transition
 commits, across any number of restarts. A transition that's been
 preempted three times, or has been pending for 250 ms, renders without
-checking, so a stream of taps can't starve it.
+checking, so a stream of taps can't starve it. A transition started by
+the commit of another (from an effect, say) gets a fresh count and clock.
 
 PythonNative doesn't slice renders the way React does on the web. Native
 views scroll, animate, and paint on the UI thread while Python renders,

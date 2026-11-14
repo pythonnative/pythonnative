@@ -502,7 +502,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 self._pending_journal = journal
 
     def _pass_finished(self) -> None:
-        """After a pass settles: reset transition counters, or schedule the transition still waiting."""
+        """After a pass settles: reset the counters of a committed transition, and schedule any transition waiting."""
         if self._transition_pass:
             self._transition_pass = False
             self.transitions.committed()
@@ -542,6 +542,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._dirty_boundaries.clear()
         self._dirty_suspense.clear()
         self._strict = 0
+        # A rolled-back transition didn't commit: keep its starvation counters.
+        self._transition_pass = False
         self._commit_iterator = None
         self._pending_future = None
         self._pending_journal = None

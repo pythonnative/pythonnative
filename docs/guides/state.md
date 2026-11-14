@@ -210,7 +210,8 @@ def App() -> pn.Node:
   may be a fresh lambda on every render.
 - **Writes apply immediately.** `store.get()` returns the new value as
   soon as `set` or `update` returns, on any thread. Subscribed
-  components re-render on the application thread like any state update.
+  components re-render on the application thread like any state update,
+  and urgently even inside a transition, so they never disagree.
 - **Unchanged values don't notify.** Setting a value equal to the
   current one does nothing, under the same equality rule the
   reconciler uses.
@@ -330,9 +331,11 @@ def Search() -> pn.Node:
 
 `set_query` is urgent, so the field updates on the next frame.
 `shown` catches up in a transition render, which PythonNative abandons
-and starts over if the user types again before it finishes. From code
-outside a component, such as a store action, wrap the update in
-[`pn.start_transition`][pythonnative.start_transition].
+and starts over if the user types again before it finishes. Where no
+`use_transition` is at hand, such as a helper that receives a setter,
+wrap the update in [`pn.start_transition`][pythonnative.start_transition].
+Only component state waits for a transition: a store write is visible at
+once, so its subscribers re-render urgently.
 
 A render that's abandoned runs again, so component bodies must be pure:
 compute from props, state, and context, and leave everything else to

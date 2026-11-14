@@ -77,7 +77,7 @@ from .element import Element, Node
 from .equality import equal
 from .platform_metrics import SafeAreaInsets, WindowDimensions
 from .runtime import TaskScope, _scope, call_on_application_thread
-from .scheduler import TransitionQueue, in_transition, run_in_transition, schedule_trigger
+from .scheduler import TransitionQueue, in_transition, run_in_transition, run_urgently, schedule_trigger
 from .suspense import Resource
 
 T = TypeVar("T")
@@ -519,9 +519,16 @@ class HookState:
             return False
         changed = False
         states = self.states
+        strict = self.strict
         for idx, (value, updates) in queues.items():
             for update in updates:
-                value = update(value) if callable(update) else update
+                if callable(update):
+                    if strict:
+                        # Strict mode: run the updater (or reducer) twice, as urgent updates do.
+                        update(value)
+                    value = update(value)
+                else:
+                    value = update
             if not equal(states[idx], value):
                 states[idx] = value
                 changed = True
@@ -1635,6 +1642,10 @@ def use_subscription(subscribe: Callable[[Callable[[], None]], Callable[[], None
         get_snapshot: Zero-arg callable returning the current value.
             Re-read on every render.
 
+    A store change re-renders its subscribers urgently, even when it's
+    written inside a transition: the store already holds the new value,
+    so deferring the re-render would show subscribers out of step.
+
     Returns:
         The current snapshot.
 
@@ -1654,7 +1665,10 @@ def use_subscription(subscribe: Callable[[Callable[[], None]], Callable[[], None
             current = getter.current()
             if not equal(observed.current, current):
                 observed.current = current
-                set_tick(lambda n: n + 1)
+                # Urgent even inside a transition: the store already holds
+                # the new value, and every render reads it, so a deferred
+                # re-render would show subscribers out of step.
+                run_urgently(lambda: set_tick(lambda n: n + 1))
 
         # Stores may notify from any thread; compare and re-render on the
         # application thread, like every other state update.

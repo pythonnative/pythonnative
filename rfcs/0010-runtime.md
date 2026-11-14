@@ -354,8 +354,11 @@ Every render pass is **urgent** or a **transition**.
   submits, back presses, gesture ends, navigation events). Continuous
   events (`on_scroll`, `on_window`, `on_selection_change`, and
   `on_gesture_update`), which the bridge already coalesces, aren't
-  urgent. Work queued from another thread with
-  `call_on_application_thread`, such as a state setter, is urgent too.
+  urgent. Neither is work queued from another thread with
+  `call_on_application_thread`, such as a state setter a worker calls:
+  it isn't user input, and counting it let a background data stream
+  abandon every transition up to the starvation limit. It runs when the
+  pass in progress finishes, like any other loop callback.
 - When the flag is set, the pass raises an internal `Preempted` signal.
   The journal rolls back every node and hook state the pass touched, the
   staged ops and publications are dropped, and the transition's updates
@@ -367,13 +370,22 @@ Every render pass is **urgent** or a **transition**.
   already guarantee.
 - A transition that has been preempted three times, or has been pending
   for 250 ms, renders without checking, so a stream of taps can't starve
-  it.
+  it. When a transition commits with more transition updates already
+  waiting (an effect started one), the count and the clock start over
+  for them.
 - `is_pending` from `use_transition` stays true until the transition
   commits, across any number of restarts.
 
-`pn.start_transition(fn)` is exported for code outside a component, such
-as a store action. It marks the updates in `fn` as a transition and has
-no pending flag.
+`pn.start_transition(fn)` is exported for code with no `use_transition`
+at hand, such as a helper that receives a component's state setter. It
+marks the updates in `fn` as a transition and has no pending flag.
+
+Only component state waits for a transition. An external store (a
+`pn.Store`, or anything read through `use_subscription`) holds its new
+value as soon as it's written, and every render reads it, so a deferred
+re-render would show its subscribers out of step. A subscriber's
+re-render is therefore urgent even when the store is written inside a
+transition, as React does for `useSyncExternalStore`.
 
 `TransitionQueue` now records the hook states with queued transition
 updates, the preemption count, and when the transition was queued; its
@@ -397,7 +409,8 @@ mode, for components beneath it:
 - On mount, each effect runs, its cleanup runs, and it runs again, for
   both `use_effect` and `use_layout_effect`.
 - `use_memo` factories, `use_state` initializers, and updater functions
-  (which includes reducers) run twice.
+  (which includes reducers) run twice, including updaters a transition
+  pass applies.
 
 In a release build, and without the wrapper, nothing changes. The
 `pn init` template wraps its root in `StrictMode`. `pythonnative.testing`

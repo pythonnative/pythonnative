@@ -178,6 +178,57 @@ def test_start_transition_outside_a_component() -> None:
     assert commits == [("clicks 1 pending False", "cell 0 0"), ("clicks 1 pending False", "cell 0 7")]
 
 
+def test_a_store_written_in_a_transition_rerenders_its_subscribers_urgently() -> None:
+    store = pn.Store({"query": ""})
+
+    @pn.component
+    def Header() -> pn.Node:
+        return pn.Text(f"header {pn.use_store(store, lambda state: state['query'])}")
+
+    @pn.component
+    def Results() -> pn.Node:
+        return pn.Text(f"results {pn.use_store(store, lambda state: state['query'])}")
+
+    result = render(pn.Column(Header(), Results()))
+    pn.start_transition(lambda: store.set({"query": "a"}))
+    assert not result.reconciler.transitions.pending, "a store update never waits for a transition"
+    result.settle()
+    assert result.text() == ["header a", "results a"]
+
+
+def test_a_follow_up_transition_gets_its_own_starvation_clock() -> None:
+    from pythonnative.hooks import HookState
+    from pythonnative.runtime import get_loop
+
+    transitions = scheduler.TransitionQueue()
+    transitions.add(HookState())
+    transitions.started = get_loop().time() - 10.0
+    transitions.preemptions = 2
+    assert transitions.must_finish(get_loop().time())
+
+    # Updates still waiting when a transition commits are a new transition.
+    transitions.committed()
+    assert transitions.preemptions == 0
+    assert transitions.started is not None
+    assert not transitions.must_finish(get_loop().time())
+
+    transitions.take()
+    transitions.committed()
+    assert transitions.started is None
+
+
+def test_a_setter_called_from_another_thread_is_not_urgent_input() -> None:
+    import threading
+
+    result = render(App())
+    worker = threading.Thread(target=lambda: _ctx["press"]())
+    worker.start()
+    worker.join()
+    assert not scheduler.urgent_input_pending(), "background updates don't abandon transitions"
+    result.settle()
+    assert result.text()[0] == "clicks 1 pending False"
+
+
 def test_a_deferred_value_restarts_for_the_newer_value() -> None:
     rendered: List[str] = []
 

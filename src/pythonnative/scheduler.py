@@ -44,6 +44,7 @@ __all__ = [
     "in_transition",
     "queue_urgent",
     "run_in_transition",
+    "run_urgently",
     "schedule_trigger",
     "start_transition",
     "urgent_input_pending",
@@ -76,8 +77,9 @@ def queue_urgent(callback: Callable[..., Any], *args: Any) -> None:
     """Queue discrete input on the application loop, ahead of any transition render.
 
     The bridge queues presses, text changes, keys, back presses, and
-    other discrete events this way, and state setters called from other
-    threads queue their update this way. A render pass for a transition
+    other discrete events this way. Work from other threads (a state
+    setter called by a worker) isn't user input and doesn't come through
+    here, so background updates never abandon a transition. A render pass for a transition
     that's in progress notices the queued input before its next
     component body, abandons its work, and runs again after the input
     has been handled and committed.
@@ -200,22 +202,42 @@ def run_in_transition(fn: Callable[[], None]) -> None:
         _transition_var.reset(token)
 
 
+def run_urgently(fn: Callable[[], None]) -> None:
+    """Run ``fn`` with its state updates marked urgent, even inside a transition.
+
+    External stores change the moment they're written, so a component
+    that reads one during render can't keep showing the old value the
+    way a transition keeps component state. Their re-render is urgent
+    (as with React's ``useSyncExternalStore``), so every subscriber
+    shows the same value.
+    """
+    token = _transition_var.set(False)
+    try:
+        fn()
+    finally:
+        _transition_var.reset(token)
+
+
 def start_transition(fn: Callable[[], None]) -> None:
     """Mark the state updates ``fn`` makes as a transition.
 
-    Use it outside a component, in a store action or a callback that
-    has no [`use_transition`][pythonnative.use_transition] at hand. The
-    updates render after urgent work, and the render is abandoned and
-    run again if the user taps or types while it's in progress. Inside
-    a component, prefer ``use_transition``, whose ``is_pending`` flag
-    shows that the transition hasn't committed yet.
+    Use it where no [`use_transition`][pythonnative.use_transition] is
+    at hand, such as a helper that receives a component's state setter.
+    The updates render after urgent work, and the render is abandoned
+    and run again if the user taps or types while it's in progress.
+    Inside a component, prefer ``use_transition``, whose ``is_pending``
+    flag shows that the transition hasn't committed yet.
+
+    Only component state waits for the transition. A
+    [`Store`][pythonnative.Store] or other external store changes as
+    soon as it's written, so its subscribers re-render urgently.
 
     Example:
         ```python
         import pythonnative as pn
 
-        def show_results(query: str) -> None:
-            pn.start_transition(lambda: store.set_query(query))
+        def show_results(set_query, query: str) -> None:
+            pn.start_transition(lambda: set_query(query))
         ```
     """
     run_in_transition(fn)
@@ -277,9 +299,18 @@ class TransitionQueue:
         self.preemptions += 1
 
     def committed(self) -> None:
-        """Reset the starvation counters once nothing is left waiting."""
-        if not self._states:
-            self.preemptions = 0
+        """Reset the starvation counters after a transition commits.
+
+        Updates already waiting again (an effect of the commit started
+        another transition) are a new transition: their clock starts now,
+        so they can still yield to input.
+        """
+        self.preemptions = 0
+        if self._states:
+            from .runtime import get_loop
+
+            self.started = get_loop().time()
+        else:
             self.started = None
 
     def clear(self) -> None:

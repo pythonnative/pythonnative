@@ -233,16 +233,15 @@ def call_threadsafe(callback: Callable[..., Any], *args: Any) -> None:
 def call_on_application_thread(fn: Callable[[], None]) -> None:
     """Execute Python work on its owner thread, inline when already there.
 
-    From another thread the work is queued as urgent input, so a
-    transition rendering on the loop yields to it.
+    Work from another thread (a state setter called by a worker, say)
+    isn't user input, so it doesn't make a transition render yield: the
+    loop runs it once the render in progress has finished.
     """
     loop = get_loop()
     if _on_loop_thread(loop):
         fn()
     else:
-        from .scheduler import queue_urgent
-
-        queue_urgent(fn)
+        loop.call_soon_threadsafe(fn)
 
 
 def resolve_future(future: asyncio.Future[T], value: T) -> None:
