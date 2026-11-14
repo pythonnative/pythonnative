@@ -233,8 +233,9 @@ export async function runMotionTests() {
   assert(target.el.parentNode === layer && target.frame.y === 110, 'a frame during the flight waits for the landing');
   await until(() => !target.flight, 'the flight to land', 1500);
   assert(target.el.parentNode === pushed.el && domOrder(pushed.el) === '52,51' && target.el.style.top === '110px' && source.el.style.visibility === '' && !layer.isConnected, 'the target lands in its parent at its index and frame');
-  await sleep(100);
-  assert(pushed.el.style.transitionDuration === '', 'the screens take their own timing back');
+  // The screens settle on their own transition's end, which a loaded
+  // runner can deliver well after the flight lands.
+  await until(() => pushed.el.style.transitionDuration === '', 'the screens to take their own timing back', 1500);
   // A pop flies back from the leaving screen to the revealed one.
   host.pairs = [{from: 26, to: 25, name: 'photo', source: 51, target: 50, transition: null, source_style: {}, target_style: {}}];
   host.finished = [];
