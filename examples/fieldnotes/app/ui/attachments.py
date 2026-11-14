@@ -16,7 +16,7 @@ from .capture_screen import CaptureScreen
 from .media_screen import MediaScreen
 from .pro_screen import ProScreen
 from .theme import Styles
-from .widgets import ActionButton, Banner, PrimaryButton, slots
+from .widgets import ActionButton, Banner, PrimaryButton
 
 METERING_FLOOR = -60.0
 """Decibels treated as silence on the level meter. Below this, nobody's talking."""
@@ -86,30 +86,26 @@ def AddAttachments(entry: Entry) -> pn.Node:
             set_notice(f"Couldn't add the video: {error}")
 
     return pn.Column(
-        *slots(
-            buttons=pn.View(
-                ActionButton(
-                    "Camera", "camera", lambda: navigation.push(CaptureScreen(entry_id=entry.id)), disabled=full
+        pn.View(
+            ActionButton("Camera", "camera", lambda: navigation.push(CaptureScreen(entry_id=entry.id)), disabled=full),
+            ActionButton("Photos", "images", choose_photos, disabled=full),
+            ActionButton("Video", "film", choose_video, disabled=full),
+            ActionButton("Voice", "mic", lambda: set_recording(True), disabled=full or recording),
+            style=styles.wrap,
+        ),
+        VoiceRecorder(entry_id=entry.id, on_close=lambda: set_recording(False)) if recording else None,
+        Banner(notice, "warning") if notice else None,
+        (
+            pn.View(
+                pn.Text(
+                    f"{FREE_ATTACHMENTS} of {FREE_ATTACHMENTS} attachments used.",
+                    style=[styles.caption, styles.grow],
                 ),
-                ActionButton("Photos", "images", choose_photos, disabled=full),
-                ActionButton("Video", "film", choose_video, disabled=full),
-                ActionButton("Voice", "mic", lambda: set_recording(True), disabled=full or recording),
-                style=styles.wrap,
-            ),
-            recorder=VoiceRecorder(entry_id=entry.id, on_close=lambda: set_recording(False)) if recording else None,
-            notice=Banner(notice, "warning") if notice else None,
-            pro=(
-                pn.View(
-                    pn.Text(
-                        f"{FREE_ATTACHMENTS} of {FREE_ATTACHMENTS} attachments used.",
-                        style=[styles.caption, styles.grow],
-                    ),
-                    pn.Button("Get Pro", on_press=lambda: navigation.push(ProScreen())),
-                    style=styles.spread,
-                )
-                if full
-                else None
-            ),
+                pn.Button("Get Pro", on_press=lambda: navigation.push(ProScreen())),
+                style=styles.spread,
+            )
+            if full
+            else None
         ),
         style=pn.style(gap=8),
     )
@@ -194,26 +190,14 @@ def VoiceRecorder(entry_id: str, on_close: Callable[[], None]) -> pn.Node:
     }
     live = phase in ("recording", "paused")
     return pn.Column(
-        *slots(
-            label=pn.Text(labels[phase], style=styles.error_text if phase == "failed" else styles.label),
-            meter=pn.ProgressBar(value=level, color=styles.accent) if live else None,
-            actions=pn.View(
-                *slots(
-                    pause=(
-                        ActionButton("Resume" if phase == "paused" else "Pause", "pause", toggle_pause)
-                        if live
-                        else None
-                    ),
-                    # This stays mounted while saving: unmounting it would cancel keep().
-                    keep=(
-                        PrimaryButton("Keep note", keep, disabled=phase == "saving")
-                        if live or phase == "saving"
-                        else None
-                    ),
-                    close=ActionButton("Close" if phase == "failed" else "Discard", "x", on_close),
-                ),
-                style=styles.wrap,
-            ),
+        pn.Text(labels[phase], style=styles.error_text if phase == "failed" else styles.label),
+        pn.ProgressBar(value=level, color=styles.accent) if live else None,
+        pn.View(
+            ActionButton("Resume" if phase == "paused" else "Pause", "pause", toggle_pause) if live else None,
+            # This stays mounted while saving: unmounting it would cancel keep().
+            PrimaryButton("Keep note", keep, disabled=phase == "saving") if live or phase == "saving" else None,
+            ActionButton("Close" if phase == "failed" else "Discard", "x", on_close),
+            style=styles.wrap,
         ),
         style=[styles.card, {"gap": 8}],
     )

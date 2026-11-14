@@ -1,0 +1,23 @@
+# Tests urgent input preempts a rendering transition and commits first.
+#
+# Demo screen: examples/e2e-suite/app/screens/runtime/preemption_demo.py
+# Source under test: src/pythonnative/reconciler/core.py :: Reconciler._render_transition
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Runtime
+      DEMO_TITLE: Preemption
+- assertVisible: "Taps: 0"
+- assertVisible: "Rows version: 0"
+- tapOn: "Render 120 rows"
+- extendedWaitUntil:
+    visible: "Rows version: 1"
+    timeout: 10000
+- assertVisible: "Taps: 1"
+- assertVisible: "Order: urgent first"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Runtime

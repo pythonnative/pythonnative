@@ -17,7 +17,6 @@ from __future__ import annotations
 import ctypes
 import os
 import struct
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple
 
 __all__ = [
@@ -97,46 +96,119 @@ class _PlatformStruct(ctypes.Structure):
     ]
 
 
-@dataclass
-class Platform:
+class _Record:
+    """Value equality and a readable ``repr`` over ``__slots__``.
+
+    The decoded records below are created for every op of every commit, so
+    they're plain slotted classes rather than dataclasses (which cost an
+    ``exec`` per class at import). Treat them as read-only.
+    """
+
+    __slots__ = ()
+
+    def _fields(self) -> Tuple[str, ...]:
+        return type(self).__slots__
+
+    def _values(self) -> Tuple[Any, ...]:
+        return tuple(getattr(self, name) for name in self._fields())
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, _Record) or other.__class__ is not self.__class__:
+            return NotImplemented
+        return self._values() == other._values()
+
+    def __hash__(self) -> int:
+        return hash(self._values())
+
+    def __repr__(self) -> str:
+        fields = ", ".join(f"{name}={getattr(self, name)!r}" for name in self._fields())
+        return f"{type(self).__name__}({fields})"
+
+
+class Platform(_Record):
     """Python implementations of the platform callbacks (host and tests).
 
     On iOS and Android the platform layer is Swift or Kotlin and registers
     itself; a Python platform exists only where Python plays the UI thread.
+    Every callback defaults to a no-op (``baseline`` to the bottom edge).
     """
 
-    schedule_mount: Callable[[], None] = lambda: None
-    schedule_work: Callable[[], None] = lambda: None
-    request_frames: Callable[[], None] = lambda: None
-    measure: Callable[[int, int, str, int, dict[str, Any], float, int, float, int], Tuple[float, float]] = (
-        lambda surface, tag, component, mode, props, width, width_mode, height, height_mode: (0.0, 0.0)
+    __slots__ = ("schedule_mount", "schedule_work", "request_frames", "measure", "baseline", "emit")
+
+    def __init__(
+        self,
+        schedule_mount: Callable[[], None] = lambda: None,
+        schedule_work: Callable[[], None] = lambda: None,
+        request_frames: Callable[[], None] = lambda: None,
+        measure: Callable[[int, int, str, int, dict[str, Any], float, int, float, int], Tuple[float, float]] = (
+            lambda surface, tag, component, mode, props, width, width_mode, height, height_mode: (0.0, 0.0)
+        ),
+        baseline: Callable[[int, int, float, float], float] = lambda surface, tag, width, height: height,
+        emit: Callable[[str, int, int, str, str], None] = lambda kind, surface, tag, name, payload: None,
+    ) -> None:
+        self.schedule_mount = schedule_mount
+        self.schedule_work = schedule_work
+        self.request_frames = request_frames
+        self.measure = measure
+        self.baseline = baseline
+        self.emit = emit
+
+
+class MountOp(_Record):
+    """One decoded mount transaction op (see ``include/pn_core.h``).
+
+    ``owner`` is set on ``exit`` ops: 0 when the core animates the view out,
+    1 when the platform does.
+    """
+
+    __slots__ = (
+        "kind",
+        "tag",
+        "component",
+        "props",
+        "removed",
+        "recreate",
+        "parent",
+        "index",
+        "frame",
+        "name",
+        "arguments",
+        "call_id",
+        "owner",
     )
-    baseline: Callable[[int, int, float, float], float] = lambda surface, tag, width, height: height
-    emit: Callable[[str, int, int, str, str], None] = lambda kind, surface, tag, name, payload: None
+
+    def __init__(
+        self,
+        kind: str,
+        tag: int = 0,
+        component: str = "",
+        props: Optional[dict[str, Any]] = None,
+        removed: Tuple[str, ...] = (),
+        recreate: bool = False,
+        parent: int = 0,
+        index: int = 0,
+        frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
+        name: str = "",
+        arguments: Any = None,
+        call_id: int = 0,
+        owner: int = 0,
+    ) -> None:
+        self.kind = kind
+        self.tag = tag
+        self.component = component
+        self.props: dict[str, Any] = {} if props is None else props
+        self.removed = removed
+        self.recreate = recreate
+        self.parent = parent
+        self.index = index
+        self.frame = frame
+        self.name = name
+        self.arguments = arguments
+        self.call_id = call_id
+        self.owner = owner
 
 
-@dataclass(frozen=True)
-class MountOp:
-    """One decoded mount transaction op (see ``include/pn_core.h``)."""
-
-    kind: str
-    tag: int = 0
-    component: str = ""
-    props: dict[str, Any] = field(default_factory=dict)
-    removed: Tuple[str, ...] = ()
-    recreate: bool = False
-    parent: int = 0
-    index: int = 0
-    frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
-    name: str = ""
-    arguments: Any = None
-    call_id: int = 0
-    owner: int = 0
-    """``exit`` ops: 0 when the core animates the view out, 1 when the platform does."""
-
-
-@dataclass(frozen=True)
-class MotionWrite:
+class MotionWrite(_Record):
     """One record of the core's motion writes (RFC 0009).
 
     ``kind`` is ``"prop"`` (``tag``, ``prop``, ``value``), ``"frame"``
@@ -144,22 +216,38 @@ class MotionWrite:
     destroy each, children first).
     """
 
-    kind: str
-    tag: int = 0
-    prop: str = ""
-    value: Any = None
-    frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
-    tags: Tuple[int, ...] = ()
+    __slots__ = ("kind", "tag", "prop", "value", "frame", "tags")
+
+    def __init__(
+        self,
+        kind: str,
+        tag: int = 0,
+        prop: str = "",
+        value: Any = None,
+        frame: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0),
+        tags: Tuple[int, ...] = (),
+    ) -> None:
+        self.kind = kind
+        self.tag = tag
+        self.prop = prop
+        self.value = value
+        self.frame = frame
+        self.tags = tags
 
 
-@dataclass(frozen=True)
-class MountTransaction:
+class MountTransaction(_Record):
     """A decoded transaction: its surface, revision, id, and ops."""
 
-    surface: int
-    revision: int
-    id: int
-    ops: Tuple[MountOp, ...]
+    __slots__ = ("surface", "revision", "id", "ops")
+
+    def __init__(self, surface: int, revision: int, id: int, ops: Tuple[MountOp, ...]) -> None:
+        self.surface = surface
+        self.revision = revision
+        self.id = id
+        self.ops = ops
+
+
+_LAYOUTS = {fmt: struct.Struct("<" + fmt) for fmt in ("B", "H", "I", "q", "d")}
 
 
 class _Reader:
@@ -168,9 +256,10 @@ class _Reader:
         self.offset = 0
 
     def take(self, fmt: str) -> Any:
-        value = struct.unpack_from("<" + fmt, self.data, self.offset)
-        self.offset += struct.calcsize("<" + fmt)
-        return value[0]
+        layout = _LAYOUTS[fmt]
+        offset = self.offset
+        self.offset = offset + layout.size
+        return layout.unpack_from(self.data, offset)[0]
 
     def string(self) -> str:
         length = self.take("I")

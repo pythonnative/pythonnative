@@ -451,7 +451,9 @@ the [Async + data guide](../guides/async.md):
   fetcher / wrap an async mutator with loading and error state.
 - [`use_transition`][pythonnative.use_transition] /
   [`use_deferred_value`][pythonnative.use_deferred_value]: mark
-  expensive updates as low priority so urgent updates paint first.
+  expensive updates as transitions, so urgent updates commit first and
+  a transition that's rendering when the user taps or types starts
+  over; see [Transitions and preemption](reconciliation.md#transitions-and-preemption).
 - [`use_persisted_state`][pythonnative.use_persisted_state]:
   `use_state` backed by [`AsyncStorage`][pythonnative.AsyncStorage].
 
@@ -634,6 +636,11 @@ def Settings() -> pn.Node:
    comprehensions, `try` blocks, or nested functions, and not after an
    early `return`.
 3. Hooks must be called in the same order on every render.
+4. Keep component bodies pure. A transition render can be abandoned and
+   run again, and [`StrictMode`][pythonnative.StrictMode] runs bodies
+   twice in development, so a body that changes something outside
+   itself (a module-level counter, a cache dict) does it more than once.
+   Do that work in an event handler or an effect.
 
 !!! tip "Why these rules?"
     Hooks are matched to per-component slots by call order. If a hook
@@ -645,8 +652,8 @@ def Settings() -> pn.Node:
 Run `pn lint` to catch violations of these rules without running the
 app. It reports a conditional or late hook (`PN101`), a hook outside a
 component or custom hook (`PN102`), a missing effect, memo, or
-callback dependency (`PN103`), and `key=` passed to a user component
-(`PN104`). See the [Linting guide](../guides/linting.md).
+callback dependency (`PN103`), `key=` passed to a user component
+(`PN104`), and module-level state written while rendering (`PN105`). See the [Linting guide](../guides/linting.md).
 
 In dev mode (`pn preview`, `pn run` with hot reload, or `PN_DEV=1`),
 violating these rules raises a

@@ -255,7 +255,13 @@ def native_callback(kind: str, tag: int, name: str, payload: str) -> None:
             # this discrete message.
             with _continuous_lock:
                 _continuous.clear()
-            loop.call_soon_threadsafe(native_callback, kind, tag, name, payload)
+            if kind == "event" or kind == "host":
+                # Discrete input: a transition rendering now yields to it.
+                from ..scheduler import queue_urgent
+
+                queue_urgent(native_callback, kind, tag, name, payload)
+            else:
+                loop.call_soon_threadsafe(native_callback, kind, tag, name, payload)
         return
     dispatch(kind, tag, name, payload)
 

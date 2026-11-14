@@ -1,7 +1,6 @@
 """Regression tests for component ownership and scheduling contracts."""
 
 import asyncio
-from dataclasses import FrozenInstanceError
 from typing import Any
 
 import pytest
@@ -13,18 +12,20 @@ from pythonnative.runtime import run_blocking
 from pythonnative.testing import FakeBackend, render
 
 
-def test_element_owns_immutable_snapshot() -> None:
+def test_element_is_immutable_and_takes_its_props_without_copying() -> None:
     props = {"text": "before"}
     children: list[Any] = []
     element = pn.Element("Text", props, children)
-    props["text"] = "after"
     children.append(pn.Text("child"))
-    assert element.props["text"] == "before"
+    assert element.props is props
     assert element.children == ()
-    with pytest.raises(TypeError):
-        element.props["text"] = "changed"  # type: ignore[index]
-    with pytest.raises(FrozenInstanceError):
-        element.type = "View"  # type: ignore[misc]
+    with pytest.raises(AttributeError):
+        element.type = "View"
+    with pytest.raises(AttributeError):
+        del element.key
+    keyed = element.with_key(3)
+    assert keyed.key == "3" and keyed.props is props and keyed.type == "Text"
+    assert element.key is None
 
 
 def test_python_argument_binding_preserves_positional_only_and_variadics() -> None:
@@ -73,10 +74,9 @@ def test_urgent_state_rebases_after_deferred_updates_and_setters_are_stable() ->
         handles["set"](lambda value: value + 1)
         assert snapshots[-1] == (0, False), "setters schedule the flush for the next loop turn"
         await asyncio.sleep(0)
-        assert snapshots[-1] == (1, True)
-        rec.transitions.flush()
+        assert snapshots[-1] == (1, True), "the urgent pass renders the urgent update only"
         await asyncio.sleep(0)
-        assert snapshots[-1] == (11, False)
+        assert snapshots[-1] == (11, False), "the transition pass replays every update in order"
         assert all(setter is setters[0] for setter in setters)
         rec.unmount()
 

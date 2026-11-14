@@ -25,6 +25,9 @@ Example:
     ```
 """
 
+import importlib
+from typing import TYPE_CHECKING, Any
+
 from ._base import _SPAN_STYLE_KEYS, _flatten_text_spans, _make_element  # noqa: F401
 from .controls import (
     ActivityIndicator,
@@ -47,9 +50,8 @@ from .events import (
     SelectionEvent,
     WebNavigationEvent,
 )
-from .graphics import BlurType, BlurView, LinearGradient, PreserveAspectRatio, Svg
-from .layout import (  # noqa: F401
-    _SAFE_AREA_EDGES,
+from .graphics import BlurType, BlurView, LinearGradient
+from .layout import (
     Column,
     KeyboardAvoidingView,
     Row,
@@ -57,23 +59,26 @@ from .layout import (  # noqa: F401
     ScrollView,
     Spacer,
     View,
-    _KeyboardAvoidingContainer,
-    _numeric_edge_padding,
-    _SafeAreaContainer,
-)
-from .lists import (  # noqa: F401
-    _DEFAULT_ROW_EXTENT,
-    FlatList,
-    ListController,
-    SectionList,
-    _NativeList,
-    _RowSpec,
 )
 from .media import Image, ImageBackground, ImageSource, WebView
 from .overlays import Modal, Portal
-from .pressable import Pressable, PressState, Ripple, _StatefulPressable  # noqa: F401
-from .structural import ErrorBoundary, Fragment, Suspense, set_error_fallback
+from .pressable import Pressable, PressState, Ripple
+from .structural import ErrorBoundary, Fragment, StrictMode, Suspense, set_error_fallback
 from .text import Button, EllipsizeMode, KeyboardAppearance, Text, TextInput
+
+if TYPE_CHECKING:
+    from .lists import FlatList, ListController, SectionList
+    from .vector import PreserveAspectRatio, Svg
+
+# The list components and ``Svg`` (with ``pythonnative.svg``) load on first
+# use (PEP 562), so ``import pythonnative`` doesn't pay for them.
+_LAZY = {
+    "FlatList": "lists",
+    "ListController": "lists",
+    "SectionList": "lists",
+    "PreserveAspectRatio": "vector",
+    "Svg": "vector",
+}
 
 __all__ = [
     "set_error_fallback",
@@ -89,6 +94,7 @@ __all__ = [
     "ErrorBoundary",
     "FlatList",
     "Fragment",
+    "StrictMode",
     "Image",
     "ImageBackground",
     "ImageLoadEvent",
@@ -143,7 +149,25 @@ def _install_contracts() -> None:
     if not schema.load_builtin_contracts():
         from ..sdk.builtins import install
 
-        install(globals())
+        install(_factories())
+
+
+def __getattr__(name: str) -> Any:
+    module = _LAZY.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(importlib.import_module(f".{module}", __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | _LAZY.keys())
+
+
+def _factories() -> dict[str, Any]:
+    """Every public name in this package, loading the lazy ones (contract derivation reads them all)."""
+    return {name: globals()[name] if name in globals() else __getattr__(name) for name in __all__}
 
 
 _install_contracts()

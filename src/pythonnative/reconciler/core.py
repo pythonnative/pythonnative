@@ -8,14 +8,26 @@ Each pass runs the same phases in order:
    producing [`Element`][pythonnative.Element] descriptions. Hook state
    is installed for the duration of each body.
 2. **Diff and stage**: elements are compared with the mounted
-   [`VNode`][pythonnative.reconciler.VNode] in their slot. Creates,
-   prop updates, attach/detach, and destroys are *staged* into an op
-   list instead of being applied immediately.
+   [`VNode`][pythonnative.reconciler.VNode] in their slot, and the
+   committed tree is updated in place. Creates, prop updates, child
+   moves, and destroys are *staged* into an op list instead of being
+   applied immediately. Every node is recorded in the render journal
+   before its first change, so a pass that fails or is preempted rolls
+   back to the committed tree.
 3. **Commit**: the staged ops go to the backend in one batch, refs are
    populated, the layout pass runs (once a viewport is known), then
    effects flush: ``use_layout_effect`` first, ``use_effect`` after. An
    effect that raises is routed to the nearest ``ErrorBoundary``, exactly
    like a render-time exception.
+
+Child lists follow React's identity rule (RFC 0010): each entry of a
+child list occupies a slot, ``None`` and ``False`` keep their slot empty,
+and a list is a group whose items are matched among themselves. A keyed
+element matches the old child with the same key; an unkeyed one matches
+the old unkeyed child in the same slot. A list that keeps its shape is
+updated in place without building any lookup tables, and native child
+order is recomputed only for containers whose children were created,
+destroyed, moved, or replaced.
 
 State setters never render inline. [`request_render`][pythonnative.reconciler.core.Reconciler.request_render]
 schedules one flush on the application loop with ``call_soon``, so every
@@ -27,6 +39,12 @@ re-scheduling itself more than ``MAX_RENDER_PASSES`` times raises
 ``RuntimeError("Too many re-renders")`` from the component that keeps
 dirtying itself, routed through the nearest boundary like any render
 error.
+
+Updates marked as transitions render in a pass of their own after urgent
+work. Until that pass flushes its first mutation, it checks for queued
+urgent input before each component body; when input is waiting, it rolls
+back, the input is handled and committed, and the transition renders
+again.
 
 The class is assembled from mixins to keep each concern readable:
 this module holds the render/diff/commit pipeline,
@@ -41,12 +59,13 @@ import asyncio
 import weakref
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, Set, Tuple
 
 from .. import diagnostics
 from .. import journal as _journal
+from .. import profiling as _profiling
 from ..component import Component
-from ..element import ERROR_BOUNDARY, FRAGMENT, SUSPENSE, Element
+from ..element import STRICT_MODE, Element, type_label
 from ..equality import equal, equal_props
 from ..errors import add_component_frame, complete_component_stack
 from ..events import EVENTS_PROP, extract_events, get_event_registry
@@ -55,20 +74,38 @@ from ..journal import Journal, JournalDict
 from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
 from ..profiling import profiled
 from ..runtime import _on_loop_thread, _scope, get_loop
-from ..scheduler import TransitionQueue, schedule_trigger
+from ..scheduler import TransitionQueue, schedule_trigger, urgent_context, urgent_input_pending
+from ..style import MOTION_STYLE_KEY
 from ..suspense import Suspend, run_eagerly
 from .boundaries import BoundaryMixin, HydrationMap
 from .children import plan_child_moves
 from .layout_pass import LayoutMixin
-from .vnode import VNode, next_tag, normalize_children
+from .vnode import (
+    BOUNDARY,
+    COMPONENT,
+    NATIVE,
+    PROVIDER,
+    SUSPENSE_KIND,
+    WRAPPER,
+    VNode,
+    child_slots,
+    kind_of,
+    next_tag,
+    touch,
+)
 
-__all__ = ["MAX_RENDER_PASSES", "Reconciler"]
+__all__ = ["MAX_RENDER_PASSES", "Preempted", "Reconciler"]
 
-# Props the reconciler consumes itself and never forwards to the
-# native handler. ``ref`` receives an imperative handle after commit,
-# mirroring React's ``ref`` semantics.
-_RECONCILER_OWNED_PROPS = frozenset({"ref"})
 _MOTION_PROPS = ("entering", "exiting", "layout", "shared_transition", "item_entering", "item_exiting", "item_layout")
+
+# Props that take the general path (``_split_props``): the reconciler owns
+# ``ref``, the core reports layout for ``on_layout``, gesture and refresh
+# callbacks are nested in their prop, and motion props are encoded for
+# the core.
+_SPECIAL_PROPS = frozenset({"ref", "on_layout", "gestures", "refresh_control", MOTION_STYLE_KEY, *_MOTION_PROPS})
+_WORKLET_MARK = "__pn_worklet__"
+_MISSING = object()
+_PLAIN_VALUES = frozenset({str, int, float, bool, type(None)})
 
 MAX_RENDER_PASSES = 50
 """How many times one flush may re-schedule itself before it is a render storm.
@@ -79,6 +116,23 @@ drain iterations inside one flush the reconciler raises
 ``RuntimeError("Too many re-renders")`` from the offending component
 and routes it through the nearest ``ErrorBoundary``.
 """
+
+
+def _effect_depth(state: HookState) -> int:
+    node = state.vnode
+    depth = 0
+    while node is not None:
+        depth += 1
+        node = node.parent
+    return depth
+
+
+class Preempted(BaseException):
+    """Raised inside a transition pass when urgent input is waiting; the pass rolls back.
+
+    Derives from :class:`BaseException` so neither error boundaries nor
+    application code catch it.
+    """
 
 
 class Reconciler(BoundaryMixin, LayoutMixin):
@@ -103,16 +157,19 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         on_back_registered: Optional callback fired when the first
             [`use_back_handler`][pythonnative.use_back_handler]
             registers, so hosts can enable hardware back interception.
-        transitions: Deferred-render queue behind
-            [`use_transition`][pythonnative.use_transition]; owned per
-            reconciler so screens never delay each other.
+        transitions: The components with updates waiting for this
+            reconciler's transition pass; owned per reconciler so screens
+            never delay each other.
     """
 
     def __init__(self, backend: Any) -> None:
         self.backend = backend
         self.root: Optional[VNode] = None
         self._tag_nodes: Dict[int, VNode] = JournalDict()
-        self._effect_states: Dict[int, HookState] = JournalDict()
+        # Hook states rendered since the last commit; empty between passes,
+        # so a rolled-back pass simply clears it.
+        self._effect_states: Dict[int, HookState] = {}
+        # The tags each native container has attached, in order.
         self._native_children: Dict[int, List[int]] = JournalDict()
         self._publications: List[Callable[[], None]] = []
         if hasattr(backend, "subscribe_layout"):
@@ -126,8 +183,17 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._events = get_event_registry()
         self._ops: List[Mutation] = []
         self._created: List[VNode] = []
+        # Native containers whose attached children may no longer match
+        # their child list, keyed by ``id``; synced before each flush.
+        self._stale: Dict[int, VNode] = {}
         self._rendering = False
         self._render_queued = False
+        # Whether the pass in progress yields to urgent input (a
+        # transition pass, until its first flush).
+        self._preemptible = False
+        self._transition_pass = False
+        # How many StrictMode wrappers enclose the subtree being rendered.
+        self._strict = 0
         self._pending_future: asyncio.Future[Any] | None = None
         self._commit_iterator: Any = None
         self._pending_journal: Journal | None = None
@@ -222,24 +288,27 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     @profiled("render")
     def flush_dirty(self) -> Any:
-        """Re-render only the components whose state changed, then commit.
+        """Render what's waiting, then commit: urgent updates first, then a transition.
 
         This is the hot path for state-driven updates: each dirty
         component re-runs its own body and reconciles its subtree in
-        place; the batch commits as one native transaction. Returns the
-        (possibly replaced) root native view.
+        place; the batch commits as one native transaction. When no
+        urgent update is waiting, the queued transition updates render
+        in a preemptible pass. Returns the (possibly replaced) root
+        native view.
         """
         if self.root is None:
             return None
         if self._rendering:
             self._render_queued = True
             return self.root_view()
-        if not self._has_dirty_work():
-            return self.root_view()
-        with self._pass():
-            self._destroyed_tags.clear()
-            self._drain_dirty()
-            self._commit()
+        if self._has_dirty_work():
+            with self._pass():
+                self._destroyed_tags.clear()
+                self._drain_dirty()
+                self._commit()
+        elif self.transitions.pending:
+            self._render_transition()
         return self.root_view()
 
     def unmount(self) -> None:
@@ -253,6 +322,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             return
         self._destroy_tree(root)
         self.root = None
+        self._stale.clear()
         self._dirty_nodes.clear()
         self._dirty_boundaries.clear()
         self._dirty_suspense.clear()
@@ -307,18 +377,30 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         if self._rendering:
             self._render_queued = True
             return
+        self._schedule_flush()
+
+    def request_transition(self) -> None:
+        """Schedule a flush that renders the queued transition updates after any urgent work."""
+        if self._rendering:
+            # The pass in flight schedules the transition when it ends.
+            return
+        self._schedule_flush()
+
+    def _schedule_flush(self) -> None:
         if self._flush_scheduled:
             return
         self._flush_scheduled = True
         loop = get_loop()
+        # A flush starts from a clean context: the caller may be inside a
+        # transition, a batch, or a render.
         if _on_loop_thread(loop):
-            loop.call_soon(self._run_scheduled_flush)
+            loop.call_soon(self._run_scheduled_flush, context=urgent_context())
         else:
-            loop.call_soon_threadsafe(self._run_scheduled_flush)
+            loop.call_soon_threadsafe(self._run_scheduled_flush, context=urgent_context())
 
     def _run_scheduled_flush(self) -> None:
         self._flush_scheduled = False
-        if self.root is None or self._rendering or not self._has_dirty_work():
+        if self.root is None or self._rendering or not (self._has_dirty_work() or self.transitions.pending):
             if not self._rendering:
                 self._settled()
             return
@@ -342,11 +424,41 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         return unregister
 
     # ------------------------------------------------------------------
+    # Transitions
+    # ------------------------------------------------------------------
+
+    def _render_transition(self) -> None:
+        """Apply the queued transition updates and render them in a preemptible pass."""
+        transitions = self.transitions
+        preemptible = not transitions.must_finish(get_loop().time())
+        if preemptible and urgent_input_pending():
+            # Input is already on its way to the loop; let it run first.
+            self._schedule_flush()
+            return
+        try:
+            with self._pass(preemptible=preemptible, transition=True):
+                self._destroyed_tags.clear()
+                journal = _journal.active
+                for hook_state in transitions.take():
+                    if journal is not None and hook_state._journal_stamp != journal.identity:
+                        journal.record(hook_state)
+                    vnode = hook_state.vnode
+                    if hook_state.apply_transition_updates() and vnode is not None and vnode.mounted:
+                        self._dirty_nodes[id(vnode)] = vnode
+                self._drain_dirty()
+                self._commit()
+        except Preempted:
+            transitions.preempted()
+            _profiling.count("transitions.preempted")
+            diagnostics.log(f"reconciler: transition preempted ({transitions.preemptions})")
+            self._schedule_flush()
+
+    # ------------------------------------------------------------------
     # Pass bookkeeping
     # ------------------------------------------------------------------
 
     @contextmanager
-    def _pass(self) -> Iterator[None]:
+    def _pass(self, preemptible: bool = False, transition: bool = False) -> Iterator[None]:
         """Mark a pass in flight and drain renders requested during it.
 
         Python failures roll back the bookkeeping the pass touched and
@@ -360,6 +472,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             yield
             return
         self._rendering = True
+        self._preemptible = preemptible
+        self._transition_pass = transition
         self._storm = 0
         journal = Journal()
         token = _journal.install(journal)
@@ -378,12 +492,22 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             raise
         finally:
             _journal.uninstall(token)
+            self._preemptible = False
             if self._pending_future is None:
                 journal.active = False
                 self._rendering = False
                 self._render_queued = False
+                self._pass_finished()
             else:
                 self._pending_journal = journal
+
+    def _pass_finished(self) -> None:
+        """After a pass settles: reset the counters of a committed transition, and schedule any transition waiting."""
+        if self._transition_pass:
+            self._transition_pass = False
+            self.transitions.committed()
+        if self.transitions.pending and self.root is not None:
+            self._schedule_flush()
 
     def _abort_pass(self, journal: Journal) -> None:
         if getattr(self.backend, "_failed", False):
@@ -412,9 +536,14 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         self._ops.clear()
         self._created.clear()
         self._publications.clear()
+        self._effect_states.clear()
+        self._stale.clear()
         self._dirty_nodes.clear()
         self._dirty_boundaries.clear()
         self._dirty_suspense.clear()
+        self._strict = 0
+        # A rolled-back transition didn't commit: keep its starvation counters.
+        self._transition_pass = False
         self._commit_iterator = None
         self._pending_future = None
         self._pending_journal = None
@@ -433,11 +562,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     async def wait_for_commit(self) -> None:
         """Wait until mounting and its queued state updates have settled."""
-        while self.commit_pending or self._has_dirty_work() or self._flush_scheduled:
+        while self.commit_pending or self._has_dirty_work() or self._flush_scheduled or self.transitions.pending:
             waiter = get_loop().create_future()
             self._idle_waiters.append(waiter)
             if not self.commit_pending:
-                self.request_render()
+                self._schedule_flush()
             await waiter
 
     def _settled(self, error: BaseException | None = None) -> None:
@@ -502,6 +631,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 callback()
             if self._has_dirty_work():
                 self.request_render()
+        if not self._rendering:
+            self._pass_finished()
         self._settled()
 
     def _has_dirty_work(self) -> bool:
@@ -509,33 +640,37 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     def _drain_dirty(self) -> None:
         """Process dirty components and boundary retries until none remain."""
-        while self._has_dirty_work():
+        while self._dirty_nodes or self._dirty_boundaries or self._dirty_suspense:
             self._storm += 1
             if self._storm > MAX_RENDER_PASSES:
                 self._fail_render_storm()
                 continue
 
-            boundaries = list(self._dirty_boundaries.values())
-            self._dirty_boundaries.clear()
-            for boundary in boundaries:
-                if boundary.mounted:
-                    with self._providers_above(boundary):
-                        self._local_update(
-                            boundary, partial(self._reconcile_error_boundary, boundary, boundary.element)
-                        )
+            if self._dirty_boundaries:
+                boundaries = list(self._dirty_boundaries.values())
+                self._dirty_boundaries.clear()
+                for boundary in boundaries:
+                    if boundary.mounted:
+                        with self._providers_above(boundary):
+                            self._reconcile_error_boundary(boundary, boundary.element)
 
-            suspended = list(self._dirty_suspense.values())
-            self._dirty_suspense.clear()
-            for node in suspended:
-                if node.mounted and node.suspense_showing_fallback:
-                    with self._providers_above(node):
-                        try:
-                            self._local_update(node, partial(self._attempt_suspense_content, node))
-                        except Exception as exc:
-                            self._route_error(node, exc)
+            if self._dirty_suspense:
+                suspended = list(self._dirty_suspense.values())
+                self._dirty_suspense.clear()
+                for node in suspended:
+                    if node.mounted and node.suspense_showing_fallback:
+                        with self._providers_above(node):
+                            try:
+                                self._attempt_suspense_content(node)
+                            except Exception as exc:
+                                self._route_error(node, exc)
 
-            pending = sorted(self._dirty_nodes.values(), key=VNode.depth)
+            if not self._dirty_nodes:
+                continue
+            pending = list(self._dirty_nodes.values())
             self._dirty_nodes.clear()
+            if len(pending) > 1:
+                pending.sort(key=VNode.depth)
             for vnode in pending:
                 hs = vnode.hook_state
                 if not vnode.mounted or hs is None or not hs._dirty:
@@ -583,6 +718,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         nearest ``ErrorBoundary`` and the resulting fallback is committed
         in a nested commit, so the rest of the tree is unaffected.
         """
+        self._preemptible = False
         yield self._flush_ops()
         self._run_layout()
         yield self._flush_ops()
@@ -614,6 +750,8 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     @profiled("commit")
     def _flush_ops(self) -> asyncio.Future[Any] | None:
         """Send pending ops to the backend and resolve created views."""
+        if self._stale:
+            self._sync_stale()
         ops = self._ops
         created = self._created
         if ops:
@@ -645,27 +783,51 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         return None
 
     def _resolve_created(self, created: list[VNode]) -> None:
+        if not created:
+            return
+        resolve_view = self.backend.resolve_view
+        publications = self._publications
+        register = self._events.register
         for node in created:
-            if not node.mounted or node.tag is None:
+            tag = node.tag
+            if not node.mounted or tag is None:
                 continue
-            node.native_view = self.backend.resolve_view(node.tag)
-            self._publications.append(partial(self._attach_ref, node.element, node.tag))
-            ancestor = node.parent
+            view = node.native_view = resolve_view(tag)
+            element = node.element
+            if "ref" in element.props:
+                publications.append(partial(self._attach_ref, element, tag))
+            # Wrappers whose first native root is this view take its
+            # identity; events run in the nearest component's task scope.
             scope = None
+            delegating = True
+            ancestor = node.parent
             while ancestor is not None:
-                if scope is None and ancestor.hook_state is not None:
-                    scope = ancestor.hook_state.task_scope
-                if not ancestor.is_native:
-                    self._refresh_identity(ancestor)
+                if delegating:
+                    if ancestor.kind != NATIVE and ancestor.tag == tag:
+                        if ancestor.native_view is not view:
+                            touch(ancestor)
+                            ancestor.native_view = view
+                    else:
+                        delegating = False
+                hook_state = ancestor.hook_state
+                if hook_state is not None and scope is None:
+                    scope = hook_state.task_scope
+                    if not delegating:
+                        break
+                elif scope is not None and not delegating:
+                    break
                 ancestor = ancestor.parent
-            self._publications.append(partial(self._events.set_scope, node.tag, scope))
+            publications.append(partial(register, tag, node, scope))
 
     def _flush_layout_effects(self) -> bool:
         """Run queued layout effects; returns whether a failure activated a boundary."""
         routed = False
-        for state in sorted(
-            self._effect_states.values(), key=lambda hs: hs.vnode.depth() if hs.vnode else 0, reverse=True
-        ):
+        due = [
+            state for state in self._effect_states.values() if state._pending_layout_effects or state._strict_effects
+        ]
+        if len(due) > 1:
+            due.sort(key=_effect_depth, reverse=True)
+        for state in due:
             if state.vnode is not None and state.vnode.mounted:
                 try:
                     state.flush_layout_effects()
@@ -679,8 +841,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     def _flush_passive_effects(self) -> bool:
         """Run queued passive effects; returns whether a failure activated a boundary."""
         routed = False
-        states, self._effect_states = self._effect_states, JournalDict()
-        for state in sorted(states.values(), key=lambda hs: hs.vnode.depth() if hs.vnode else 0, reverse=True):
+        states, self._effect_states = self._effect_states, {}
+        due = [state for state in states.values() if state._pending_effects or state._strict_effects]
+        if len(due) > 1:
+            due.sort(key=_effect_depth, reverse=True)
+        for state in due:
             if state.vnode is not None and state.vnode.mounted:
                 try:
                     state.flush_pending_effects()
@@ -696,45 +861,50 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     # ------------------------------------------------------------------
 
     def _create_tree(self, element: Element) -> VNode:
-        type_obj = element.type
-        if isinstance(type_obj, str):
+        kind = kind_of(element.type)
+        if kind == NATIVE:
             return self._create_native(element)
-        if isinstance(type_obj, Component):
+        if kind == COMPONENT:
             return self._create_component(element)
-        if isinstance(type_obj, Context):
+        if kind == WRAPPER:
+            return self._create_wrapper(element)
+        if kind == PROVIDER:
             return self._create_provider(element)
-        if type_obj is ERROR_BOUNDARY:
+        if kind == BOUNDARY:
             return self._create_error_boundary(element)
-        if type_obj is SUSPENSE:
-            return self._create_suspense(element)
-        if type_obj is FRAGMENT:
-            return self._create_wrapper(element, "Fragment")
-        raise TypeError(
-            f"Unsupported element type {type_obj!r}. Element types are native view names, "
-            "@component functions, contexts (providers), or the structural types."
-        )
+        return self._create_suspense(element)
 
     def _create_native(self, element: Element) -> VNode:
         tag = next_tag()
-        clean_props, events = self._split_props(element.props)
-        node = VNode(element, [], tag=tag)
+        type_name = element.type
+        node = VNode(element, [], tag, NATIVE)
+        clean, events = self._native_props(element.props)
+        node.clean_props = clean
+        node.events = events
         self._tag_nodes[tag] = node
-        node.clean_props = clean_props
-        if events:
-            self._publications.append(partial(self._events.set_events, tag, events))
-        self._ops.append(CreateOp(tag, element.type, clean_props))
+        ops = self._ops
+        ops.append(CreateOp(tag, type_name, clean))
         self._created.append(node)
 
-        index = 0
+        attached: List[int] = []
+        children = node.children
         try:
-            for child_el in normalize_children(element.children, owner=element.type):
+            for slot, child_el in enumerate(child_slots(element.children, type_name)):
+                if child_el is None:
+                    continue
                 child = self._create_tree(child_el)
+                child.slot = slot
                 child.parent = node
-                node.children.append(child)
-                for root in self._native_roots(child):
-                    if root.tag is not None:
-                        self._ops.append(InsertOp(tag, root.tag, index))
-                        index += 1
+                children.append(child)
+                if child.kind == NATIVE:
+                    if child_el.type != "Portal":
+                        child_tag: int = child.tag  # type: ignore[assignment]
+                        ops.append(InsertOp(tag, child_tag, len(attached)))
+                        attached.append(child_tag)
+                else:
+                    for root in self._native_roots(child):
+                        ops.append(InsertOp(tag, root.tag, len(attached)))  # type: ignore[arg-type]
+                        attached.append(root.tag)  # type: ignore[arg-type]
         except Suspend:
             # Don't leak the container (and already-built siblings) when
             # a child suspends; hook states are salvaged for the retry.
@@ -745,7 +915,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         except Exception:
             self._destroy_tree(node)
             raise
-        self._native_children[tag] = self._flattened_child_tags(node)
+        self._native_children[tag] = attached
         return node
 
     def _create_component(self, element: Element) -> VNode:
@@ -753,9 +923,12 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         # component's hook state from the attempt that suspended;
         # reclaiming it keeps cached resources warm.
         hook_state = self._take_hydrated_hook_state(element) or HookState()
-        journal = _journal.current()
+        journal = _journal.active
         if journal is not None and hook_state.owner is None:
             journal.undo.append(hook_state.cleanup_all_effects)
+        if self._strict and hook_state.owner is None and diagnostics.is_dev():
+            hook_state.strict = True
+            hook_state._strict_effects = 3
         rendered = self._render_component_body(hook_state, element)
         try:
             children = self._create_child_list(rendered)
@@ -770,7 +943,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             if diagnostics.is_dev():
                 add_component_frame(exc, element.type)
             raise
-        node = VNode(element, children)
+        node = VNode(element, children, None, COMPONENT)
         for child in children:
             child.parent = node
         node.hook_state = hook_state
@@ -785,28 +958,33 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         consumers: "weakref.WeakSet[HookState]" = weakref.WeakSet()
         context._push(element.props.get("value"), consumers)
         try:
-            children = self._create_child_list(
-                normalize_children(element.children, owner=self._provider_label(context))
-            )
+            children = self._create_child_list(child_slots(element.children, self._provider_label(context)))
         finally:
             context._pop()
-        node = VNode(element, children)
+        node = VNode(element, children, None, PROVIDER)
         node.context_consumers = consumers
         for child in children:
             child.parent = node
         self._refresh_identity(node)
         return node
 
-    def _create_wrapper(self, element: Element, owner: str) -> VNode:
-        children = self._create_child_list(normalize_children(element.children, owner=owner))
-        node = VNode(element, children)
+    def _create_wrapper(self, element: Element) -> VNode:
+        strict = element.type is STRICT_MODE
+        if strict:
+            self._strict += 1
+        try:
+            children = self._create_child_list(child_slots(element.children, type_label(element.type)))
+        finally:
+            if strict:
+                self._strict -= 1
+        node = VNode(element, children, None, WRAPPER)
         for child in children:
             child.parent = node
         self._refresh_identity(node)
         return node
 
-    def _create_child_list(self, elements: List[Element]) -> List[VNode]:
-        """Create nodes for ``elements``, cleaning up on mid-list failure.
+    def _create_child_list(self, slots: Sequence[Optional[Element]]) -> List[VNode]:
+        """Create nodes for a child list, cleaning up on mid-list failure.
 
         When the failure is a ``Suspend``, already-built siblings are
         torn down with their hook states *salvaged*, so the boundary's
@@ -814,8 +992,12 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """
         nodes: List[VNode] = []
         try:
-            for el in elements:
-                nodes.append(self._create_tree(el))
+            for slot, el in enumerate(slots):
+                if el is None:
+                    continue
+                node = self._create_tree(el)
+                node.slot = slot
+                nodes.append(node)
         except Suspend:
             if self._suspense_salvage is None:
                 self._suspense_salvage = {}
@@ -832,21 +1014,29 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     # Component bodies
     # ------------------------------------------------------------------
 
-    @profiled("component", lambda self, hook_state, element: {"component": element.type.display_name})
-    def _render_component_body(self, hook_state: HookState, element: Element) -> List[Element]:
+    def _render_component_body(self, hook_state: HookState, element: Element) -> Sequence[Optional[Element]]:
         """Render synchronously or suspend on a real, component-owned task.
 
         An ``async def`` body is stepped eagerly: its first step runs
         right here, and only when the first ``await`` is actually
         pending does the remainder become a task the component owns, at
         which point the render suspends on it.
-        """
-        from ..profiling import count
 
-        count("components.rendered")
+        In a transition pass this is where urgent input preempts the
+        render: before the body runs.
+        """
+        if self._preemptible and urgent_input_pending():
+            raise Preempted()
+        if _profiling._session is None and _profiling._active.get() is None:
+            return self._run_component_body(hook_state, element)
+        _profiling.count("components.rendered")
+        with _profiling.span("component", component=element.type.display_name):
+            return self._run_component_body(hook_state, element)
+
+    def _run_component_body(self, hook_state: HookState, element: Element) -> Sequence[Optional[Element]]:
         journal = _journal.active
         if journal is not None and hook_state._journal_stamp != journal.identity:
-            journal.snapshot(hook_state, HookState._JOURNALED)
+            journal.record(hook_state)
         self._effect_states[id(hook_state)] = hook_state
         component: Component = element.type
         label = component.display_name
@@ -891,12 +1081,21 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 if diagnostics.is_dev():
                     add_component_frame(exc, component)
                 raise
-            return normalize_children(result, owner=label, dynamic=True)
+            return child_slots(result, label, returned=True)
 
-        hook_state.begin_render(label)
         token = install_hook_state(hook_state)
         scope_token = _scope.set(hook_state.task_scope)
         try:
+            if hook_state.strict:
+                # Strict mode: run the body once more and discard the
+                # result, so an impure body shows itself.
+                hook_state.begin_render(label)
+                marks = (len(hook_state._pending_effects), len(hook_state._pending_layout_effects))
+                component.render(element)
+                hook_state.finish_render()
+                del hook_state._pending_effects[marks[0] :]
+                del hook_state._pending_layout_effects[marks[1] :]
+            hook_state.begin_render(label)
             rendered = component.render(element)
             hook_state.finish_render()
         except Suspend as signal:
@@ -920,7 +1119,9 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             _scope.reset(scope_token)
             restore_hook_state(token)
             hook_state._dirty = False
-        return normalize_children(rendered, owner=label, dynamic=True)
+        if rendered.__class__ is Element:
+            return (rendered,)
+        return child_slots(rendered, label, returned=True)
 
     def _register_component_retry(self, vnode: VNode, signal: Suspend) -> None:
         """Re-render ``vnode`` once the work it suspended on completes.
@@ -951,35 +1152,26 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         caller, which routes them to the nearest Suspense boundary.
         """
         hook_state = vnode.hook_state
-        if hook_state is None or not vnode.is_component:
+        if hook_state is None or vnode.kind != COMPONENT:
             return
-
-        def work() -> None:
-            try:
-                rendered = self._render_component_body(hook_state, vnode.element)
-            except Suspend as signal:
-                if signal.hook_state is hook_state:
-                    self._register_component_retry(vnode, signal)
-                    return
-                raise
-            try:
-                children = self._reconcile_child_list(vnode.children, rendered)
-            except Suspend:
-                # The retry must re-run this body: its output was never adopted.
-                hook_state._dirty = True
-                raise
-            for child in children:
-                child.parent = vnode
-            vnode.children = children
-            vnode.rendered = rendered
-            self._refresh_identity(vnode)
-            hook_state.vnode = vnode
-            hook_state.owner = self
-
         try:
             with self._providers_above(vnode):
-                self._local_update(vnode, work)
-        except Suspend:
+                try:
+                    rendered = self._render_component_body(hook_state, vnode.element)
+                except Suspend as signal:
+                    if signal.hook_state is hook_state:
+                        self._register_component_retry(vnode, signal)
+                        return
+                    raise
+                touch(vnode)
+                try:
+                    self._reconcile_children(vnode, rendered)
+                except Suspend:
+                    # The retry must re-run this body: its output was never adopted.
+                    hook_state._dirty = True
+                    raise
+                vnode.rendered = rendered
+        except (Suspend, Preempted):
             raise
         except Exception as exc:
             if diagnostics.is_dev():
@@ -991,34 +1183,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """The components from ``node`` up to the root, innermost first."""
         path: List[Any] = []
         while node is not None:
-            if node.is_component:
+            if node.kind == COMPONENT:
                 path.append(node.element.type)
             node = node.parent
         return path
-
-    def _local_update(self, node: VNode, work: Callable[[], Any]) -> None:
-        """Run ``work`` on ``node`` and repair the surrounding native structure.
-
-        Captures the nearest native container's child tags before the
-        work, then refreshes transparent ancestors' delegated identity
-        and re-syncs that container's children afterwards, so only the
-        moves the update actually caused reach the native side.
-        """
-        before_roots = [root.tag for root in self._native_roots(node)]
-        container = self._nearest_native_ancestor(node)
-        before = (
-            self._native_children.get(container.tag, []) if container is not None and container.tag is not None else []
-        )
-        work()
-        current = node.parent
-        while current is not None and current is not container:
-            self._refresh_identity(current)
-            current = current.parent
-        after_roots = [root.tag for root in self._native_roots(node)]
-        if before_roots == after_roots:
-            return
-        if container is not None and container.tag is not None:
-            self._sync_native_children(container.tag, before, self._flattened_child_roots(container))
 
     def _route_error(self, vnode: VNode, exc: BaseException) -> None:
         """Route a render or effect failure to the nearest ``ErrorBoundary`` ancestor.
@@ -1028,10 +1196,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """
         node = vnode.parent
         while node is not None:
-            if node.is_error_boundary:
+            if node.kind == BOUNDARY:
                 try:
                     with self._providers_above(node):
-                        self._local_update(node, partial(self._activate_boundary, node, exc))
+                        self._activate_boundary(node, exc)
                 except Exception as escaped:
                     # A boundary without a fallback (or whose fallback failed)
                     # hands the error to the next boundary up.
@@ -1051,10 +1219,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """
         node = vnode.parent
         while node is not None:
-            if node.is_suspense:
+            if node.kind == SUSPENSE_KIND:
                 try:
                     with self._providers_above(node):
-                        self._local_update(node, partial(self._hide_suspense_content, node, signal))
+                        self._hide_suspense_content(node, signal)
                 except Suspend as escaped:
                     signal = escaped  # a boundary without a fallback is transparent
                 else:
@@ -1065,19 +1233,26 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     @contextmanager
     def _providers_above(self, vnode: VNode) -> Iterator[None]:
-        """Push the provided values of every provider above ``vnode``, outermost first."""
+        """Push the provided values of every provider above ``vnode``, and its StrictMode, outermost first."""
         chain: List[Tuple[Context, Any, Any]] = []
+        strict = 0
         node = vnode.parent
         while node is not None:
-            if node.is_provider:
+            kind = node.kind
+            if kind == PROVIDER:
                 chain.append((node.element.type, node.element.props.get("value"), node.context_consumers))
+            elif kind == WRAPPER and node.element.type is STRICT_MODE:
+                strict += 1
             node = node.parent
         chain.reverse()
         for context, value, consumers in chain:
             context._push(value, consumers)
+        saved = self._strict
+        self._strict = strict
         try:
             yield
         finally:
+            self._strict = saved
             for context, _value, _consumers in reversed(chain):
                 context._pop()
 
@@ -1086,69 +1261,181 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     # ------------------------------------------------------------------
 
     def _reconcile_node(self, old: VNode, new_el: Element) -> VNode:
-        if new_el is old.element and self._reusable(old):
+        """Update ``old`` to describe ``new_el``; returns the node now in the slot."""
+        old_el = old.element
+        if new_el is old_el and self._reusable(old):
             # The parent rendered the identical element: nothing in this
             # subtree changed through props. Components with their own
             # pending state are still in the dirty queue and render there.
             return old
-        if not self._same_type(old.element, new_el):
+        new_type = new_el.type
+        old_type = old_el.type
+        if old_type is not new_type and not (old_type.__class__ is str and old_type == new_type):
             new_node = self._create_tree(new_el)
             self._destroy_tree(old)
             return new_node
-        if old.is_native:
-            return self._reconcile_native(old, new_el)
-        if old.is_component:
-            return self._reconcile_component(old, new_el)
-        if old.is_provider:
-            return self._reconcile_provider(old, new_el)
-        if old.is_error_boundary:
-            return self._reconcile_error_boundary(old, new_el)
-        if old.is_suspense:
-            return self._reconcile_suspense(old, new_el)
-        return self._reconcile_wrapper(old, new_el, "Fragment")
+        kind = old.kind
+        if kind == NATIVE:
+            self._reconcile_native(old, new_el)
+        elif kind == COMPONENT:
+            self._reconcile_component(old, new_el)
+        elif kind == WRAPPER:
+            self._reconcile_wrapper(old, new_el)
+        elif kind == PROVIDER:
+            self._reconcile_provider(old, new_el)
+        elif kind == BOUNDARY:
+            self._reconcile_error_boundary(old, new_el)
+        else:
+            self._reconcile_suspense(old, new_el)
+        return old
 
     @staticmethod
     def _reusable(node: VNode) -> bool:
         """Whether ``node`` can be kept as is when its parent renders the identical element."""
-        if node.is_component:
+        if node.kind == COMPONENT:
             hs = node.hook_state
             return hs is not None and node.rendered is not None and not hs._dirty
-        return node.tag is not None or not node.is_native
+        return True
 
-    def _reconcile_native(self, old: VNode, new_el: Element) -> VNode:
-        new_clean, events = self._split_props(new_el.props)
-        if old.tag is not None:
-            self._publications.append(partial(self._events.set_events, old.tag, events))
-        changed = self._diff_props(old.clean_props, new_clean)
+    def _reconcile_native(self, old: VNode, new_el: Element) -> None:
+        old_props = old.element.props
+        new_props = new_el.props
+        changed = False
+        if new_props is not old_props:
+            result = (
+                self._update_native_props(old, old_props, new_props)
+                if _SPECIAL_PROPS.isdisjoint(new_props) and _SPECIAL_PROPS.isdisjoint(old_props)
+                else None
+            )
+            if result is None:
+                self._update_native_props_slow(old, new_el)
+                changed = True
+            else:
+                changed = result
+        children = new_el.children
+        if children or old.children:
+            if self._reconcile_children(old, child_slots(children, new_el.type)):
+                changed = True
         if changed:
-            if old.tag is not None:
-                self._ops.append(UpdateOp(old.tag, changed))
-        old.clean_props = new_clean
+            touch(old)
+            old.element = new_el
 
-        old_ref = old.element.props.get("ref")
+    def _update_native_props(self, node: VNode, old: Mapping[str, Any], new: Mapping[str, Any]) -> Optional[bool]:
+        """The one-pass prop update; returns whether anything changed, or ``None`` for the general path.
+
+        Values identical to the old ones are skipped, a changed ``on_*``
+        callable only updates the node's handler table, and anything
+        else is compared under the framework equality rule. Nothing is
+        written until the walk has decided the fast path applies.
+        """
+        changed: Optional[Dict[str, Any]] = None
+        events: Optional[Dict[str, Any]] = None
+        shared = 0
+        for key, value in new.items():
+            previous = old.get(key, _MISSING)
+            if previous is _MISSING:
+                if value is UNSET or (key[:3] == "on_" and callable(value)):
+                    return None
+            else:
+                shared += 1
+                if previous is value:
+                    continue
+                if key[:3] == "on_" and (callable(value) or callable(previous)):
+                    if not (callable(value) and callable(previous)) or getattr(value, _WORKLET_MARK, False):
+                        return None
+                    if getattr(previous, _WORKLET_MARK, False):
+                        return None
+                    if events is None:
+                        events = dict(node.events or ())
+                    events[key] = value
+                    continue
+                if value is UNSET:
+                    return None
+                cls = value.__class__
+                if cls is previous.__class__ and cls in _PLAIN_VALUES:
+                    if previous == value:
+                        continue
+                elif equal(previous, value):
+                    continue
+            if changed is None:
+                changed = {}
+            changed[key] = value
+        if shared != len(old):
+            for key in old:
+                if key not in new:
+                    if key[:3] == "on_" and callable(old[key]):
+                        return None
+                    if changed is None:
+                        changed = {}
+                    changed[key] = UNSET
+        if changed is None and events is None:
+            return False
+        touch(node)
+        if changed is not None:
+            clean = dict(node.clean_props)
+            for key, value in changed.items():
+                if value is UNSET:
+                    clean.pop(key, None)
+                else:
+                    clean[key] = value
+            node.clean_props = clean
+            self._ops.append(UpdateOp(node.tag, changed))  # type: ignore[arg-type]
+        if events is not None:
+            node.events = events
+        return True
+
+    def _update_native_props_slow(self, node: VNode, new_el: Element) -> None:
+        """The general prop update: refs, layout observers, gestures, refresh controls, and motion props."""
+        touch(node)
+        new_clean, events = self._split_props(new_el.props)
+        changed = self._diff_props(node.clean_props, new_clean)
+        if changed and node.tag is not None:
+            self._ops.append(UpdateOp(node.tag, changed))
+        node.clean_props = new_clean
+        node.events = events or None
+        old_ref = node.element.props.get("ref")
         new_ref = new_el.props.get("ref")
         if old_ref is not new_ref:
             self._publications.append(partial(self._clear_ref, old_ref))
-            self._publications.append(partial(self._attach_ref, new_el, old.tag))
+            self._publications.append(partial(self._attach_ref, new_el, node.tag))
 
-        before = self._flattened_child_tags(old)
-        children = self._reconcile_child_list(old.children, normalize_children(new_el.children, owner=new_el.type))
-        old.children = children
-        for child in children:
-            child.parent = old
-        old.element = new_el
-        if old.tag is not None:
-            self._sync_native_children(old.tag, before, self._flattened_child_roots(old))
-        return old
+    def _native_props(self, props: Mapping[str, Any]) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+        """Split a new view's props into its native payload and its Python handlers."""
+        if not props:
+            return {}, None
+        if not _SPECIAL_PROPS.isdisjoint(props):
+            clean, events = self._split_props(props)
+            return clean, events or None
+        clean = {}
+        handlers: Optional[Dict[str, Any]] = None
+        for key, value in props.items():
+            if key[:3] == "on_" and callable(value):
+                if getattr(value, _WORKLET_MARK, False):
+                    clean, events = self._split_props(props)
+                    return clean, events or None
+                if handlers is None:
+                    handlers = {}
+                handlers[key] = value
+            elif value is UNSET:
+                continue
+            else:
+                clean[key] = value
+        if handlers is not None:
+            clean[EVENTS_PROP] = frozenset(handlers)
+        return clean, handlers
 
-    def _reconcile_component(self, old: VNode, new_el: Element) -> VNode:
+    def _reconcile_component(self, old: VNode, new_el: Element) -> None:
         if self._can_skip_memoized(old, new_el):
+            touch(old)
             old.element = new_el
-            return old
-        hook_state = old.hook_state or HookState()
+            return
+        hook_state = old.hook_state
+        assert hook_state is not None
         rendered = self._render_component_body(hook_state, new_el)
+        touch(old)
+        old.element = new_el
         try:
-            children = self._reconcile_child_list(old.children, rendered)
+            self._reconcile_children(old, rendered)
         except Suspend:
             hook_state._dirty = True
             raise
@@ -1156,44 +1443,38 @@ class Reconciler(BoundaryMixin, LayoutMixin):
             if diagnostics.is_dev():
                 add_component_frame(exc, new_el.type)
             raise
-        old.children = children
-        for child in children:
-            child.parent = old
-        old.element = new_el
-        old.hook_state = hook_state
         old.rendered = rendered
-        self._refresh_identity(old)
-        hook_state.vnode = old
-        hook_state.owner = self
-        return old
 
-    def _reconcile_provider(self, old: VNode, new_el: Element) -> VNode:
+    def _reconcile_provider(self, old: VNode, new_el: Element) -> None:
         context: Context = new_el.type
         new_value = new_el.props.get("value")
-        if "value" not in old.element.props or not equal(old.element.props["value"], new_value):
+        old_props = old.element.props
+        changed = old.element.key != new_el.key
+        if "value" not in old_props or not equal(old_props["value"], new_value):
             self._mark_context_consumers(old, context)
+            changed = True
         context._push(new_value, old.context_consumers)
         try:
-            children = self._reconcile_child_list(
-                old.children, normalize_children(new_el.children, owner=self._provider_label(context))
-            )
+            if self._reconcile_children(old, child_slots(new_el.children, self._provider_label(context))):
+                changed = True
         finally:
             context._pop()
-        old.children = children
-        for child in children:
-            child.parent = old
-        old.element = new_el
-        self._refresh_identity(old)
-        return old
+        if changed:
+            touch(old)
+            old.element = new_el
 
-    def _reconcile_wrapper(self, old: VNode, new_el: Element, owner: str) -> VNode:
-        children = self._reconcile_child_list(old.children, normalize_children(new_el.children, owner=owner))
-        old.children = children
-        for child in children:
-            child.parent = old
-        old.element = new_el
-        self._refresh_identity(old)
-        return old
+    def _reconcile_wrapper(self, old: VNode, new_el: Element) -> None:
+        strict = new_el.type is STRICT_MODE
+        if strict:
+            self._strict += 1
+        try:
+            changed = self._reconcile_children(old, child_slots(new_el.children, type_label(new_el.type)))
+        finally:
+            if strict:
+                self._strict -= 1
+        if changed or old.element.key != new_el.key:
+            touch(old)
+            old.element = new_el
 
     def _mark_context_consumers(self, provider: VNode, context: Context) -> None:
         """Mark every component that read ``context`` from ``provider`` for re-render.
@@ -1237,14 +1518,45 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 )
             return False
 
-    def _reconcile_child_list(self, old_children: List[VNode], new_children: List[Element]) -> List[VNode]:
-        """Match, reconcile, create, and destroy one level of children.
+    def _reconcile_children(self, parent: VNode, slots: Sequence[Optional[Element]]) -> bool:
+        """Reconcile ``parent``'s child list against ``slots``; return whether its structure changed.
 
-        Keyed children match by key; unkeyed children match by position
-        among the unkeyed siblings. Type changes replace the node. This
-        pass is purely structural: native attachment order is derived
-        afterwards by the nearest native container via
-        [`_sync_native_children`][pythonnative.reconciler.core.Reconciler._sync_native_children].
+        The caller has recorded ``parent`` in the journal if it's going
+        to write it; this writes ``parent.children`` only when the list
+        changed, recording the parent first.
+        """
+        old = parent.children
+        children = self._reconcile_child_list(parent, old, slots)
+        if children is old:
+            return False
+        touch(parent)
+        parent.children = children
+        self._structure_changed(parent)
+        return True
+
+    def _set_children(self, parent: VNode, children: List[VNode]) -> None:
+        """Replace ``parent``'s children with nodes already reconciled or created (boundaries)."""
+        for child in children:
+            if child.parent is not parent:
+                touch(child)
+                child.parent = parent
+        touch(parent)
+        parent.children = children
+        self._structure_changed(parent)
+
+    def _reconcile_child_list(
+        self, parent: VNode, old_children: List[VNode], slots: Sequence[Optional[Element]]
+    ) -> List[VNode]:
+        """Match, reconcile, create, and destroy one child list.
+
+        Returns ``old_children`` itself when the list kept its shape (the
+        same element type and key in the same slots), after updating each
+        child in place; no lookup tables are built for that case.
+        Otherwise keyed elements match the old child with the same key
+        wherever it was, unkeyed elements match the old unkeyed child in
+        the same slot, and a different type replaces the node. Native
+        attachment order is synced later, for containers whose structure
+        changed.
 
         On failure, any freshly created replacement nodes are destroyed
         before the exception propagates so an enclosing boundary can
@@ -1252,47 +1564,70 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         failure is a ``Suspend`` their hook states are salvaged for the
         boundary's retry.
         """
-        old_by_key: Dict[Any, VNode] = {}
-        old_unkeyed: List[VNode] = []
+        count = len(slots)
+        old_count = len(old_children)
+        limit = count if count < old_count else old_count
+        index = 0
+        reconcile = self._reconcile_node
+        while index < limit:
+            child = old_children[index]
+            el = slots[index]
+            if el is None or child.slot != index:
+                break
+            old_el = child.element
+            if old_el.key != el.key:
+                break
+            new_type = el.type
+            old_type = old_el.type
+            if old_type is not new_type and not (old_type.__class__ is str and old_type == new_type):
+                break
+            if el is not old_el or not self._reusable(child):
+                reconcile(child, el)
+            index += 1
+        if index == count == old_count:
+            return old_children
+
+        result = old_children[:index]
+        by_key: Dict[Any, VNode] = {}
+        by_slot: Dict[int, VNode] = {}
         # Duplicate keys are an application bug (dev mode warns), but they
         # must never corrupt the tree: each old node matches at most once,
         # and every old node that doesn't match is destroyed.
-        old_duplicates: List[VNode] = []
-        for child in old_children:
+        leftovers: List[VNode] = []
+        for child in old_children[index:]:
             key = child.element.key
             if key is None:
-                old_unkeyed.append(child)
-            elif key in old_by_key:
-                old_duplicates.append(child)
+                by_slot[child.slot] = child
+            elif key in by_key:
+                leftovers.append(child)
             else:
-                old_by_key[key] = child
+                by_key[key] = child
 
-        result: List[VNode] = []
         fresh: List[VNode] = []
-        used_keys: Set[Any] = set()
-        unkeyed_iter = iter(old_unkeyed)
         try:
-            for new_el in new_children:
-                matched: Optional[VNode] = None
-                if new_el.key is not None:
-                    if new_el.key not in used_keys:
-                        matched = old_by_key.get(new_el.key)
-                        if matched is not None:
-                            used_keys.add(new_el.key)
-                else:
-                    matched = next(unkeyed_iter, None)
-
+            for slot in range(index, count):
+                el = slots[slot]
+                if el is None:
+                    continue
+                key = el.key
+                matched = by_key.pop(key, None) if key is not None else by_slot.pop(slot, None)
                 if matched is None:
-                    node = self._create_tree(new_el)
+                    node = self._create_tree(el)
                     fresh.append(node)
-                    result.append(node)
-                elif not self._same_type(matched.element, new_el):
-                    node = self._create_tree(new_el)
-                    self._destroy_tree(matched)
-                    fresh.append(node)
-                    result.append(node)
                 else:
-                    result.append(self._reconcile_node(matched, new_el))
+                    old_type = matched.element.type
+                    new_type = el.type
+                    if old_type is not new_type and not (old_type.__class__ is str and old_type == new_type):
+                        node = self._create_tree(el)
+                        fresh.append(node)
+                        self._destroy_tree(matched)
+                    else:
+                        node = reconcile(matched, el)
+                if node.slot != slot or node.parent is not parent:
+                    touch(node)
+                    node.slot = slot
+                    node.parent = parent
+                result.append(node)
         except Suspend:
             if self._suspense_salvage is None:
                 self._suspense_salvage = {}
@@ -1304,12 +1639,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
                 self._destroy_tree(node)
             raise
 
-        for key, node in old_by_key.items():
-            if key not in used_keys:
-                self._destroy_tree(node)
-        for node in old_duplicates:
+        for node in by_key.values():
             self._destroy_tree(node)
-        for node in unkeyed_iter:
+        for node in by_slot.values():
+            self._destroy_tree(node)
+        for node in leftovers:
             self._destroy_tree(node)
         return result
 
@@ -1329,31 +1663,39 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """
         if not node.mounted:
             return
+        touch(node)
         node.mounted = False
         self._dirty_nodes.pop(id(node), None)
-        self._dirty_boundaries.pop(id(node), None)
-        self._dirty_suspense.pop(id(node), None)
-        if node.suspense_hydration:
-            self._dispose_hydration(node.suspense_hydration)
-            node.suspense_hydration = None
-        node.suspense_hidden = None
+        if node.kind == BOUNDARY:
+            self._dirty_boundaries.pop(id(node), None)
+        elif node.kind == SUSPENSE_KIND:
+            self._dirty_suspense.pop(id(node), None)
+            if node.suspense_hydration:
+                self._dispose_hydration(node.suspense_hydration)
+                node.suspense_hydration = None
+            node.suspense_hidden = None
         hs = node.hook_state
+        publications = self._publications
         if hs is not None:
             self._effect_states.pop(id(hs), None)
-            if salvage is not None and node.is_component:
+            if salvage is not None and node.kind == COMPONENT:
                 salvage.setdefault((id(node.element.type), node.element.key), []).append(hs)
             else:
-                self._publications.append(hs.cleanup_all_effects)
-            self._publications.append(hs.detach)
-        self._publications.append(partial(self._clear_ref, node.element.props.get("ref")))
+                publications.append(hs.cleanup_all_effects)
+            publications.append(hs.detach)
         for child in node.children:
             self._destroy_tree(child, salvage=salvage)
-        if node.is_native and node.tag is not None:
-            self._native_children.pop(node.tag, None)
-            self._tag_nodes.pop(node.tag, None)
-            self._publications.append(partial(self._events.clear, node.tag))
-            self._ops.append(DestroyOp(node.tag))
-            self._destroyed_tags.add(node.tag)
+        if node.kind == NATIVE:
+            ref = node.element.props.get("ref")
+            if ref is not None:
+                publications.append(partial(self._clear_ref, ref))
+            tag = node.tag
+            if tag is not None:
+                self._native_children.pop(tag, None)
+                self._tag_nodes.pop(tag, None)
+                publications.append(partial(self._events.clear, tag))
+                self._ops.append(DestroyOp(tag))
+                self._destroyed_tags.add(tag)
         node.children = []
         node.parent = None
 
@@ -1368,7 +1710,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         handler self-attaches to a top-level overlay. Transparent
         wrappers contribute the concatenation of their children's roots.
         """
-        if node.is_native:
+        if node.kind == NATIVE:
             return [] if node.element.type == "Portal" else [node]
         roots: List[VNode] = []
         for child in node.children:
@@ -1378,7 +1720,11 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     def _flattened_child_roots(self, node: VNode) -> List[VNode]:
         roots: List[VNode] = []
         for child in node.children:
-            roots.extend(self._native_roots(child))
+            if child.kind == NATIVE:
+                if child.element.type != "Portal":
+                    roots.append(child)
+            else:
+                roots.extend(self._native_roots(child))
         return roots
 
     def _flattened_child_tags(self, node: VNode) -> List[int]:
@@ -1388,21 +1734,51 @@ class Reconciler(BoundaryMixin, LayoutMixin):
     def _nearest_native_ancestor(node: VNode) -> Optional[VNode]:
         current = node.parent
         while current is not None:
-            if current.is_native:
+            if current.kind == NATIVE:
                 return current
             current = current.parent
         return None
 
     def _refresh_identity(self, node: VNode) -> None:
         """Point a wrapper's ``tag`` / ``native_view`` at its first native root."""
-        if node.is_native:
+        if node.kind == NATIVE:
             return
-        for root in self._native_roots(node):
-            node.tag = root.tag
-            node.native_view = root.native_view
-            return
-        node.tag = None
-        node.native_view = None
+        first = node
+        while first.kind != NATIVE:
+            for child in first.children:
+                if child.kind != NATIVE or child.element.type != "Portal":
+                    roots = self._native_roots(child)
+                    if roots:
+                        first = roots[0]
+                        break
+            else:
+                if node.tag is not None or node.native_view is not None:
+                    touch(node)
+                    node.tag = None
+                    node.native_view = None
+                return
+        if node.tag != first.tag or node.native_view is not first.native_view:
+            touch(node)
+            node.tag = first.tag
+            node.native_view = first.native_view
+
+    def _structure_changed(self, node: VNode) -> None:
+        """Note that ``node``'s child list changed: refresh wrapper identities and mark its container stale."""
+        current: Optional[VNode] = node
+        while current is not None and current.kind != NATIVE:
+            self._refresh_identity(current)
+            current = current.parent
+        if current is not None:
+            self._stale[id(current)] = current
+
+    def _sync_stale(self) -> None:
+        """Emit the inserts that bring each stale container's native children in line with its child list."""
+        stale, self._stale = self._stale, {}
+        for node in stale.values():
+            tag = node.tag
+            if not node.mounted or tag is None:
+                continue
+            self._sync_native_children(tag, self._native_children.get(tag, []), self._flattened_child_roots(node))
 
     def _sync_native_children(self, parent_tag: int, before_tags: List[int], after_roots: List[VNode]) -> bool:
         """Emit the inserts that turn the parent's native child list into ``after_roots``.
@@ -1416,11 +1792,14 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
         Returns whether the native child list changed at all.
         """
-        self._native_children[parent_tag] = [root.tag for root in after_roots if root.tag is not None]
-        surviving = [t for t in before_tags if t not in self._destroyed_tags]
-        after_tags = [r.tag for r in after_roots if r.tag is not None]
+        after_tags = [root.tag for root in after_roots if root.tag is not None]
+        if after_tags == before_tags:
+            return False
+        self._native_children[parent_tag] = after_tags
+        destroyed = self._destroyed_tags
+        surviving = [t for t in before_tags if t not in destroyed]
         if surviving == after_tags:
-            return len(surviving) != len(before_tags)
+            return True
         for tag, index in plan_child_moves(surviving, after_tags):
             self._ops.append(InsertOp(parent_tag, tag, index))
         return True
@@ -1450,9 +1829,7 @@ class Reconciler(BoundaryMixin, LayoutMixin):
         """
         if not props:
             return {}, {}
-        stripped = {
-            key: value for key, value in props.items() if key not in _RECONCILER_OWNED_PROPS and value is not UNSET
-        }
+        stripped = {key: value for key, value in props.items() if key != "ref" and value is not UNSET}
         from ..motion.runtime import runtime as motion
 
         for key in _MOTION_PROPS:
@@ -1524,9 +1901,10 @@ class Reconciler(BoundaryMixin, LayoutMixin):
 
     @staticmethod
     def _same_type(old_el: Element, new_el: Element) -> bool:
-        if isinstance(old_el.type, str):
-            return old_el.type == new_el.type
-        return old_el.type is new_el.type
+        old_type = old_el.type
+        if old_type.__class__ is str:
+            return bool(old_type == new_el.type)
+        return old_type is new_el.type
 
     @staticmethod
     def _provider_label(context: Context) -> str:

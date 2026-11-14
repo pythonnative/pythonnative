@@ -231,7 +231,12 @@ def call_threadsafe(callback: Callable[..., Any], *args: Any) -> None:
 
 
 def call_on_application_thread(fn: Callable[[], None]) -> None:
-    """Execute Python work on its owner thread, inline when already there."""
+    """Execute Python work on its owner thread, inline when already there.
+
+    Work from another thread (a state setter called by a worker, say)
+    isn't user input, so it doesn't make a transition render yield: the
+    loop runs it once the render in progress has finished.
+    """
     loop = get_loop()
     if _on_loop_thread(loop):
         fn()
@@ -288,6 +293,9 @@ def _shutdown_for_tests() -> None:
                 loop.close()
         _loop = _thread = _owner = None
         _application_scope = TaskScope()
+    from .scheduler import _reset_urgent_input
+
+    _reset_urgent_input()
 
 
 __all__ = [

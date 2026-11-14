@@ -11,7 +11,7 @@ from pythonnative.native_modules import NativeModuleError
 
 from ..journal import journal
 from .theme import Styles
-from .widgets import PrimaryButton, slots
+from .widgets import PrimaryButton
 
 GRACE_SECONDS = 30.0
 """How long the app can be away before it asks again."""
@@ -60,21 +60,19 @@ def LockScreen() -> pn.Node:
     pn.use_effect(prompt_once, [available])
 
     return pn.Column(
-        *slots(
-            icon=pn.Icon("lock", size=48, color=styles.colors.primary),
-            title=pn.Text("Field Notes is locked", style=styles.heading),
-            problem=pn.Text(problem, style=styles.error_text) if problem else None,
-            action=(
-                PrimaryButton("Unlock", unlock, disabled=busy)
-                if available
-                # Enrollment can vanish after the lock was turned on. Refusing to open
-                # would strand the journal, and the device's own passcode still guards it.
-                else pn.Column(
-                    pn.Text("This device no longer has biometrics set up.", style=styles.center_text),
-                    PrimaryButton("Open anyway", lambda: journal.publish(locked=False)),
-                    style=pn.style(gap=12),
-                )
-            ),
+        pn.Icon("lock", size=48, color=styles.colors.primary),
+        pn.Text("Field Notes is locked", style=styles.heading),
+        pn.Text(problem, style=styles.error_text) if problem else None,
+        (
+            PrimaryButton("Unlock", unlock, disabled=busy)
+            if available
+            # Enrollment can vanish after the lock was turned on. Refusing to open
+            # would strand the journal, and the device's own passcode still guards it.
+            else pn.Column(
+                pn.Text("This device no longer has biometrics set up.", style=styles.center_text),
+                PrimaryButton("Open anyway", lambda: journal.publish(locked=False)),
+                style=pn.style(gap=12),
+            )
         ),
         style=[styles.screen, styles.center],
     )

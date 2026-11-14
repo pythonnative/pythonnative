@@ -524,7 +524,7 @@ def _parse_document(markup: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
 
 
 def _build(shapes: List[Dict[str, Any]], props: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
-    from .components.graphics import Svg
+    from .components.vector import Svg
 
     merged = dict(props)
     merged.update(overrides)

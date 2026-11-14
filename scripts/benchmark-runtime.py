@@ -4,10 +4,12 @@
 Run ``python scripts/benchmark-runtime.py [--output report.json]``. The
 numbers are host timings for comparing changes on one machine, not device
 measurements: ``import pythonnative`` in a fresh interpreter, element
-construction, re-rendering a 300-component tree headlessly, and a first
-commit of 300 views to the renderer core (validation, layout, and the
-mount transaction, RFC 0007), and one display frame of the motion runtime
-driving 200 animated styles from a running spring (RFC 0009).
+construction, mounting and re-rendering a 300-component tree headlessly,
+the latency of a press that arrives while a 300-component transition is
+rendering (RFC 0010), a first commit of 300 views to the renderer core
+(validation, layout, and the mount transaction, RFC 0007), and one display
+frame of the motion runtime driving 200 animated styles from a running
+spring (RFC 0009).
 ``tests/test_performance_budgets.py`` enforces the deterministic properties
 behind these timings.
 """
@@ -24,7 +26,7 @@ import time
 from typing import Any, Callable
 
 import pythonnative as pn
-from pythonnative import diagnostics
+from pythonnative import diagnostics, runtime, scheduler
 from pythonnative.bridge import codec, contract_document
 from pythonnative.bridge.core import PROTOCOL_VERSION, load_core
 from pythonnative.testing import render
@@ -53,6 +55,78 @@ def Cell(label: str, n: int) -> pn.Node:
 def Grid(n: int) -> pn.Node:
     """300 keyed cells whose props change on every render."""
     return pn.Column(*(Cell(f"cell {i}", n).with_key(str(i)) for i in range(300)))
+
+
+def mount_ms(rounds: int = 5, repeat: int = 3) -> list[float]:
+    """Milliseconds to mount the 300-component grid into a fresh headless tree."""
+    samples = []
+    for round_index in range(rounds):
+        trees = []
+        started = time.perf_counter()
+        for index in range(repeat):
+            trees.append(render(Grid(round_index * repeat + index), viewport=None, settle_first=False))
+        samples.append((time.perf_counter() - started) * 1000 / repeat)
+        for tree in trees:
+            tree.unmount()
+    return samples
+
+
+_preempt: dict[str, Any] = {}
+
+
+@pn.component
+def Probe(label: str, n: int) -> pn.Node:
+    """A grid cell that queues a press the first time it renders for an armed transition."""
+    if _preempt.get("armed") == n:
+        _preempt["armed"] = None
+        _preempt["queued"] = time.perf_counter()
+        queue = getattr(scheduler, "queue_urgent", None)
+        if queue is not None:
+            queue(_preempt["press"])
+        else:
+            runtime.get_loop().call_soon_threadsafe(_preempt["press"])
+    value, _set_value = pn.use_state(0)
+    pn.use_effect(lambda: None, [n])
+    return pn.Row(pn.Text(label), pn.Text(str(n + value)), style=pn.style(padding=4))
+
+
+@pn.component
+def Inbox() -> pn.Node:
+    """An urgent counter above 300 cells that render for a transition."""
+    clicks, set_clicks = pn.use_state(0)
+    shown, set_shown = pn.use_state(0)
+    _is_pending, start = pn.use_transition()
+    _preempt["press"] = lambda: set_clicks(lambda count: count + 1)
+    _preempt["show"] = lambda n: start(lambda: set_shown(n))
+    _preempt["rendered_clicks"] = clicks
+    return pn.Column(
+        pn.Text(f"clicks {clicks}"),
+        pn.Column(*(Probe(f"cell {i}", shown).with_key(str(i)) for i in range(300))),
+    )
+
+
+def transition_preempt_ms(rounds: int = 7) -> list[float]:
+    """Milliseconds from a press queued during a 300-component transition render to its commit."""
+    tree = render(Inbox(), viewport=None)
+    samples = []
+    for index in range(1, rounds + 1):
+        expected = _preempt["rendered_clicks"] + 1
+        landed: list[float] = []
+
+        def committed(expected: int = expected, landed: list[float] = landed) -> None:
+            if not landed and _preempt["rendered_clicks"] == expected:
+                landed.append(time.perf_counter())
+
+        tree.reconciler.on_commit = committed
+        _preempt["armed"] = index
+        _preempt["show"](index)
+        tree.settle()
+        if not landed:
+            raise RuntimeError("The press never committed")
+        samples.append((landed[0] - _preempt["queued"]) * 1000)
+    tree.reconciler.on_commit = None
+    tree.unmount()
+    return samples
 
 
 def per_call_ms(action: Callable[[int], Any], repeat: int, rounds: int = 5) -> list[float]:
@@ -176,7 +250,9 @@ def main() -> None:
         },
         "import_ms": summary([seconds * 1000 for seconds in import_seconds(args.imports)]),
         "element_us": summary([ms * 1000 for ms in per_call_ms(lambda i: Cell(f"cell {i}", i), 2000)]),
+        "mount_300_ms": summary(mount_ms()),
         "rerender_300_ms": summary(per_call_ms(lambda i: tree.rerender(Grid(i)), 5)),
+        "transition_preempt_ms": summary(transition_preempt_ms()),
         "core_commit_300_ms": summary(per_call_ms(core_committer(envelope), 20)),
         "motion_frame_200_styles_us": summary(motion_frame_us()),
     }

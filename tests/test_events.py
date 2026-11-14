@@ -8,6 +8,7 @@ clears registrations.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, List
 
 from pythonnative.element import Element
@@ -101,7 +102,7 @@ def test_event_names_accepts_multiple_shapes() -> None:
 def test_registry_set_get_dispatch() -> None:
     registry = EventRegistry()
     hits: List[Any] = []
-    registry.set_events(7, {"on_change": lambda v: hits.append(v)})
+    registry.register(7, SimpleNamespace(events={"on_change": lambda v: hits.append(v)}))
 
     assert registry.has(7, "on_change")
     assert registry.dispatch(7, "on_change", "abc") is True
@@ -110,20 +111,21 @@ def test_registry_set_get_dispatch() -> None:
     assert registry.dispatch(99, "on_change") is False
 
 
-def test_registry_set_events_replaces_previous_bucket() -> None:
+def test_registry_reads_the_sources_current_handlers() -> None:
     registry = EventRegistry()
-    registry.set_events(1, {"on_a": lambda: None, "on_b": lambda: None})
-    registry.set_events(1, {"on_a": lambda: None})
+    source = SimpleNamespace(events={"on_a": lambda: None, "on_b": lambda: None})
+    registry.register(1, source)
+    source.events = {"on_a": lambda: None}
     assert registry.has(1, "on_a")
     assert not registry.has(1, "on_b")
 
-    registry.set_events(1, {})
+    source.events = None
     assert not registry.has(1, "on_a")
 
 
 def test_registry_clear_drops_tag() -> None:
     registry = EventRegistry()
-    registry.set_events(3, {"on_press": lambda: None})
+    registry.register(3, SimpleNamespace(events={"on_press": lambda: None}))
     registry.clear(3)
     assert registry.dispatch(3, "on_press") is False
 
@@ -134,7 +136,7 @@ def test_dispatch_swallows_callback_exceptions() -> None:
     def boom() -> None:
         raise RuntimeError("user bug")
 
-    registry.set_events(5, {"on_press": boom})
+    registry.register(5, SimpleNamespace(events={"on_press": boom}))
     # Returns True (a callback ran) without propagating; a buggy app
     # callback must not crash the platform UI thread.
     assert registry.dispatch(5, "on_press") is True

@@ -66,6 +66,8 @@ Example:
     ```
 """
 
+from typing import TYPE_CHECKING, Any
+
 from ..element import Element
 from ..mutations import UNSET, UnsetType
 from ..native_modules.registry import (
@@ -101,8 +103,28 @@ from ._components import (
     list_components,
     unregister_component,
 )
-from .plugin import PluginNotEnabledError, plugin_component, plugin_module
 from .schema import ComponentSchema, ModuleSchema, NativeField, register_schema
+
+if TYPE_CHECKING:
+    from .plugin import PluginNotEnabledError, plugin_component, plugin_module
+
+# Only capability facades declare plugins, so ``sdk.plugin`` loads on first use.
+_LAZY = frozenset({"PluginNotEnabledError", "plugin_component", "plugin_module"})
+
+
+def __getattr__(name: str) -> Any:
+    if name not in _LAZY:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from . import plugin
+
+    value = getattr(plugin, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | _LAZY)
+
 
 __all__ = [
     "UNSET",

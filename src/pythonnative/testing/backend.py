@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from ..bridge.fake import FakeTransport
-from ..mutations import CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
+from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
 from ..native_views.bridge_backend import BridgeBackend
 
 __all__ = ["DEFAULT_INTRINSIC", "IMPLICIT_ROLES", "FakeBackend", "FakeView"]
@@ -352,8 +352,6 @@ class FakeBackend(BridgeBackend):
 
         if isinstance(op, UpdateOp):
             view = self._require(op.tag, "update")
-            from ..mutations import UNSET
-
             for key, value in op.changed_props.items():
                 if value is UNSET:
                     view.props.pop(key, None)

@@ -5,11 +5,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Callable, List
 
-import pytest
-
 import pythonnative as pn
 from pythonnative.hooks import StateSetter
-from pythonnative.scheduler import TransitionQueue
 from pythonnative.testing import render
 
 ValueContext = pn.create_context(0, name="Value")
@@ -355,52 +352,7 @@ def test_remounted_consumer_under_a_new_provider_follows_it() -> None:
     assert result.text() == ["c=3"]
 
 
-# ======================================================================
-# Transition queue
-# ======================================================================
-
-
-def test_transition_queue_runs_every_trigger_then_reraises_the_first_error() -> None:
-    queue = TransitionQueue()
-    ran: List[str] = []
-
-    def make(label: str, error: Exception | None = None) -> Callable[[], None]:
-        def trigger() -> None:
-            ran.append(label)
-            if error is not None:
-                raise error
-
-        return trigger
-
-    first = ValueError("first")
-    queue.defer(make("a"))
-    queue.defer(make("b", first))
-    queue.defer(make("c", RuntimeError("second")))
-    queue.defer(make("d"))
-    queue.on_complete(make("done"))
-
-    with pytest.raises(ValueError) as raised:
-        queue.flush()
-
-    assert raised.value is first
-    assert ran == ["a", "b", "c", "d", "done"]
-    assert not queue.pending
-
-
-def test_transition_queue_dedupes_the_same_trigger() -> None:
-    queue = TransitionQueue()
-    ran: List[str] = []
-
-    def trigger() -> None:
-        ran.append("t")
-
-    queue.defer(trigger)
-    queue.defer(trigger)
-    queue.flush()
-    assert ran == ["t"]
-
-
-def test_failing_transition_does_not_drop_other_transitions() -> None:
+def test_transitions_from_two_starts_commit_together() -> None:
     setters: List[StateSetter[int]] = []
     starts: List[Callable[[Callable[[], None]], None]] = []
 
@@ -414,17 +366,10 @@ def test_failing_transition_does_not_drop_other_transitions() -> None:
         return pn.Text(f"{a},{b}")
 
     result = render(Screen())
-    queue = result.reconciler.transitions
-
-    def bad_trigger() -> None:
-        raise RuntimeError("bad trigger")
-
-    queue.defer(bad_trigger)
     starts[-1](lambda: setters[0](lambda n: n + 1))
     starts[-1](lambda: setters[1](lambda n: n + 2))
-
-    with pytest.raises(RuntimeError, match="bad trigger"):
-        queue.flush()
+    assert result.reconciler.transitions.pending
     result.settle()
 
     assert result.text() == ["1,2"]
+    assert not result.reconciler.transitions.pending

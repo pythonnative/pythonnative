@@ -56,7 +56,7 @@ def test_finding_is_frozen() -> None:
 
 
 def test_codes_are_documented() -> None:
-    assert set(CODES) == {"PN000", "PN101", "PN102", "PN103", "PN104", "PN201", "PN202", "PN203"}
+    assert set(CODES) == {"PN000", "PN101", "PN102", "PN103", "PN104", "PN105", "PN201", "PN202", "PN203"}
 
 
 def test_worklet_rules() -> None:
@@ -785,6 +785,123 @@ def test_pn104_ignores_builtins_with_key_and_other_calls() -> None:
             )
     """
     assert lint(source) == []
+
+
+# ======================================================================
+# PN105: module-level state written while rendering
+# ======================================================================
+
+
+def test_pn105_flags_writes_to_module_level_state_in_a_component_body() -> None:
+    source = """
+        import pythonnative as pn
+
+        CACHE = {}
+        SEEN = []
+        count = 0
+        GRID = [[0]]
+
+        @pn.component
+        def App(key_name):
+            global count
+            count = count + 1
+            count += 1
+            SEEN.append(key_name)
+            CACHE.update(a=1)
+            CACHE[key_name] = 1
+            CACHE[key_name] += 1
+            GRID[0][0] = 1
+            del CACHE[key_name]
+            sizes = [SEEN.pop() for _ in range(2)]
+            return pn.Text(str(sizes))
+    """
+    findings = only(source, "PN105")
+    assert [f.line for f in findings] == [12, 13, 14, 15, 16, 17, 18, 19, 20]
+    assert findings[0].message.startswith("'App' assigns the module-level name 'count' while rendering")
+    assert "'App' mutates the module-level 'SEEN' while rendering (SEEN.append)" in findings[2].message
+    assert "'App' changes an item of the module-level 'CACHE'" in findings[4].message
+
+
+def test_pn105_allows_nested_functions_locals_and_reads() -> None:
+    source = """
+        import pythonnative as pn
+        from app import store
+
+        CACHE = {}
+        items = []
+
+        @pn.component
+        def App(items):
+            items.append(1)  # a parameter shadows the module-level name
+            CACHE_COPY = dict(CACHE)
+            CACHE_COPY["a"] = 1
+            store.update(1)  # an import, not a module-level container
+            value = CACHE.get("a")
+
+            def on_press():
+                CACHE["a"] = 2
+                CACHE.clear()
+
+            pn.use_effect(lambda: CACHE.update(b=1), [])
+
+            class Local:
+                def run(self):
+                    CACHE.pop("a")
+
+            return pn.Button(str(value), on_press=on_press)
+
+        def helper():
+            CACHE["x"] = 1
+    """
+    assert only(source, "PN105") == []
+
+
+def test_pn105_enclosing_function_names_are_not_module_level() -> None:
+    source = """
+        import pythonnative as pn
+
+        log = []
+
+        def make():
+            log = []
+
+            @pn.component
+            def Inner():
+                log.append("render")
+                return None
+
+            return Inner
+
+        def outer():
+            @pn.component
+            def Other():
+                log.append("render")
+                return None
+
+            return Other
+    """
+    findings = only(source, "PN105")
+    assert [(f.line, "'Other'" in f.message) for f in findings] == [(19, True)]
+
+
+def test_pn105_recognizes_wrapped_components_and_respects_ignore_comments() -> None:
+    source = """
+        import pythonnative as pn
+
+        RENDERS = []
+
+        def body():
+            RENDERS.append(1)
+            return None
+
+        Wrapped = pn.component(body)
+
+        @pn.component
+        def Counted():
+            RENDERS.append(1)  # pn: ignore[PN105]
+            return None
+    """
+    assert [f.line for f in only(source, "PN105")] == [7]
 
 
 # ======================================================================

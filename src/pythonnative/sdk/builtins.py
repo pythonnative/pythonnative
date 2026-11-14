@@ -124,7 +124,7 @@ def install(factories: dict[str, Any]) -> None:
         if name not in PYTHON_ONLY_STYLE_KEYS
     }
     for name, factory in factories.items():
-        if name in {"ErrorBoundary", "Fragment", "Suspense", "FlatList", "SectionList"}:
+        if name in {"ErrorBoundary", "Fragment", "StrictMode", "Suspense", "FlatList", "SectionList"}:
             continue
         if not inspect.isfunction(factory) or not name[:1].isupper() or name.startswith("_"):
             continue
@@ -318,7 +318,7 @@ def derive() -> dict[str, Any]:
 
     COMPONENTS.clear()
     MODULES.clear()
-    install(vars(components))
+    install(components._factories())
     return manifest()
 
 

@@ -11,7 +11,9 @@ It connects the two halves of the bridge (installing the native -> Python
 callback on iOS), verifies the protocol version, routes ``print()`` to the
 console on iOS, warms the asyncio runtime, in debug builds starts the dev
 client that syncs sources from ``pn start``, and imports the entry module,
-so the first screen only has to render. From then on the native runtime drives
+so the first screen only has to render. Along the way it records the
+startup timeline's ``contracts``, ``bridge``, and ``app`` marks (see
+[`startup_timeline`][pythonnative.diagnostics.startup_timeline]). From then on the native runtime drives
 everything through ``callback("host", ...)``; see ``docs/concepts/bridge.md``.
 """
 
@@ -21,6 +23,8 @@ import os
 import sys
 import traceback
 from typing import Any, Dict, Optional
+
+from . import diagnostics
 
 __all__ = ["start", "status"]
 
@@ -67,19 +71,19 @@ def start(dev: bool = False, strict: bool = False, entry: Optional[str] = None) 
         from .sdk.schema import load_bundled_contracts
 
         load_bundled_contracts()
+        diagnostics.mark_startup("contracts")
         from . import bridge
 
         status_["protocol"] = bridge.handshake()
         dev_mode = bool(dev or os.environ.get("PN_DEV") in ("1", "true"))
         if dev_mode:
-            from . import diagnostics
-
             diagnostics.set_dev_mode(True)
         # Import the view backend eagerly: on a slow device the first
         # commit shouldn't also pay for importing the reconciler.
         from .native_views import get_backend
 
         get_backend()
+        diagnostics.mark_startup("bridge")
         if dev_mode:
             # Debug builds are dev clients: connect to `pn start` when
             # the build (or a remembered connection) names a server.
@@ -102,6 +106,7 @@ def start(dev: bool = False, strict: bool = False, entry: Optional[str] = None) 
             import importlib
 
             importlib.import_module(entry)
+        diagnostics.mark_startup("app")
     except Exception as exc:
         status_["error"] = f"{type(exc).__name__}: {exc}"
         print(f"[pn.bootstrap] start failed: {exc!r}", file=sys.stderr)

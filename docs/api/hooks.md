@@ -36,7 +36,8 @@ async-aware hooks layered on top of `use_state` / `use_effect`:
   [`Suspense`][pythonnative.Suspense]).
 - [`use_transition`][pythonnative.use_transition] /
   [`use_deferred_value`][pythonnative.use_deferred_value]: mark
-  expensive updates as low priority so urgent updates render first.
+  expensive updates as transitions, which render after urgent updates
+  and start over when the user taps or types mid-render.
 - [`use_query`][pythonnative.use_query]: subscribes to an async
   fetcher and re-renders on data / error / refetch.
 - [`use_mutation`][pythonnative.use_mutation]: wraps an async
@@ -96,11 +97,18 @@ more than fifty times raises `RuntimeError("Too many re-renders")`
 from the offending component and routes it through the nearest
 [`ErrorBoundary`][pythonnative.ErrorBoundary] (or the RedBox in dev
 mode). [`batch_updates`][pythonnative.scheduler.batch_updates] remains
-the explicit way to coalesce setter calls that span an `await`, and
-each reconciler owns a
-[`TransitionQueue`][pythonnative.scheduler.TransitionQueue] that
-defers renders started inside
-[`use_transition`][pythonnative.use_transition].
+the explicit way to coalesce setter calls that span an `await`.
+
+Updates made in [`start_transition`][pythonnative.scheduler.start_transition],
+[`use_transition`][pythonnative.use_transition], or
+[`use_deferred_value`][pythonnative.use_deferred_value] are transitions.
+Each reconciler's
+[`TransitionQueue`][pythonnative.scheduler.TransitionQueue] tracks the
+components with transition updates waiting; they render in a pass of
+their own after urgent work, and that pass yields to input queued with
+[`queue_urgent`][pythonnative.scheduler.queue_urgent] (the bridge queues
+discrete native events this way) until it sends its first mutation. See
+[Transitions and preemption](../concepts/reconciliation.md#transitions-and-preemption).
 
 ::: pythonnative.scheduler
     options:
