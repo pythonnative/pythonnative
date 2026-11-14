@@ -1,10 +1,10 @@
-# Component category suite, part 1 of three; see components.yaml.
+# Component category suite, part 1 of four; see components.yaml.
 #
-# The components category is large enough (35 flows) that a single
+# The components category is large enough (40 flows) that a single
 # GitHub-hosted Android emulator session can't reliably finish it: the
 # emulator grows unstable after roughly ten minutes of sustained Maestro
 # driving and drops offline mid-flow. CI therefore runs the category as
-# three parts of about twelve flows, each on a freshly booted emulator.
+# four parts of about ten flows, each on a freshly booted emulator.
 #
 # Usage:
 #     maestro test tests/e2e/suites/components-a.yaml -e APP_ID=com.pythonnative.e2e

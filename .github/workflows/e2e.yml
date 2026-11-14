@@ -33,7 +33,7 @@ jobs:
     # its own freshly booted emulator, keeps every session under the
     # limit, and parallelizes the Android pass as a bonus. Groups are
     # sized to about nine minutes of driving or less: ``components``
-    # (39 flows) runs as three parts; ``hooks`` (26 flows) dropped
+    # (40 flows) runs as four parts; ``hooks`` (26 flows) dropped
     # offline at ~11.5 minutes in one session, so it runs as two parts;
     # the remaining categories pair up to similar totals, and ``misc``
     # (14 flows) runs alone.
@@ -49,6 +49,8 @@ jobs:
             suites: components-b
           - name: components-c
             suites: components-c
+          - name: components-d
+            suites: components-d
           - name: hooks-a
             suites: hooks-a
           - name: hooks-b
@@ -174,10 +176,10 @@ jobs:
         include:
           - name: components-a
             suites: components-a
-          - name: components-b
-            suites: components-b
-          - name: components-c
-            suites: components-c
+          - name: components-b-c
+            suites: components-b components-c
+          - name: components-d
+            suites: components-d
           - name: hooks
             suites: hooks
           - name: nav-gestures-layout-styling
