@@ -4148,6 +4148,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#startup-timeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup timeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.STARTUP_PHASES" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;STARTUP_PHASES
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.diagnostics.HookOrderError" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4196,6 +4218,50 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.begin_startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;begin_startup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.mark_startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mark_startup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.startup_timeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;startup_timeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.startup_summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;startup_summary
       
     </span>
   </a>
@@ -4674,6 +4740,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#startup-timeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup timeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.STARTUP_PHASES" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;STARTUP_PHASES
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pythonnative.diagnostics.HookOrderError" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4722,6 +4810,50 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.begin_startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;begin_startup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.mark_startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mark_startup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.startup_timeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;startup_timeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pythonnative.diagnostics.startup_summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;startup_summary
       
     </span>
   </a>
@@ -4912,6 +5044,16 @@ shipping apps pay no overhead.</p>
 <p>Most apps never call this module directly; it exists so framework
 code (and custom component libraries) can report problems in a way
 that reaches the developer instead of disappearing into a log.</p>
+<h2 id="startup-timeline">Startup timeline<a class="headerlink" href="#startup-timeline" title="Permanent link">&para;</a></h2>
+<p>Every launch, in release builds too, logs one line to the device log
+once the first screen's first commit is acknowledged:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>[PN] startup: framework 182 ms, contracts 9 ms, bridge 30 ms, app 310 ms, render 41 ms, commit 28 ms, total 640 ms
+</span></code></pre></div>
+<p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;startup_timeline&lt;/span&gt;" href="#pythonnative.diagnostics.startup_timeline"><code>startup_timeline</code></a> returns
+the same numbers as a dict, and a running
+<a href="../../guides/dev-workflow/#profiling">profiler</a> records them as
+<code>startup.&lt;phase&gt;_ms</code> gauges. The docstring below says what each phase
+covers.</p>
 <p><a href="" id="pythonnative.diagnostics"></a></p>
 
 
@@ -4942,6 +5084,10 @@ Dev mode turns on:</p>
 </ul>
 <p>In production none of this runs: validation is skipped, hook-order
 checks are skipped, and errors propagate exactly as raised.</p>
+<p>The <strong>startup timeline</strong> runs in every build: each launch logs one
+<code>[PN] startup:</code> line, and
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;startup_timeline&lt;/span&gt;" href="#pythonnative.diagnostics.startup_timeline"><code>startup_timeline</code></a> returns
+the same phases.</p>
 <p>This module has no dependencies on the rest of PythonNative, so any
 module (hooks, reconciler, events) may import it freely.</p>
 
@@ -5015,6 +5161,38 @@ module (hooks, reconciler, events) may import it freely.</p>
               <td>
                 <div class="doc-md-description">
                   <p>Print a framework trace line (<code>[PN] message</code>) in dev mode.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;begin_startup&lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.begin_startup&lt;/code&gt;)" href="#pythonnative.diagnostics.begin_startup">begin_startup</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Set the <code>time.perf_counter()</code> value the <code>framework</code> phase starts from.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;mark_startup&lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.mark_startup&lt;/code&gt;)" href="#pythonnative.diagnostics.mark_startup">mark_startup</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Record that startup <code>phase</code> finished now; only the first mark of each phase counts.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;startup_timeline&lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.startup_timeline&lt;/code&gt;)" href="#pythonnative.diagnostics.startup_timeline">startup_timeline</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Return how long each startup phase of this process took, in milliseconds.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;startup_summary&lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.startup_summary&lt;/code&gt;)" href="#pythonnative.diagnostics.startup_summary">startup_summary</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The timeline as the one-line form logged at launch (<code>startup: framework 182 ms, ...</code>).</p>
                 </div>
               </td>
             </tr>
@@ -5104,6 +5282,35 @@ module (hooks, reconciler, events) may import it freely.</p>
 
 
 
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;STARTUP_PHASES&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;pythonnative.diagnostics.STARTUP_PHASES&lt;/code&gt;)" href="#pythonnative.diagnostics.STARTUP_PHASES">STARTUP_PHASES</a></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The startup phases, in launch order (see <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;startup_timeline&lt;/span&gt;" href="#pythonnative.diagnostics.startup_timeline"><code>startup_timeline</code></a>).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
 
 <div class="doc doc-children">
 
@@ -5112,6 +5319,37 @@ module (hooks, reconciler, events) may import it freely.</p>
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="pythonnative.diagnostics.STARTUP_PHASES" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">STARTUP_PHASES</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#pythonnative.diagnostics.STARTUP_PHASES" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">STARTUP_PHASES</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">"framework"</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s2">"contracts"</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">"bridge"</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">"app"</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="s2">"render"</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s2">"commit"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The startup phases, in launch order (see <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;startup_timeline&lt;/span&gt;" href="#pythonnative.diagnostics.startup_timeline"><code>startup_timeline</code></a>).</p>
+
+    </div>
+
+</div>
 
 
 
@@ -5303,6 +5541,194 @@ is doing. No-op in production.</p>
           </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.diagnostics.begin_startup" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">begin_startup</span>
+
+
+<a href="#pythonnative.diagnostics.begin_startup" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">begin_startup</span><span class="p">(</span><span class="n">origin</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Set the <code>time.perf_counter()</code> value the <code>framework</code> phase starts from.</p>
+<p><code>pythonnative/__init__.py</code> calls this with the time it started
+executing, before it records the <code>framework</code> mark.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.diagnostics.mark_startup" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">mark_startup</span>
+
+
+<a href="#pythonnative.diagnostics.mark_startup" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">mark_startup</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">phase</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n">since</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Record that startup <code>phase</code> finished now; only the first mark of each phase counts.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>phase</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One of <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;STARTUP_PHASES&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt;" href="#pythonnative.diagnostics.STARTUP_PHASES"><code>STARTUP_PHASES</code></a>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>since</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Optional&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Optional">Optional</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The <code>time.perf_counter()</code> value the phase started at.
+Defaults to the previous mark, so the phases a launch records
+in order cover it without gaps. <code>render</code> passes the time the
+first mount started, so the wait for the native screen isn't
+counted.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+        <p><code>commit</code> counts only once <code>render</code> is recorded. When it is, the
+timeline is complete: it's reported through the profiling gauges
+(<code>startup.&lt;phase&gt;_ms</code>) and, after a launch through
+<code>pythonnative.bootstrap</code>, logged as one <code>[PN] startup:</code> line, in
+release builds too.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.diagnostics.startup_timeline" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">startup_timeline</span>
+
+
+<a href="#pythonnative.diagnostics.startup_timeline" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">startup_timeline</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a></span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return how long each startup phase of this process took, in milliseconds.</p>
+<p>Keys appear in launch order, and only for the phases recorded so far:</p>
+<ul>
+<li><code>framework</code>: <code>import pythonnative</code>, from the first line of the
+  package's <code>__init__</code> to its last. Interpreter startup before it
+  isn't included.</li>
+<li><code>contracts</code>: starting the runtime and loading the native contracts
+  compiled into the app (<code>bootstrap.start</code>).</li>
+<li><code>bridge</code>: the protocol handshake and the view backend.</li>
+<li><code>app</code>: the dev client (debug builds) and importing the app's
+  entry module.</li>
+<li><code>render</code>: the first screen's first render, from the start of its
+  mount.</li>
+<li><code>commit</code>: from the end of that render until the native side
+  acknowledged the first commit.</li>
+<li><code>total</code>: from the start of <code>import pythonnative</code> until that
+  acknowledgment, including time between the phases (the native
+  screen being created, for example). Present once <code>commit</code> is.</li>
+</ul>
+<p>A process that didn't launch through <code>pythonnative.bootstrap</code> (a
+test, the browser preview) records only the phases it ran.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>, <a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#float">float</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new <code>{phase: milliseconds}</code> dict.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="pythonnative.diagnostics.startup_summary" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">startup_summary</span>
+
+
+<a href="#pythonnative.diagnostics.startup_summary" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">startup_summary</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The timeline as the one-line form logged at launch (<code>startup: framework 182 ms, ...</code>).</p>
 
 
     </div>

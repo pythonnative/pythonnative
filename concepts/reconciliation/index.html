@@ -853,6 +853,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#child-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Child identity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#keyed-children" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -890,6 +901,28 @@
     <span class="md-ellipsis">
       
         Fragments and multi-child rendering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transitions-and-preemption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transitions and preemption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strict-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict mode
       
     </span>
   </a>
@@ -4663,6 +4696,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#child-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Child identity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#keyed-children" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4700,6 +4744,28 @@
     <span class="md-ellipsis">
       
         Fragments and multi-child rendering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transitions-and-preemption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transitions and preemption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strict-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict mode
       
     </span>
   </a>
@@ -4807,23 +4873,14 @@
 
 <h1 id="reconciliation">Reconciliation<a class="headerlink" href="#reconciliation" title="Permanent link">&para;</a></h1>
 <p>Reconciliation is the process that turns a freshly produced
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree into the smallest set of native
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree into the smallest set of native
 view mutations that bring the on-screen tree into agreement with it.
-This page covers the rules that govern keyed
-diffing, function components, providers, and error boundaries.</p>
+This page covers the rules that govern child identity, keyed diffing,
+function components, transitions, strict mode, providers, and error
+boundaries.</p>
 <h2 id="why-we-need-a-reconciler">Why we need a reconciler<a class="headerlink" href="#why-we-need-a-reconciler" title="Permanent link">&para;</a></h2>
 <p>Re-running a <code>@component</code> function returns a brand-new
-<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree. Naively recreating native
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> tree. Naively recreating native
 widgets every render would be slow (Auto Layout passes, JNI roundtrips)
 and would lose user state (text selections, scroll position, focus).</p>
 <p>The reconciler instead asks: what is the <em>minimal</em> list of native
@@ -4832,38 +4889,30 @@ parallel virtual tree of <a class="autorefs autorefs-internal" title="&lt;code c
 of which holds an integer <strong>tag</strong> (the view's stable identity on the
 native side) and the props last applied.</p>
 <h2 id="the-diff-algorithm-in-one-paragraph">The diff algorithm in one paragraph<a class="headerlink" href="#the-diff-algorithm-in-one-paragraph" title="Permanent link">&para;</a></h2>
-<p>For each pair of (previous, next) elements at the same position in the
-tree:</p>
+<p>For each pair of (previous, next) elements matched in a child list
+(see <a href="#child-identity">Child identity</a>):</p>
 <ul>
 <li>If their <code>type</code> matches, <strong>update</strong>: emit an
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;UpdateOp&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.UpdateOp"><code>UpdateOp</code></a> carrying only the
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;UpdateOp&lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.UpdateOp"><code>UpdateOp</code></a> carrying only the
   props that changed (removed props arrive as <code>UNSET</code>; <code>None</code> is explicit null).</li>
 <li>If their <code>type</code> differs, <strong>replace</strong>: emit destroy ops for the old
   subtree, create ops for the new one, and recurse into its children.</li>
-<li>For container elements, match children by <code>key</code> first and by
-  position only if no key was provided. Reorder, mount, and unmount
-  as needed using <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;InsertOp&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.InsertOp"><code>InsertOp</code></a> /
-  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DestroyOp&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.DestroyOp"><code>DestroyOp</code></a>.</li>
+<li>Mount new children, unmount children that no longer match, and move
+  native views with <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;InsertOp&lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.InsertOp"><code>InsertOp</code></a> /
+  <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;DestroyOp&lt;/span&gt;" href="../../api/mutations/#pythonnative.mutations.DestroyOp"><code>DestroyOp</code></a> only when a native
+  container's children were created, destroyed, moved, or replaced.</li>
 </ul>
-<p>The reconciler runs synchronous render functions to completion on the
-application thread. Async components capture their provider environment across
-awaits. Changes to their inputs cancel obsolete work before it can publish.
-Expensive Python work delays callbacks and commits.
+<p>The committed tree is updated in place. Each node is recorded in an undo
+journal before its first change in a pass, so a pass that fails, or a
+transition that's preempted, rolls back to the committed tree. A child
+list that keeps its shape (the same types and keys in the same slots)
+is updated child by child without building any lookup tables, and a
+native view whose props didn't change isn't touched at all.</p>
+<p>The reconciler runs synchronous render functions on the application
+thread. Async components capture their provider environment across
+awaits. Changes to their inputs cancel obsolete work before it can
+publish. Expensive Python work delays callbacks and commits, except
+that a <a href="#transitions-and-preemption">transition</a> yields to urgent input.
 Native scrolling and <a href="../../guides/motion/">Motion</a> (animations and
 worklets on the UI thread) run independently; see
 <a href="../architecture/#runtime-limits">Runtime limits</a>.</p>
@@ -4883,24 +4932,84 @@ that raise are routed to the nearest error boundary, and a flush that
 re-schedules itself more than fifty times raises
 <code>RuntimeError("Too many re-renders")</code> through the same path. See
 <a href="../bridge/#commits">Commits</a> for validation and failure handling.</p>
-<p>Callable props never enter the transaction at all. They're registered
-in the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a> keyed by
-<code>(tag, event name)</code>, so a render that only changes callback identities
-emits <strong>zero</strong> ops.</p>
-<h2 id="keyed-children">Keyed children<a class="headerlink" href="#keyed-children" title="Permanent link">&para;</a></h2>
-<p>Without keys, children are matched by <strong>index</strong>. That's fine for static
-lists but breaks down when items are inserted or reordered:</p>
+<p>Callable props never enter the transaction at all. They stay on the
+view's node, and the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt;" href="../../api/events/#pythonnative.events.EventRegistry"><code>EventRegistry</code></a>
+reads them from the node when native reports an event, so a render that
+only changes callback identities emits <strong>zero</strong> ops.</p>
+<h2 id="child-identity">Child identity<a class="headerlink" href="#child-identity" title="Permanent link">&para;</a></h2>
+<p>A child list is the positional children of a native element, a
+<code>Fragment</code>, a provider, or a boundary, or the value a component
+returns. Each entry occupies one <strong>slot</strong>, numbered from zero, as in
+React:</p>
+<table>
+<thead>
+<tr>
+<th>Entry</th>
+<th>Slot holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An element</td>
+<td>That element</td>
+</tr>
+<tr>
+<td><code>None</code>, <code>False</code>, <code>True</code></td>
+<td>Nothing, but the slot is kept</td>
+</tr>
+<tr>
+<td>A list, tuple, or generator</td>
+<td>A group: an implicit fragment whose items form their own child list</td>
+</tr>
+<tr>
+<td><code>pn.Fragment(...)</code>, keyed or not</td>
+<td>A fragment node with its own child list</td>
+</tr>
+</tbody>
+</table>
+<p>Within one child list:</p>
+<ol>
+<li>An element with a key matches the old child with the same key,
+   wherever it was.</li>
+<li>An element without a key matches the old unkeyed child in the same
+   slot.</li>
+<li>A match with a different type is replaced. A slot that was empty and
+   now holds an element is a mount; the reverse is an unmount.</li>
+</ol>
+<p>So conditional children never shift their siblings:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Inbox</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">msgs</span><span class="p">,</span> <span class="n">set_msgs</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">([(</span><span class="s2">"a"</span><span class="p">,</span> <span class="s2">"Hi"</span><span class="p">),</span> <span class="p">(</span><span class="s2">"b"</span><span class="p">,</span> <span class="s2">"Hello"</span><span class="p">)])</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="o">*</span><span class="p">[</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">mid</span><span class="p">)</span> <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">],</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">query</span><span class="p">,</span> <span class="n">set_query</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">messages</span> <span class="o">=</span> <span class="n">use_messages</span><span class="p">()</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="s2">"Clear"</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_query</span><span class="p">(</span><span class="s2">""</span><span class="p">))</span> <span class="k">if</span> <span class="n">query</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">SearchField</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">query</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">set_query</span><span class="p">),</span>  <span class="c1"># keeps its state</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="p">[</span><span class="n">MessageRow</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="o">.</span><span class="n">with_key</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">messages</span><span class="p">],</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">Footer</span><span class="p">(),</span>                                       <span class="c1"># never shifts</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="p">)</span>
+</span></code></pre></div>
+<p>When the <code>Clear</code> button appears, <code>SearchField</code> stays in slot 1 and
+keeps its state. The list is one slot, a group, so <code>Footer</code> keeps its
+identity however many messages there are.</p>
+<p><code>*items</code> unpacks into separate slots, so <code>pn.Column(*rows, Footer())</code>
+still shifts <code>Footer</code> when <code>rows</code> grows, exactly as spreading an array
+does in React. Pass the list itself instead. In development, a group of
+two or more elements without keys is reported once per component.</p>
+<h2 id="keyed-children">Keyed children<a class="headerlink" href="#keyed-children" title="Permanent link">&para;</a></h2>
+<p>Within a group, children without keys are matched by <strong>index</strong>. That's
+fine for static lists but breaks down when items are inserted or
+reordered:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Inbox</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">msgs</span><span class="p">,</span> <span class="n">set_msgs</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">([(</span><span class="s2">"a"</span><span class="p">,</span> <span class="s2">"Hi"</span><span class="p">),</span> <span class="p">(</span><span class="s2">"b"</span><span class="p">,</span> <span class="s2">"Hello"</span><span class="p">)])</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="p">[</span><span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">mid</span><span class="p">)</span> <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">],</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>Without <code>key=mid</code>, inserting a new message at index <code>0</code> would update
 each existing <code>Text</code> in place rather than push them down, briefly
 showing the wrong text in each row. With keys, the reconciler matches
-"a" and "b" by identity, mounts the new row at index <code>0</code>, and shifts
+"a" and "b" by identity, mounts the new row at index <code>0</code>, and moves
 the others without re-rendering them.</p>
 <div class="admonition tip">
 <p class="admonition-title">Choose keys from the data, not the position</p>
@@ -4921,14 +5030,10 @@ rather than being a prop.</p>
    context.</li>
 <li>It recursively reconciles whatever the function returned, a
    <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-type_alias&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-type_alias-name&quot;&gt;Node&lt;/span&gt;" href="../../api/element/#pythonnative.element.Node"><code>Node</code></a>: a single
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, a <code>list</code> or other iterable of
-   nodes (which mount as siblings at the component's position), or
-   <code>None</code> (which mounts nothing).</li>
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, a <code>list</code> or tuple of nodes (a
+   child list whose entries mount as siblings at the component's
+   position, with the slot rules above), or <code>None</code> (which mounts
+   nothing).</li>
 </ol>
 <p>Hook slots are matched by their position in the function body, which is
 why hooks must be called at the top level (not inside <code>if</code>/<code>for</code>). In
@@ -4955,13 +5060,13 @@ checks let the reconciler skip work when a parent re-renders:</p>
 <p>The identity bailout needs no API. It applies whenever a component
 passes through elements it didn't build, which is the common case for
 containers:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Card</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">expanded</span><span class="p">,</span> <span class="n">set_expanded</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_expanded</span><span class="p">(</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="ow">not</span> <span class="n">e</span><span class="p">)),</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"display"</span><span class="p">:</span> <span class="s2">"flex"</span> <span class="k">if</span> <span class="n">expanded</span> <span class="k">else</span> <span class="s2">"none"</span><span class="p">}),</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Card</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">:</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">expanded</span><span class="p">,</span> <span class="n">set_expanded</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">Button</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">on_press</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">set_expanded</span><span class="p">(</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="ow">not</span> <span class="n">e</span><span class="p">)),</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">View</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"display"</span><span class="p">:</span> <span class="s2">"flex"</span> <span class="k">if</span> <span class="n">expanded</span> <span class="k">else</span> <span class="s2">"none"</span><span class="p">}),</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <p>Toggling <code>expanded</code> re-renders <code>Card</code>, but <code>children</code> are the same
 element objects its parent passed in, so the reconciler doesn't
@@ -4970,11 +5075,65 @@ element is cached, so a navigator re-render (a title change, a focus
 change) doesn't re-render the screens.</p>
 <h2 id="fragments-and-multi-child-rendering">Fragments and multi-child rendering<a class="headerlink" href="#fragments-and-multi-child-rendering" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Fragment&lt;/span&gt;" href="../../api/components/#pythonnative.components.Fragment"><code>Fragment</code></a> groups siblings without a wrapping
-native view: its children splice directly into the parent's native
-child list. <code>None</code> and <code>False</code> children are dropped everywhere, so
-conditional rendering with <code>cond and pn.Text(...)</code> needs no special
-casing. A keyed Fragment participates in keyed diffing as one unit,
-moving all of its children together.</p>
+native view: its children mount as native siblings at its position in
+the parent's native child list. A fragment is a node of its own that
+occupies one slot, keyed or not, and its children are matched among
+themselves, like a list's. A keyed Fragment moves all of its children
+together.</p>
+<h2 id="transitions-and-preemption">Transitions and preemption<a class="headerlink" href="#transitions-and-preemption" title="Permanent link">&para;</a></h2>
+<p>Every render pass is <strong>urgent</strong> or a <strong>transition</strong>. State updates made
+inside <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;start_transition&lt;/span&gt;" href="../../api/hooks/#pythonnative.scheduler.start_transition"><code>start_transition</code></a>, the
+<code>start_transition</code> that <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_transition&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_transition"><code>use_transition</code></a>
+returns, or a <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_deferred_value&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_deferred_value"><code>use_deferred_value</code></a>
+catch-up are transition updates. They wait in their component's state
+queue, so urgent renders keep reading the old value, and they render in
+a pass of their own after urgent work.</p>
+<p>Only component state waits. A <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Store&lt;/span&gt;" href="../../api/store/#pythonnative.store.Store"><code>Store</code></a>, or any
+source read through <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_subscription&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_subscription"><code>use_subscription</code></a>,
+holds its new value as soon as it's written, so its subscribers
+re-render urgently even when the write happens inside a transition.
+Otherwise one subscriber could show the new value while another still
+showed the old one.</p>
+<p>A transition pass checks for queued urgent input before each component
+body. The bridge queues presses, text changes, keys, submits, back
+presses, gesture ends, and navigation events as urgent input; scroll,
+gesture updates, layout, window metrics, and selection changes are
+coalesced and don't count. Neither does work from another thread, such
+as a state setter a worker calls: it isn't input, and it runs once the
+pass finishes. When input is waiting, and the pass hasn't
+sent anything to native yet, PythonNative:</p>
+<ol>
+<li>rolls the pass back, restoring every node and hook state it touched
+   and dropping its staged mutations and effects;</li>
+<li>runs the input's handler, renders its urgent updates, and commits
+   them;</li>
+<li>renders the transition again, replaying every queued update in its
+   original order.</li>
+</ol>
+<p><code>is_pending</code> from <code>use_transition</code> stays <code>True</code> until the transition
+commits, across any number of restarts. A transition that's been
+preempted three times, or has been pending for 250 ms, renders without
+checking, so a stream of taps can't starve it. A transition started by
+the commit of another (from an effect, say) gets a fresh count and clock.</p>
+<p>PythonNative doesn't slice renders the way React does on the web. Native
+views scroll, animate, and paint on the UI thread while Python renders,
+so a transition never needs to pause for the screen; it only needs to
+get out of the way of input.</p>
+<h2 id="strict-mode">Strict mode<a class="headerlink" href="#strict-mode" title="Permanent link">&para;</a></h2>
+<p>A preempted transition renders again, so a component body must be
+pure: a body that changes something outside itself would apply the
+change twice. <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;StrictMode&lt;/span&gt;" href="../../api/components/#pythonnative.components.StrictMode"><code>StrictMode</code></a> finds those
+bodies in development:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">StrictMode</span><span class="p">(</span><span class="n">App</span><span class="p">())</span>
+</span></code></pre></div>
+<p>For every component mounted beneath it, in development mode, the body
+runs twice per render (the first result is discarded), <code>use_state</code>
+initializers, updater functions, reducers, and <code>use_memo</code> factories
+run twice, and on mount each <code>use_effect</code> and <code>use_layout_effect</code> runs,
+cleans up, and runs again. Release builds ignore it. The <code>pn init</code>
+template wraps its root in <code>StrictMode</code>, and <code>pn lint</code> rule <code>PN105</code>
+flags the most common impurity it exposes: assigning to a module-level
+name or mutating a module-level container in a component body.</p>
 <h2 id="portals">Portals<a class="headerlink" href="#portals" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Portal&lt;/span&gt;" href="../../api/components/#pythonnative.components.Portal"><code>Portal</code></a> elements contribute <strong>zero</strong> native
 children to their parent. Their subtree mounts into a full-screen
@@ -4996,18 +5155,18 @@ marks exactly the registered consumers dirty. It doesn't walk the
 provider's subtree looking for them, so the cost is proportional to the
 number of consumers. Consumers re-render even when a memoized ancestor
 or an identity bailout skips the subtree between them and the provider.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">Accent</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_context</span><span class="p">(</span><span class="s2">"#000000"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"Accent"</span><span class="p">)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Page</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">return</span> <span class="n">Accent</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">value</span><span class="o">=</span><span class="s2">"#222222"</span><span class="p">)</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">accent</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_context</span><span class="p">(</span><span class="n">Accent</span><span class="p">)</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hi"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">accent</span><span class="p">})</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">Accent</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">create_context</span><span class="p">(</span><span class="s2">"#000000"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"Accent"</span><span class="p">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">Page</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">return</span> <span class="n">Accent</span><span class="o">.</span><span class="n">Provider</span><span class="p">(</span><span class="n">Header</span><span class="p">(),</span> <span class="n">value</span><span class="o">=</span><span class="s2">"#222222"</span><span class="p">)</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="k">def</span><span class="w"> </span><span class="nf">Header</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">accent</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_context</span><span class="p">(</span><span class="n">Accent</span><span class="p">)</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Text</span><span class="p">(</span><span class="s2">"Hi"</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="p">{</span><span class="s2">"color"</span><span class="p">:</span> <span class="n">accent</span><span class="p">})</span>
 </span></code></pre></div>
 <h2 id="error-boundaries">Error boundaries<a class="headerlink" href="#error-boundaries" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ErrorBoundary&lt;/span&gt;" href="../../api/components/#pythonnative.components.ErrorBoundary"><code>ErrorBoundary</code></a> is a special-cased
@@ -5018,12 +5177,7 @@ exception escapes a child component or handler, the reconciler:</p>
    callback, if provided.</li>
 <li>Tears down the partially-mounted subtree.</li>
 <li>Renders the boundary's <code>fallback</code> (a static
-   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, <code>fallback(error)</code>, or
+   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a>, <code>fallback(error)</code>, or
    <code>fallback(error, reset)</code> where <code>reset</code> remounts the children).</li>
 <li>Continues reconciling the rest of the page.</li>
 </ol>
@@ -5053,16 +5207,18 @@ bottleneck.</p>
 <li>See how mounting interacts with hooks: <a href="../lifecycle/">Lifecycle</a>.</li>
 </ul>
 <h2 id="elements-and-update-priority">Elements and update priority<a class="headerlink" href="#elements-and-update-priority" title="Permanent link">&para;</a></h2>
-<p>Elements hold read-only property snapshots and tuple children. Values inside
-application props aren't deep-copied; replace mutable application data when its
-meaning changes. Component construction follows the decorated function's Python
-signature, including positional-only parameters, keyword-only parameters,
-variadic children, and normal argument errors.</p>
-<p>State setters and reducer dispatch functions retain their identity across renders.
-Deferred updates stay out of urgent renders. When deferred work runs, the state
-queue replays urgent updates in their original order so an urgent edit isn't lost.
-Python rendering remains cooperative: a long synchronous function cannot be
-preempted by a later urgent update.</p>
+<p>Elements are immutable: assigning an attribute raises, and
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;with_key&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element.with_key"><code>with_key</code></a> copies one. An element
+keeps the props mapping its factory built rather than copying it, and its
+children are a tuple. Values inside application props aren't copied;
+replace mutable application data when its meaning changes. Component
+construction follows the decorated function's Python signature, including
+positional-only parameters, keyword-only parameters, variadic children,
+and normal argument errors.</p>
+<p>State setters and reducer dispatch functions retain their identity across
+renders. Transition updates stay out of urgent renders. When the
+transition renders, the state queue replays urgent updates in their
+original order so an urgent edit isn't lost.</p>
 <p>A native mount failure retires the surface and cancels its work. Validation
 failure before native mutation preserves the previous revision and can be retried.
 Property validation copies only changed records, so a one-property update doesn't

@@ -4953,16 +4953,13 @@ every launch. So a purchase runs as an application task:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">PrimaryButton</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">run_application_task</span><span class="p">(</span><span class="n">pro</span><span class="o">.</span><span class="n">buy</span><span class="p">()),</span> <span class="n">disabled</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">busy</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Deleting an entry works the same way, since its screen goes away as it does.</p>
-<p>There's a subtler version of the same trap. <code>None</code> children are dropped before diffing,
-not kept as holes, so a banner appearing above a row of buttons shifts those buttons
-into new slots and remounts them. That loses their state and cancels whatever they're
-running. <code>widgets.slots</code> gives each child a fixed key:</p>
+<p>A conditional child is safe next to these buttons. <code>None</code> keeps its slot in the child
+list, so a banner appearing above a row of buttons doesn't shift them into new slots,
+and they keep their state and whatever they're running:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="o">*</span><span class="n">slots</span><span class="p">(</span>
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>        <span class="n">problem</span><span class="o">=</span><span class="n">Banner</span><span class="p">(</span><span class="n">problem</span><span class="p">,</span> <span class="s2">"warning"</span><span class="p">)</span> <span class="k">if</span> <span class="n">problem</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>        <span class="n">shutter</span><span class="o">=</span><span class="n">PrimaryButton</span><span class="p">(</span><span class="n">shutter</span><span class="p">,</span> <span class="n">take_picture</span><span class="p">),</span>
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="p">),</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="p">)</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">Banner</span><span class="p">(</span><span class="n">problem</span><span class="p">,</span> <span class="s2">"warning"</span><span class="p">)</span> <span class="k">if</span> <span class="n">problem</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="n">PrimaryButton</span><span class="p">(</span><span class="n">shutter</span><span class="p">,</span> <span class="n">take_picture</span><span class="p">),</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="failing-in-production">Failing in production<a class="headerlink" href="#failing-in-production" title="Permanent link">&para;</a></h2>
 <p><code>main.py</code> installs both hooks at import time, so they hear about the very first render:</p>

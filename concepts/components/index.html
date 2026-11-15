@@ -4957,12 +4957,7 @@ React. You describe <em>what</em> the UI should look like, and the framework
 handles creating and updating native views.</p>
 <h2 id="element-functions">Element functions<a class="headerlink" href="#element-functions" title="Permanent link">&para;</a></h2>
 <p>UI is built with element-creating functions. Each returns a
-lightweight <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;
-
-
-  &lt;span class=&quot;doc doc-labels&quot;&gt;
-      &lt;small class=&quot;doc doc-label doc-label-dataclass&quot;&gt;&lt;code&gt;dataclass&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> descriptor; no native
+lightweight <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Element&lt;/span&gt;" href="../../api/element/#pythonnative.element.Element"><code>Element</code></a> descriptor; no native
 objects are created until the
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Reconciler&lt;/span&gt;" href="../../api/reconciler/#pythonnative.reconciler.core.Reconciler"><code>Reconciler</code></a> mounts the tree.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pythonnative</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pn</span>
@@ -5236,8 +5231,11 @@ conditional idioms type-check:</p>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="p">(</span><span class="n">Row</span><span class="p">(</span><span class="n">item</span><span class="o">=</span><span class="n">item</span><span class="p">)</span><span class="o">.</span><span class="n">with_key</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">id</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">),</span>
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">)</span>
 </span></code></pre></div>
-<p><code>None</code> and <code>False</code> are dropped during reconciliation, and nested
-iterables are flattened. Strings aren't nodes: wrap text in
+<p><code>None</code> and <code>False</code> render nothing but keep their slot, so the
+siblings after them keep their state when the condition changes, and a
+list or generator is one group whose items are matched among
+themselves (see <a href="../reconciliation/#child-identity">Child identity</a>).
+Strings aren't nodes: wrap text in
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;Text&lt;/span&gt;" href="../../api/components/#pythonnative.components.Text"><code>pn.Text</code></a>. Annotate every component's return type
 as <code>pn.Node</code>, since a component may return an element, a list of
 siblings, or <code>None</code> to render nothing.</p>

@@ -5502,7 +5502,9 @@ the <a href="../../guides/async/">Async + data guide</a>:</p>
   fetcher / wrap an async mutator with loading and error state.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_transition&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_transition"><code>use_transition</code></a> /
   <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_deferred_value&lt;/span&gt;" href="../../api/hooks/#pythonnative.hooks.use_deferred_value"><code>use_deferred_value</code></a>: mark
-  expensive updates as low priority so urgent updates paint first.</li>
+  expensive updates as transitions, so urgent updates commit first and
+  a transition that's rendering when the user taps or types starts
+  over; see <a href="../reconciliation/#transitions-and-preemption">Transitions and preemption</a>.</li>
 <li><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;use_persisted_state&lt;/span&gt;" href="../../api/storage/#pythonnative.storage.use_persisted_state"><code>use_persisted_state</code></a>:
   <code>use_state</code> backed by <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;AsyncStorage&lt;/span&gt;" href="../../api/storage/#pythonnative.storage.AsyncStorage"><code>AsyncStorage</code></a>.</li>
 </ul>
@@ -5656,6 +5658,11 @@ recognizes it and allows hook calls inside it.</p>
    comprehensions, <code>try</code> blocks, or nested functions, and not after an
    early <code>return</code>.</li>
 <li>Hooks must be called in the same order on every render.</li>
+<li>Keep component bodies pure. A transition render can be abandoned and
+   run again, and <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;StrictMode&lt;/span&gt;" href="../../api/components/#pythonnative.components.StrictMode"><code>StrictMode</code></a> runs bodies
+   twice in development, so a body that changes something outside
+   itself (a module-level counter, a cache dict) does it more than once.
+   Do that work in an event handler or an effect.</li>
 </ol>
 <div class="admonition tip">
 <p class="admonition-title">Why these rules?</p>
@@ -5668,8 +5675,8 @@ that the parent calls unconditionally.</p>
 <p>Run <code>pn lint</code> to catch violations of these rules without running the
 app. It reports a conditional or late hook (<code>PN101</code>), a hook outside a
 component or custom hook (<code>PN102</code>), a missing effect, memo, or
-callback dependency (<code>PN103</code>), and <code>key=</code> passed to a user component
-(<code>PN104</code>). See the <a href="../../guides/linting/">Linting guide</a>.</p>
+callback dependency (<code>PN103</code>), <code>key=</code> passed to a user component
+(<code>PN104</code>), and module-level state written while rendering (<code>PN105</code>). See the <a href="../../guides/linting/">Linting guide</a>.</p>
 <p>In dev mode (<code>pn preview</code>, <code>pn run</code> with hot reload, or <code>PN_DEV=1</code>),
 violating these rules raises a
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;HookOrderError&lt;/span&gt;" href="../../api/diagnostics/#pythonnative.diagnostics.HookOrderError"><code>HookOrderError</code></a> naming the component

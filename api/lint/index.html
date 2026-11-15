@@ -4716,7 +4716,7 @@ catches and how to suppress a finding.</p>
         <p>Static checks for the rules of hooks, behind <code>pn lint</code>.</p>
 <p>The linter parses Python source with the standard library's <code>ast</code> module,
 so it has no dependencies and never imports or runs the code it checks.
-It reports four rules for hooks:</p>
+It reports five rules for components and hooks:</p>
 <ul>
 <li><code>PN101</code>: a hook is called conditionally: inside an <code>if</code>, a loop, a
   <code>try</code>, a <code>match</code>, a comprehension, a lambda, a conditional
@@ -4728,6 +4728,11 @@ It reports four rules for hooks:</p>
   literal dependency list leaves out.</li>
 <li><code>PN104</code>: <code>key=</code> is passed to a module-level <code>@component</code>; use
   <code>.with_key(...)</code> on the returned element instead.</li>
+<li><code>PN105</code>: a component body assigns a module-level name (<code>global</code>) or
+  mutates a module-level container (<code>CACHE.append(x)</code>,
+  <code>CACHE[k] = v</code>, <code>del CACHE[k]</code>). A render can run more than once,
+  so the change would repeat. Nested functions, such as event handlers
+  and effects, are exempt.</li>
 </ul>
 <p>And three rules for worklets (RFC 0009):</p>
 <ul>
@@ -4880,10 +4885,11 @@ comment silences every finding on its line, and
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">"PN102"</span><span class="p">:</span> <span class="s2">"hook called outside a component or custom hook"</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">"PN103"</span><span class="p">:</span> <span class="s2">"dependency list is missing a name the callback reads"</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="s2">"PN104"</span><span class="p">:</span> <span class="s2">"key= passed to a user component"</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s2">"PN201"</span><span class="p">:</span> <span class="s2">"a worklet uses Python the UI thread can't run"</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="s2">"PN202"</span><span class="p">:</span> <span class="s2">"a worklet-only API receives a function that isn't marked @worklet"</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="s2">"PN203"</span><span class="p">:</span> <span class="s2">"a shared value is read during render"</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">}</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="s2">"PN105"</span><span class="p">:</span> <span class="s2">"a component body assigns or mutates module-level state"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="s2">"PN201"</span><span class="p">:</span> <span class="s2">"a worklet uses Python the UI thread can't run"</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="s2">"PN202"</span><span class="p">:</span> <span class="s2">"a worklet-only API receives a function that isn't marked @worklet"</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="s2">"PN203"</span><span class="p">:</span> <span class="s2">"a shared value is read during render"</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">}</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">

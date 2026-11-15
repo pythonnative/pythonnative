@@ -5470,6 +5470,9 @@ This uses public asyncio APIs and never inspects selector internals.</p>
     <div class="doc doc-contents ">
 
         <p>Execute Python work on its owner thread, inline when already there.</p>
+<p>Work from another thread (a state setter called by a worker, say)
+isn't user input, so it doesn't make a transition render yield: the
+loop runs it once the render in progress has finished.</p>
 
 
     </div>

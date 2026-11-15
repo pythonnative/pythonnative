@@ -4036,21 +4036,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pythonnative.events.EventRegistry.set_events" class="md-nav__link">
+  <a href="#pythonnative.events.EventRegistry.register" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;set_events
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pythonnative.events.EventRegistry.set_scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;set_scope
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;register
       
     </span>
   </a>
@@ -4747,21 +4736,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#pythonnative.events.EventRegistry.set_events" class="md-nav__link">
+  <a href="#pythonnative.events.EventRegistry.register" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;set_events
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pythonnative.events.EventRegistry.set_scope" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;set_scope
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;register
       
     </span>
   </a>
@@ -4942,16 +4920,21 @@ commit; platform handlers read from it when a native widget fires.</p>
     <div class="doc doc-contents first">
 
         <p>Tag-based event routing between native views and Python callbacks.</p>
-<p>Event props such as <code>on_press</code> and <code>on_change</code> stay in a Python
-registry. Native views send a tag and event name through the bridge:</p>
+<p>Event props such as <code>on_press</code> and <code>on_change</code> stay in Python.
+Native views send a tag and event name through the bridge:</p>
 <ul>
 <li>The reconciler strips callable props out of the payload sent to
-  native handlers and registers them here, keyed by <code>(tag, name)</code>.</li>
-<li>Handlers wire their platform listener <strong>once</strong> at view creation; the
+  native handlers and keeps them on the view's node
+  (<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;VNode&lt;/span&gt;" href="../reconciler/#pythonnative.reconciler.vnode.VNode"><code>VNode.events</code></a>).</li>
+<li>When a view is committed, its node is registered here under its tag.
+  Handlers wire their platform listener <strong>once</strong> at view creation; the
   listener calls <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;dispatch_event&lt;/span&gt;" href="#pythonnative.events.dispatch_event"><code>dispatch_event</code></a>
-  with the view's tag and the event name.</li>
-<li>Re-renders only mutate this Python-side registry; no native call is
-  made when just a callback identity changes.</li>
+  with the view's tag and the event name, and the registry reads the
+  handler from the node.</li>
+<li>Re-renders only change the node's handler table; no native call and
+  no registry write is made when just a callback identity changes. A
+  render pass that's rolled back restores the node's table with the
+  rest of the node.</li>
 </ul>
 <p>The set of event names present on an element is forwarded to handlers
 under the <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;EVENTS_PROP&lt;/span&gt;
@@ -4986,7 +4969,7 @@ event nobody listens to is a cheap dict miss.</p>
             <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;EventRegistry&lt;/span&gt; (&lt;code&gt;pythonnative.events.EventRegistry&lt;/code&gt;)" href="#pythonnative.events.EventRegistry">EventRegistry</a></code></td>
             <td>
               <div class="doc-md-description">
-                <p>Process-wide map of <code>(tag, event name) -&gt; Python callback</code>.</p>
+                <p>Process-wide map of view tag to the node holding that view's handlers.</p>
               </div>
             </td>
           </tr>
@@ -5242,9 +5225,12 @@ event nobody listens to is a cheap dict miss.</p>
 
 
 
-        <p>Process-wide map of <code>(tag, event name) -&gt; Python callback</code>.</p>
-<p>Registration and lookup are protected by a lock. Bridge backends queue
-native input to the Python application thread before dispatching it.</p>
+        <p>Process-wide map of view tag to the node holding that view's handlers.</p>
+<p>A registered <em>source</em> is anything with an <code>events</code> attribute that
+is a mapping of event name to callback, or <code>None</code>: the
+reconciler registers each committed native node. Registration,
+lookup, and dispatch happen on the application thread; bridge
+backends queue native input there before dispatching it.</p>
 
 
 
@@ -5267,18 +5253,10 @@ native input to the Python application thread before dispatching it.</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_events&lt;/span&gt; (&lt;code&gt;pythonnative.events.EventRegistry.set_events&lt;/code&gt;)" href="#pythonnative.events.EventRegistry.set_events">set_events</a></code></td>
+              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;register&lt;/span&gt; (&lt;code&gt;pythonnative.events.EventRegistry.register&lt;/code&gt;)" href="#pythonnative.events.EventRegistry.register">register</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Replace every registration for <code>tag</code> with <code>events</code>.</p>
-                </div>
-              </td>
-            </tr>
-            <tr class="doc-section-item">
-              <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;set_scope&lt;/span&gt; (&lt;code&gt;pythonnative.events.EventRegistry.set_scope&lt;/code&gt;)" href="#pythonnative.events.EventRegistry.set_scope">set_scope</a></code></td>
-              <td>
-                <div class="doc-md-description">
-                  <p>Associate callbacks with the component that owns this view.</p>
+                  <p>Route events for <code>tag</code> to <code>source.events</code>, run in the owning component's <code>scope</code>.</p>
                 </div>
               </td>
             </tr>
@@ -5294,7 +5272,7 @@ native input to the Python application thread before dispatching it.</p>
               <td><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-method&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;clear&lt;/span&gt; (&lt;code&gt;pythonnative.events.EventRegistry.clear&lt;/code&gt;)" href="#pythonnative.events.EventRegistry.clear">clear</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Drop every registration for <code>tag</code> (called on view destroy).</p>
+                  <p>Drop the registration for <code>tag</code> (called on view destroy).</p>
                 </div>
               </td>
             </tr>
@@ -5352,39 +5330,17 @@ native input to the Python application thread before dispatching it.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="pythonnative.events.EventRegistry.set_events" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set_events</span>
+<h3 id="pythonnative.events.EventRegistry.register" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">register</span>
 
 
-<a href="#pythonnative.events.EventRegistry.set_events" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_events</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">events</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Dict&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Dict">Dict</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Callable&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Callable">Callable</a></span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">]]</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#pythonnative.events.EventRegistry.register" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">register</span><span class="p">(</span><span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Replace every registration for <code>tag</code> with <code>events</code>.</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="pythonnative.events.EventRegistry.set_scope" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">set_scope</span>
-
-
-<a href="#pythonnative.events.EventRegistry.set_scope" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">set_scope</span><span class="p">(</span><span class="n">tag</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Any&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Associate callbacks with the component that owns this view.</p>
+        <p>Route events for <code>tag</code> to <code>source.events</code>, run in the owning component's <code>scope</code>.</p>
 
 
     </div>
@@ -5424,7 +5380,7 @@ native input to the Python application thread before dispatching it.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Drop every registration for <code>tag</code> (called on view destroy).</p>
+        <p>Drop the registration for <code>tag</code> (called on view destroy).</p>
 
 
     </div>

@@ -1313,6 +1313,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#expensive-updates-and-pure-renders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expensive updates and pure renders
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#choosing-a-tool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4597,6 +4608,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#expensive-updates-and-pure-renders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expensive updates and pure renders
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#choosing-a-tool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4870,7 +4892,8 @@ a selector, and re-render only when the selected value changes:</p>
   may be a fresh lambda on every render.</li>
 <li><strong>Writes apply immediately.</strong> <code>store.get()</code> returns the new value as
   soon as <code>set</code> or <code>update</code> returns, on any thread. Subscribed
-  components re-render on the application thread like any state update.</li>
+  components re-render on the application thread like any state update,
+  and urgently even inside a transition, so they never disagree.</li>
 <li><strong>Unchanged values don't notify.</strong> Setting a value equal to the
   current one does nothing, under the same equality rule the
   reconciler uses.</li>
@@ -4978,6 +5001,32 @@ from a subscriber:</p>
 component unmounts first.</p>
 <p>For secrets such as tokens, use
 <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;SecureStore&lt;/span&gt;" href="../../api/native_modules/#pythonnative.native_modules.secure_store.SecureStore"><code>SecureStore</code></a> instead of <code>AsyncStorage</code>.</p>
+<h2 id="expensive-updates-and-pure-renders">Expensive updates and pure renders<a class="headerlink" href="#expensive-updates-and-pure-renders" title="Permanent link">&para;</a></h2>
+<p>When one input drives an expensive subtree, such as a search field
+filtering a long list, make the expensive part a transition so typing
+stays responsive:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nd">@pn</span><span class="o">.</span><span class="n">component</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">Search</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pn</span><span class="o">.</span><span class="n">Node</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">query</span><span class="p">,</span> <span class="n">set_query</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_state</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">shown</span> <span class="o">=</span> <span class="n">pn</span><span class="o">.</span><span class="n">use_deferred_value</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">return</span> <span class="n">pn</span><span class="o">.</span><span class="n">Column</span><span class="p">(</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="n">pn</span><span class="o">.</span><span class="n">TextInput</span><span class="p">(</span><span class="n">value</span><span class="o">=</span><span class="n">query</span><span class="p">,</span> <span class="n">on_change</span><span class="o">=</span><span class="n">set_query</span><span class="p">),</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>        <span class="n">Results</span><span class="p">(</span><span class="n">shown</span><span class="p">),</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="p">)</span>
+</span></code></pre></div>
+<p><code>set_query</code> is urgent, so the field updates on the next frame.
+<code>shown</code> catches up in a transition render, which PythonNative abandons
+and starts over if the user types again before it finishes. Where no
+<code>use_transition</code> is at hand, such as a helper that receives a setter,
+wrap the update in <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;start_transition&lt;/span&gt;" href="../../api/hooks/#pythonnative.scheduler.start_transition"><code>pn.start_transition</code></a>.
+Only component state waits for a transition: a store write is visible at
+once, so its subscribers re-render urgently.</p>
+<p>A render that's abandoned runs again, so component bodies must be pure:
+compute from props, state, and context, and leave everything else to
+event handlers and effects. Wrap your root in
+<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;StrictMode&lt;/span&gt;" href="../../api/components/#pythonnative.components.StrictMode"><code>pn.StrictMode</code></a> (the <code>pn init</code> template does)
+to run bodies, initializers, updaters, and mount effects twice in
+development, which makes impure code misbehave where you can see it.</p>
 <h2 id="choosing-a-tool">Choosing a tool<a class="headerlink" href="#choosing-a-tool" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Only one component uses it:</strong> <code>use_state</code>, or <code>use_reducer</code> when
