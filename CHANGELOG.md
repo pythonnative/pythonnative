@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.55.0 (2026-11-15)
+
+### Features
+
+- **runtime**: Add child slots, preemption, and StrictMode
+  ([#124](https://github.com/pythonnative/pythonnative/pull/124),
+  [`6224a9a`](https://github.com/pythonnative/pythonnative/commit/6224a9af1fac82441f45e8827b58aef50c6a93d2))
+
+
 ## v0.54.0 (2026-11-11)
 
 ### Features

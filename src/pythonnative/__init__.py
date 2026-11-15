@@ -84,7 +84,7 @@ Example:
     ```
 """
 
-__version__ = "0.54.0"
+__version__ = "0.55.0"
 
 # ruff: noqa: E402 (the clock below starts before the imports it measures)
 
