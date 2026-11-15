@@ -152,7 +152,7 @@ def Icon(
         pn.Icon("star", fill="#F59E0B", color="#F59E0B")
         ```
     """
-    from ..components.graphics import Svg
+    from ..components.vector import Svg
     from ..style import resolve_style
 
     # Icon records are already flattened wire dicts; ``Svg`` passes them through.

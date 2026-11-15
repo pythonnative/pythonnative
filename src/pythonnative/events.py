@@ -1,15 +1,20 @@
 """Tag-based event routing between native views and Python callbacks.
 
-Event props such as ``on_press`` and ``on_change`` stay in a Python
-registry. Native views send a tag and event name through the bridge:
+Event props such as ``on_press`` and ``on_change`` stay in Python.
+Native views send a tag and event name through the bridge:
 
 - The reconciler strips callable props out of the payload sent to
-  native handlers and registers them here, keyed by ``(tag, name)``.
-- Handlers wire their platform listener **once** at view creation; the
+  native handlers and keeps them on the view's node
+  ([`VNode.events`][pythonnative.reconciler.VNode]).
+- When a view is committed, its node is registered here under its tag.
+  Handlers wire their platform listener **once** at view creation; the
   listener calls [`dispatch_event`][pythonnative.events.dispatch_event]
-  with the view's tag and the event name.
-- Re-renders only mutate this Python-side registry; no native call is
-  made when just a callback identity changes.
+  with the view's tag and the event name, and the registry reads the
+  handler from the node.
+- Re-renders only change the node's handler table; no native call and
+  no registry write is made when just a callback identity changes. A
+  render pass that's rolled back restores the node's table with the
+  rest of the node.
 
 The set of event names present on an element is forwarded to handlers
 under the [`EVENTS_PROP`][pythonnative.events.EVENTS_PROP] key (a
@@ -18,7 +23,6 @@ delegates, gesture recognizers) can do so conditionally. Dispatching an
 event nobody listens to is a cheap dict miss.
 """
 
-import threading
 from typing import Any, Callable, Dict, FrozenSet, Optional, Tuple
 
 EVENTS_PROP = "_pn_events"
@@ -35,27 +39,22 @@ _NESTED_EVENT_PROPS: Dict[str, Dict[str, str]] = {
 
 
 class EventRegistry:
-    """Process-wide map of ``(tag, event name) -> Python callback``.
+    """Process-wide map of view tag to the node holding that view's handlers.
 
-    Registration and lookup are protected by a lock. Bridge backends queue
-    native input to the Python application thread before dispatching it.
+    A registered *source* is anything with an ``events`` attribute that
+    is a mapping of event name to callback, or ``None``: the
+    reconciler registers each committed native node. Registration,
+    lookup, and dispatch happen on the application thread; bridge
+    backends queue native input there before dispatching it.
     """
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._sources: Dict[int, Any] = {}
         self._scopes: Dict[int, Any] = {}
-        self._callbacks: Dict[int, Dict[str, Callable[..., Any]]] = {}
 
-    def set_events(self, tag: int, events: Dict[str, Callable[..., Any]]) -> None:
-        """Replace every registration for ``tag`` with ``events``."""
-        with self._lock:
-            if events:
-                self._callbacks[tag] = dict(events)
-            else:
-                self._callbacks.pop(tag, None)
-
-    def set_scope(self, tag: int, scope: Any) -> None:
-        """Associate callbacks with the component that owns this view."""
+    def register(self, tag: int, source: Any, scope: Any = None) -> None:
+        """Route events for ``tag`` to ``source.events``, run in the owning component's ``scope``."""
+        self._sources[tag] = source
         self._scopes[tag] = scope
 
     def invoke(self, tag: int, name: str, *args: Any) -> Any:
@@ -68,18 +67,17 @@ class EventRegistry:
         return None
 
     def clear(self, tag: int) -> None:
-        """Drop every registration for ``tag`` (called on view destroy)."""
-        with self._lock:
-            self._callbacks.pop(tag, None)
-            self._scopes.pop(tag, None)
+        """Drop the registration for ``tag`` (called on view destroy)."""
+        self._sources.pop(tag, None)
+        self._scopes.pop(tag, None)
 
     def get(self, tag: int, name: str) -> Optional[Callable[..., Any]]:
         """Return the callback for ``(tag, name)``, or ``None``."""
-        with self._lock:
-            bucket = self._callbacks.get(tag)
-            if bucket is None:
-                return None
-            return bucket.get(name)
+        source = self._sources.get(tag)
+        if source is None:
+            return None
+        events = source.events
+        return events.get(name) if events else None
 
     def has(self, tag: int, name: str) -> bool:
         """Return whether a callback is registered for ``(tag, name)``."""
@@ -112,9 +110,8 @@ class EventRegistry:
 
     def reset(self) -> None:
         """Drop every registration (test helper)."""
-        with self._lock:
-            self._callbacks.clear()
-            self._scopes.clear()
+        self._sources.clear()
+        self._scopes.clear()
 
 
 _registry = EventRegistry()

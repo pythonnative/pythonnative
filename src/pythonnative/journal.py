@@ -5,21 +5,18 @@ attribute assignments; native mutation and effect publication are separate.
 
 The reconciler installs a [`Journal`][pythonnative.journal.Journal] for the
 duration of one render pass and raises the module-level ``journal_active``
-flag. [`VNode`][pythonnative.reconciler.VNode] and
-[`Ref`][pythonnative.Ref] consult that flag in ``__setattr__`` so attribute
-writes outside a pass cost one global lookup and no call.
+flag. [`Ref`][pythonnative.Ref] consults that flag in ``__setattr__`` so
+attribute writes outside a pass cost one global lookup and no call.
 
-Inside a pass, an object is captured once, on its first write: the
-journal takes a [`snapshot`][pythonnative.journal.Journal.snapshot] of
-every journaled field and stamps the object with the journal's identity,
-so later writes in the same pass compare one attribute. Objects created
-during the pass are stamped at construction and never captured, because a
-rollback discards them. For a node, the journaled fields are
-``STRUCTURAL_FIELDS``: the tree structure and native identity, the element
-and clean props the next diff compares against, and hook and boundary
-state. The per-pass layout caches (``measure_cache``, ``last_frame``,
-``layout_node``, ``layout_dirty``) are skipped; they are rebuilt by the
-next layout pass and never observed by application code.
+Inside a pass, an object is captured once, before its first change: the
+reconciler calls [`record`][pythonnative.journal.Journal.record] for a
+[`VNode`][pythonnative.reconciler.VNode] (through ``vnode.touch``) and
+[`snapshot`][pythonnative.journal.Journal.snapshot] for a hook state, and
+the journal stamps the object with its identity, so later changes in the
+same pass compare one attribute. Objects created during the pass are
+stamped at construction and never captured, because a rollback discards
+them. A node's ``last_frame`` layout cache isn't captured; the next layout
+reports it again.
 """
 
 from __future__ import annotations
@@ -32,7 +29,6 @@ from typing import Any, Callable
 __all__ = [
     "Journal",
     "JournalDict",
-    "STRUCTURAL_FIELDS",
     "active",
     "journal_active",
     "record_attribute",
@@ -50,29 +46,6 @@ active: Journal | None = None
 
 FRESH = 0
 """Stamp of an object no journal needs to capture (created before any pass)."""
-
-STRUCTURAL_FIELDS = frozenset(
-    {
-        "root",
-        "children",
-        "parent",
-        "tag",
-        "native_view",
-        "element",
-        "clean_props",
-        "hook_state",
-        "mounted",
-        "rendered",
-        "hidden_by_suspense",
-        "error",
-        "suspense_showing_fallback",
-        "suspense_hidden",
-        "suspense_hydration",
-        "suspense_waits",
-    }
-)
-"""The ``VNode`` (and reconciler) fields a rollback restores; layout caches are not among them."""
-
 
 _next_identity = 0
 
@@ -146,6 +119,16 @@ class Journal:
                     object.__setattr__(obj, name, value)
 
         self.undo.append(restore)
+
+    def record(self, node: Any) -> None:
+        """Capture a node's pass-mutable fields in one undo entry and stamp it.
+
+        ``node`` provides ``_capture()`` and ``_restore(values)``; see
+        [`VNode`][pythonnative.reconciler.VNode].
+        """
+        node._journal_stamp = self.identity
+        if self.active:
+            self.undo.append(functools.partial(node._restore, node._capture()))
 
     def attribute(self, obj: Any, name: str) -> None:
         """Capture an attribute before its first mutation in this pass."""

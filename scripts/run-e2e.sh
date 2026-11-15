@@ -16,7 +16,7 @@
 #
 # Available suites: inbox, full, components, hooks, navigation, layout, styling,
 # animations, gestures, assets, misc, capabilities. The components and hooks categories also
-# have lettered parts (components-a/b/c, hooks-a/b) that CI's Android shards
+# have lettered parts (components-a/b/c/d, hooks-a/b) that CI's Android shards
 # run separately.
 #
 # Multiple category suites can be passed at once; they run sequentially in
@@ -102,12 +102,12 @@ for suite in "${SUITES[@]}"; do
         MAESTRO_TARGETS+=("tests/e2e/ios.yaml")
       fi
       ;;
-    components|components-a|components-b|components-c|hooks|hooks-a|hooks-b|navigation|layout|styling|animations|gestures|assets|misc|capabilities)
+    components|components-a|components-b|components-c|components-d|hooks|hooks-a|hooks-b|navigation|layout|styling|animations|gestures|assets|misc|capabilities)
       MAESTRO_TARGETS+=("tests/e2e/suites/${suite}.yaml")
       ;;
     *)
       echo "Error: unknown suite '$suite'" >&2
-      echo "Available suites: full, components, components-a, components-b, components-c, hooks, hooks-a, hooks-b, navigation, layout, styling, animations, gestures, assets, misc, capabilities" >&2
+      echo "Available suites: full, components, components-a, components-b, components-c, components-d, hooks, hooks-a, hooks-b, navigation, layout, styling, animations, gestures, assets, misc, capabilities" >&2
       exit 2
       ;;
   esac

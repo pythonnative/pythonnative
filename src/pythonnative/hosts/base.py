@@ -191,7 +191,12 @@ class ScreenHost:
         try:
             self._is_rendering = True
             try:
+                started = time.perf_counter()
                 self.root_native_view = self.reconciler.mount(self._root_element())
+                # The startup timeline (first host of the process only).
+                diagnostics.mark_startup("render", since=started)
+                if not self.reconciler.commit_pending:
+                    diagnostics.mark_startup("commit")
                 if self.root_native_view is not None:
                     self._attach_root(self.root_native_view)
                 self._drain_renders()
@@ -305,6 +310,7 @@ class ScreenHost:
         reconciler.on_render_requested = self.request_render
 
         def mounted() -> None:
+            diagnostics.mark_startup("commit")
             if self.reconciler is not reconciler:
                 return
             root = reconciler.root_view()

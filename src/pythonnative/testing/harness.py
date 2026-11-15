@@ -34,12 +34,9 @@ PRESSABLE_TYPES = frozenset({"Pressable", "Button"})
 
 
 def _flush_renders(reconciler: Any) -> bool:
-    """Flush dirty components and queued transitions; return whether anything is still pending."""
+    """Flush dirty components, then queued transitions; return whether anything is still pending."""
     reconciler.flush_dirty()
-    if reconciler.transitions.pending:
-        reconciler.transitions.flush()
-        return True
-    return reconciler._has_dirty_work()
+    return bool(reconciler._has_dirty_work() or reconciler.transitions.pending)
 
 
 def settle(reconciler: Any = None, timeout: float = 1.0) -> None:

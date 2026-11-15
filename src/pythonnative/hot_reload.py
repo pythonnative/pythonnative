@@ -802,6 +802,15 @@ def apply_reload(changed_modules: Sequence[str], hosts: Optional[Sequence[Any]] 
     # stranded, so those reloads remount. Functions are rebound by the module
     # re-execution and picked up on the next render.
     fingerprints = _class_fingerprints(t for t in targets if t in sys.modules)
+    # Fast Refresh fingerprints the old components from the source their
+    # modules loaded with. Components kept it when they were defined; a file
+    # that didn't change (a module of hooks, say) still holds it, so keep it
+    # now, before the reload replaces those modules.
+    from .refresh import remember_module
+
+    for name in targets:
+        if name not in imported and name in sys.modules:
+            remember_module(sys.modules[name])
 
     # Changed modules are reloaded strictly so a syntax error is reported
     # with its traceback; the dependents (which didn't change) reload

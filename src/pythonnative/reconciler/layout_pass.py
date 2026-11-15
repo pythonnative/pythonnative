@@ -47,16 +47,27 @@ def _is_view_handle(value: Any) -> bool:
     return isinstance(value, _ViewHandle)
 
 
+_components: Any = None
+_invalidating: Dict[str, Tuple[Any, frozenset[str]]] = {}
+
+
 def affects_layout(type_name: str, changed: Dict[str, Any]) -> bool:
     """Whether ``changed`` props can alter a native node's layout."""
-    from ..sdk.schema import COMPONENTS
+    global _components
+    if _components is None:
+        from ..sdk.schema import COMPONENTS
 
-    schema = COMPONENTS.get(type_name)
+        _components = COMPONENTS
+    schema = _components.get(type_name)
     if schema is None:
         return True
-    if any(schema.props.get(key, {}).get("native", {}).get("invalidates_layout") for key in changed):
-        return True
-    return any(key in LAYOUT_STYLE_KEYS for key in changed)
+    cached = _invalidating.get(type_name)
+    if cached is None or cached[0] is not schema:
+        keys = frozenset(
+            key for key, field in schema.props.items() if field.get("native", {}).get("invalidates_layout")
+        )
+        cached = _invalidating[type_name] = (schema, keys | LAYOUT_STYLE_KEYS)
+    return not cached[1].isdisjoint(changed)
 
 
 class LayoutMixin:

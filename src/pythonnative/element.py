@@ -14,7 +14,8 @@ An element's ``type`` is one of three things:
 - a **structural type**: one of the singletons defined here
   ([`FRAGMENT`][pythonnative.element.FRAGMENT],
   [`ERROR_BOUNDARY`][pythonnative.element.ERROR_BOUNDARY],
-  [`SUSPENSE`][pythonnative.element.SUSPENSE]) or a
+  [`SUSPENSE`][pythonnative.element.SUSPENSE],
+  [`STRICT_MODE`][pythonnative.element.STRICT_MODE]) or a
   [`Context`][pythonnative.Context] (whose elements are providers).
 
 Structural types are real objects rather than magic strings so the
@@ -35,13 +36,13 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Iterable, Iterator, Mapping, Optional
 
 __all__ = [
     "ERROR_BOUNDARY",
     "FRAGMENT",
+    "STRICT_MODE",
     "SUSPENSE",
     "Element",
     "Node",
@@ -76,7 +77,12 @@ SUSPENSE = StructuralType("Suspense")
 """Type of [`Suspense`][pythonnative.Suspense] elements."""
 
 
-@dataclass(frozen=True, init=False, eq=False, slots=True)
+STRICT_MODE = StructuralType("StrictMode")
+"""Type of [`StrictMode`][pythonnative.StrictMode] elements."""
+
+_PLAIN_CHILDREN = (type(None), bool, list, tuple)
+
+
 class Element:
     """Immutable description of a single UI node.
 
@@ -87,18 +93,27 @@ class Element:
     or a [`Context`][pythonnative.Context]. The reconciler dispatches on
     this distinction when mounting the tree.
 
+    An element is immutable: assigning an attribute raises
+    ``AttributeError``. The ``props`` mapping is the one the caller
+    passed, not a copy, so factories hand over a dict they just built and
+    nothing else keeps a reference to it. Copy an element with
+    [`with_key`][pythonnative.element.Element.with_key].
+
     Attributes:
         type: The element kind (see the module docstring).
-        props: Read-only snapshot of properties passed to the native handler or the
-            component function.
-        children: Immutable tuple of child nodes. ``None`` and ``False``
-            entries are permitted and dropped during reconciliation, so
-            conditional children (``cond and Text(...)``) need no special
-            casing. Components receive these as their ``*children``.
+        props: Properties passed to the native handler or the component
+            function. Treat it as read-only.
+        children: Immutable tuple of child nodes. Each entry occupies one
+            slot of the child list: an element, ``None`` or a ``bool``
+            for an empty slot (``cond and Text(...)``), or a list or tuple
+            that forms a group whose items are matched among themselves.
+            Components receive these as their ``*children``.
         key: Optional stable identity used by the reconciler when
-            diffing keyed lists. Two elements with the same ``type`` and
+            diffing child lists. Two elements with the same ``type`` and
             ``key`` are treated as the same logical node across renders.
     """
+
+    __slots__ = ("type", "props", "children", "key")
 
     type: Any
     props: Mapping[str, Any]
@@ -112,10 +127,25 @@ class Element:
         children: Optional[Iterable[Any]] = None,
         key: Optional[str] = None,
     ) -> None:
-        object.__setattr__(self, "type", type_)
-        object.__setattr__(self, "props", MappingProxyType(dict(props or {})))
-        object.__setattr__(self, "children", tuple(map(_materialize, children)) if children is not None else ())
-        object.__setattr__(self, "key", key)
+        if children is None:
+            children = ()
+        else:
+            if type(children) is not tuple:
+                children = tuple(children)
+            for child in children:
+                if child.__class__ is not Element and child.__class__ not in _PLAIN_CHILDREN:
+                    children = tuple(map(_materialize, children))
+                    break
+        _set_type(self, type_)
+        _set_props(self, _EMPTY if props is None else props)
+        _set_children(self, children)
+        _set_key(self, key)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        raise AttributeError(f"Element is immutable; use with_key() to copy one (tried to set {name!r})")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError(f"Element is immutable (tried to delete {name!r})")
 
     def __repr__(self) -> str:
         return f"Element({type_label(self.type)!r}, props={sorted(self.props)}, children={len(self.children)})"
@@ -138,6 +168,20 @@ class Element:
 
     __hash__ = None  # type: ignore[assignment,unused-ignore]
 
+    def __copy__(self) -> "Element":
+        return self
+
+    def __deepcopy__(self, memo: Any) -> "Element":
+        return self
+
+    def __reduce__(self) -> Any:
+        return (Element, (self.type, dict(self.props), self.children, self.key))
+
+    @classmethod
+    def __native_schema__(cls) -> dict[str, Any]:
+        """An element prop (``refresh_control``) crosses the bridge as the object its factory unwraps."""
+        return {"type": "object"}
+
     def with_key(self, key: object) -> "Element":
         """Return a copy of this element carrying ``key``.
 
@@ -146,14 +190,28 @@ class Element:
         parameters next to a ``ParamSpec``):
 
         ```python
-        pn.Column(*(Row(item).with_key(item.id) for item in items))
+        pn.Column([Row(item).with_key(item.id) for item in items])
         ```
 
         Built-in factories also accept ``key=`` directly. Non-string
-        keys are converted with ``str``; ``None`` clears the key.
+        keys are converted with ``str``; ``None`` clears the key. The
+        copy shares this element's props and children.
         """
-        text = None if key is None else (key if isinstance(key, str) else str(key))
-        return Element(self.type, self.props, self.children, key=text)
+        copy = _new(Element)
+        _set_type(copy, self.type)
+        _set_props(copy, self.props)
+        _set_children(copy, self.children)
+        _set_key(copy, None if key is None else (key if key.__class__ is str else str(key)))
+        return copy
+
+
+_new = object.__new__
+_slots: Any = Element.__dict__
+_set_type = _slots["type"].__set__
+_set_props = _slots["props"].__set__
+_set_children = _slots["children"].__set__
+_set_key = _slots["key"].__set__
+_EMPTY: Mapping[str, Any] = MappingProxyType({})
 
 
 def _materialize(child: Any) -> Any:
@@ -173,10 +231,11 @@ def _materialize(child: Any) -> Any:
 type Node = Element | None | bool | list[Node] | tuple[Node, ...] | Iterator[Node]
 """Anything that can appear in an element tree.
 
-An element, ``None`` or a ``bool`` for "nothing" (so ``cond and
-pn.Text(...)`` and ``pn.Text(...) if cond else None`` both work), or a
-possibly nested list, tuple, or iterator (a generator expression) of
-nodes. The alias names those containers rather than ``Iterable`` so a
+An element, ``None`` or a ``bool`` for an empty slot (so ``cond and
+pn.Text(...)`` and ``pn.Text(...) if cond else None`` both work, and the
+siblings after them keep their identity), or a possibly nested list,
+tuple, or iterator (a generator expression) of nodes, which forms a group
+whose items are matched among themselves. The alias names those containers rather than ``Iterable`` so a
 bare string, which is an iterable of strings, is a type error. Every built-in container declares
 ``*children: Node`` and component bodies return a ``Node``. Strings
 aren't nodes: wrap text in [`Text`][pythonnative.Text]."""

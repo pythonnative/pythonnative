@@ -19,7 +19,7 @@ from ..geo import tilt_degrees
 from ..journal import AttachmentLimitReached, journal
 from ..models import AttachmentKind
 from .theme import Styles
-from .widgets import ActionButton, Banner, PrimaryButton, slots
+from .widgets import ActionButton, Banner, PrimaryButton
 
 MODES = ["Photo", "Clip"]
 CAMERA_PROBLEMS = {
@@ -145,28 +145,24 @@ def CaptureScreen(entry_id: str) -> pn.Node:
             style=pn.style(flex=1),
         ),
         pn.Column(
-            *slots(
-                problem=Banner(problem, "warning") if problem else None,
-                mode=pn.SegmentedControl(
-                    segments=MODES,
-                    selected_index=mode,
-                    on_change=set_mode,
-                    disabled=recording,
-                    tint_color=styles.colors.primary,
-                    accessibility_label="Capture mode",
-                ),
-                saved=pn.Text(
-                    f"{saved} added to this entry" if saved else "Saved straight to this entry.",
-                    style=styles.caption,
-                ),
-                shutter=PrimaryButton(shutter, take_picture if mode == 0 else toggle_clip, disabled=unavailable),
-                actions=pn.View(
-                    *slots(
-                        system=ActionButton("System camera", "camera", system_camera) if unavailable else None,
-                        done=ActionButton("Done", "x", navigation.go_back),
-                    ),
-                    style=styles.wrap,
-                ),
+            Banner(problem, "warning") if problem else None,
+            pn.SegmentedControl(
+                segments=MODES,
+                selected_index=mode,
+                on_change=set_mode,
+                disabled=recording,
+                tint_color=styles.colors.primary,
+                accessibility_label="Capture mode",
+            ),
+            pn.Text(
+                f"{saved} added to this entry" if saved else "Saved straight to this entry.",
+                style=styles.caption,
+            ),
+            PrimaryButton(shutter, take_picture if mode == 0 else toggle_clip, disabled=unavailable),
+            pn.View(
+                ActionButton("System camera", "camera", system_camera) if unavailable else None,
+                ActionButton("Done", "x", navigation.go_back),
+                style=styles.wrap,
             ),
             style=styles.content,
         ),

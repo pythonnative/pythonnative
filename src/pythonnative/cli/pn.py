@@ -128,7 +128,9 @@ Root = pn.StackNavigator(
 
 @pn.component
 def App() -> pn.Node:
-    return pn.NavigationContainer(Root)
+    # StrictMode runs bodies and mount effects twice in development to
+    # surface impure renders; release builds ignore it.
+    return pn.StrictMode(pn.NavigationContainer(Root))
 """
 
 _GITIGNORE = "# PythonNative\n__pycache__/\n*.pyc\n.venv/\nbuild/\n.mypy_cache/\n.pytest_cache/\n.DS_Store\n"

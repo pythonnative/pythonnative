@@ -1,0 +1,19 @@
+# Tests StrictMode re-runs mount effects in development and not in release.
+#
+# Demo screen: examples/e2e-suite/app/screens/components/strict_mode.py
+# Source under test: src/pythonnative/components/structural.py :: StrictMode
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Components
+      DEMO_TITLE: StrictMode
+- assertVisible: "Checked child mounted"
+- extendedWaitUntil:
+    visible: "Matches: yes"
+    timeout: 5000
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Components

@@ -13,7 +13,7 @@ from .errors_screen import ErrorLogScreen
 from .lock_screen import biometrics_available
 from .pro_screen import ProScreen
 from .theme import Styles
-from .widgets import ActionButton, Banner, Field, ScreenHeader, Section, slots
+from .widgets import ActionButton, Banner, Field, ScreenHeader, Section
 
 APPEARANCES: tuple[Appearance, ...] = ("system", "light", "dark")
 
@@ -62,38 +62,30 @@ def SyncSection(settings: Settings) -> pn.Node:
     changed = address.strip() != settings.server_url
     return Section(
         "Sync server",
-        *slots(
-            address=Field(
-                "Server address",
-                address,
-                set_address,
-                placeholder="192.168.1.20:8770",
-                keyboard_type="url",
-                auto_capitalize="none",
-            ),
-            problem=pn.Text(problem, style=styles.error_text) if problem else None,
-            status=pn.Text(describe_sync(settings.server_url, status), style=styles.body),
-            pending=(
-                pn.Text(
-                    f"{pending} waiting to sync." if pending else "Everything has been sent.",
-                    style=styles.caption,
-                )
-                if settings.server_url
-                else None
-            ),
-            moving=pn.Text(f"Moving {moving} attachments...", style=styles.caption) if moving else None,
-            transfer=Banner(transfer_error, "warning") if transfer_error else None,
-            actions=pn.View(
-                *slots(
-                    save=ActionButton("Save address", "cloud", connect, disabled=not changed),
-                    retry=(
-                        ActionButton("Retry now", "refresh-cw", sync_client.retry_now)
-                        if status.phase == "waiting"
-                        else None
-                    ),
-                ),
-                style=styles.wrap,
-            ),
+        Field(
+            "Server address",
+            address,
+            set_address,
+            placeholder="192.168.1.20:8770",
+            keyboard_type="url",
+            auto_capitalize="none",
+        ),
+        pn.Text(problem, style=styles.error_text) if problem else None,
+        pn.Text(describe_sync(settings.server_url, status), style=styles.body),
+        (
+            pn.Text(
+                f"{pending} waiting to sync." if pending else "Everything has been sent.",
+                style=styles.caption,
+            )
+            if settings.server_url
+            else None
+        ),
+        pn.Text(f"Moving {moving} attachments...", style=styles.caption) if moving else None,
+        Banner(transfer_error, "warning") if transfer_error else None,
+        pn.View(
+            ActionButton("Save address", "cloud", connect, disabled=not changed),
+            ActionButton("Retry now", "refresh-cw", sync_client.retry_now) if status.phase == "waiting" else None,
+            style=styles.wrap,
         ),
     )
 

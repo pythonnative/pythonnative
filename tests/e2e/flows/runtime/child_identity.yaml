@@ -1,0 +1,34 @@
+# Tests a conditional sibling and a growing list don't remount stateful siblings.
+#
+# Demo screen: examples/e2e-suite/app/screens/runtime/child_identity_demo.py
+# Source under test: src/pythonnative/reconciler/core.py :: Reconciler._reconcile_child_list
+appId: ${APP_ID}
+---
+- runFlow:
+    file: ../../helpers/open_demo.yaml
+    env:
+      CATEGORY: Runtime
+      DEMO_TITLE: Child identity
+- tapOn: "Bump counter"
+- tapOn: "Bump counter"
+- assertVisible: "Counter: 2"
+- tapOn: "Toggle banner"
+- assertVisible: "Banner shown"
+- assertVisible: "Counter: 2"
+- tapOn: "Toggle banner"
+- assertNotVisible: "Banner shown"
+- assertVisible: "Counter: 2"
+- scrollUntilVisible:
+    element: "Bump footer"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Bump footer"
+- assertVisible: "Footer: 1"
+- tapOn: "Add row"
+- tapOn: "Add row"
+- assertVisible: "Row 1"
+- assertVisible: "Footer: 1"
+- runFlow:
+    file: ../../helpers/close_demo.yaml
+    env:
+      CATEGORY: Runtime

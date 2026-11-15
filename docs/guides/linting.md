@@ -195,6 +195,36 @@ can't declare a parameter named `key` at all: `@pn.component` raises
 `TypeError` for one, and calling a component with `key=` raises
 `TypeError` at run time too.
 
+### PN105: components don't change module-level state while rendering
+
+A component's body should only compute what to show. A render can run
+more than once for one update (a transition that's interrupted starts
+over, for example), so a change it makes to state outside the component
+happens more than once. `PN105` flags, directly in a component's body:
+
+- assigning a module-level name declared `global`, including augmented
+  assignment (`global count; count += 1`)
+- assigning or deleting an item of a module-level name
+  (`CACHE[key] = value`, `del CACHE[key]`, `CACHE[key] += 1`)
+- calling a method that changes a list, dict, set, or deque in place on
+  a module-level name (`SEEN.append(x)`, `CACHE.update(...)`,
+  `CACHE.pop(key)`, `TAGS.add(tag)`)
+
+```python
+_seen: list[str] = []
+
+
+@pn.component
+def Row(item: Item) -> pn.Node:
+    _seen.append(item.id)  # PN105
+    return pn.Text(item.title)
+```
+
+Keep the value in state or a ref, or make the change in an effect or an
+event handler. Nested functions, lambdas, and classes aren't checked,
+since they run later, and neither is a name the component binds itself,
+such as a parameter or a local copy.
+
 ### PN201: worklets must compile
 
 Every function marked `@pn.worklet`, and every inline lambda passed to
@@ -291,6 +321,9 @@ The linter works on one file at a time and doesn't infer types, so:
   alias that doesn't start with `use_`, isn't recognized.
 - `PN104` only knows about components defined at module level in the
   same file.
+- `PN105` only sees names assigned at module level in the same file,
+  and it goes by method name: calling `add` or `update` on any such
+  name is flagged, and mutating an imported object isn't.
 - `PN202` only knows about worklets decorated in the same file. A
   worklet imported from another module is flagged; suppress the finding
   on that line.

@@ -23,6 +23,21 @@ Most apps never call this module directly; it exists so framework
 code (and custom component libraries) can report problems in a way
 that reaches the developer instead of disappearing into a log.
 
+## Startup timeline
+
+Every launch, in release builds too, logs one line to the device log
+once the first screen's first commit is acknowledged:
+
+```text
+[PN] startup: framework 182 ms, contracts 9 ms, bridge 30 ms, app 310 ms, render 41 ms, commit 28 ms, total 640 ms
+```
+
+[`startup_timeline`][pythonnative.diagnostics.startup_timeline] returns
+the same numbers as a dict, and a running
+[profiler](../guides/dev-workflow.md#profiling) records them as
+`startup.<phase>_ms` gauges. The docstring below says what each phase
+covers.
+
 [](){ #pythonnative.diagnostics }
 
 ::: pythonnative.diagnostics

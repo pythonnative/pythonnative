@@ -24,7 +24,7 @@ import weakref
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from ..bridge import PROTOCOL_VERSION, codec, get_transport
-from ..mutations import UNSET, CreateOp, DestroyOp, InsertOp, Mutation, UpdateOp
+from ..mutations import UNSET, CreateOp, DestroyOp, Mutation, UpdateOp
 
 __all__ = ["BridgeBackend", "CommitError", "NativeViewRef", "SURFACE"]
 
@@ -348,20 +348,20 @@ class BridgeBackend:
             )
 
         for op in ops:
-            if isinstance(op, DestroyOp):
-                motion.release_view(self, op.tag)
+            cls = op.__class__
+            if cls is DestroyOp:
+                motion.release_view(self, op.tag)  # type: ignore[union-attr]
                 continue
-            if isinstance(op, CreateOp):
-                props = op.props
-            elif isinstance(op, UpdateOp):
-                props = op.changed_props
+            if cls is CreateOp:
+                props = op.props  # type: ignore[union-attr]
+            elif cls is UpdateOp:
+                props = op.changed_props  # type: ignore[union-attr]
             else:
                 continue
-            if not props:
-                continue
-            for key in ("_pn_motion", "gestures"):
-                if key in props:
-                    motion.retain_view(self, op.tag, key, handlers(key, props[key]))
+            if "_pn_motion" in props:
+                motion.retain_view(self, op.tag, "_pn_motion", handlers("_pn_motion", props["_pn_motion"]))  # type: ignore[union-attr]
+            if "gestures" in props:
+                motion.retain_view(self, op.tag, "gestures", handlers("gestures", props["gestures"]))  # type: ignore[union-attr]
 
     def _accept_commit(
         self,
@@ -389,21 +389,28 @@ class BridgeBackend:
         from ..reconciler.layout_pass import affects_layout
 
         destroyed: List[int] = []
+        updates: List[UpdateOp] = []
+        layout_required = self._layout_required
+        types = self._types
         for op in ops:
-            if isinstance(op, (CreateOp, DestroyOp, InsertOp)) or (
-                isinstance(op, UpdateOp) and affects_layout(self._types.get(op.tag, ""), op.changed_props)
-            ):
-                self._layout_required = True
-            if isinstance(op, CreateOp):
-                self._types[op.tag] = op.type_name
-                self._births[op.tag] = revision
-                self._refs[op.tag] = NativeViewRef(op.tag, op.type_name)
-            elif isinstance(op, DestroyOp):
-                destroyed.append(op.tag)
+            cls = op.__class__
+            if cls is UpdateOp:
+                updates.append(op)  # type: ignore[arg-type]
+                if not layout_required and affects_layout(types.get(op.tag, ""), op.changed_props):  # type: ignore[union-attr]
+                    layout_required = True
+                continue
+            layout_required = True
+            if cls is CreateOp:
+                types[op.tag] = op.type_name  # type: ignore[union-attr]
+                self._births[op.tag] = revision  # type: ignore[union-attr]
+                self._refs[op.tag] = NativeViewRef(op.tag, op.type_name)  # type: ignore[union-attr]
+            elif cls is DestroyOp:
+                destroyed.append(op.tag)  # type: ignore[union-attr]
+        self._layout_required = layout_required
         for tag, props in sidecar:
             self._python_props.setdefault(tag, {}).update(props)
-        for op in ops:
-            if isinstance(op, UpdateOp):
+        if self._python_props:
+            for op in updates:
                 # Omission clears the sidecar; an explicit null stays a value.
                 bucket = self._python_props.get(op.tag)
                 if bucket:

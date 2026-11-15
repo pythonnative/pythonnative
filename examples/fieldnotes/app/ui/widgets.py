@@ -19,24 +19,6 @@ _BANNER_ICONS: dict[BannerKind, pn.IconName] = {
 }
 
 
-def slots(**children: pn.Node) -> list[pn.Node]:
-    """Give each child a fixed identity among its siblings, named by its keyword.
-
-    ``None`` children are dropped before diffing, not kept as holes, so a banner
-    appearing above a row of buttons would otherwise shift those buttons into new
-    slots and remount them. That loses their state, and it cancels any async press
-    handler they're running. Use this in any list with a conditional child above
-    something that matters.
-
-    Args:
-        **children: The children, in order. ``None`` and ``False`` stay "nothing".
-
-    Returns:
-        The children, keyed.
-    """
-    return [child.with_key(name) if isinstance(child, pn.Element) else child for name, child in children.items()]
-
-
 @pn.component
 def ScreenHeader(title: str, action: Optional[pn.Element] = None) -> pn.Node:
     """A tab's large title. Tabs sit under the root stack, whose bar is hidden for them."""

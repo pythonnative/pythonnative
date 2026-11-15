@@ -1,0 +1,75 @@
+{
+  "environment": {
+    "python": "3.13.15",
+    "system": "macOS-15.7.9-x86_64-i386-64bit-Mach-O",
+    "machine": "x86_64",
+    "host": "Intel Mac (x86_64); load average about 7 to 11 during the runs",
+    "note": "Host timings only. Before (main at 851b0080, via PYTHONPATH) and after ran alternately on the same machine, twice each; the second pair is shown. Both used this branch's scripts/benchmark-runtime.py; on main, transition_preempt_ms measures a press queued during a transition that can't be preempted."
+  },
+  "host_runtime": {
+    "command": "python scripts/benchmark-runtime.py --imports 9",
+    "before": {
+      "import_ms": 308.201,
+      "element_us": 3.337,
+      "mount_300_ms": 98.862,
+      "rerender_300_ms": 75.909,
+      "transition_preempt_ms": 125.414,
+      "core_commit_300_ms": 8.324,
+      "motion_frame_200_styles_us": 1491.314
+    },
+    "after": {
+      "import_ms": 226.484,
+      "element_us": 2.231,
+      "mount_300_ms": 52.217,
+      "rerender_300_ms": 23.51,
+      "transition_preempt_ms": 13.311,
+      "core_commit_300_ms": 7.054,
+      "motion_frame_200_styles_us": 1450.948
+    },
+    "units": "medians"
+  },
+  "call_counts": {
+    "command": "the probe in tests/test_performance_budgets.py (sys.setprofile, release mode, fresh interpreter)",
+    "before": {
+      "rerender_300": 166764,
+      "mount_300": 249063,
+      "per_rerendered_component": 556
+    },
+    "after": {
+      "rerender_300": 55935,
+      "mount_300": 111510,
+      "per_rerendered_component": 186
+    }
+  },
+  "import_probe": {
+    "before": {
+      "pythonnative_modules": 67,
+      "all_modules": 240,
+      "dataclass_definitions": 53
+    },
+    "after": {
+      "pythonnative_modules": 46,
+      "all_modules": 211,
+      "dataclass_definitions": 24
+    }
+  },
+  "fieldnotes_startup_ios_simulator": {
+    "device": "iPhone 17 Pro simulator, iOS 26.2, release configuration",
+    "measure": "Embedded Python initialized to first screen attached, three launches",
+    "before_s": [
+      1.26,
+      1.38
+    ],
+    "after_s": [
+      0.76,
+      0.78,
+      0.91
+    ],
+    "after_timeline_ms": [
+      "framework 393, contracts 36, bridge 43, app 192, render 97, commit 6, total 781",
+      "framework 380, contracts 36, bridge 43, app 188, render 96, commit 6, total 760",
+      "framework 449, contracts 44, bridge 55, app 228, render 110, commit 7, total 904"
+    ],
+    "note": "Before at a load average of about 6, after at about 27 to 35."
+  }
+}

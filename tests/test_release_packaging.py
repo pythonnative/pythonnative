@@ -181,7 +181,7 @@ DEV_ONLY_LAZY_IMPORTS = {
     # `start(dev=True)` starts the dev client; release templates pass False.
     ("pythonnative.bootstrap", "start", "pythonnative.devclient"),
     # Fast Refresh fingerprint; guarded by `except ImportError` for release.
-    ("pythonnative.component", "_hook_signature", "pythonnative.refresh"),
+    ("pythonnative.component", "_refresh_module", "pythonnative.refresh"),
     # Hot reload entry points, called only by the dev client and preview.
     ("pythonnative.hosts.base", "ScreenHost.reload", "pythonnative.hot_reload"),
     ("pythonnative.hosts.base", "ScreenHost._try_fast_refresh", "pythonnative.hot_reload"),

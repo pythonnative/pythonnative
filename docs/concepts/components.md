@@ -293,8 +293,11 @@ pn.Column(
 )
 ```
 
-`None` and `False` are dropped during reconciliation, and nested
-iterables are flattened. Strings aren't nodes: wrap text in
+`None` and `False` render nothing but keep their slot, so the
+siblings after them keep their state when the condition changes, and a
+list or generator is one group whose items are matched among
+themselves (see [Child identity](reconciliation.md#child-identity)).
+Strings aren't nodes: wrap text in
 [`pn.Text`][pythonnative.Text]. Annotate every component's return type
 as `pn.Node`, since a component may return an element, a list of
 siblings, or `None` to render nothing.

@@ -20,6 +20,11 @@ Dev mode turns on:
 In production none of this runs: validation is skipped, hook-order
 checks are skipped, and errors propagate exactly as raised.
 
+The **startup timeline** runs in every build: each launch logs one
+``[PN] startup:`` line, and
+[`startup_timeline`][pythonnative.diagnostics.startup_timeline] returns
+the same phases.
+
 This module has no dependencies on the rest of PythonNative, so any
 module (hooks, reconciler, events) may import it freely.
 """
@@ -27,9 +32,10 @@ module (hooks, reconciler, events) may import it freely.
 import os
 import sys
 import threading
+import time
 import traceback
 from collections import deque
-from typing import Any, Callable, Deque, List, Optional, Set, Tuple
+from typing import Any, Callable, Deque, Dict, List, Optional, Set, Tuple
 
 __all__ = [
     "HookOrderError",
@@ -47,6 +53,11 @@ __all__ = [
     "report_error",
     "set_error_handler",
     "add_listener",
+    "STARTUP_PHASES",
+    "begin_startup",
+    "mark_startup",
+    "startup_summary",
+    "startup_timeline",
 ]
 
 
@@ -127,6 +138,102 @@ def log(message: str) -> None:
         print(f"[PN] {message}", flush=True)
     except Exception:
         pass
+
+
+# ======================================================================
+# Startup timeline
+# ======================================================================
+
+STARTUP_PHASES = ("framework", "contracts", "bridge", "app", "render", "commit")
+"""The startup phases, in launch order (see [`startup_timeline`][pythonnative.diagnostics.startup_timeline])."""
+
+_startup_origin: Optional[float] = None
+_startup_last: Optional[float] = None
+_startup: Dict[str, float] = {}
+
+
+def begin_startup(origin: float) -> None:
+    """Set the ``time.perf_counter()`` value the ``framework`` phase starts from.
+
+    ``pythonnative/__init__.py`` calls this with the time it started
+    executing, before it records the ``framework`` mark.
+    """
+    global _startup_origin, _startup_last
+    if _startup_origin is None:
+        _startup_origin = _startup_last = origin
+
+
+def mark_startup(phase: str, since: Optional[float] = None) -> None:
+    """Record that startup ``phase`` finished now; only the first mark of each phase counts.
+
+    Args:
+        phase: One of [`STARTUP_PHASES`][pythonnative.diagnostics.STARTUP_PHASES].
+        since: The ``time.perf_counter()`` value the phase started at.
+            Defaults to the previous mark, so the phases a launch records
+            in order cover it without gaps. ``render`` passes the time the
+            first mount started, so the wait for the native screen isn't
+            counted.
+
+    ``commit`` counts only once ``render`` is recorded. When it is, the
+    timeline is complete: it's reported through the profiling gauges
+    (``startup.<phase>_ms``) and, after a launch through
+    ``pythonnative.bootstrap``, logged as one ``[PN] startup:`` line, in
+    release builds too.
+    """
+    global _startup_last
+    if phase in _startup or (phase == "commit" and "render" not in _startup):
+        return
+    now = time.perf_counter()
+    start = since if since is not None else _startup_last if _startup_last is not None else now
+    _startup[phase] = (now - start) * 1000.0
+    _startup_last = now
+    # No profiler can be running before the profiling module is imported.
+    profiling = sys.modules.get(f"{__package__}.profiling")
+    if profiling is not None:
+        profiling.gauge(f"startup.{phase}_ms", round(_startup[phase]))
+    if phase == "commit":
+        if _startup_origin is not None:
+            _startup["total"] = (now - _startup_origin) * 1000.0
+        if "app" in _startup:
+            try:
+                print(f"[PN] {startup_summary()}", flush=True)
+            except Exception:
+                pass
+
+
+def startup_timeline() -> Dict[str, float]:
+    """Return how long each startup phase of this process took, in milliseconds.
+
+    Keys appear in launch order, and only for the phases recorded so far:
+
+    - ``framework``: ``import pythonnative``, from the first line of the
+      package's ``__init__`` to its last. Interpreter startup before it
+      isn't included.
+    - ``contracts``: starting the runtime and loading the native contracts
+      compiled into the app (``bootstrap.start``).
+    - ``bridge``: the protocol handshake and the view backend.
+    - ``app``: the dev client (debug builds) and importing the app's
+      entry module.
+    - ``render``: the first screen's first render, from the start of its
+      mount.
+    - ``commit``: from the end of that render until the native side
+      acknowledged the first commit.
+    - ``total``: from the start of ``import pythonnative`` until that
+      acknowledgment, including time between the phases (the native
+      screen being created, for example). Present once ``commit`` is.
+
+    A process that didn't launch through ``pythonnative.bootstrap`` (a
+    test, the browser preview) records only the phases it ran.
+
+    Returns:
+        A new ``{phase: milliseconds}`` dict.
+    """
+    return dict(_startup)
+
+
+def startup_summary() -> str:
+    """The timeline as the one-line form logged at launch (``startup: framework 182 ms, ...``)."""
+    return "startup: " + ", ".join(f"{phase} {ms:.0f} ms" for phase, ms in _startup.items())
 
 
 # ======================================================================

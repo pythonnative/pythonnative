@@ -15,6 +15,7 @@ import json
 import threading
 import time
 import types
+from types import SimpleNamespace
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import pytest
@@ -331,7 +332,7 @@ def test_events_from_the_page_core_reach_handlers_on_the_main_thread(web: Any) -
 
     seen: List[Any] = []
     _mount(web, (42, "Button", {"title": "Press", "_pn_events": ["on_press"]}))
-    get_event_registry().set_events(42, {"on_press": lambda *args: seen.append(args)})
+    get_event_registry().register(42, SimpleNamespace(events={"on_press": lambda *args: seen.append(args)}))
     web.page.core.fire(42, "on_press")
     assert seen == []  # delivered on the main loop, not on the socket thread
     web.transport.drain_main()
@@ -348,7 +349,7 @@ def test_page_callbacks_are_never_answered(web: Any) -> None:
         seen.append(payload)
         return {"root": 77}
 
-    get_event_registry().set_events(5, {"on_bind_row": bind_row})
+    get_event_registry().register(5, SimpleNamespace(events={"on_bind_row": bind_row}))
     before = len(web.page.sent)
     web.page.core.fire(
         5, "on_bind_row", {"index": 0, "key": "a", "revision": 1, "extent": 44.0, "width": 390.0, "sticky": -1}
@@ -378,7 +379,7 @@ def test_gestures_are_recognized_by_the_page_core(web: Any) -> None:
 
     taps: List[Any] = []
     _mount(web, (9, "View", {"gestures": [{"kind": "tap", "n_taps": 1, "max_distance": 20.0}]}))
-    get_event_registry().set_events(9, {"gesture:0": lambda payload: taps.append(payload)})
+    get_event_registry().register(9, SimpleNamespace(events={"gesture:0": lambda payload: taps.append(payload)}))
     # The page forwards view-local and window coordinates to pn_core_pointer.
     web.page.core.pointer(9, [(POINTER_DOWN, 1, 10.0, 10.0, 110.0, 210.0, 1.0)])
     web.page.core.pointer(9, [(POINTER_UP, 1, 11.0, 10.0, 111.0, 210.0, 1.05)])

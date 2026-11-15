@@ -49,8 +49,13 @@ tag indexes, dirty component work, and pending effects. Updating a child preserv
 its ancestors and siblings unless their own inputs or context change. A child
 element that's the identical object from the previous render is skipped with
 its subtree, and a changed context value marks only the consumers recorded in
-its provider's registry (see [Reconciliation](reconciliation.md#skipping-unchanged-subtrees)). Native
-child relationships are rebuilt when a component's native roots change.
+its provider's registry (see [Reconciliation](reconciliation.md#skipping-unchanged-subtrees)). Child
+lists follow React's identity rule: `None` and `False` keep their slot and a
+list is a group, so a conditional child never remounts its siblings (see
+[Child identity](reconciliation.md#child-identity)). The committed tree is
+updated in place and each changed node is recorded in an undo journal, so a
+failed or preempted render rolls back. Native child order is recomputed only
+for containers whose children were created, destroyed, moved, or replaced.
 Effects run after the renderer core accepts and lays out a commit, with child
 effects preceding parents.
 Renders are batched automatically: setter calls made in one callback, effect,
@@ -185,9 +190,12 @@ minute shows a fallback screen, so a broken tree can't loop forever.
 [`pn.set_error_handler`][pythonnative.set_error_handler] receives every uncaught
 error with its phase, in development and release builds alike.
 Reconciliation reduces work at dirty component roots but doesn't time-slice
-arbitrary Python render functions. Long computations delay Python callbacks
-and commits even while native scrolling and the core's worklets and animation
-drivers continue.
+arbitrary Python render functions. A transition render yields to discrete
+input before each component body (see
+[Transitions and preemption](reconciliation.md#transitions-and-preemption)),
+but a single long component body, and any urgent render, runs to completion.
+Long computations delay Python callbacks and commits even while native
+scrolling and the core's worklets and animation drivers continue.
 Use cooperative async work, move blocking I/O off the application thread,
 and keep expensive computation out of render functions.
 

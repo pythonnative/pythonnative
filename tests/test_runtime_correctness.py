@@ -17,6 +17,7 @@ from pythonnative.element import Element
 from pythonnative.hooks import Ref, use_effect, use_layout_effect, use_memo, use_ref, use_state
 from pythonnative.mutations import CreateOp
 from pythonnative.reconciler import MAX_RENDER_PASSES, Reconciler, VNode
+from pythonnative.reconciler.vnode import touch
 from pythonnative.suspense import start_resource
 from pythonnative.testing import FakeBackend, render, render_hook
 
@@ -488,17 +489,19 @@ def test_vnode_writes_skip_the_journal_when_no_pass_is_recording(monkeypatch: py
 
 def test_journal_captures_each_existing_node_once_per_pass() -> None:
     existing = VNode(Element("Text", {"text": "x"}, []))
-    layout_only = VNode(Element("Text", {"text": "x"}, []))
+    untouched = VNode(Element("Text", {"text": "x"}, []))
     recording = journal.Journal()
     token = journal.install(recording)
     try:
         assert journal.journal_active is True
         fresh = VNode(Element("Text", {"text": "fresh"}, []))
         for _ in range(100):
+            touch(existing)
             existing.children = []
             existing.element = Element("Text", {"text": "y"}, [])
+            touch(fresh)
             fresh.children = []
-            layout_only.last_frame = (0.0, 0.0, 1.0, 1.0)
+            untouched.last_frame = (0.0, 0.0, 1.0, 1.0)
     finally:
         journal.uninstall(token)
     assert len(recording.undo) == 1
@@ -513,14 +516,18 @@ def test_journal_rollback_restores_a_node_snapshot() -> None:
     recording = journal.Journal()
     token = journal.install(recording)
     try:
+        touch(node)
         node.element = Element("Text", {"text": "y"}, [])
-        node.children.append(VNode(Element("Text", {"text": "new"}, [])))
-        node.children = []
+        node.children = [child, VNode(Element("Text", {"text": "new"}, []))]
+        node.mounted = False
+        node.events = {"on_press": print}
     finally:
         journal.uninstall(token)
     recording.rollback()
     assert node.element is original
     assert node.children == [child]
+    assert node.mounted is True
+    assert node.events is None
 
 
 def test_accepting_a_journal_makes_stamped_nodes_capturable_again() -> None:
@@ -528,8 +535,10 @@ def test_accepting_a_journal_makes_stamped_nodes_capturable_again() -> None:
     recording = journal.Journal()
     token = journal.install(recording)
     try:
+        touch(node)
         node.tag = 1
         recording.accept()
+        touch(node)
         node.tag = 2
     finally:
         journal.uninstall(token)

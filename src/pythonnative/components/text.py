@@ -101,7 +101,7 @@ def Text(
     Returns:
         An [`Element`][pythonnative.Element] of type ``"Text"``.
     """
-    rich = any(isinstance(p, Element) for p in parts) or len(parts) > 1
+    rich = len(parts) > 1 or (len(parts) == 1 and isinstance(parts[0], Element))
     on_span_press: Optional[_SpanPressDispatcher] = None
     if rich:
         # The label's own ``on_press`` is the whole-label event; spans

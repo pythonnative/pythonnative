@@ -5,6 +5,8 @@ appId: ${APP_ID}
 - runFlow: ../flows/alerts/confirm_alert.yaml
 - runFlow: ../flows/storage/async_storage.yaml
 - runFlow: ../flows/runtime/run_async.yaml
+- runFlow: ../flows/runtime/child_identity.yaml
+- runFlow: ../flows/runtime/preemption.yaml
 - runFlow: ../flows/platform/platform_info.yaml
 - runFlow: ../flows/device/keyboard.yaml
 - runFlow: ../flows/device/dimensions.yaml

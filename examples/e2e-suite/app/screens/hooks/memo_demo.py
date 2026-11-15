@@ -17,14 +17,14 @@ _render_counts = {"a": 0, "b": 0}
 @pn.memo
 @pn.component
 def _MemoA() -> pn.Node:
-    _render_counts["a"] += 1
+    _render_counts["a"] += 1  # pn: ignore[PN105] (counting renders is the point of this demo)
     return pn.Text(f"MemoA render count: {_render_counts['a']}", style=pn.style(font_weight="600"))
 
 
 @pn.memo
 @pn.component
 def _MemoB(label: str = "x") -> pn.Node:
-    _render_counts["b"] += 1
+    _render_counts["b"] += 1  # pn: ignore[PN105]
     return pn.Text(
         f"MemoB label={label} render count: {_render_counts['b']}",
         style=pn.style(font_weight="600"),
@@ -44,8 +44,8 @@ def MemoDemo() -> pn.Node:
     mounted = pn.use_ref(False)
     if not mounted.current:
         mounted.current = True
-        _render_counts["a"] = 0
-        _render_counts["b"] = 0
+        _render_counts["a"] = 0  # pn: ignore[PN105]
+        _render_counts["b"] = 0  # pn: ignore[PN105]
 
     return DemoScreen(
         "memo",

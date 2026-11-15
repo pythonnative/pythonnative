@@ -13,7 +13,7 @@ from ..journal import journal
 from ..models import Entry, format_day
 from .entry_screen import EntryScreen
 from .theme import Styles
-from .widgets import ActionButton, Banner, EmptyState, ScreenHeader, slots
+from .widgets import ActionButton, Banner, EmptyState, ScreenHeader
 
 
 def markers_for(entries: tuple[Entry, ...], color: str) -> list[Marker]:
@@ -94,42 +94,38 @@ def MapScreen(focus: Optional[str] = None) -> pn.Node:
     count = len(entries)
     summary = f"{len(located)} of {count} entries have a location." if count else "Entries you write will appear here."
     return pn.SafeAreaView(
-        *slots(
-            header=ScreenHeader("Map", ActionButton("Fit all", "locate", fit_all, disabled=not located)),
-            summary=pn.Column(
-                pn.Text(summary, style=styles.caption), style=pn.style(padding_horizontal=16, padding_bottom=8)
-            ),
-            problem=(
-                pn.View(Banner(problem, "warning"), style=pn.style(padding_horizontal=16, padding_bottom=8))
-                if problem
-                else None
-            ),
-            # With no map to show, the same places are still worth listing.
-            places=(
-                pn.ScrollView(
-                    (
-                        PlaceList(entries=located)
-                        if located
-                        else EmptyState("map-pin", "No places yet", "Entries record where they were written.")
-                    ),
-                    style=styles.grow,
-                )
-                if problem
-                else None
-            ),
-            map=(
-                MapView(
-                    ref=map_ref,
-                    initial_region=start,
-                    markers=markers_for(located, styles.accent),
-                    on_marker_press=lambda entry_id: navigation.push(EntryScreen(id=entry_id)),
-                    on_error=set_problem,
-                    accessibility_label="Map of your journal entries",
-                    style=styles.grow,
-                )
-                if not problem
-                else None
-            ),
+        ScreenHeader("Map", ActionButton("Fit all", "locate", fit_all, disabled=not located)),
+        pn.Column(pn.Text(summary, style=styles.caption), style=pn.style(padding_horizontal=16, padding_bottom=8)),
+        (
+            pn.View(Banner(problem, "warning"), style=pn.style(padding_horizontal=16, padding_bottom=8))
+            if problem
+            else None
+        ),
+        # With no map to show, the same places are still worth listing.
+        (
+            pn.ScrollView(
+                (
+                    PlaceList(entries=located)
+                    if located
+                    else EmptyState("map-pin", "No places yet", "Entries record where they were written.")
+                ),
+                style=styles.grow,
+            )
+            if problem
+            else None
+        ),
+        (
+            MapView(
+                ref=map_ref,
+                initial_region=start,
+                markers=markers_for(located, styles.accent),
+                on_marker_press=lambda entry_id: navigation.push(EntryScreen(id=entry_id)),
+                on_error=set_problem,
+                accessibility_label="Map of your journal entries",
+                style=styles.grow,
+            )
+            if not problem
+            else None
         ),
         edges=("top",),
         style=styles.screen,
